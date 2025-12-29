@@ -3,6 +3,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Code editor scrollbar styling */
+.code-editor-textarea {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 transparent;
+}
+
+.code-editor-textarea::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.code-editor-textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.code-editor-textarea::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.code-editor-textarea::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+.code-editor-textarea::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Custom slow pulse animation for decorative elements */
 @keyframes pulse-slow {
   0%, 100% {

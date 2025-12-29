@@ -426,7 +426,7 @@ function CodeVisualizerPage() {
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
                         <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-300 rounded-full blur-2xl transform -translate-x-1/2 translate-y-1/2" />
                     </div>
-                    
+
                     {/* Top Nav Bar */}
                     <div className="relative flex items-center justify-between px-4 py-4 pt-4">
                         <Link to="/" className="text-white font-bold text-xl tracking-tight">
@@ -447,14 +447,14 @@ function CodeVisualizerPage() {
                             </Link>
                         )}
                     </div>
-                    
+
                     {/* Hero Section */}
-                    <div className="relative text-center px-6 pb-8 pt-2">
+                    <div className="relative text-center px-6 pb-12 pt-2">
                         <p className="text-white/90 text-base font-medium">See your Python code come alive</p>
                         <p className="text-white/60 text-sm mt-1">Step-by-step execution visualization</p>
                     </div>
                 </div>
-                
+
                 {/* Mobile Editor - Clean, no card look */}
                 <div className="flex-1 flex flex-col bg-white -mt-3 rounded-t-2xl relative z-10">
                     {/* Simple Editor Header */}
@@ -462,8 +462,8 @@ function CodeVisualizerPage() {
                         <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
                                 <svg className="w-4 h-4 text-white" viewBox="0 0 256 255" fill="currentColor">
-                                    <path d="M126.916.072c-64.832 0-60.784 28.115-60.784 28.115l.072 29.128h61.868v8.745H41.631S.145 61.355.145 126.77c0 65.417 36.21 63.097 36.21 63.097h21.61v-30.356s-1.165-36.21 35.632-36.21h61.362s34.475.557 34.475-33.319V33.97S194.67.072 126.916.072zM92.802 19.66a11.12 11.12 0 0 1 11.13 11.13 11.12 11.12 0 0 1-11.13 11.13 11.12 11.12 0 0 1-11.13-11.13 11.12 11.12 0 0 1 11.13-11.13z"/>
-                                    <path d="M128.757 254.126c64.832 0 60.784-28.115 60.784-28.115l-.072-29.127H127.6v-8.745h86.441s41.486 4.705 41.486-60.712c0-65.416-36.21-63.096-36.21-63.096h-21.61v30.355s1.165 36.21-35.632 36.21h-61.362s-34.475-.557-34.475 33.32v56.013s-5.235 33.897 62.518 33.897zm34.114-19.586a11.12 11.12 0 0 1-11.13-11.13 11.12 11.12 0 0 1 11.13-11.131 11.12 11.12 0 0 1 11.13 11.13 11.12 11.12 0 0 1-11.13 11.13z"/>
+                                    <path d="M126.916.072c-64.832 0-60.784 28.115-60.784 28.115l.072 29.128h61.868v8.745H41.631S.145 61.355.145 126.77c0 65.417 36.21 63.097 36.21 63.097h21.61v-30.356s-1.165-36.21 35.632-36.21h61.362s34.475.557 34.475-33.319V33.97S194.67.072 126.916.072zM92.802 19.66a11.12 11.12 0 0 1 11.13 11.13 11.12 11.12 0 0 1-11.13 11.13 11.12 11.12 0 0 1-11.13-11.13 11.12 11.12 0 0 1 11.13-11.13z" />
+                                    <path d="M128.757 254.126c64.832 0 60.784-28.115 60.784-28.115l-.072-29.127H127.6v-8.745h86.441s41.486 4.705 41.486-60.712c0-65.416-36.21-63.096-36.21-63.096h-21.61v30.355s1.165 36.21-35.632 36.21h-61.362s-34.475-.557-34.475 33.32v56.013s-5.235 33.897 62.518 33.897zm34.114-19.586a11.12 11.12 0 0 1-11.13-11.13 11.12 11.12 0 0 1 11.13-11.131 11.12 11.12 0 0 1 11.13 11.13 11.12 11.12 0 0 1-11.13 11.13z" />
                                 </svg>
                             </div>
                             <span className="text-slate-700 font-semibold text-sm">Python Editor</span>
@@ -473,7 +473,7 @@ function CodeVisualizerPage() {
                             <span className="text-xs font-medium text-emerald-600">Ready</span>
                         </div>
                     </div>
-                    
+
                     <CodeEditor
                         code={code}
                         setCode={setCode}
@@ -488,7 +488,7 @@ function CodeVisualizerPage() {
                         isMobile={true}
                     />
                 </div>
-                
+
                 {/* Mobile Footer - Minimal with spacing */}
                 <div className="bg-slate-50 py-5 px-4 mt-auto">
                     <div className="flex items-center justify-center gap-4 text-xs text-slate-500">

@@ -1,4 +1,85 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
+
+// Python syntax highlighter using tokenization
+const highlightPython = (code) => {
+    if (!code) return '';
+    
+    const escapeHtml = (str) => str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    
+    const keywords = new Set(['def', 'class', 'if', 'elif', 'else', 'for', 'while', 'return', 'import', 'from', 'as', 'try', 'except', 'finally', 'with', 'lambda', 'yield', 'raise', 'pass', 'break', 'continue', 'in', 'not', 'and', 'or', 'is', 'None', 'True', 'False', 'global', 'nonlocal', 'assert', 'del']);
+    const builtins = new Set(['print', 'len', 'range', 'int', 'str', 'float', 'list', 'dict', 'set', 'tuple', 'input', 'open', 'type', 'isinstance', 'sorted', 'reversed', 'enumerate', 'zip', 'map', 'filter', 'sum', 'min', 'max', 'abs', 'round', 'pow', 'hex', 'oct', 'bin', 'ord', 'chr', 'format', 'repr', 'hash', 'id', 'dir', 'vars', 'locals', 'globals', 'hasattr', 'getattr', 'setattr', 'delattr', 'callable', 'iter', 'next', 'slice', 'super']);
+    
+    // Token patterns in priority order
+    const tokenPatterns = [
+        { type: 'comment', regex: /#.*$/ },
+        { type: 'string', regex: /"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/ },
+        { type: 'number', regex: /\b\d+\.?\d*\b/ },
+        { type: 'word', regex: /\b[a-zA-Z_]\w*\b/ },
+        { type: 'other', regex: /\S/ },
+        { type: 'space', regex: /\s+/ },
+    ];
+    
+    const combinedRegex = new RegExp(tokenPatterns.map(p => `(${p.regex.source})`).join('|'), 'gm');
+    
+    let result = '';
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = combinedRegex.exec(code)) !== null) {
+        // Add any skipped characters
+        if (match.index > lastIndex) {
+            result += escapeHtml(code.slice(lastIndex, match.index));
+        }
+        
+        const token = match[0];
+        let tokenType = 'other';
+        
+        // Determine token type based on which group matched
+        for (let i = 1; i <= tokenPatterns.length; i++) {
+            if (match[i] !== undefined) {
+                tokenType = tokenPatterns[i - 1].type;
+                break;
+            }
+        }
+        
+        // Apply highlighting based on token type
+        const escaped = escapeHtml(token);
+        switch (tokenType) {
+            case 'comment':
+                result += `<span class="text-slate-400 italic">${escaped}</span>`;
+                break;
+            case 'string':
+                result += `<span class="text-green-600">${escaped}</span>`;
+                break;
+            case 'number':
+                result += `<span class="text-orange-500">${escaped}</span>`;
+                break;
+            case 'word':
+                if (keywords.has(token)) {
+                    result += `<span class="text-purple-600 font-medium">${escaped}</span>`;
+                } else if (builtins.has(token)) {
+                    result += `<span class="text-cyan-600">${escaped}</span>`;
+                } else {
+                    result += escaped;
+                }
+                break;
+            default:
+                result += escaped;
+        }
+        
+        lastIndex = combinedRegex.lastIndex;
+    }
+    
+    // Add remaining text
+    if (lastIndex < code.length) {
+        result += escapeHtml(code.slice(lastIndex));
+    }
+    
+    return result;
+};
 
 const CodeEditor = ({
     code,
@@ -14,20 +95,34 @@ const CodeEditor = ({
     const lines = code.split('\n');
     const textareaRef = useRef(null);
     const lineNumbersRef = useRef(null);
+    const highlightRef = useRef(null);
+    const highlightContentRef = useRef(null);
 
-    // Sync scroll between textarea and line numbers
+    // Memoized highlighted code
+    const highlightedCode = useMemo(() => highlightPython(code), [code]);
+
+    // Sync scroll between textarea, line numbers, and highlight overlay
     useEffect(() => {
         const textarea = textareaRef.current;
         const lineNumbers = lineNumbersRef.current;
+        const highlightContent = highlightContentRef.current;
 
-        if (textarea && lineNumbers) {
-            const handleScroll = () => {
+        if (!textarea) return;
+
+        const handleScroll = () => {
+            if (lineNumbers) {
                 lineNumbers.scrollTop = textarea.scrollTop;
-            };
-            textarea.addEventListener('scroll', handleScroll);
-            return () => textarea.removeEventListener('scroll', handleScroll);
-        }
-    }, []);
+            }
+            if (highlightContent) {
+                highlightContent.style.transform = `translate(${-textarea.scrollLeft}px, ${-textarea.scrollTop}px)`;
+            }
+        };
+
+        textarea.addEventListener('scroll', handleScroll);
+        handleScroll();
+
+        return () => textarea.removeEventListener('scroll', handleScroll);
+    }, [isMobile]);
 
     // Mobile-optimized layout
     if (isMobile) {
@@ -39,6 +134,13 @@ const CodeEditor = ({
                     <div
                         ref={lineNumbersRef}
                         className="w-7 bg-slate-100/80 border-r border-slate-200 py-3 select-none overflow-hidden flex-shrink-0"
+                        onWheel={(e) => {
+                            const textarea = textareaRef.current;
+                            if (!textarea) return;
+                            textarea.scrollTop += e.deltaY;
+                            textarea.scrollLeft += e.deltaX;
+                            e.preventDefault();
+                        }}
                     >
                         {(lines.length > 0 ? lines : ['']).map((_, index) => (
                             <div
@@ -50,25 +152,28 @@ const CodeEditor = ({
                         ))}
                     </div>
 
-                    {/* Code Editor */}
+                    {/* Code Editor with Syntax Highlighting */}
                     <div className="flex-1 relative">
+                        {/* Syntax highlighted overlay */}
+                        <pre
+                            ref={highlightRef}
+                            className="absolute inset-0 w-full h-full font-mono text-sm leading-6 p-3 pointer-events-none overflow-hidden whitespace-pre"
+                            aria-hidden="true"
+                        >
+                            <code
+                                ref={highlightContentRef}
+                                className="block"
+                                style={{ willChange: 'transform' }}
+                                dangerouslySetInnerHTML={{ __html: highlightedCode || '<span class="text-slate-400"># Paste your Python code here...</span>' }}
+                            />
+                        </pre>
                         <textarea
                             ref={textareaRef}
                             value={code}
                             onChange={(e) => setCode(e.target.value)}
-                            placeholder={`# Paste your Python code here...
-
-# Example: Bubble Sort
-arr = [64, 34, 25, 12, 22, 11, 90]
-n = len(arr)
-
-for i in range(n):
-    for j in range(0, n-i-1):
-        if arr[j] > arr[j+1]:
-            arr[j], arr[j+1] = arr[j+1], arr[j]
-
-print(arr)`}
-                            className="w-full h-full bg-transparent text-slate-800 font-mono text-sm leading-6 p-3 resize-none outline-none placeholder:text-slate-400 caret-indigo-500 selection:bg-indigo-100"
+                            placeholder=""
+                            wrap="off"
+                            className="code-editor-textarea absolute inset-0 w-full h-full bg-transparent text-transparent font-mono text-sm leading-6 p-3 resize-none outline-none caret-blue-600 selection:bg-blue-100 z-10 overflow-auto whitespace-pre"
                             spellCheck="false"
                             disabled={isRunning}
                         />
@@ -152,9 +257,10 @@ print(arr)`}
                 <div className="flex items-center gap-4">
                     {/* Title */}
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm flex-shrink-0">
-                            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M14.25.18l.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98l-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95l.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25l-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z" />
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm flex-shrink-0">
+                            <svg className="w-4 h-4 text-white" viewBox="0 0 256 255" fill="currentColor">
+                                <path d="M126.916.072c-64.832 0-60.784 28.115-60.784 28.115l.072 29.128h61.868v8.745H41.631S.145 61.355.145 126.77c0 65.417 36.21 63.097 36.21 63.097h21.61v-30.356s-1.165-36.21 35.632-36.21h61.362s34.475.557 34.475-33.319V33.97S194.67.072 126.916.072zM92.802 19.66a11.12 11.12 0 0 1 11.13 11.13 11.12 11.12 0 0 1-11.13 11.13 11.12 11.12 0 0 1-11.13-11.13 11.12 11.12 0 0 1 11.13-11.13z"/>
+                                <path d="M128.757 254.126c64.832 0 60.784-28.115 60.784-28.115l-.072-29.127H127.6v-8.745h86.441s41.486 4.705 41.486-60.712c0-65.416-36.21-63.096-36.21-63.096h-21.61v30.355s1.165 36.21-35.632 36.21h-61.362s-34.475-.557-34.475 33.32v56.013s-5.235 33.897 62.518 33.897zm34.114-19.586a11.12 11.12 0 0 1-11.13-11.13 11.12 11.12 0 0 1 11.13-11.131 11.12 11.12 0 0 1 11.13 11.13 11.12 11.12 0 0 1-11.13 11.13z"/>
                             </svg>
                         </div>
                         <div>
@@ -179,6 +285,13 @@ print(arr)`}
                 <div
                     ref={lineNumbersRef}
                     className="w-12 md:w-14 bg-slate-100 border-r border-slate-200 py-4 select-none overflow-hidden flex-shrink-0"
+                    onWheel={(e) => {
+                        const textarea = textareaRef.current;
+                        if (!textarea) return;
+                        textarea.scrollTop += e.deltaY;
+                        textarea.scrollLeft += e.deltaX;
+                        e.preventDefault();
+                    }}
                 >
                     {(lines.length > 0 ? lines : ['']).map((_, index) => (
                         <div
@@ -190,25 +303,28 @@ print(arr)`}
                     ))}
                 </div>
 
-                {/* Code Editor */}
+                {/* Code Editor with Syntax Highlighting */}
                 <div className="flex-1 relative">
+                    {/* Syntax highlighted overlay */}
+                    <pre
+                        ref={highlightRef}
+                        className="absolute inset-0 w-full h-full font-mono text-sm leading-6 p-4 pointer-events-none overflow-hidden whitespace-pre"
+                        aria-hidden="true"
+                    >
+                        <code
+                            ref={highlightContentRef}
+                            className="block"
+                            style={{ willChange: 'transform' }}
+                            dangerouslySetInnerHTML={{ __html: highlightedCode || '<span class="text-slate-400"># Paste your Python code here...</span>' }}
+                        />
+                    </pre>
                     <textarea
                         ref={textareaRef}
                         value={code}
                         onChange={(e) => setCode(e.target.value)}
-                        placeholder={`# Paste your Python code here...
-
-# Example: Bubble Sort
-arr = [64, 34, 25, 12, 22, 11, 90]
-n = len(arr)
-
-for i in range(n):
-    for j in range(0, n-i-1):
-        if arr[j] > arr[j+1]:
-            arr[j], arr[j+1] = arr[j+1], arr[j]
-
-print(arr)`}
-                        className="w-full h-full bg-transparent text-slate-800 font-mono text-sm leading-6 p-4 resize-none outline-none placeholder:text-slate-400 caret-indigo-500 selection:bg-indigo-100"
+                        placeholder=""
+                        wrap="off"
+                        className="code-editor-textarea absolute inset-0 w-full h-full bg-transparent text-transparent font-mono text-sm leading-6 p-4 resize-none outline-none caret-blue-600 selection:bg-blue-100 z-10 overflow-auto whitespace-pre"
                         spellCheck="false"
                         disabled={isRunning}
                     />
