@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Sparkles, ChevronLeft, Play } from 'lucide-react';
+import { Sparkles, ChevronLeft, Play, Code2, List } from 'lucide-react';
+import EnterpriseVisualizer from './EnterpriseVisualizer';
 
 // CSS animation for smooth card appearance
 const cardAnimationStyles = `
@@ -36,7 +37,8 @@ const MobileImmersiveVisualizer = ({
     const contentRef = useRef(null);
     const cardRefs = useRef([]);
     const [focusedIndex, setFocusedIndex] = useState(0);
-    const [focusModeEnabled, setFocusModeEnabled] = useState(false); // Default: normal scroll
+    const [focusModeEnabled, setFocusModeEnabled] = useState(false);
+    const [viewMode, setViewMode] = useState('list'); // 'list' | 'visualize' // Default: normal scroll
     const hasMoreSteps = visibleSteps.length < totalSteps;
 
     // Calculate which card is most centered in the viewport
@@ -181,24 +183,38 @@ const MobileImmersiveVisualizer = ({
             {/* Mobile Header */}
             <header className="flex-shrink-0 bg-white border-b border-slate-200 px-4 py-3 safe-area-top">
                 <div className="flex items-center justify-between">
-                    {/* Back Button */}
-                    <button
-                        onClick={onClose}
-                        className="flex items-center gap-1 text-slate-600 hover:text-slate-900 font-medium text-sm -ml-1 p-1"
-                    >
-                        <ChevronLeft className="w-5 h-5" />
-                        <span>Back</span>
-                    </button>
-
-                    {/* Step Counter */}
-                    <div className="flex items-center gap-2">
+                    {/* Left: Back & Steps */}
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={onClose}
+                            className="p-2 -ml-2 text-slate-600 hover:text-slate-900 rounded-full hover:bg-slate-100 transition-colors"
+                        >
+                            <ChevronLeft className="w-5 h-5" />
+                        </button>
                         <span className="text-sm font-semibold text-slate-800">
                             {visibleSteps.length} of {totalSteps} Steps
                         </span>
                     </div>
 
-                    {/* Placeholder for balance */}
-                    <div className="w-16" />
+                    {/* Right: Mode Toggles */}
+                    <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-lg border border-slate-200/50">
+                        {/* Current Mode: Steps */}
+                        <button
+                            className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600 border border-slate-200/50' : 'text-slate-400 hover:text-slate-600 border border-transparent'}`}
+                            title="Steps View"
+                            onClick={() => setViewMode('list')}
+                        >
+                            <List className="w-4 h-4" />
+                        </button>
+                        {/* Visualization Mode */}
+                        <button
+                            className={`p-1.5 rounded-md transition-all ${viewMode === 'visualize' ? 'bg-white shadow-sm text-indigo-600 border border-slate-200/50' : 'text-slate-400 hover:text-slate-600 border border-transparent'}`}
+                            title="Code View"
+                            onClick={() => setViewMode('visualize')}
+                        >
+                            <Code2 className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -238,231 +254,244 @@ const MobileImmersiveVisualizer = ({
 
             {/* Main Content - Scroll Container */}
             {!isLoading && visibleSteps.length > 0 && (
-                <main
-                    ref={contentRef}
-                    className={`flex-1 overflow-y-auto px-4 ${focusModeEnabled ? 'scroll-smooth' : 'py-0'} ${hasMoreSteps ? 'pb-24' : ''}`}
-                    style={{
-                        ...(focusModeEnabled ? { scrollSnapType: 'y proximity' } : {}),
-                        overflowAnchor: 'none'
-                    }}
-                >
-                    {/* Controls & Spacing */}
-                    {/* Controls & Spacing */}
-                    {/* Inline Focus Button (Only when OFF) */}
-                    {!focusModeEnabled && (
-                        <div className="py-4 animate-[fadeSlideIn_0.3s_ease-out]">
-                            <button
-                                onClick={() => {
-                                    setFocusModeEnabled(true);
-                                    if (contentRef.current) {
-                                        contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-                                    }
-                                    setFocusedIndex(0);
-                                }}
-                                className="w-full bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 px-4 py-3 rounded-xl text-sm flex items-center justify-center gap-2 font-semibold shadow-sm transition-all active:scale-[0.98]"
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <circle cx="12" cy="12" r="3" />
-                                </svg>
-                                Enable Focus Mode
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Top padding to allow first card to be centered (Focus Mode only) */}
-                    <div
-                        className={`transition-all ease-in-out ${focusModeEnabled ? 'duration-500' : 'duration-[1500ms]'}`}
-                        style={{ height: focusModeEnabled ? '30vh' : '0px' }}
-                    />
-
-                    {/* Step Cards Container */}
-                    <div className={focusModeEnabled ? 'space-y-2' : 'space-y-3'}>
-                        {/* Step Cards */}
-                        {visibleSteps.map((step, idx) => {
-                            const isLatest = idx === visibleSteps.length - 1;
-
-                            // Extract explanation text and dry run
-                            let explanationText = step.explanation || '';
-                            let dryRunLines = [];
-
-                            if (explanationText.includes('DRY-RUN:')) {
-                                const dryRunMatch = explanationText.match(/DRY-RUN:\s*([\s\S]*?)(?:$)/i);
-                                if (dryRunMatch) {
-                                    dryRunLines = dryRunMatch[1].trim().split('\n').filter(line => line.trim());
-                                }
-                                explanationText = explanationText.substring(0, explanationText.indexOf('DRY-RUN:')).replace(/🔍/g, '').trim();
-                            }
-
-                            if (step.dry_run && Array.isArray(step.dry_run) && step.dry_run.length > 0) {
-                                dryRunLines = step.dry_run;
-                            }
-
-                            // Calculate focus level for Focus Mode (0 = focused, 1+ = distance from focused)
-                            const distanceFromFocus = Math.abs(idx - focusedIndex);
-                            const isFocused = distanceFromFocus === 0;
-                            const isNearFocus = distanceFromFocus === 1;
-
-                            // Style based on Focus Mode
-                            const cardWrapperStyle = focusModeEnabled ? {
-                                transform: isFocused ? 'scale(1)' : isNearFocus ? 'scale(0.97)' : 'scale(0.94)',
-                                opacity: isFocused ? 1 : isNearFocus ? 0.7 : 0.4,
-                                filter: isFocused ? 'blur(0px)' : isNearFocus ? 'blur(1px)' : 'blur(2px)',
-                            } : {};
-
-                            return (
-                                <div
-                                    key={idx}
-                                    ref={el => cardRefs.current[idx] = el}
-                                    className={`transition-all ease-in-out ${focusModeEnabled ? 'duration-500' : 'duration-[1500ms]'}`}
-                                    style={cardWrapperStyle}
+                viewMode === 'list' ? (
+                    <main
+                        ref={contentRef}
+                        className={`flex-1 overflow-y-auto px-4 ${focusModeEnabled ? 'scroll-smooth' : 'py-0'} ${hasMoreSteps ? 'pb-24' : ''}`}
+                        style={{
+                            ...(focusModeEnabled ? { scrollSnapType: 'y proximity' } : {}),
+                            overflowAnchor: 'none'
+                        }}
+                    >
+                        {/* Controls & Spacing */}
+                        {/* Controls & Spacing */}
+                        {/* Inline Focus Button (Only when OFF) */}
+                        {!focusModeEnabled && (
+                            <div className="py-4 animate-[fadeSlideIn_0.3s_ease-out]">
+                                <button
+                                    onClick={() => {
+                                        setFocusModeEnabled(true);
+                                        if (contentRef.current) {
+                                            contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+                                        }
+                                        setFocusedIndex(0);
+                                    }}
+                                    className="w-full bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 px-4 py-3 rounded-xl text-sm flex items-center justify-center gap-2 font-semibold shadow-sm transition-all active:scale-[0.98]"
                                 >
-                                    {/* Horizontal line separator between cards */}
-                                    {idx > 0 && (
-                                        <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent my-3" />
-                                    )}
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <circle cx="12" cy="12" r="3" />
+                                    </svg>
+                                    Enable Focus Mode
+                                </button>
+                            </div>
+                        )}
 
-                                    {/* Step Card */}
+                        {/* Top padding to allow first card to be centered (Focus Mode only) */}
+                        <div
+                            className={`transition-all ease-in-out ${focusModeEnabled ? 'duration-500' : 'duration-[1500ms]'}`}
+                            style={{ height: focusModeEnabled ? '30vh' : '0px' }}
+                        />
+
+                        {/* Step Cards Container */}
+                        <div className={focusModeEnabled ? 'space-y-2' : 'space-y-3'}>
+                            {/* Step Cards */}
+                            {visibleSteps.map((step, idx) => {
+                                const isLatest = idx === visibleSteps.length - 1;
+
+                                // Extract explanation text and dry run
+                                let explanationText = step.explanation || '';
+                                let dryRunLines = [];
+
+                                if (explanationText.includes('DRY-RUN:')) {
+                                    const dryRunMatch = explanationText.match(/DRY-RUN:\s*([\s\S]*?)(?:$)/i);
+                                    if (dryRunMatch) {
+                                        dryRunLines = dryRunMatch[1].trim().split('\n').filter(line => line.trim());
+                                    }
+                                    explanationText = explanationText.substring(0, explanationText.indexOf('DRY-RUN:')).replace(/🔍/g, '').trim();
+                                }
+
+                                if (step.dry_run && Array.isArray(step.dry_run) && step.dry_run.length > 0) {
+                                    dryRunLines = step.dry_run;
+                                }
+
+                                // Calculate focus level for Focus Mode (0 = focused, 1+ = distance from focused)
+                                const distanceFromFocus = Math.abs(idx - focusedIndex);
+                                const isFocused = distanceFromFocus === 0;
+                                const isNearFocus = distanceFromFocus === 1;
+
+                                // Style based on Focus Mode
+                                const cardWrapperStyle = focusModeEnabled ? {
+                                    transform: isFocused ? 'scale(1)' : isNearFocus ? 'scale(0.97)' : 'scale(0.94)',
+                                    opacity: isFocused ? 1 : isNearFocus ? 0.7 : 0.4,
+                                    filter: isFocused ? 'blur(0px)' : isNearFocus ? 'blur(1px)' : 'blur(2px)',
+                                } : {};
+
+                                return (
                                     <div
-                                        className={`bg-white rounded-xl shadow-sm border overflow-hidden animate-[fadeSlideIn_0.3s_ease-out] ${focusModeEnabled && isFocused ? 'border-indigo-200 shadow-md ring-2 ring-indigo-100' : 'border-slate-100'}`}
-                                        style={{ animationFillMode: 'both', animationDelay: `${(idx % 6) * 50}ms` }}
+                                        key={idx}
+                                        ref={el => cardRefs.current[idx] = el}
+                                        className={`transition-all ease-in-out ${focusModeEnabled ? 'duration-500' : 'duration-[1500ms]'}`}
+                                        style={cardWrapperStyle}
                                     >
-                                        {/* Header */}
-                                        <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-                                            <div className="flex items-center gap-2">
-                                                <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
-                                                    Line {step.lineNumber || step.line_no || step.line}
-                                                </span>
-                                                <span className="text-xs text-slate-400">
-                                                    Step {idx + 1}
-                                                </span>
-                                            </div>
-                                        </div>
+                                        {/* Horizontal line separator between cards */}
+                                        {idx > 0 && (
+                                            <div className="h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent my-3" />
+                                        )}
 
-                                        {/* Code */}
-                                        <div className="px-3 py-2 bg-white border-b border-slate-100">
-                                            <div className="font-mono text-sm text-slate-800 whitespace-pre overflow-x-auto">
-                                                {highlightSyntax(step.code)}
+                                        {/* Step Card */}
+                                        <div
+                                            className={`bg-white rounded-xl shadow-sm border overflow-hidden animate-[fadeSlideIn_0.3s_ease-out] ${focusModeEnabled && isFocused ? 'border-indigo-200 shadow-md ring-2 ring-indigo-100' : 'border-slate-100'}`}
+                                            style={{ animationFillMode: 'both', animationDelay: `${(idx % 6) * 50}ms` }}
+                                        >
+                                            {/* Header */}
+                                            <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
+                                                        Line {step.lineNumber || step.line_no || step.line}
+                                                    </span>
+                                                    <span className="text-xs text-slate-400">
+                                                        Step {idx + 1}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        {/* Explanation */}
-                                        {step.explanation && (
-                                            <div className="p-3 bg-gradient-to-br from-indigo-50/50 to-purple-50/30">
-                                                <div className="flex items-start gap-2">
-                                                    <Sparkles className="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" />
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm text-slate-700 leading-relaxed">
-                                                            {explanationText}
-                                                        </p>
-                                                        {dryRunLines.length > 0 && renderDryRun(dryRunLines)}
+                                            {/* Code */}
+                                            <div className="px-3 py-2 bg-white border-b border-slate-100">
+                                                <div className="font-mono text-sm text-slate-800 whitespace-pre overflow-x-auto">
+                                                    {highlightSyntax(step.code)}
+                                                </div>
+                                            </div>
+
+                                            {/* Explanation */}
+                                            {step.explanation && (
+                                                <div className="p-3 bg-gradient-to-br from-indigo-50/50 to-purple-50/30">
+                                                    <div className="flex items-start gap-2">
+                                                        <Sparkles className="w-4 h-4 text-indigo-500 flex-shrink-0 mt-0.5" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm text-slate-700 leading-relaxed">
+                                                                {explanationText}
+                                                            </p>
+                                                            {dryRunLines.length > 0 && renderDryRun(dryRunLines)}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
 
-                                        {/* Generating Placeholder */}
-                                        {!step.explanation && (
-                                            <div className="p-3 bg-slate-50">
-                                                <div className="flex items-center gap-2 text-slate-500">
-                                                    <div className="w-4 h-4 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin" />
-                                                    <span className="text-xs">Generating...</span>
+                                            {/* Generating Placeholder */}
+                                            {!step.explanation && (
+                                                <div className="p-3 bg-slate-50">
+                                                    <div className="flex items-center gap-2 text-slate-500">
+                                                        <div className="w-4 h-4 border-2 border-slate-300 border-t-indigo-500 rounded-full animate-spin" />
+                                                        <span className="text-xs">Generating...</span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
 
-                                        {/* Variables */}
-                                        {step.variables && Object.keys(step.variables).length > 0 && (
-                                            <div className="px-3 py-2 border-t border-slate-100">
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {Object.entries(step.variables).map(([name, data]) => {
-                                                        const value = data.value !== undefined
-                                                            ? (typeof data.value === 'object' ? JSON.stringify(data.value) : String(data.value))
-                                                            : 'undefined';
-                                                        const isChanged = step.changedVars?.includes(name);
+                                            {/* Variables */}
+                                            {step.variables && Object.keys(step.variables).length > 0 && (
+                                                <div className="px-3 py-2 border-t border-slate-100">
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {Object.entries(step.variables).map(([name, data]) => {
+                                                            const value = data.value !== undefined
+                                                                ? (typeof data.value === 'object' ? JSON.stringify(data.value) : String(data.value))
+                                                                : 'undefined';
+                                                            const isChanged = step.changedVars?.includes(name);
 
-                                                        return (
-                                                            <span
-                                                                key={name}
-                                                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono ${isChanged
-                                                                    ? 'bg-indigo-100 text-indigo-700'
-                                                                    : 'bg-slate-100 text-slate-600'
-                                                                    }`}
-                                                            >
-                                                                <span className="font-semibold">{name}</span>
-                                                                <span className="text-slate-400">=</span>
-                                                                <span>{value.length > 15 ? value.slice(0, 15) + '...' : value}</span>
-                                                            </span>
-                                                        );
-                                                    })}
+                                                            return (
+                                                                <span
+                                                                    key={name}
+                                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono ${isChanged
+                                                                        ? 'bg-indigo-100 text-indigo-700'
+                                                                        : 'bg-slate-100 text-slate-600'
+                                                                        }`}
+                                                                >
+                                                                    <span className="font-semibold">{name}</span>
+                                                                    <span className="text-slate-400">=</span>
+                                                                    <span>{value.length > 15 ? value.slice(0, 15) + '...' : value}</span>
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
 
-                                        {/* Output */}
-                                        {step.output && (
-                                            <div className="px-3 py-2 border-t border-slate-100">
-                                                <div className="bg-slate-900 rounded-lg p-2 font-mono text-xs text-emerald-400">
-                                                    <span className="text-slate-500 mr-2">$</span>
-                                                    {step.output}
+                                            {/* Output */}
+                                            {step.output && (
+                                                <div className="px-3 py-2 border-t border-slate-100">
+                                                    <div className="bg-slate-900 rounded-lg p-2 font-mono text-xs text-emerald-400">
+                                                        <span className="text-slate-500 mr-2">$</span>
+                                                        {step.output}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {/* Loading More Indicator - Simple bouncing dots */}
+                            {isLoadingMore && (
+                                <div className="flex items-center justify-center gap-2 text-sm text-slate-500 py-4">
+                                    <span className="inline-flex gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    </span>
+                                    Receiving steps...
+                                </div>
+                            )}
+
+                            {/* Completion Marker - Only show when all steps are visible */}
+                            {!isGenerating && !hasMoreSteps && visibleSteps.length > 0 && (
+                                <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                                            <polyline points="20,6 9,17 4,12" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-bold text-emerald-800">Complete! 🎉</h4>
+                                        <p className="text-xs text-emerald-600">{totalSteps} steps executed</p>
                                     </div>
                                 </div>
-                            );
-                        })}
+                            )}
 
-                        {/* Loading More Indicator - Simple bouncing dots */}
-                        {isLoadingMore && (
-                            <div className="flex items-center justify-center gap-2 text-sm text-slate-500 py-4">
-                                <span className="inline-flex gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-                                </span>
-                                Receiving steps...
-                            </div>
-                        )}
-
-                        {/* Completion Marker - Only show when all steps are visible */}
-                        {!isGenerating && !hasMoreSteps && visibleSteps.length > 0 && (
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                                        <polyline points="20,6 9,17 4,12" />
-                                    </svg>
+                            {/* Generating Indicator */}
+                            {isGenerating && (
+                                <div className="flex items-center justify-center gap-2 text-sm text-slate-500 py-3">
+                                    <span className="inline-flex gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    </span>
+                                    Receiving steps...
                                 </div>
-                                <div>
-                                    <h4 className="text-sm font-bold text-emerald-800">Complete! 🎉</h4>
-                                    <p className="text-xs text-emerald-600">{totalSteps} steps executed</p>
-                                </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
 
-                        {/* Generating Indicator */}
-                        {isGenerating && (
-                            <div className="flex items-center justify-center gap-2 text-sm text-slate-500 py-3">
-                                <span className="inline-flex gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }} />
-                                </span>
-                                Receiving steps...
-                            </div>
-                        )}
+                        {/* Bottom padding to allow last card to be centered (Focus Mode only) */}
+                        <div
+                            className={`transition-all ease-in-out ${focusModeEnabled ? 'duration-500' : 'duration-[1500ms]'}`}
+                            style={{ height: focusModeEnabled ? '30vh' : '0px' }}
+                        />
+                    </main>
+                ) : (
+                    <div className="flex-1 flex flex-col bg-slate-900 overflow-hidden relative animate-[fadeSlideIn_0.3s_ease-out]">
+                        <EnterpriseVisualizer
+                            steps={visibleSteps}
+                            code={code}
+                            isGenerating={isGenerating}
+                            currentStepIndex={focusedIndex}
+                            width={window.innerWidth}
+                            height={window.innerHeight - 120}
+                        />
                     </div>
-
-                    {/* Bottom padding to allow last card to be centered (Focus Mode only) */}
-                    <div
-                        className={`transition-all ease-in-out ${focusModeEnabled ? 'duration-500' : 'duration-[1500ms]'}`}
-                        style={{ height: focusModeEnabled ? '30vh' : '0px' }}
-                    />
-                </main>
+                )
             )}
 
             {/* Fixed Floating Load More Button - Like Desktop */}
-            {!isLoading && hasMoreSteps && !isStreaming && (
+            {!isLoading && hasMoreSteps && !isStreaming && viewMode === 'list' && (
                 <div className="fixed bottom-0 left-0 right-0 p-4 pb-6 bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent pointer-events-none">
                     <button
                         onClick={onLoadMore}
