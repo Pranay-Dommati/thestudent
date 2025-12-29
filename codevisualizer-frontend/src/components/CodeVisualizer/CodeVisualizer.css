@@ -59,6 +59,18 @@
     background: rgba(99, 102, 241, 0.5);
 }
 
+/* Fix text selection visibility in code editor */
+.code-visualizer-container .code-editor-textarea::selection {
+    background: rgba(59, 130, 246, 0.3);
+    color: #1e293b;
+    -webkit-text-fill-color: #1e293b;
+}
+
+.code-visualizer-container .code-editor-textarea::-moz-selection {
+    background: rgba(59, 130, 246, 0.3);
+    color: #1e293b;
+}
+
 /* Resizable panel styles */
 .code-visualizer-container .resizable-panel {
     transition: none;
