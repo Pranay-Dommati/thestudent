@@ -1,6 +1,20 @@
 import React, { useRef } from 'react';
 import { Sparkles, ChevronLeft, Play } from 'lucide-react';
 
+// CSS animation for smooth card appearance
+const cardAnimationStyles = `
+@keyframes fadeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+`;
+
 /**
  * MobileImmersiveVisualizer - Dedicated mobile component for code visualization
  * Uses vertical scrollable timeline with professional mobile UX
@@ -120,6 +134,9 @@ const MobileImmersiveVisualizer = ({
 
     return (
         <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col">
+            {/* Inject animation styles */}
+            <style>{cardAnimationStyles}</style>
+
             {/* Mobile Header */}
             <header className="flex-shrink-0 bg-white border-b border-slate-200 px-4 py-3 safe-area-top">
                 <div className="flex items-center justify-between">
@@ -192,7 +209,11 @@ const MobileImmersiveVisualizer = ({
                             }
 
                             return (
-                                <div key={idx} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                                <div
+                                    key={idx}
+                                    className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-[fadeSlideIn_0.3s_ease-out]"
+                                    style={{ animationFillMode: 'both', animationDelay: `${(idx % 6) * 50}ms` }}
+                                >
                                     {/* Header */}
                                     <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                                         <div className="flex items-center gap-2">
@@ -277,6 +298,18 @@ const MobileImmersiveVisualizer = ({
                                 </div>
                             );
                         })}
+
+                        {/* Loading More Indicator - Simple bouncing dots */}
+                        {isLoadingMore && (
+                            <div className="flex items-center justify-center gap-2 text-sm text-slate-500 py-4">
+                                <span className="inline-flex gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                </span>
+                                Receiving steps...
+                            </div>
+                        )}
 
                         {/* Completion Marker - Only show when all steps are visible */}
                         {!isGenerating && !hasMoreSteps && visibleSteps.length > 0 && (
