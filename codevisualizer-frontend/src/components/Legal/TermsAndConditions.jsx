@@ -72,7 +72,7 @@ const TermsAndConditions = () => {
                                 </div>
                             </summary>
                             <div className="px-5 py-4 border-t border-slate-100 text-sm md:text-base text-slate-600 bg-slate-50/50">
-                                <p className="mb-2">As an EasyLearnova user, you are responsible for:</p>
+                                <p className="mb-2">As an CodeVisualizer user, you are responsible for:</p>
                                 <ul className="list-disc pl-5 space-y-1">
                                     <li>Providing accurate and current account information</li>
                                     <li>Keeping your password secure and confidential</li>
@@ -98,7 +98,7 @@ const TermsAndConditions = () => {
                                     <li>Is for personal, non-commercial use only</li>
                                     <li>Cannot be reproduced or distributed without permission</li>
                                     <li>Is provided "as is" without guarantees of accuracy</li>
-                                    <li>Remains the intellectual property of EasyLearnova</li>
+                                    <li>Remains the intellectual property of CodeVisualizer</li>
                                 </ul>
                             </div>
                         </details>
@@ -179,7 +179,7 @@ const TermsAndConditions = () => {
                     <div className="mt-8 md:mt-12 bg-slate-50 border border-slate-200 p-6 rounded-xl">
                         <h4 className="text-base md:text-lg font-bold text-slate-900 mb-2">Acceptance</h4>
                         <p className="text-slate-600 text-xs md:text-sm">
-                            By using EasyLearnova, you agree to these Terms and Conditions. If you don't agree, please don't use our service.
+                            By using CodeVisualizer, you agree to these Terms and Conditions. If you don't agree, please don't use our service.
                         </p>
                     </div>
                 </motion.div>

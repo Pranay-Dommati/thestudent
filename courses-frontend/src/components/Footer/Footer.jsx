@@ -105,7 +105,7 @@ const Footer = () => {
     const isButtonDisabled = isSubmitting;
 
     return (
-        <footer className="bg-white border-t border-gray-100 pt-8 pb-6 mt-12">
+        <footer className="bg-white border-t border-gray-100 pt-8 pb-6 mt-12 pb-24 lg:pb-6">
             <div className="max-w-6xl mx-auto px-4">
 
                 {/* Simplified Layout: Links & Social */}

@@ -21,7 +21,7 @@ const AuthFooter = () => {
 
                     {/* Right side - Copyright */}
                     <div className="flex items-center space-x-2 text-sm text-gray-500">
-                        <span>© {new Date().getFullYear()} EasyLearnova.</span>
+                        <span>© {new Date().getFullYear()} CodeVisualizer.</span>
                         <span className="hidden sm:inline">All rights reserved.</span>
                     </div>
                 </div>

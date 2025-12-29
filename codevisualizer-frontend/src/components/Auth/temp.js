@@ -175,7 +175,7 @@ export default function AuthForm() {
                 </div>
                 
                 <h2 className="text-2xl sm:text-3xl font-bold mb-3 md:mb-4 text-center">
-                  {isSignUp ? 'Welcome to Students Hub!' : 'Welcome Back!'}
+                  {isSignUp ? 'Welcome to EasyLearnova!' : 'Welcome Back!'}
                 </h2>
                 
                 <p className="text-sm text-center mb-6 max-w-xs text-white/90">

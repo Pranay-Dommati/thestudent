@@ -541,7 +541,7 @@ export default function AuthForm() {
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.2, duration: 0.3 }}
                                 >
-                                    {isSignUp ? 'Join EasyLearnova' : 'Welcome Back!'}
+                                    {isSignUp ? 'Join CodeVisualizer' : 'Welcome Back!'}
                                 </motion.h1>
 
                                 <motion.p
@@ -863,7 +863,7 @@ export default function AuthForm() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: 0.2, duration: 0.3 }}
                                     >
-                                        {isSignUp ? 'Welcome to EasyLearnova!' : 'Welcome Back!'}
+                                        {isSignUp ? 'Welcome to CodeVisualizer!' : 'Welcome Back!'}
                                     </motion.h2>
 
                                     <motion.p

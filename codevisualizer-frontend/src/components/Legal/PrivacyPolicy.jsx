@@ -164,7 +164,7 @@ const PrivacyPolicy = () => {
                             Contact us at <strong className="text-slate-900">easylearnova@gmail.com</strong>
                         </p>
                         <p className="text-xs md:text-sm text-slate-400">
-                            EasyLearnova, Hyderabad, Telangana, India
+                            CodeVisualizer, Hyderabad, Telangana, India
                         </p>
                     </section>
                 </motion.div>

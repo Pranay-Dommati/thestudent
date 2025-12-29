@@ -536,7 +536,7 @@ function CodeVisualizerPage() {
                         </a>
                     </div>
 
-                    <p className="text-center text-xs text-slate-400">© 2025 EasyLearnova</p>
+                    <p className="text-center text-xs text-slate-400">© 2025 CodeVisualizer</p>
                 </div>
             </div>
 

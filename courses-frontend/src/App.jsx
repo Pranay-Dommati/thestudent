@@ -42,7 +42,7 @@ import OnlineStatusToaster from './components/Common/OnlineStatusToaster.jsx';
 import OfflineRouterHandler from './components/Common/OfflineRouterHandler.jsx';
 import OfflinePage from './components/Common/OfflinePage.jsx';
 const CertificatePreview = React.lazy(() => import('./components/Certificates/CertificatePreview'));
-import OnboardingModal from './components/Onboarding/OnboardingModal';
+
 import GlobalBackgroundGenerationCard from './components/ProLearning/GlobalBackgroundGenerationCard';
 
 const CourseDetailsWrapper = () => {
@@ -262,8 +262,7 @@ const App = () => {
                     <OnlineStatusToaster />
                     {/* Auto-route to /offline when disconnected and back when restored */}
                     <OfflineRouterHandler />
-                    {/* Global Onboarding Modal - shows for new users on first login */}
-                    <OnboardingModal />
+
                     {/* Global Background Generation Card - shows on non-ProLearning pages when generating */}
                     <GlobalBackgroundGenerationCard />
 

@@ -78,7 +78,7 @@ const TermsAndConditions = () => {
                 </div>
               </summary>
               <div className="px-3 md:px-4 py-2.5 md:py-3 border-t text-sm md:text-base text-gray-700">
-                <p className="mb-2">As a student hub user, you are responsible for:</p>
+                <p className="mb-2">As a EasyLearnova user, you are responsible for:</p>
                 <ul className="list-disc pl-5 space-y-1">
                   <li>Providing accurate and current account information</li>
                   <li>Keeping your password secure and confidential</li>
