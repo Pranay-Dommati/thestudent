@@ -35,7 +35,7 @@ class PythonTracer:
     
     SAFE_TYPES = (int, float, str, bool, list, tuple, dict, set, type(None))
     MAX_STEPS = 1000
-    MAX_STR_LENGTH = 500
+    MAX_STR_LENGTH = 100
     
     def __init__(self):
         self.frames: List[TraceFrame] = []
@@ -51,12 +51,6 @@ class PythonTracer:
         self.function_start_line: int = 0
         self.function_end_line: int = 0
         self.on_frame = None
-        # Track for-loop iterations: {line_no: iteration_count}
-        self.loop_iterations: Dict[int, int] = {}
-        # Store enriched frame dicts for post-processing
-        self.frame_dicts: List[Dict] = []
-        # Buffer for streaming look-ahead
-        self.pending_frame_dict: Optional[Dict] = None
         
     def _safe_copy(self, value: Any) -> Any:
         if value is None:
@@ -86,26 +80,10 @@ class PythonTracer:
             return "NoneType"
         return type(value).__name__
     
-    def _format_value(self, value: Any) -> str:
-        """Format a value for dry-run display."""
-        if value is None:
-            return "None"
-        if isinstance(value, str):
-            if len(value) > 50:
-                return f'"{value[:50]}..."'
-            return f'"{value}"'
-        if isinstance(value, (list, tuple)):
-            if len(value) > 5:
-                items = [self._format_value(v) for v in value[:5]]
-                return f"[{', '.join(items)}, ...]"
-            items = [self._format_value(v) for v in value]
-            return f"[{', '.join(items)}]"
-        return str(value)
-    
     def _serialize_locals(self, local_vars: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
         result = {}
         for name, value in local_vars.items():
-            if (name.startswith('_') and name != '_') or name.startswith('@'):
+            if name.startswith('_') or name.startswith('@'):
                 continue
             if name == 'self':
                 continue
@@ -176,348 +154,6 @@ class PythonTracer:
         # Function definitions don't change variables at this line
         
         return predicted
-    
-    def _compute_expected_values(self, code_line: str, current_locals: Dict[str, Any]) -> Dict[str, Any]:
-        """Compute the expected NEW values for variables that will be assigned.
-        
-        This is crucial for showing the RESULT of an operation, not just the inputs.
-        We safely evaluate simple arithmetic/comparison expressions.
-        """
-        computed = {}
-        code = code_line.strip()
-        
-        # Build eval context
-        eval_context = {}
-        for name, data in current_locals.items():
-            if name.startswith('_') and name != '_':
-                continue
-            val = data.get('value') if isinstance(data, dict) else data
-            eval_context[name] = val
-        
-        # Tuple/multiple assignment: `a, b = expr1, expr2` OR `a, b = b, a + b`
-        tuple_assign_match = re.match(r'^([a-zA-Z_]\w*(?:\s*,\s*[a-zA-Z_]\w*)+)\s*=\s*(.+)$', code)
-        if tuple_assign_match and '==' not in code:
-            var_names_str = tuple_assign_match.group(1)
-            expression = tuple_assign_match.group(2).strip()
-            var_names = [v.strip() for v in var_names_str.split(',')]
-            
-            try:
-                # Evaluate the right-hand side as a tuple
-                result = eval(expression, {"__builtins__": {}}, eval_context)
-                if isinstance(result, (tuple, list)) and len(result) == len(var_names):
-                    for i, var_name in enumerate(var_names):
-                        computed[var_name] = self._safe_copy(result[i])
-            except:
-                pass
-            
-            return computed
-        
-        # Simple assignment: `var = expression`
-        assign_match = re.match(r'^(\w+)\s*=\s*(.+)$', code)
-        if assign_match and '==' not in code:
-            var_name = assign_match.group(1)
-            expression = assign_match.group(2).strip()
-            
-            # Create a context with current locals
-            eval_context = {}
-            for name, data in current_locals.items():
-                if name.startswith('_'):
-                    continue
-                val = data.get('value') if isinstance(data, dict) else data
-                eval_context[name] = val
-            
-            # Case 1: Simple variable copy - `current = dummy`
-            if expression in eval_context:
-                computed[var_name] = self._safe_copy(eval_context[expression])
-            
-            # Case 2: Attribute access - `val = node.val`
-            elif '.' in expression and '(' not in expression and '[' not in expression:
-                parts = expression.split('.')
-                if len(parts) == 2:
-                    obj_name, attr_name = parts
-                    if obj_name in eval_context:
-                        obj = eval_context[obj_name]
-                        if hasattr(obj, attr_name):
-                            computed[var_name] = getattr(obj, attr_name)
-            
-            # Case 3: Array/list indexing - `max_val = nums[0]`
-            elif '[' in expression and ']' in expression and '(' not in expression:
-                # Match patterns like: arr[0], arr[i], arr[-1]
-                index_match = re.match(r'^(\w+)\[(.+)\]$', expression)
-                if index_match:
-                    arr_name = index_match.group(1)
-                    index_expr = index_match.group(2)
-                    if arr_name in eval_context:
-                        arr = eval_context[arr_name]
-                        try:
-                            # Try to evaluate the index
-                            if index_expr.lstrip('-').isdigit():
-                                idx = int(index_expr)
-                            elif index_expr in eval_context:
-                                idx = eval_context[index_expr]
-                            else:
-                                idx = eval(index_expr, {"__builtins__": {}}, eval_context)
-                            
-                            if isinstance(arr, (list, tuple, str)) and -len(arr) <= idx < len(arr):
-                                computed[var_name] = self._safe_copy(arr[idx])
-                        except:
-                            pass
-            
-            # Case 4: Safe arithmetic expressions
-            elif self._is_safe_expression(expression):
-                try:
-                    result = eval(expression, {"__builtins__": {}}, eval_context)
-                    computed[var_name] = self._safe_copy(result)
-                except:
-                    pass
-            
-            # Case 5: If the variable already exists (loop iteration), use current value
-            # This handles cases like `dummy = ListNode(0)` in a loop
-            elif var_name in eval_context:
-                computed[var_name] = self._safe_copy(eval_context[var_name])
-        
-        # Augmented assignment: `var += expr`, `var -= expr`, etc.
-        aug_match = re.match(r'^(\w+)\s*([+\-*/|&^%@])=\s*(.+)$', code)
-        if aug_match:
-            var_name = aug_match.group(1)
-            operator = aug_match.group(2)
-            expression = aug_match.group(3).strip()
-            
-            try:
-                eval_context = {}
-                for name, data in current_locals.items():
-                    if name.startswith('_'):
-                        continue
-                    val = data.get('value') if isinstance(data, dict) else data
-                    eval_context[name] = val
-                
-                if var_name in eval_context and self._is_safe_expression(expression):
-                    current_val = eval_context[var_name]
-                    expr_val = eval(expression, {"__builtins__": {}}, eval_context)
-                    
-                    op_map = {
-                        '+': lambda a, b: a + b,
-                        '-': lambda a, b: a - b,
-                        '*': lambda a, b: a * b,
-                        '/': lambda a, b: a / b,
-                        '%': lambda a, b: a % b,
-                    }
-                    if operator in op_map:
-                        result = op_map[operator](current_val, expr_val)
-                        computed[var_name] = self._safe_copy(result)
-            except:
-                pass
-        
-        # Handle ternary expressions: var = value if condition else other_value
-        ternary_match = re.match(r'^(\w+)\s*=\s*(.+)\s+if\s+(\w+)\s+else\s+(.+)$', code)
-        if ternary_match:
-            var_name = ternary_match.group(1)
-            true_expr = ternary_match.group(2).strip()
-            condition_var = ternary_match.group(3).strip()
-            false_expr = ternary_match.group(4).strip()
-            
-            try:
-                # Get the condition value
-                if condition_var in current_locals:
-                    cond_data = current_locals[condition_var]
-                    cond_val = cond_data.get('value') if isinstance(cond_data, dict) else cond_data
-                    
-                    # Determine if condition is truthy
-                    is_truthy = bool(cond_val) if cond_val is not None else False
-                    
-                    if is_truthy:
-                        # Evaluate the true branch
-                        # Handle attribute access like l2.val
-                        if '.' in true_expr:
-                            parts = true_expr.split('.')
-                            obj_name = parts[0]
-                            attr_name = parts[1]
-                            if obj_name in current_locals:
-                                obj_data = current_locals[obj_name]
-                                obj_val = obj_data.get('value') if isinstance(obj_data, dict) else obj_data
-                                if hasattr(obj_val, attr_name):
-                                    computed[var_name] = getattr(obj_val, attr_name)
-                        else:
-                            # Simple variable
-                            if true_expr in current_locals:
-                                data = current_locals[true_expr]
-                                computed[var_name] = data.get('value') if isinstance(data, dict) else data
-                    else:
-                        # Evaluate the false branch (usually 0 or similar)
-                        try:
-                            computed[var_name] = eval(false_expr, {"__builtins__": {}}, {})
-                        except:
-                            pass
-            except:
-                pass
-        
-        return computed
-    
-    def _is_safe_expression(self, expr: str) -> bool:
-        """Check if an expression is safe to evaluate (no function calls, imports, etc.)"""
-        # Disallow dangerous patterns
-        dangerous = ['import', 'exec', 'eval', 'open', 'file', 'input', '__', 
-                     'lambda', 'class', 'def', 'global', 'nonlocal']
-        expr_lower = expr.lower()
-        for d in dangerous:
-            if d in expr_lower:
-                return False
-        
-        # Allow simple expressions with arithmetic and comparisons
-        # Check for function call patterns like `func(` but allow things like `(a + b)`
-        # This is a simple heuristic: if there's a word immediately followed by '(' it's likely a function call
-        if re.search(r'\b[a-zA-Z_]\w*\s*\(', expr):
-            # Exception: allow things like `(x + y)` but not `foo(x)`
-            # Check if it's just a parenthesized expression
-            if not re.match(r'^\s*\(', expr):
-                return False
-        
-        return True
-    
-    def _generate_dry_run(self, code_line: str, locals_data: Dict[str, Any], computed_values: Dict[str, Any], loop_info: Optional[Dict[str, Any]] = None) -> List[str]:
-        """Generate a deterministic DRY-RUN breakdown.
-        
-        This is the enterprise fix - we compute the DRY-RUN ourselves,
-        don't rely on AI for computation.
-        
-        Returns a list of lines for the DRY-RUN section.
-        """
-        code = code_line.strip()
-        lines = [code]  # Always start with original code
-        
-        def get_val(name):
-            """Get the actual value from locals, properly formatted."""
-            if name in locals_data:
-                data = locals_data[name]
-                val = data.get('value') if isinstance(data, dict) else data
-                return val
-            return None
-        
-        def format_val(val):
-            """Format a value for display."""
-            if val is None:
-                return "None"
-            if isinstance(val, bool):
-                return str(val)
-            if isinstance(val, str):
-                return repr(val)
-            return str(val)
-        
-        def is_truthy(val):
-            """Check if a value is truthy."""
-            try:
-                return bool(val)
-            except:
-                return val is not None
-        
-        # Handle while/if conditions with or/and
-        condition_match = re.match(r'^(while|if|elif)\s+(.+):', code)
-        if condition_match:
-            keyword = condition_match.group(1)
-            condition = condition_match.group(2).strip()
-            
-            # Split by 'or' or 'and'
-            if ' or ' in condition or ' and ' in condition:
-                # Parse the condition parts
-                parts = re.split(r'\s+(or|and)\s+', condition)
-                condition_lines = []
-                
-                for part in parts:
-                    if part in ('or', 'and'):
-                        continue
-                    part = part.strip()
-                    val = get_val(part)
-                    if val is not None:
-                        truthy = is_truthy(val)
-                        mark = "✓" if truthy else "✗"
-                        condition_lines.append(f"  {part} = {format_val(val)} {'(truthy)' if truthy else '(falsy)'} {mark}")
-                
-                if condition_lines:
-                    lines = [f"{keyword.capitalize()} condition:"] + condition_lines
-                    # Add result
-                    if keyword == 'while':
-                        lines.append("→ Loop continues" if any('✓' in l for l in condition_lines) else "→ Loop exits")
-                    else:
-                        lines.append("→ True ✓" if any('✓' in l for l in condition_lines) else "→ False ✗")
-            else:
-                # Simple condition
-                val = get_val(condition)
-                if val is not None:
-                    truthy = is_truthy(val)
-                    mark = "✓" if truthy else "✗"
-                    lines.append(f"{condition} = {format_val(val)} {'(truthy)' if truthy else '(falsy)'} {mark}")
-            
-            return lines
-        
-        # Handle tuple/multiple assignments: a, b = expr1, expr2 OR a, b = b, a + b
-        tuple_assign_match = re.match(r'^([a-zA-Z_]\w*(?:\s*,\s*[a-zA-Z_]\w*)+)\s*=\s*(.+)$', code)
-        if tuple_assign_match and '==' not in code:
-            var_names_str = tuple_assign_match.group(1)
-            expression = tuple_assign_match.group(2).strip()
-            var_names = [v.strip() for v in var_names_str.split(',')]
-            
-            # Substitute variable values in the expression
-            substituted = expression
-            for name, data in locals_data.items():
-                if name in substituted:
-                    val = data.get('value') if isinstance(data, dict) else data
-                    # Replace whole word only
-                    substituted = re.sub(r'\b' + re.escape(name) + r'\b', format_val(val), substituted)
-            
-            if substituted != expression:
-                lines.append(f"{var_names_str} = {substituted}")
-            
-            # Add computed results for each variable
-            results = []
-            for var_name in var_names:
-                if computed_values and var_name in computed_values:
-                    results.append(f"{var_name} = {format_val(computed_values[var_name])}")
-            if results:
-                lines.append(f"→ {', '.join(results)}")
-            
-            return lines
-        
-        # Handle simple assignments: var = expr
-        assign_match = re.match(r'^(\w+)\s*=\s*(.+)$', code)
-        if assign_match and '==' not in code:
-            var_name = assign_match.group(1)
-            expression = assign_match.group(2).strip()
-            
-            # Substitute variable values in the expression
-            substituted = expression
-            for name, data in locals_data.items():
-                if name in substituted:
-                    val = data.get('value') if isinstance(data, dict) else data
-                    # Replace whole word only
-                    substituted = re.sub(r'\b' + re.escape(name) + r'\b', format_val(val), substituted)
-            
-            if substituted != expression:
-                lines.append(f"{var_name} = {substituted}")
-            
-            # Add computed result
-            if computed_values and var_name in computed_values:
-                result = computed_values[var_name]
-                lines.append(f"→ {var_name} = {format_val(result)}")
-            
-            return lines
-        
-        # Handle for loops - USE loop_info AS SSOT (Enterprise Architecture)
-        for_match = re.match(r'for\s+(\w+)\s+in\s+(.+):', code)
-        if for_match:
-            loop_var = for_match.group(1)
-            iterable_expr = for_match.group(2).strip()
-            
-            # SSOT: Use loop_info ONLY (no fallback)
-            if loop_info and loop_info.get('variable') == loop_var:
-                val = loop_info.get('value')
-                iteration = loop_info.get('iteration')
-                total = loop_info.get('total')
-                # Deterministic dry-run from SSOT
-                lines.append(f"for {loop_var} in {iterable_expr}:")
-                lines.append(f"→ Iteration {iteration}/{total}: {loop_var} = {format_val(val)}")
-            return lines
-        
-        return lines
     
     def _get_code_line(self, line_no: int) -> str:
         if 0 < line_no <= len(self.source_lines):
@@ -682,89 +318,8 @@ class PythonTracer:
         if event == 'line':
             self.step_count += 1
             current_locals = dict(frame.f_locals)
-            code_line = self._get_code_line(line_no)
-            
-            # ROBUST AST-BASED LOOP ANALYSIS
-            # Instead of guessing with dictionary regex, we parse the code structure exactly like Python does.
-            loop_info = None
-            try:
-                # We add ' pass' because 'for x in y:' is incomplete syntax on its own.
-                # 'pass' completes the block so AST can parse it.
-                tree = ast.parse(code_line.strip() + " pass")
-                
-                if len(tree.body) > 0 and isinstance(tree.body[0], ast.For):
-                    for_node = tree.body[0]
-                    
-                    # 1. Identify Loop Variable(s) - handle both single and tuple unpacking
-                    loop_vars = []
-                    if isinstance(for_node.target, ast.Name):
-                        loop_vars = [for_node.target.id]
-                    elif isinstance(for_node.target, ast.Tuple):
-                        # Handle tuple unpacking: for c1, c2 in zip(s, t):
-                        for elt in for_node.target.elts:
-                            if isinstance(elt, ast.Name):
-                                loop_vars.append(elt.id)
-                    
-                    if loop_vars:
-                        # 2. Evaluate Iterable Expression safely
-                        # Merge all contexts: builtins + globals + locals into ONE dict
-                        eval_globals = {"__builtins__": __builtins__}
-                        eval_globals.update(frame.f_globals)
-                        eval_globals.update(current_locals)
-                        expr_code = compile(ast.Expression(body=for_node.iter), filename="<string>", mode="eval")
-                        iterable = eval(expr_code, eval_globals)
-
-                        if iterable is not None and hasattr(iterable, '__iter__'):
-                            try:
-                                iterable_list = list(iterable) if not isinstance(iterable, (list, tuple)) else iterable
-                                # Track iteration count for this line
-                                if line_no not in self.loop_iterations:
-                                    self.loop_iterations[line_no] = 0
-                                iter_idx = self.loop_iterations[line_no]
-                                
-                                # Format loop_var string for display
-                                loop_var_str = ', '.join(loop_vars)
-                                
-                                if iter_idx < len(iterable_list):
-                                    next_value = iterable_list[iter_idx]
-                                    # Update the loop variable(s) in our serialized locals
-                                    if len(loop_vars) == 1:
-                                        current_locals[loop_vars[0]] = next_value
-                                        value_str = next_value
-                                    else:
-                                        # Tuple unpacking
-                                        if isinstance(next_value, (list, tuple)) and len(next_value) == len(loop_vars):
-                                            for i, var in enumerate(loop_vars):
-                                                current_locals[var] = next_value[i]
-                                            value_str = ', '.join([str(v) for v in next_value])
-                                        else:
-                                            value_str = str(next_value)
-                                    
-                                    loop_info = {
-                                        'variable': loop_var_str,
-                                        'iteration': iter_idx + 1,
-                                        'value': value_str,
-                                        'total': len(iterable_list),
-                                        'finished': False
-                                    }
-                                    # print(f"[LOOP DEBUG] Step {self.step_count} Line {line_no}: ITERATION {iter_idx + 1}/{len(iterable_list)}, finished=False")
-                                else:
-                                    # Loop is exiting - mark as finished
-                                    loop_info = {
-                                        'variable': loop_var_str,
-                                        'iteration': iter_idx + 1,
-                                        'value': None,
-                                        'total': len(iterable_list),
-                                        'finished': True
-                                    }
-                                    # print(f"[LOOP DEBUG] Step {self.step_count} Line {line_no}: FINISHED! iter_idx={iter_idx} >= len={len(iterable_list)}")
-                                self.loop_iterations[line_no] += 1
-                            except (TypeError, ValueError):
-                                pass
-            except Exception:
-                pass
-            
             serialized_locals = self._serialize_locals(current_locals)
+            code_line = self._get_code_line(line_no)
             
             # Predict what THIS line will change (based on code analysis)
             predicted_changes = self._predict_changed_vars(code_line, current_locals)
@@ -781,174 +336,14 @@ class PythonTracer:
                 changed_vars=predicted_changes,
                 function_name=func_name if func_name != '<module>' else None
             )
-            
-            # Add loop info if this is a for-loop line
-            frame_dict = trace_frame.to_dict()
-            if loop_info:
-                frame_dict['loop_info'] = loop_info
-            
-            # STATE TRACKING FOR DRY-RUN:
-            # - state_before = state at START of this line (serialized_locals, before line executes)
-            # - state_after = state at START of next line (filled in when next frame fires)
-            
-            # Set THIS frame's state_before (current state before line executes)
-            state_before_simple = {}
-            for var_name, data in serialized_locals.items():
-                val = data.get('value') if isinstance(data, dict) else data
-                state_before_simple[var_name] = val
-            frame_dict['state_before'] = state_before_simple
-            
-            # Update PREVIOUS frame's state_after (current state = result of previous line)
-            # This gives the previous frame its "after" state
-            if len(self.frame_dicts) > 0:
-                prev_frame = self.frame_dicts[-1]
-                prev_frame['state_after'] = state_before_simple.copy()
-            
             trace_frame.explanation = self._generate_explanation(trace_frame)
-            frame_dict['explanation'] = trace_frame.explanation
-            
             self.frames.append(trace_frame)
-            self.frame_dicts.append(frame_dict)  # Store enriched dict for post-processing
-
-            
             if self.on_frame:
                 try:
-                    # ENTERPRISE-GRADE STATE-DIFF DRY-RUN:
-                    # Instead of parsing code, we observe runtime state changes.
-                    # pending_frame = state BEFORE execution
-                    # current_locals = state AFTER execution
-                    # diff = dry-run
-                    
-                    if self.pending_frame_dict:
-                        pending = self.pending_frame_dict
-                        pending_locals = pending.get('locals', {})
-                        # Compute state diff: what changed between before and after
-                        pending_code = pending.get('code', '').strip()
-                        pending_loop_info = pending.get('loop_info')
-                        
-                        # Check if the pending frame's loop_info already has finished=True
-                        # OR if the CURRENT frame shows the loop has finished (same line)
-                        current_loop_info = frame_dict.get('loop_info')
-                        if pending_loop_info and 'for ' in pending_code:
-                            if current_loop_info and current_loop_info.get('finished'):
-                                # Current frame says loop is finished, update pending
-                                pending_loop_info = current_loop_info.copy()
-                                pending['loop_info'] = pending_loop_info
-                        
-                        # Detect line types
-                        is_assignment = '=' in pending_code and '==' not in pending_code and 'for ' not in pending_code and 'if ' not in pending_code and 'while ' not in pending_code
-                        is_conditional = pending_code.startswith('if ') or pending_code.startswith('elif ') or pending_code.startswith('while ')
-                        
-                        # Detect ALL variable changes (assignments AND mutations like .append())
-                        # Compare pending_locals vs serialized_locals to catch in-place modifications
-                        state_changes = []
-                        
-                        # Check all variables in serialized_locals (current state)
-                        for var_name, after_data in serialized_locals.items():
-                            after_val = after_data.get('value') if isinstance(after_data, dict) else after_data
-                            
-                            before_val = None
-                            if var_name in pending_locals:
-                                before_data = pending_locals[var_name]
-                                before_val = before_data.get('value') if isinstance(before_data, dict) else before_data
-                            
-                            # Check if value changed (new variable or modified value)
-                            if before_val != after_val:
-                                state_changes.append({
-                                    'var': var_name,
-                                    'before': before_val,
-                                    'after': after_val
-                                })
-                        
-                        # AI-ONLY DRY-RUN ARCHITECTURE:
-                        # The tracer provides CONTEXT (state_before, state_after, loop_info)
-                        # The AI generates ALL dry-run explanations using this context
-                        # This is cleaner - no manual edge-case handling needed
-                        # AI naturally explains simple things simply, complex things thoroughly
-                        
-                        # Populate computed_values for frontend variable display
-                        if state_changes:
-                            computed_vals = {}
-                            for change in state_changes:
-                                computed_vals[change['var']] = change['after']
-                            pending['computed_values'] = computed_vals
-                        
-                        # Add state_before and state_after for AI hybrid dry-run
-                        # Simplify to just var -> value mappings
-                        state_before_simple = {}
-                        for var_name, data in pending_locals.items():
-                            val = data.get('value') if isinstance(data, dict) else data
-                            state_before_simple[var_name] = val
-                        
-                        state_after_simple = {}
-                        for var_name, data in serialized_locals.items():
-                            val = data.get('value') if isinstance(data, dict) else data
-                            state_after_simple[var_name] = val
-                        
-                        pending['state_before'] = state_before_simple
-                        pending['state_after'] = state_after_simple
-                        
-                        # COMPUTE LOCALS_AFTER: Start with pending_locals, apply ONLY changes from THIS line
-                        # Manual deep copy to avoid tracing interference with copy module
-                        locals_after = {}
-                        for k, v in pending_locals.items():
-                            if isinstance(v, dict):
-                                locals_after[k] = dict(v)
-                                if 'value' in locals_after[k]:
-                                    val = locals_after[k]['value']
-                                    if isinstance(val, list):
-                                        locals_after[k]['value'] = list(val)
-                                    elif isinstance(val, dict):
-                                        locals_after[k]['value'] = dict(val)
-                            else:
-                                locals_after[k] = v
-                        
-                        for change in state_changes:
-                            var = change['var']
-                            after_val = change['after']
-                            # Update the variable with its new value
-                            if var in locals_after:
-                                if isinstance(locals_after[var], dict):
-                                    locals_after[var]['value'] = after_val
-                                else:
-                                    locals_after[var] = {'value': after_val, 'type': type(after_val).__name__}
-                            else:
-                                # New variable
-                                locals_after[var] = {'value': after_val, 'type': type(after_val).__name__}
-                        
-                        # Update pending's locals with the computed post-state
-                        pending['locals'] = locals_after
-                        
-                        # Send the pending frame with correct post-state
-                        self.on_frame(pending)
-                    
-                    # Store current frame as pending
-                    # Shallow copy the frame, but manually deep copy 'locals' to avoid mutable object corruption
-                    pending_copy = frame_dict.copy()
-                    if 'locals' in pending_copy:
-                        # Manual deep copy of locals dict (avoids copy module issues during tracing)
-                        old_locals = pending_copy['locals']
-                        new_locals = {}
-                        for k, v in old_locals.items():
-                            if isinstance(v, dict):
-                                new_locals[k] = dict(v)  # Shallow copy the inner dict
-                                # Deep copy the 'value' if it's a mutable type
-                                if 'value' in new_locals[k]:
-                                    val = new_locals[k]['value']
-                                    if isinstance(val, list):
-                                        new_locals[k]['value'] = list(val)
-                                    elif isinstance(val, dict):
-                                        new_locals[k]['value'] = dict(val)
-                            else:
-                                new_locals[k] = v
-                        pending_copy['locals'] = new_locals
-                    self.pending_frame_dict = pending_copy
-                    
-                except Exception as e:
-                    # Log the error for debugging
-                    import traceback
-                    print(f"[TRACER ERROR] Streaming buffer exception: {e}")
-                    traceback.print_exc()
+                    self.on_frame(trace_frame.to_dict())
+                except Exception:
+                    # Never break tracing due to callback errors
+                    pass
             
         elif event == 'exception':
             self.step_count += 1
@@ -974,7 +369,6 @@ class PythonTracer:
     
     def trace(self, code: str, input_values: Optional[List[str]] = None, on_frame=None) -> Dict[str, Any]:
         self.frames = []
-        self.frame_dicts = []  # Reset enriched dicts
         self.step_count = 0
         self.previous_locals = {}
         self.error = None
@@ -982,11 +376,9 @@ class PythonTracer:
         self.inside_target_function = False
         self.target_function_name = None
         self.target_class_name = None
-        self.loop_iterations = {}  # Reset loop tracking
         self.function_start_line = 0
         self.function_end_line = 0
         self.on_frame = on_frame
-        self.pending_frame_dict = None  # Reset buffer
         
         self.source_lines = code.split('\n')
         self._analyze_code_structure(code)
@@ -1013,57 +405,22 @@ class PythonTracer:
                     exec(compiled_code, sandbox_globals, sandbox_globals)
                 finally:
                     sys.settrace(None)
-                    # Flush pending frame if any
-                    if self.pending_frame_dict and self.on_frame:
-                         try:
-                             self.on_frame(self.pending_frame_dict)
-                         except Exception:
-                             pass
-                         self.pending_frame_dict = None
             
             result["output"] = captured.getvalue()
             result["success"] = True
-            
-            # POST-PROCESSING: Look ahead to fill in computed_values for variables we couldn't compute
-            # This happens when a line creates a new object (e.g., dummy = ListNode(0))
-            for i, frame_dict in enumerate(self.frame_dicts):
-                # If there are changed_vars without computed values, look ahead
-                changed_vars = frame_dict.get('changed_vars', [])
-                computed_values = frame_dict.get('computed_values', {})
-                if computed_values is None:
-                    computed_values = {}
-                
-                for var_name in changed_vars:
-                    if var_name not in computed_values:
-                        # Look at the NEXT frame's locals to get the actual value after execution
-                        if i + 1 < len(self.frame_dicts):
-                            next_locals = self.frame_dicts[i + 1].get('locals', {})
-                            
-                            if var_name in next_locals:
-                                next_val = next_locals[var_name]
-                                val_to_store = None
-                                if isinstance(next_val, dict) and 'value' in next_val:
-                                    val_to_store = next_val['value']
-                                else:
-                                    val_to_store = next_val
-                                
-                                computed_values[var_name] = val_to_store
-                
-                frame_dict['computed_values'] = computed_values
-            
-            result["frames"] = self.frame_dicts
+            result["frames"] = [frame.to_dict() for frame in self.frames]
             
             if self.error:
                 result["error"] = self.error
                 
         except SyntaxError as e:
             result["error"] = f"Syntax Error at line {e.lineno}: {e.msg}"
-            result["frames"] = self.frame_dicts if self.frame_dicts else [frame.to_dict() for frame in self.frames]
+            result["frames"] = [frame.to_dict() for frame in self.frames]
             
         except Exception as e:
             result["error"] = f"{type(e).__name__}: {str(e)}"
-            result["frames"] = self.frame_dicts if self.frame_dicts else [frame.to_dict() for frame in self.frames]
-            result["success"] = len(self.frame_dicts) > 0 or len(self.frames) > 0
+            result["frames"] = [frame.to_dict() for frame in self.frames]
+            result["success"] = len(self.frames) > 0
             
         return result
 
