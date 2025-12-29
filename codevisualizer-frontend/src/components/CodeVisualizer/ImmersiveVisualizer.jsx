@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Rocket, X } from 'lucide-react';
 import EnterpriseVisualizer from './EnterpriseVisualizer';
 import MobileImmersiveVisualizer from './MobileImmersiveVisualizer';
 
@@ -26,6 +26,14 @@ const ImmersiveVisualizer = ({
 
     // Visualization mode: 'timeline' (legacy) or 'enterprise' (PixiJS + GSAP)
     const [visualizationMode, setVisualizationMode] = useState('timeline');
+    const [showEnterpriseModal, setShowEnterpriseModal] = useState(false);
+
+    // Show modal when switching to enterprise mode
+    useEffect(() => {
+        if (visualizationMode === 'enterprise') {
+            setShowEnterpriseModal(true);
+        }
+    }, [visualizationMode]);
 
     // Cinematic step reveal: queue incoming steps and animate one-by-one
     const [pendingSteps, setPendingSteps] = useState([]);
@@ -963,7 +971,52 @@ const ImmersiveVisualizer = ({
                     style={{ width: isStreaming ? '100%' : `${steps.length > 0 ? ((currentStepIndex + 1) / steps.length) * 100 : 0}%` }}
                 />
             </div>
-        </div >
+            {/* Desktop Enterprise Coming Soon Modal - BLOCKING */}
+            {showEnterpriseModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <style>{`
+                        @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                        @keyframes popIn { 0% { opacity: 0; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
+                    `}</style>
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-slate-900/80 backdrop-blur-md transition-opacity animate-[fadeSlideIn_0.3s_ease-out]"
+                        onClick={() => { setVisualizationMode('timeline'); setShowEnterpriseModal(false); }}
+                    />
+
+                    {/* Modal Card */}
+                    <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 overflow-hidden animate-[popIn_0.4s_cubic-bezier(0.16,1,0.3,1)]">
+                        {/* Background Decoration */}
+                        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10" />
+                        <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl" />
+
+                        <div className="relative flex flex-col items-center text-center">
+                            {/* Icon */}
+                            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg mb-6 rotate-3">
+                                <Rocket className="w-10 h-10 text-white" />
+                            </div>
+
+                            {/* Content */}
+                            <h3 className="text-2xl font-bold text-slate-900 mb-3">
+                                Coming Soon
+                            </h3>
+                            <p className="text-slate-600 leading-relaxed mb-8 max-w-xs mx-auto">
+                                Our cinematic <b>Visualizer</b> is under construction. We're building a stunning new way to experience your code.
+                            </p>
+
+                            {/* Back Button */}
+                            <button
+                                onClick={() => { setVisualizationMode('timeline'); setShowEnterpriseModal(false); }}
+                                className="w-full py-3.5 px-6 bg-slate-900 text-white rounded-xl font-bold text-sm shadow-xl hover:bg-slate-800 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                            >
+                                <Sparkles className="w-4 h-4 text-yellow-400" />
+                                Return to Dry Runner
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 

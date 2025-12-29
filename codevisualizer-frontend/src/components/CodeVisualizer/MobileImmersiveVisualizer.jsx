@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Sparkles, ChevronLeft, Play, Code2, List } from 'lucide-react';
+import { Sparkles, ChevronLeft, Play, Code2, List, PanelRight, Rocket, X } from 'lucide-react';
 import EnterpriseVisualizer from './EnterpriseVisualizer';
 
 // CSS animation for smooth card appearance
@@ -13,6 +13,14 @@ const cardAnimationStyles = `
         opacity: 1;
         transform: translateY(0);
     }
+}
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
 }
 `;
 
@@ -38,7 +46,16 @@ const MobileImmersiveVisualizer = ({
     const cardRefs = useRef([]);
     const [focusedIndex, setFocusedIndex] = useState(0);
     const [focusModeEnabled, setFocusModeEnabled] = useState(false);
-    const [viewMode, setViewMode] = useState('list'); // 'list' | 'visualize' // Default: normal scroll
+    const [viewMode, setViewMode] = useState('list'); // 'list' | 'visualize'
+    const [showCodeSidebar, setShowCodeSidebar] = useState(false);
+    const [showEnterpriseModal, setShowEnterpriseModal] = useState(false);
+
+    // Show modal when switching to visualize mode
+    useEffect(() => {
+        if (viewMode === 'visualize') {
+            setShowEnterpriseModal(true);
+        }
+    }, [viewMode]); // Default: normal scroll
     const hasMoreSteps = visibleSteps.length < totalSteps;
 
     // Calculate which card is most centered in the viewport
@@ -181,38 +198,45 @@ const MobileImmersiveVisualizer = ({
             <style>{cardAnimationStyles}</style>
 
             {/* Mobile Header */}
-            <header className="flex-shrink-0 bg-white border-b border-slate-200 px-4 py-3 safe-area-top">
-                <div className="flex items-center justify-between">
-                    {/* Left: Back & Steps */}
-                    <div className="flex items-center gap-3">
+            <header className="flex-shrink-0 bg-white border-b border-slate-200 px-4 py-3 safe-area-top relative z-40">
+                <div className="flex items-center justify-between min-h-[40px]">
+                    {/* Left: Back */}
+                    <div className="flex items-center gap-3 z-10">
                         <button
                             onClick={onClose}
                             className="p-2 -ml-2 text-slate-600 hover:text-slate-900 rounded-full hover:bg-slate-100 transition-colors"
                         >
                             <ChevronLeft className="w-5 h-5" />
                         </button>
-                        <span className="text-sm font-semibold text-slate-800">
-                            {visibleSteps.length} of {totalSteps} Steps
-                        </span>
                     </div>
 
-                    {/* Right: Mode Toggles */}
-                    <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-lg border border-slate-200/50">
+                    {/* Center: Mode Toggles (Absolute) */}
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 bg-slate-100/90 p-1 rounded-lg border border-slate-200/60 z-10 shadow-inner">
                         {/* Current Mode: Steps */}
                         <button
-                            className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600 border border-slate-200/50' : 'text-slate-400 hover:text-slate-600 border border-transparent'}`}
+                            className={`p-2 rounded-md transition-all duration-200 ${viewMode === 'list' ? 'bg-white shadow-sm text-indigo-600 scale-100' : 'text-slate-400 hover:text-slate-600 hover:bg-black/5 scale-95'}`}
                             title="Steps View"
                             onClick={() => setViewMode('list')}
                         >
-                            <List className="w-4 h-4" />
+                            <List className="w-4 h-4" strokeWidth={2.5} />
                         </button>
                         {/* Visualization Mode */}
                         <button
-                            className={`p-1.5 rounded-md transition-all ${viewMode === 'visualize' ? 'bg-white shadow-sm text-indigo-600 border border-slate-200/50' : 'text-slate-400 hover:text-slate-600 border border-transparent'}`}
-                            title="Code View"
+                            className={`p-2 rounded-md transition-all duration-200 ${viewMode === 'visualize' ? 'bg-white shadow-sm text-indigo-600 scale-100' : 'text-slate-400 hover:text-slate-600 hover:bg-black/5 scale-95'}`}
+                            title="Animation View"
                             onClick={() => setViewMode('visualize')}
                         >
-                            <Code2 className="w-4 h-4" />
+                            <Play className="w-4 h-4 fill-current" />
+                        </button>
+                    </div>
+
+                    {/* Right: Sidebar Button */}
+                    <div className="flex items-center z-10">
+                        <button
+                            onClick={() => setShowCodeSidebar(true)}
+                            className="p-2 -mr-2 text-slate-500 hover:text-slate-900 rounded-full hover:bg-slate-100 transition-colors"
+                        >
+                            <Code2 className="w-5 h-5" />
                         </button>
                     </div>
                 </div>
@@ -513,6 +537,101 @@ const MobileImmersiveVisualizer = ({
                 </div>
             )}
 
+            {/* Code Sidebar Overlay */}
+            {showCodeSidebar && (
+                <div className="fixed inset-0 z-[60]">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity animate-[fadeSlideIn_0.2s_ease-out]"
+                        onClick={() => setShowCodeSidebar(false)}
+                    />
+
+                    {/* Sidebar Panel */}
+                    <div className="absolute right-0 top-0 bottom-0 w-[85%] max-w-[320px] bg-white shadow-2xl flex flex-col border-l border-slate-200 animate-[slideInRight_0.3s_cubic-bezier(0.16,1,0.3,1)]">
+                        {/* Header */}
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white flex-shrink-0">
+                            <div className="flex items-center gap-2">
+                                <Code2 className="w-5 h-5 text-indigo-600" />
+                                <h3 className="font-semibold text-slate-800">Source Code</h3>
+                            </div>
+                            <button
+                                onClick={() => setShowCodeSidebar(false)}
+                                className="p-2 -mr-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Code Content */}
+                        <div className="flex-1 overflow-y-auto p-4 font-mono text-xs sm:text-sm bg-white text-slate-800">
+                            {codeLines.map((line, idx) => {
+                                const lineNum = idx + 1;
+                                const activeStep = visibleSteps[focusedIndex];
+                                const isCurrentLine = activeStep?.lineNumber === lineNum || activeStep?.line_no === lineNum || activeStep?.line === lineNum;
+
+                                return (
+                                    <div
+                                        key={idx}
+                                        className={`flex rounded-md transition-colors ${isCurrentLine ? 'bg-indigo-50/80 border-l-2 border-indigo-500 shadow-sm' : 'border-l-2 border-transparent'}`}
+                                    >
+                                        <span className={`w-8 text-right pr-3 select-none flex-shrink-0 py-0.5 ${isCurrentLine ? 'text-indigo-600 font-bold' : 'text-slate-300'}`}>
+                                            {lineNum}
+                                        </span>
+                                        <span className={`flex-1 whitespace-pre py-0.5 overflow-x-auto ${isCurrentLine ? 'text-slate-900 font-medium' : 'text-slate-500'}`}>
+                                            {highlightSyntax(line)}
+                                        </span>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Enterprise Coming Soon Modal */}
+            {showEnterpriseModal && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-slate-900/80 backdrop-blur-md transition-opacity animate-[fadeSlideIn_0.3s_ease-out]"
+                        onClick={() => { setViewMode('list'); setShowEnterpriseModal(false); }}
+                    />
+
+                    {/* Modal Card */}
+                    <div className="relative bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 overflow-hidden animate-[popIn_0.4s_cubic-bezier(0.16,1,0.3,1)]">
+                        {/* Background Decoration */}
+                        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10" />
+                        <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl" />
+
+                        <div className="relative flex flex-col items-center text-center">
+                            {/* Icon */}
+                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg mb-5 rotate-3 transform transition-transform hover:rotate-6">
+                                <Rocket className="w-8 h-8 text-white" />
+                            </div>
+
+                            {/* Content */}
+                            <h3 className="text-xl font-bold text-slate-900 mb-2">
+                                Coming Soon!
+                            </h3>
+                            <p className="text-slate-600 text-sm leading-relaxed mb-6">
+                                The cinematic <b>Visualizer</b> is currently under construction. We're building a stunning new way to experience your code.
+                            </p>
+
+                            {/* Block access - Return button */}
+                            <button
+                                onClick={() => { setViewMode('list'); setShowEnterpriseModal(false); }}
+                                className="w-full py-3 px-4 bg-slate-900 text-white rounded-xl font-semibold text-sm shadow-xl hover:bg-slate-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                                Return to Dry Runner
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
