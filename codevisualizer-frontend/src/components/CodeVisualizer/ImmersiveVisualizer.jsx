@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Sparkles, Rocket, X, HelpCircle } from 'lucide-react';
+import { Sparkles, Rocket, X, RotateCcw } from 'lucide-react';
 import EnterpriseVisualizer from './EnterpriseVisualizer';
 import MobileImmersiveVisualizer from './MobileImmersiveVisualizer';
 import AskSIAPanel from './AskSIAPanel';
@@ -66,6 +66,12 @@ const ImmersiveVisualizer = ({
             setIsStepAnimating(false);
             setDisplayedStepsCount(BATCH_SIZE);
             setAllSteps([]);
+
+            // Reset Ask SIA state
+            setRightPanelTab('code');
+            setWhyExplanation(null);
+            setIsLoadingWhy(false);
+            setWhyTargetStep(null);
             // Wait for steps to stream in
         }
     }, [isOpen, isLoading]);
@@ -845,7 +851,7 @@ const ImmersiveVisualizer = ({
                                                             }`}
                                                         title="Understand why this line exists"
                                                     >
-                                                        <HelpCircle className="w-3.5 h-3.5" />
+                                                        <RotateCcw className="w-3.5 h-3.5" />
                                                         The Why?
                                                     </button>
                                                 </div>

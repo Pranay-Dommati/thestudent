@@ -32,8 +32,15 @@ const AskSIAPanel = ({
      */
     const preprocessExplanation = (text) => {
         if (!text) return '';
-        // Remove the emoji header line - we'll render our own
+
+        // Robust cleanup: 
+        // 1. Normalize newlines (standardize to \n)
+        // 2. Remove quotes from inside inline code: `'var'` -> `var`
+        // 3. Remove the header lines
         return text
+            .replace(/\r\n?/g, '\n') // Normalize newlines
+            .replace(/`'([^`]+)'`/g, '`$1`') // Strip single quotes inside backticks
+            .replace(/`"([^`]+)"`/g, '`$1`') // Strip double quotes inside backticks
             .replace(/^💡\s*Why this step matters\s*\n*/i, '')
             .replace(/^Why this step matters\s*\n*/i, '')
             .trim();
@@ -83,25 +90,27 @@ const AskSIAPanel = ({
         strong: ({ children }) => (
             <strong className="font-semibold text-slate-900">{children}</strong>
         ),
-        // Inline code - light style like ChatGPT
+        // Inline code - light blue style to match theme
         code: ({ children, inline, className }) => {
-            // Check if it's a code block (has language class) or inline
-            const isInline = inline || !className;
-
-            if (isInline) {
+            // Check if it's inline (no className means inline in ReactMarkdown)
+            if (inline) {
                 return (
-                    <code className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-800 font-mono text-sm border border-slate-200">
+                    <code className="px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-800 font-mono text-sm border border-indigo-100">
                         {children}
                     </code>
                 );
             }
-            // Code blocks - keep dark theme for contrast
+            // Code blocks - light blue theme to match panel
             return (
-                <pre className="bg-slate-800 text-slate-100 rounded-lg p-4 overflow-x-auto my-3 border border-slate-700">
-                    <code className="font-mono text-sm">{children}</code>
-                </pre>
+                <code className="font-mono text-sm text-indigo-900">{children}</code>
             );
         },
+        // Pre elements - light blue background (prevents extra black box)
+        pre: ({ children }) => (
+            <pre className="bg-indigo-50 text-indigo-900 rounded-lg p-4 overflow-x-auto my-3 border border-indigo-100">
+                {children}
+            </pre>
+        ),
         // Lists
         ul: ({ children }) => (
             <ul className="list-disc list-inside text-slate-700 mb-3 pl-2 space-y-1">{children}</ul>
@@ -113,6 +122,9 @@ const AskSIAPanel = ({
             <li className="text-slate-700">{children}</li>
         ),
     };
+
+    // Generate cleaned explanation once to ensure consistency across all render paths
+    const cleanedExplanation = preprocessExplanation(explanation);
 
     return (
         <div className="flex flex-col h-full bg-white">
@@ -138,7 +150,7 @@ const AskSIAPanel = ({
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                 {/* Loading State */}
                 {isLoading && (
                     <div className="flex flex-col items-center justify-center h-full py-12">
@@ -150,18 +162,15 @@ const AskSIAPanel = ({
                         <p className="mt-4 text-slate-500 text-sm font-medium animate-pulse">
                             SIA is thinking...
                         </p>
-                        {lineText && (
-                            <div className="mt-3 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 max-w-full overflow-x-auto">
-                                <code className="text-xs text-slate-600 font-mono whitespace-nowrap">
-                                    {lineText.length > 50 ? lineText.substring(0, 50) + '...' : lineText}
-                                </code>
-                            </div>
-                        )}
+                        {/* Show stripped line for context if needed */}
+                        <div className="mt-3 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 max-w-full overflow-x-auto opacity-50">
+                            <div className="h-4 bg-slate-200 rounded w-24"></div>
+                        </div>
                     </div>
                 )}
 
                 {/* No Explanation State */}
-                {!isLoading && !explanation && (
+                {!isLoading && !cleanedExplanation && (
                     <div className="flex flex-col items-center justify-center h-full py-12 text-center">
                         <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
                             <MessageCircle className="w-8 h-8 text-slate-400" />
@@ -170,19 +179,19 @@ const AskSIAPanel = ({
                             Explore Why
                         </h3>
                         <p className="text-slate-500 text-sm max-w-xs">
-                            Click the <span className="font-semibold text-indigo-600">"Why"</span> button on any step card to understand why that line of code exists.
+                            Click the <span className="font-semibold text-indigo-600"><RotateCcw className="w-3 h-3 inline mr-1" />The Why</span> button on any step card to understand why that line of code exists.
                         </p>
                     </div>
                 )}
 
                 {/* Error State - Only if it starts with X and isn't a valid explanation */}
-                {!isLoading && explanation && explanation.trim().startsWith('❌') && !explanation.includes('Why this step matters') && (
+                {!isLoading && cleanedExplanation && cleanedExplanation.trim().startsWith('❌') && !cleanedExplanation.includes('Why this step matters') && (
                     <div className="p-4 rounded-xl bg-red-50 border border-red-200">
                         <div className="flex items-start gap-3">
                             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                             <div className="text-red-700 text-sm">
                                 <ReactMarkdown components={markdownComponents}>
-                                    {explanation}
+                                    {cleanedExplanation}
                                 </ReactMarkdown>
                             </div>
                         </div>
@@ -190,7 +199,7 @@ const AskSIAPanel = ({
                 )}
 
                 {/* Explanation Content - Visual distinction for WHY section */}
-                {!isLoading && explanation && !(explanation.trim().startsWith('❌') && !explanation.includes('Why this step matters')) && (
+                {!isLoading && cleanedExplanation && !(cleanedExplanation.trim().startsWith('❌') && !cleanedExplanation.includes('Why this step matters')) && (
                     <div className="bg-indigo-50/50 border border-indigo-100 border-l-4 border-l-indigo-400 rounded-lg p-4">
                         {/* Header */}
                         <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b border-indigo-200">
@@ -199,7 +208,7 @@ const AskSIAPanel = ({
                         {/* Markdown Content */}
                         <div className="prose prose-slate prose-sm max-w-none">
                             <ReactMarkdown components={markdownComponents}>
-                                {preprocessExplanation(explanation)}
+                                {cleanedExplanation}
                             </ReactMarkdown>
                         </div>
                     </div>

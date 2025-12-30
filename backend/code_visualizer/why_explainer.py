@@ -67,7 +67,7 @@ For SINGLE CONDITION lines (if/elif with one check):
 
 This line contains a single condition, and it is necessary.
 
-**Condition: `[exact condition text]`**
+**Condition:** **[exact condition text]**
 [What this condition checks]
 
 **Why this condition is required:**
@@ -75,8 +75,9 @@ This line contains a single condition, and it is necessary.
 
 **Failure case:**
 Check condition:
-
-`[var] [op] [var]` → `[evaluated]` → ❌
+```python
+[var] [op] [var] → [evaluated] → ❌
+```
 
 This means:
 - [algorithm decision]
@@ -85,8 +86,9 @@ This means:
 
 **Success case:**
 Check condition:
-
-`[var] [op] [var]` → `[evaluated]` → ✅
+```python
+[var] [op] [var] → [evaluated] → ✅
+```
 
 This means:
 - [algorithm decision]
@@ -98,10 +100,10 @@ For COMPOUND lines (loops or conditions with multiple checks using 'and'/'or'):
 
 This line contains [N] conditions, and all are necessary.
 
-**Condition 1: `[exact condition text]`**
+**Condition 1:** **[exact condition text]**
 [Explain what this condition checks]
 
-**Condition 2: `[exact condition text]`**
+**Condition 2:** **[exact condition text]**
 [Explain what this condition checks]
 
 **Why all conditions together are required:**
@@ -109,8 +111,9 @@ This line contains [N] conditions, and all are necessary.
 
 **Failure case:**
 Check condition:
-
-`[var] [op] [var]` → `[evaluated]` → ❌
+```python
+[var] [op] [var] → [evaluated] → ❌
+```
 
 This means:
 - [algorithm decision]
@@ -119,8 +122,9 @@ This means:
 
 **Success case:**
 Check condition:
-
-`[var] [op] [var]` → `[evaluated]` → ✅
+```python
+[var] [op] [var] → [evaluated] → ✅
+```
 
 This means:
 - [algorithm decision]
@@ -137,9 +141,12 @@ RULES:
 - For Failure/Success cases:
     - ALWAYS start with "**Failure case:**" or "**Success case:**"
     - ALWAYS put "Check condition:" on its own line
-    - ALWAYS put the expression `... → ...` on its own line with a blank line before it
+    - ALWAYS put the expression inside TRIPLE backticks (```python ... ```) to make it a code block
     - ALWAYS use the bullet list for "This means:"
 - NEVER write Failure/Success as paragraphs or essay form
+- NEVER use single backticks (`) for individual variables like `n` or `result`
+- ONLY use triple backticks for the Check condition code block
+- For inline variable mentions in explanations, use plain text or **bold** for emphasis
 - Show HOW the algorithm THINKS, not just describe it"""
 
 
