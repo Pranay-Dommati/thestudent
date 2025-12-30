@@ -943,3 +943,85 @@ Your response (JSON only):"""
             
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)})
+
+
+# =============================================================================
+# "THE WHY" — LINE-SPECIFIC EXPLANATION ENDPOINT
+# =============================================================================
+@csrf_exempt
+@require_http_methods(["POST"])
+def generate_why_explanation(request):
+    """
+    Generate a deterministic 'Why' explanation for a specific line.
+    
+    This is PHASE 1 of "The Why" feature - a teaching engine that explains
+    WHY a line of code exists, not just WHAT it does.
+    
+    Request body:
+    {
+        "full_code": "...",           # Full source code
+        "line_number": 9,             # Line number (1-indexed)
+        "line_text": "...",           # Exact line text
+        "phase": "pre-merge",         # Execution phase (optional)
+        "sample_input": {...},        # Sample input used (optional)
+        "problem_type": "...",        # Type of problem (optional)
+        "function_purpose": "..."     # Purpose of the function (optional)
+    }
+    
+    Response:
+    {
+        "success": true,
+        "explanation": "...",         # Structured explanation
+        "cached": true/false,         # Whether from cache
+        "line_number": 9,
+        "complexity": "compound_control"
+    }
+    """
+    try:
+        data = json.loads(request.body)
+        
+        # Required fields
+        full_code = data.get('full_code', '')
+        line_number = data.get('line_number', 0)
+        line_text = data.get('line_text', '')
+        
+        # Validation
+        if not full_code or not line_number:
+            return JsonResponse({
+                "success": False,
+                "error": "Missing required fields: full_code, line_number"
+            }, status=400)
+        
+        # Optional fields
+        phase = data.get('phase', 'execution')
+        sample_input = data.get('sample_input')
+        problem_type = data.get('problem_type', 'algorithm')
+        function_purpose = data.get('function_purpose', '')
+        
+        # Get the Why Explainer instance
+        from .why_explainer import get_why_explainer
+        why_explainer = get_why_explainer()
+        
+        # Generate explanation
+        result = why_explainer.generate_why_explanation(
+            full_code=full_code,
+            line_number=line_number,
+            line_text=line_text,
+            phase=phase,
+            sample_input=sample_input,
+            problem_type=problem_type,
+            function_purpose=function_purpose
+        )
+        
+        return JsonResponse({
+            "success": True,
+            **result
+        })
+        
+    except Exception as e:
+        print(f"[WhyEndpoint] ERROR: {e}")
+        return JsonResponse({
+            "success": False,
+            "error": str(e)
+        }, status=500)
+

@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Sparkles, Rocket, X } from 'lucide-react';
+import { Sparkles, Rocket, X, HelpCircle } from 'lucide-react';
 import EnterpriseVisualizer from './EnterpriseVisualizer';
 import MobileImmersiveVisualizer from './MobileImmersiveVisualizer';
+import AskSIAPanel from './AskSIAPanel';
+import { whyService } from '../../services/WhyService';
 
 const BATCH_SIZE = 6; // Number of steps to show/generate at a time
 
@@ -41,6 +43,12 @@ const ImmersiveVisualizer = ({
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [allSteps, setAllSteps] = useState([]);  // Store all steps with explanations
     const [scrollToStepIndex, setScrollToStepIndex] = useState(null);  // Index to scroll to after loading
+
+    // "The Why" feature state
+    const [rightPanelTab, setRightPanelTab] = useState('code');  // 'code' or 'asksia'
+    const [whyExplanation, setWhyExplanation] = useState(null);
+    const [isLoadingWhy, setIsLoadingWhy] = useState(false);
+    const [whyTargetStep, setWhyTargetStep] = useState(null);
 
     const scrollContainerRef = useRef(null);
     const latestStepRef = useRef(null);
@@ -227,6 +235,37 @@ const ImmersiveVisualizer = ({
             window.removeEventListener('mouseup', stopResizing);
         };
     }, [resize, stopResizing]);
+
+    // "The Why" handler - fetch explanation for a specific step
+    const handleWhyClick = useCallback(async (step, stepIndex) => {
+        console.log(`[Why] Clicked on step ${stepIndex + 1}, line ${step.lineNumber}`);
+
+        // Switch to Ask SIA tab
+        setRightPanelTab('asksia');
+        setWhyTargetStep(step);
+        setIsLoadingWhy(true);
+        setWhyExplanation(null);
+
+        try {
+            const result = await whyService.getWhyExplanation({
+                fullCode: code,
+                lineNumber: step.lineNumber,
+                lineText: step.code,
+                phase: step.phase || 'execution',
+                sampleInput: null,  // Could be passed from parent if available
+                problemType: 'algorithm',
+                functionPurpose: ''
+            });
+
+            console.log(`[Why] Received explanation for line ${step.lineNumber}:`, result.cached ? 'CACHED' : 'FRESH');
+            setWhyExplanation(result.explanation);
+        } catch (error) {
+            console.error('[Why] Error:', error);
+            setWhyExplanation(`💡 Why this step matters\n\n❌ Error: ${error.message}`);
+        } finally {
+            setIsLoadingWhy(false);
+        }
+    }, [code]);
 
     // Load more explanations on-demand with SSE streaming
     const loadMoreExplanations = useCallback(async () => {
@@ -625,50 +664,91 @@ const ImmersiveVisualizer = ({
                         style={{ transform: 'translateX(-50%)' }}
                     />
 
-                    {/* Source Code Panel (Light Theme) */}
-                    <div className="flex-1 overflow-y-auto pl-2 pr-4 py-4 font-mono text-sm bg-white text-slate-800">
-                        {codeLines.map((line, idx) => {
-                            const lineNum = idx + 1;
+                    {/* Tab Header */}
+                    <div className="flex-shrink-0 flex border-b border-slate-200 bg-slate-50">
+                        <button
+                            onClick={() => setRightPanelTab('code')}
+                            className={`flex-1 px-4 py-2.5 text-sm font-semibold transition-all ${rightPanelTab === 'code'
+                                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white'
+                                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                                }`}
+                        >
+                            Code
+                        </button>
+                        <button
+                            onClick={() => setRightPanelTab('asksia')}
+                            className={`flex-1 px-4 py-2.5 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${rightPanelTab === 'asksia'
+                                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white'
+                                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                                }`}
+                        >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            Ask SIA
+                            {isLoadingWhy && (
+                                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                            )}
+                        </button>
+                    </div>
 
-                            // In Enterprise mode, use currentStepIndex; in Timeline mode, use selectedStep or latest visible step
-                            const activeStep = visualizationMode === 'enterprise'
-                                ? (currentStepIndex >= 0 ? steps[currentStepIndex] : null)
-                                : (selectedStepIndex !== null ? visibleSteps[selectedStepIndex] : visibleSteps[visibleSteps.length - 1]);
+                    {/* Tab Content */}
+                    {rightPanelTab === 'code' && (
+                        /* Source Code Panel (Light Theme) */
+                        <div className="flex-1 overflow-y-auto pl-2 pr-4 py-4 font-mono text-sm bg-white text-slate-800">
+                            {codeLines.map((line, idx) => {
+                                const lineNum = idx + 1;
 
-                            const isCurrentLine = activeStep?.lineNumber === lineNum ||
-                                activeStep?.line_no === lineNum ||
-                                activeStep?.line === lineNum;
+                                // In Enterprise mode, use currentStepIndex; in Timeline mode, use selectedStep or latest visible step
+                                const activeStep = visualizationMode === 'enterprise'
+                                    ? (currentStepIndex >= 0 ? steps[currentStepIndex] : null)
+                                    : (selectedStepIndex !== null ? visibleSteps[selectedStepIndex] : visibleSteps[visibleSteps.length - 1]);
 
-                            // Check which lines have been executed so far
-                            const executedLines = visualizationMode === 'enterprise'
-                                ? steps.slice(0, currentStepIndex + 1).map(s => s.lineNumber || s.line_no || s.line)
-                                : visibleSteps.map(s => s.lineNumber || s.line_no || s.line);
-                            const wasExecuted = executedLines.includes(lineNum);
+                                const isCurrentLine = activeStep?.lineNumber === lineNum ||
+                                    activeStep?.line_no === lineNum ||
+                                    activeStep?.line === lineNum;
 
-                            return (
-                                <div
-                                    key={idx}
-                                    className={`flex transition-all duration-300 rounded-lg ${isCurrentLine
-                                        ? 'bg-indigo-50 border-l-4 border-indigo-600'
-                                        : ''
-                                        }`}
-                                >
-                                    <span className={`w-8 min-w-[2rem] text-right pr-3 select-none flex-shrink-0 ${isCurrentLine ? 'text-indigo-600 font-bold' : 'text-slate-400'
-                                        }`}>
-                                        {lineNum}
-                                    </span>
-                                    <span
-                                        className={`flex-1 whitespace-pre ${isCurrentLine
-                                            ? 'text-slate-900'
-                                            : 'text-slate-600'
+                                // Check which lines have been executed so far
+                                const executedLines = visualizationMode === 'enterprise'
+                                    ? steps.slice(0, currentStepIndex + 1).map(s => s.lineNumber || s.line_no || s.line)
+                                    : visibleSteps.map(s => s.lineNumber || s.line_no || s.line);
+                                const wasExecuted = executedLines.includes(lineNum);
+
+                                return (
+                                    <div
+                                        key={idx}
+                                        className={`flex transition-all duration-300 rounded-lg ${isCurrentLine
+                                            ? 'bg-indigo-50 border-l-4 border-indigo-600'
+                                            : ''
                                             }`}
                                     >
-                                        {highlightSyntax(line)}
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                        <span className={`w-8 min-w-[2rem] text-right pr-3 select-none flex-shrink-0 ${isCurrentLine ? 'text-indigo-600 font-bold' : 'text-slate-400'
+                                            }`}>
+                                            {lineNum}
+                                        </span>
+                                        <span
+                                            className={`flex-1 whitespace-pre ${isCurrentLine
+                                                ? 'text-slate-900'
+                                                : 'text-slate-600'
+                                                }`}
+                                        >
+                                            {highlightSyntax(line)}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {rightPanelTab === 'asksia' && (
+                        /* Ask SIA Panel - The Why Explanation */
+                        <AskSIAPanel
+                            explanation={whyExplanation}
+                            lineNumber={whyTargetStep?.lineNumber}
+                            lineText={whyTargetStep?.code}
+                            isLoading={isLoadingWhy}
+                            isReadOnly={true}
+                            complexity={whyTargetStep?.complexity || 'simple'}
+                        />
+                    )}
                 </div>
 
                 {/* Right Side - Execution Timeline (Scrollable) */}
@@ -745,12 +825,28 @@ const ImmersiveVisualizer = ({
                                                 ? 'ring-2 ring-indigo-400'
                                                 : 'hover:shadow-xl'
                                                 }`}>
-                                                {/* Line Badge */}
+                                                {/* Line Badge + Why Button */}
                                                 <div className="flex items-center gap-3 mb-4">
                                                     <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold">
                                                         Line {step.lineNumber}
                                                     </span>
                                                     <span className="text-xs text-slate-400">Step {idx + 1}</span>
+
+                                                    {/* Why Button - THE WHY FEATURE */}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleWhyClick(step, idx);
+                                                        }}
+                                                        className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${whyTargetStep?.lineNumber === step.lineNumber && rightPanelTab === 'asksia'
+                                                            ? 'bg-indigo-600 text-white shadow-md'
+                                                            : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                                                            }`}
+                                                        title="Understand why this line exists"
+                                                    >
+                                                        <HelpCircle className="w-3.5 h-3.5" />
+                                                        Why?
+                                                    </button>
                                                 </div>
 
                                                 {/* Code - Big, prominent */}

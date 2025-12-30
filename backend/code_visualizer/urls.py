@@ -26,4 +26,7 @@ urlpatterns = [
     
     # Code validation
     path('validate/', views.validate_code_endpoint, name='validate'),
+    
+    # "The Why" — Line-specific explanations
+    path('generate-why/', views.generate_why_explanation, name='generate_why_explanation'),
 ]
