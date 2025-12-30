@@ -252,10 +252,12 @@ const AskSIAPanel = ({
                     </div>
                 )}
 
-                {/* Explanation Content */}
+                {/* Explanation Content - Visual distinction for WHY section */}
                 {!isLoading && explanation && !explanation.includes('❌') && (
-                    <div className="prose prose-slate prose-sm max-w-none">
-                        {renderExplanation(explanation)}
+                    <div className="bg-indigo-50/50 border border-indigo-100 border-l-4 border-l-indigo-400 rounded-lg p-4">
+                        <div className="prose prose-slate prose-sm max-w-none">
+                            {renderExplanation(explanation)}
+                        </div>
                     </div>
                 )}
             </div>
