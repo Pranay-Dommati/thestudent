@@ -184,14 +184,19 @@ class WhyExplanationCache:
         return None
     
     def set(self, full_code: str, line_number: int, explanation: str) -> None:
-        """Cache an explanation."""
+        """Cache an explanation only if it's complete (not truncated)."""
+        # Don't cache truncated/incomplete responses
+        if not explanation or len(explanation) < 200:
+            print(f"[WhyCache] SKIPPED (too short - {len(explanation) if explanation else 0} chars): Line {line_number}")
+            return
+        
         key = self._generate_key(full_code, line_number)
         self._cache[key] = {
             'explanation': explanation,
             'created_at': datetime.utcnow().isoformat(),
             'line_number': line_number
         }
-        print(f"[WhyCache] STORED: Line {line_number} (key={key[:8]}...)")
+        print(f"[WhyCache] STORED: Line {line_number} ({len(explanation)} chars, key={key[:8]}...)")
     
     def clear(self) -> None:
         """Clear all cached explanations."""
@@ -284,9 +289,15 @@ class WhyExplainer:
                 'complexity': str
             }
         """
+        import time
+        request_id = f"{line_number}_{int(time.time() * 1000) % 10000}"
+        print(f"\n[Why #{request_id}] ========== REQUEST START ==========")
+        print(f"[Why #{request_id}] Line {line_number}: '{line_text[:50]}...' " if len(line_text) > 50 else f"[Why #{request_id}] Line {line_number}: '{line_text}'")
+        
         # Check cache first
         cached_explanation = self.cache.get(full_code, line_number)
         if cached_explanation:
+            print(f"[Why #{request_id}] ✓ CACHE HIT - returning {len(cached_explanation)} chars")
             return {
                 'explanation': cached_explanation,
                 'cached': True,
@@ -294,8 +305,11 @@ class WhyExplainer:
                 'complexity': self._detect_line_complexity(line_text)
             }
         
+        print(f"[Why #{request_id}] CACHE MISS - generating fresh explanation")
+        
         # Check if AI is available
         if not self.is_available or not self.client:
+            print(f"[Why #{request_id}] ✗ ERROR: AI service unavailable")
             error_msg = "💡 Why this step matters\n\n❌ AI service unavailable. Please check API configuration."
             return {
                 'explanation': error_msg,
@@ -306,6 +320,7 @@ class WhyExplainer:
         
         # Detect complexity
         complexity = self._detect_line_complexity(line_text)
+        print(f"[Why #{request_id}] Detected complexity: {complexity}")
         
         # Build user prompt
         prompt = self._build_prompt(
@@ -321,26 +336,37 @@ class WhyExplainer:
         
         try:
             # Call Gemini AI
+            print(f"[Why #{request_id}] Calling Gemini AI (max_tokens=2500)...")
+            start_time = time.time()
+            
             response = self.client.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=WHY_SYSTEM_PROMPT,
                     temperature=0.1,  # Very low for determinism
-                    max_output_tokens=1500,
+                    max_output_tokens=2500,  # Increased for complex multi-condition explanations
                 )
             )
             
+            elapsed = time.time() - start_time
             explanation = response.text.strip()
+            
+            print(f"[Why #{request_id}] ✓ AI responded in {elapsed:.2f}s")
+            print(f"[Why #{request_id}] Response length: {len(explanation)} chars")
+            
+            # Warn if response seems truncated
+            if len(explanation) < 200:
+                print(f"[Why #{request_id}] ⚠️ WARNING: Response seems truncated! Only {len(explanation)} chars")
             
             # Ensure it starts with the header
             if not explanation.startswith('💡'):
                 explanation = f"💡 Why this step matters\n\n{explanation}"
             
-            # Cache the result
+            # Cache the result (will skip if too short)
             self.cache.set(full_code, line_number, explanation)
             
-            print(f"[WhyExplainer] Generated explanation for line {line_number} ({complexity})")
+            print(f"[Why #{request_id}] ========== REQUEST COMPLETE ==========\n")
             
             return {
                 'explanation': explanation,
@@ -350,8 +376,10 @@ class WhyExplainer:
             }
             
         except Exception as e:
+            elapsed = time.time() - start_time if 'start_time' in dir() else 0
+            print(f"[Why #{request_id}] ✗ ERROR after {elapsed:.2f}s: {type(e).__name__}: {str(e)}")
+            print(f"[Why #{request_id}] ========== REQUEST FAILED ==========\n")
             error_msg = f"💡 Why this step matters\n\n❌ Error generating explanation: {str(e)}"
-            print(f"[WhyExplainer] ERROR: {e}")
             return {
                 'explanation': error_msg,
                 'cached': False,
