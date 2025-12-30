@@ -261,7 +261,9 @@ const ImmersiveVisualizer = ({
 
             console.log(`[On-Demand] Using ${executionId ? 'ENTERPRISE' : 'LEGACY'} mode for steps ${currentCount}-${currentCount + remainingSteps.length - 1}`);
 
-            const response = await fetch('/api/visualizer/generate-explanations-stream/', {
+            // Use environment variable for production or fallback to relative path for local dev
+            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+            const response = await fetch(`${apiBaseUrl}/visualizer/generate-explanations-stream/`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)

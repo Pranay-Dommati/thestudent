@@ -1,33 +1,70 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React from "react";
+import { Link } from "react-router-dom";
+import { FaLinkedin, FaInstagram } from "react-icons/fa";
+import { FaXTwitter } from "react-icons/fa6";
 
 const AuthFooter = () => {
-  return (
-    <footer className="relative mt-auto bg-white/80 backdrop-blur-sm border-t border-gray-200">
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
-          {/* Left side - Links */}
-          <div className="flex items-center space-x-6 text-sm text-gray-600">
-            <Link to="/privacy" className="hover:text-blue-600 transition-colors">
-              Privacy Policy
-            </Link>
-            <Link to="/terms" className="hover:text-blue-600 transition-colors">
-              Terms of Service
-            </Link>
-            <Link to="/feedback" className="hover:text-blue-600 transition-colors">
-              Feedback
-            </Link>
-          </div>
+    return (
+        <footer className="bg-white border-t border-gray-100 pt-8 pb-6 mt-12 pb-24 lg:pb-6">
+            <div className="max-w-6xl mx-auto px-4">
 
-          {/* Right side - Copyright */}
-          <div className="flex items-center space-x-2 text-sm text-gray-500">
-            <span>© {new Date().getFullYear()} EasyLearnova.</span>
-            <span className="hidden sm:inline">All rights reserved.</span>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
+                {/* Simplified Layout: Links & Social */}
+                <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
+
+                    {/* Navigation Links */}
+                    <div className="flex flex-wrap justify-center md:justify-start gap-x-8 gap-y-2 text-sm font-medium text-gray-500">
+                        <Link to="/feedback" className="hover:text-indigo-600 transition-colors">Feedback</Link>
+                        <Link to="/terms-and-conditions" className="hover:text-indigo-600 transition-colors">Terms of Service</Link>
+                        <Link to="/privacy-policy" className="hover:text-indigo-600 transition-colors">Privacy Policy</Link>
+                    </div>
+
+                    {/* Social Media Icons */}
+                    <div className="flex justify-center space-x-6 text-xl">
+                        <a
+                            href="https://x.com/easylearnova"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-400 hover:text-gray-900 transition-colors"
+                            title="X (Twitter)"
+                            aria-label="Visit us on X (Twitter)"
+                        >
+                            <FaXTwitter />
+                        </a>
+                        <a
+                            href="https://www.linkedin.com/company/easylearnova/?viewAsMember=true"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-400 hover:text-[#0077b5] transition-colors"
+                            title="LinkedIn"
+                            aria-label="Visit us on LinkedIn"
+                        >
+                            <FaLinkedin />
+                        </a>
+                        <a
+                            href="https://www.instagram.com/easylearnova"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-400 hover:text-[#E4405F] transition-colors"
+                            title="Instagram"
+                            aria-label="Visit us on Instagram"
+                        >
+                            <FaInstagram />
+                        </a>
+                    </div>
+                </div>
+
+                {/* Divider & Copyright */}
+                <div className="border-t border-gray-100 pt-6 text-center md:text-left flex flex-col md:flex-row justify-between items-center text-xs text-gray-400">
+                    <p>
+                        © {new Date().getFullYear()} EasyLearnova. All rights reserved.
+                        <span className="mx-2">|</span>
+                        <a href="https://easylearnova.com" className="hover:text-indigo-600 transition-colors">Powered by EasyLearnova</a>
+                    </p>
+                    <p className="mt-2 md:mt-0">Empowering learners worldwide.</p>
+                </div>
+            </div>
+        </footer>
+    );
 };
 
 export default AuthFooter;

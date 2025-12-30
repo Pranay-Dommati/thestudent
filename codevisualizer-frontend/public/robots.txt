@@ -1,61 +1,7 @@
-# ==============================
-# EasyLearnova Robots.txt
-# Last updated: 25 Oct 2025
-# ==============================
-
 User-agent: *
-
-# Allow all public pages by default
 Allow: /
 
-# Explicitly allow important static assets
-# Critical for React/Vite SPA - Google needs these to render pages properly
-Allow: /assets/
-Allow: /static/
-Allow: /images/
-Allow: /js/
-Allow: /css/
-Allow: /fonts/
+Disallow: /admin
+Disallow: /api
 
-# Disallow private and authentication routes
-# User-specific pages (require login)
-Disallow: /profile
-Disallow: /learning-hub
-
-# Authentication and password reset pages
-Disallow: /auth
-Disallow: /login
-Disallow: /signup
-Disallow: /reset-password/
-Disallow: /forgot-password
-
-# Admin and internal pages
-Disallow: /admin-p/
-Disallow: /admin/
-Disallow: /api/
-Disallow: /internal/
-Disallow: /testing/
-Disallow: /test/
-
-# Prevent crawling of dynamic learning pages (user-specific content)
-# These pages require enrollment and authentication
-Disallow: /courses/*/learning
-# Note: /pro-learning (without courseId) now redirects to /chat (301)
-# We block direct indexing, but allow /pro-learning/:courseId for AI courses
-Disallow: /pro-learning$
-Disallow: /courses/*/certificate
-Disallow: /courses/*/learning/quiz
-
-# Prevent crawling of search result pages with query parameters
-# Saves crawl budget and prevents duplicate content
-Disallow: /*?*search=
-Disallow: /*?*query=
-Disallow: /*?*filter=
-Disallow: /*?*sort=
-
-# Redirect/alias cleanup (avoid duplicate content)
-Disallow: /terms
-Disallow: /privacy
-
-# Sitemap location for efficient crawling
-Sitemap: https://easylearnova.com/sitemap.xml
+Sitemap: https://codevisualizer.easylearnova.com/sitemap.xml

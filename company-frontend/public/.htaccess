@@ -1,3 +1,11 @@
+## 301 Redirects: Course pages to courses subdomain (MUST BE FIRST)
+Redirect 301 /courses https://courses.easylearnova.com/
+Redirect 301 /courses/10th https://courses.easylearnova.com/10th
+Redirect 301 /courses/11th https://courses.easylearnova.com/11th
+Redirect 301 /courses/12th https://courses.easylearnova.com/12th
+Redirect 301 /courses/6th https://courses.easylearnova.com/6th
+Redirect 301 /courses/7th https://courses.easylearnova.com/7th
+
 ## SPA routing for React/Vite on Apache (Hostinger)
 ## This file resides in frontend/public so Vite copies it into dist/ on build.
 

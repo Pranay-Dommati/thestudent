@@ -155,7 +155,11 @@ const Footer = () => {
 
                 {/* Divider & Copyright */}
                 <div className="border-t border-gray-100 pt-6 text-center md:text-left flex flex-col md:flex-row justify-between items-center text-xs text-gray-400">
-                    <p>© {new Date().getFullYear()} EasyLearnova. All rights reserved.</p>
+                    <p>
+                        © {new Date().getFullYear()} EasyLearnova. All rights reserved.
+                        <span className="mx-2">|</span>
+                        <a href="https://easylearnova.com" className="hover:text-indigo-600 transition-colors">Powered by EasyLearnova</a>
+                    </p>
                     <p className="mt-2 md:mt-0">Empowering learners worldwide.</p>
                 </div>
             </div>

@@ -60,7 +60,9 @@ const Footer = () => {
                 {/* Bottom Row: Copyright and Slogan */}
                 <div className="border-t border-slate-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-500">
                     <p>
-                        © {new Date().getFullYear()} EasyLearnova. All rights reserved.
+                        © {new Date().getFullYear()} Code Visualizer. All rights reserved.
+                        <span className="mx-2">|</span>
+                        <a href="https://easylearnova.com" className="hover:text-blue-600 transition-colors">Powered by EasyLearnova</a>
                     </p>
                     <p>
                         Empowering learners worldwide.
