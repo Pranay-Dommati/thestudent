@@ -163,10 +163,11 @@ const ImmersiveVisualizer = ({
             const scrollBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
 
             // Only auto-scroll if user is within 300px of the bottom (not reading previous content)
-            if (scrollBottom < 300) {
+            // AND we have more than 2 steps (prevents initial jump on second step)
+            if (scrollBottom < 300 && visibleSteps.length > 2) {
                 latestStepRef.current.scrollIntoView({
                     behavior: 'smooth',
-                    block: 'center'
+                    block: 'nearest'
                 });
             }
         }
@@ -669,8 +670,8 @@ const ImmersiveVisualizer = ({
                         <button
                             onClick={() => setRightPanelTab('code')}
                             className={`flex-1 px-4 py-2.5 text-sm font-semibold transition-all ${rightPanelTab === 'code'
-                                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white'
-                                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                                ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white'
+                                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
                                 }`}
                         >
                             Code
@@ -678,8 +679,8 @@ const ImmersiveVisualizer = ({
                         <button
                             onClick={() => setRightPanelTab('asksia')}
                             className={`flex-1 px-4 py-2.5 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${rightPanelTab === 'asksia'
-                                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white'
-                                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
+                                ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white'
+                                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'
                                 }`}
                         >
                             <Sparkles className="w-3.5 h-3.5" />
@@ -845,7 +846,7 @@ const ImmersiveVisualizer = ({
                                                         title="Understand why this line exists"
                                                     >
                                                         <HelpCircle className="w-3.5 h-3.5" />
-                                                        Why?
+                                                        The Why?
                                                     </button>
                                                 </div>
 

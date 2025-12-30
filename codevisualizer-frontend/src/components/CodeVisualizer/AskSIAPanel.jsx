@@ -1,5 +1,6 @@
 import React from 'react';
-import { Sparkles, Lightbulb, MessageCircle, AlertCircle, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { Sparkles, MessageCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 /**
  * AskSIAPanel — Read-only explanation renderer panel
@@ -27,156 +28,90 @@ const AskSIAPanel = ({
 }) => {
 
     /**
-     * Parse and render the explanation with proper formatting
+     * Preprocess the explanation to clean up the header
      */
-    const renderExplanation = (text) => {
-        if (!text) return null;
+    const preprocessExplanation = (text) => {
+        if (!text) return '';
+        // Remove the emoji header line - we'll render our own
+        return text
+            .replace(/^💡\s*Why this step matters\s*\n*/i, '')
+            .replace(/^Why this step matters\s*\n*/i, '')
+            .trim();
+    };
 
-        // Split by lines and process
-        const lines = text.split('\n');
-        const elements = [];
-        let currentList = [];
-        let inList = false;
-
-        lines.forEach((line, idx) => {
-            // Header line (💡 Why this step matters)
-            if (line.includes('💡') || line.includes('Why this step matters')) {
-                elements.push(
-                    <div key={idx} className="flex items-center gap-2 mb-4 pb-3 border-b border-indigo-200">
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-                            <Lightbulb className="w-4 h-4 text-white" />
-                        </div>
-                        <h3 className="text-base font-bold text-slate-800">
-                            Why this step matters
-                        </h3>
+    /**
+     * Custom components for ReactMarkdown styling
+     */
+    const markdownComponents = {
+        // Headings
+        h1: ({ children }) => (
+            <h3 className="text-lg font-bold text-slate-900 mt-4 mb-2">{children}</h3>
+        ),
+        h2: ({ children }) => (
+            <h4 className="text-base font-semibold text-indigo-700 mt-4 mb-2 flex items-start gap-2">
+                <span className="text-indigo-400">▸</span>
+                <span>{children}</span>
+            </h4>
+        ),
+        h3: ({ children }) => (
+            <h4 className="text-base font-semibold text-indigo-700 mt-3 mb-1 flex items-start gap-2">
+                <span className="text-indigo-400">▸</span>
+                <span>{children}</span>
+            </h4>
+        ),
+        // Paragraphs
+        p: ({ children }) => {
+            // Check if this is a failure/success case
+            const text = String(children);
+            if (text.toLowerCase().includes('failure case:')) {
+                return (
+                    <div className="mt-3 p-3 rounded-lg bg-red-50 border border-red-200">
+                        <span className="font-semibold text-red-700">⚠️ {children}</span>
                     </div>
                 );
-                return;
             }
-
-            // Bold headers (**Condition 1: ...**)
-            if (line.startsWith('**') && line.includes(':**')) {
-                // Close any open list
-                if (inList && currentList.length > 0) {
-                    elements.push(
-                        <ul key={`list-${idx}`} className="list-disc list-inside text-slate-600 mb-3 pl-2 space-y-1">
-                            {currentList}
-                        </ul>
-                    );
-                    currentList = [];
-                    inList = false;
-                }
-
-                const headerText = line.replace(/\*\*/g, '').trim();
-                elements.push(
-                    <h4 key={idx} className="font-semibold text-indigo-700 mt-4 mb-1 flex items-start gap-2">
-                        <span className="text-indigo-400">▸</span>
-                        <span>{headerText}</span>
-                    </h4>
-                );
-                return;
-            }
-
-            // Bullet points (- item)
-            if (line.trim().startsWith('- ') || line.trim().startsWith('• ')) {
-                inList = true;
-                currentList.push(
-                    <li key={`li-${idx}`} className="text-slate-700">
-                        {line.trim().substring(2)}
-                    </li>
-                );
-                return;
-            }
-
-            // Failure/Success case headers
-            if (line.toLowerCase().includes('failure case:') || line.toLowerCase().includes('success case:')) {
-                // Close any open list
-                if (inList && currentList.length > 0) {
-                    elements.push(
-                        <ul key={`list-${idx}`} className="list-disc list-inside text-slate-600 mb-3 pl-2 space-y-1">
-                            {currentList}
-                        </ul>
-                    );
-                    currentList = [];
-                    inList = false;
-                }
-
-                const isFailure = line.toLowerCase().includes('failure');
-                elements.push(
-                    <div key={idx} className={`mt-3 p-3 rounded-lg ${isFailure ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
-                        <span className={`font-semibold ${isFailure ? 'text-red-700' : 'text-green-700'}`}>
-                            {isFailure ? '⚠️ ' : '✓ '}{line}
-                        </span>
+            if (text.toLowerCase().includes('success case:')) {
+                return (
+                    <div className="mt-3 p-3 rounded-lg bg-green-50 border border-green-200">
+                        <span className="font-semibold text-green-700">✓ {children}</span>
                     </div>
                 );
-                return;
             }
+            return <p className="text-slate-700 leading-relaxed mb-3">{children}</p>;
+        },
+        // Strong/Bold text
+        strong: ({ children }) => (
+            <strong className="font-semibold text-slate-900">{children}</strong>
+        ),
+        // Inline code - light style like ChatGPT
+        code: ({ children, inline, className }) => {
+            // Check if it's a code block (has language class) or inline
+            const isInline = inline || !className;
 
-            // Code blocks (`code`)
-            if (line.includes('`')) {
-                const parts = line.split('`');
-                const rendered = parts.map((part, i) => {
-                    if (i % 2 === 1) {
-                        // Code part
-                        return (
-                            <code key={i} className="px-1.5 py-0.5 rounded bg-slate-100 text-indigo-700 font-mono text-sm">
-                                {part}
-                            </code>
-                        );
-                    }
-                    return part;
-                });
-
-                // Close any open list
-                if (inList && currentList.length > 0) {
-                    elements.push(
-                        <ul key={`list-${idx}`} className="list-disc list-inside text-slate-600 mb-3 pl-2 space-y-1">
-                            {currentList}
-                        </ul>
-                    );
-                    currentList = [];
-                    inList = false;
-                }
-
-                elements.push(
-                    <p key={idx} className="text-slate-700 leading-relaxed mb-2">
-                        {rendered}
-                    </p>
-                );
-                return;
-            }
-
-            // Regular paragraph
-            if (line.trim()) {
-                // Close any open list
-                if (inList && currentList.length > 0) {
-                    elements.push(
-                        <ul key={`list-${idx}`} className="list-disc list-inside text-slate-600 mb-3 pl-2 space-y-1">
-                            {currentList}
-                        </ul>
-                    );
-                    currentList = [];
-                    inList = false;
-                }
-
-                elements.push(
-                    <p key={idx} className="text-slate-700 leading-relaxed mb-2">
-                        {line}
-                    </p>
+            if (isInline) {
+                return (
+                    <code className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-800 font-mono text-sm border border-slate-200">
+                        {children}
+                    </code>
                 );
             }
-        });
-
-        // Close any remaining list
-        if (inList && currentList.length > 0) {
-            elements.push(
-                <ul key="list-final" className="list-disc list-inside text-slate-600 mb-3 pl-2 space-y-1">
-                    {currentList}
-                </ul>
+            // Code blocks - keep dark theme for contrast
+            return (
+                <pre className="bg-slate-800 text-slate-100 rounded-lg p-4 overflow-x-auto my-3 border border-slate-700">
+                    <code className="font-mono text-sm">{children}</code>
+                </pre>
             );
-        }
-
-        return elements;
+        },
+        // Lists
+        ul: ({ children }) => (
+            <ul className="list-disc list-inside text-slate-700 mb-3 pl-2 space-y-1">{children}</ul>
+        ),
+        ol: ({ children }) => (
+            <ol className="list-decimal list-inside text-slate-700 mb-3 pl-2 space-y-1">{children}</ol>
+        ),
+        li: ({ children }) => (
+            <li className="text-slate-700">{children}</li>
+        ),
     };
 
     return (
@@ -240,23 +175,32 @@ const AskSIAPanel = ({
                     </div>
                 )}
 
-                {/* Error State */}
-                {!isLoading && explanation && explanation.includes('❌') && (
+                {/* Error State - Only if it starts with X and isn't a valid explanation */}
+                {!isLoading && explanation && explanation.trim().startsWith('❌') && !explanation.includes('Why this step matters') && (
                     <div className="p-4 rounded-xl bg-red-50 border border-red-200">
                         <div className="flex items-start gap-3">
                             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                             <div className="text-red-700 text-sm">
-                                {renderExplanation(explanation)}
+                                <ReactMarkdown components={markdownComponents}>
+                                    {explanation}
+                                </ReactMarkdown>
                             </div>
                         </div>
                     </div>
                 )}
 
                 {/* Explanation Content - Visual distinction for WHY section */}
-                {!isLoading && explanation && !explanation.includes('❌') && (
+                {!isLoading && explanation && !(explanation.trim().startsWith('❌') && !explanation.includes('Why this step matters')) && (
                     <div className="bg-indigo-50/50 border border-indigo-100 border-l-4 border-l-indigo-400 rounded-lg p-4">
+                        {/* Header */}
+                        <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b border-indigo-200">
+                            Why this step matters
+                        </h3>
+                        {/* Markdown Content */}
                         <div className="prose prose-slate prose-sm max-w-none">
-                            {renderExplanation(explanation)}
+                            <ReactMarkdown components={markdownComponents}>
+                                {preprocessExplanation(explanation)}
+                            </ReactMarkdown>
                         </div>
                     </div>
                 )}

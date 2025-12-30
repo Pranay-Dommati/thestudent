@@ -74,10 +74,24 @@ This line contains a single condition, and it is necessary.
 [Brief explanation]
 
 **Failure case:**
-[What would go wrong without it]
+Check condition:
+
+`[var] [op] [var]` → `[evaluated]` → ❌
+
+This means:
+- [algorithm decision]
+- [what action happens (e.g. skip/continue)]
+- [what happens next]
 
 **Success case:**
-[What happens when satisfied]
+Check condition:
+
+`[var] [op] [var]` → `[evaluated]` → ✅
+
+This means:
+- [algorithm decision]
+- [what action happens]
+- [what happens next]
 
 For COMPOUND lines (loops or conditions with multiple checks using 'and'/'or'):
 💡 Why this step matters
@@ -94,10 +108,24 @@ This line contains [N] conditions, and all are necessary.
 [Explain why they work together]
 
 **Failure case:**
-[What would go wrong if a condition was missing]
+Check condition:
+
+`[var] [op] [var]` → `[evaluated]` → ❌
+
+This means:
+- [algorithm decision]
+- [what action happens]
+- [what happens next]
 
 **Success case:**
-[What happens when conditions are satisfied]
+Check condition:
+
+`[var] [op] [var]` → `[evaluated]` → ✅
+
+This means:
+- [algorithm decision]
+- [what action happens]
+- [what happens next]
 
 RULES:
 - Start with "💡 Why this step matters" header
@@ -105,7 +133,14 @@ RULES:
 - Be educational but CONCISE — no fluff
 - For simple lines AND simple loops, keep it to 1-2 direct sentences
 - ONLY use the compound format when the line has 'and' or 'or' keywords
-- Focus on the WHY, not the WHAT"""
+- Focus on the WHY, not the WHAT
+- For Failure/Success cases:
+    - ALWAYS start with "**Failure case:**" or "**Success case:**"
+    - ALWAYS put "Check condition:" on its own line
+    - ALWAYS put the expression `... → ...` on its own line with a blank line before it
+    - ALWAYS use the bullet list for "This means:"
+- NEVER write Failure/Success as paragraphs or essay form
+- Show HOW the algorithm THINKS, not just describe it"""
 
 
 # =============================================================================
