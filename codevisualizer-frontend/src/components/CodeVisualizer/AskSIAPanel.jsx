@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Sparkles, MessageCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Sparkles, MessageCircle, AlertCircle, Loader2, Reply } from 'lucide-react';
 
 /**
  * AskSIAPanel — Read-only explanation renderer panel
@@ -179,7 +179,7 @@ const AskSIAPanel = ({
                             Explore Why
                         </h3>
                         <p className="text-slate-500 text-sm max-w-xs">
-                            Click the <span className="font-semibold text-indigo-600"><RotateCcw className="w-3 h-3 inline mr-1" />The Why</span> button on any step card to understand why that line of code exists.
+                            Click the <span className="font-semibold text-indigo-600"><Reply className="w-3 h-3 inline mr-1 transform rotate-180" />The Why</span> button on any step card to understand why that line of code exists.
                         </p>
                     </div>
                 )}

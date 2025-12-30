@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Sparkles, Rocket, X, RotateCcw } from 'lucide-react';
+import { Sparkles, Rocket, X, Reply } from 'lucide-react';
 import EnterpriseVisualizer from './EnterpriseVisualizer';
 import MobileImmersiveVisualizer from './MobileImmersiveVisualizer';
 import AskSIAPanel from './AskSIAPanel';
@@ -851,7 +851,7 @@ const ImmersiveVisualizer = ({
                                                             }`}
                                                         title="Understand why this line exists"
                                                     >
-                                                        <RotateCcw className="w-3.5 h-3.5" />
+                                                        <Reply className="w-3.5 h-3.5 transform rotate-180" />
                                                         The Why?
                                                     </button>
                                                 </div>
