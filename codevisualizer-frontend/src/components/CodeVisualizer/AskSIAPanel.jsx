@@ -162,7 +162,19 @@ const AskSIAPanel = ({
             <code className="font-mono text-sm">{children}</code>
         ),
         pre: ({ children }) => (
-            <pre className="bg-slate-800 text-slate-100 rounded-lg p-3 overflow-x-auto my-2 text-sm">{children}</pre>
+            <pre
+                className="rounded-[10px] overflow-x-auto my-2 font-mono"
+                style={{
+                    backgroundColor: '#F6F8FF',
+                    border: '1px solid #E0E7FF',
+                    padding: '12px 14px',
+                    fontSize: '13.5px',
+                    lineHeight: 1.6,
+                    color: '#1E293B'
+                }}
+            >
+                {children}
+            </pre>
         ),
         ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
         ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
