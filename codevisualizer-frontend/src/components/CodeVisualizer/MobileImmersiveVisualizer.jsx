@@ -447,22 +447,22 @@ const MobileImmersiveVisualizer = ({
                                             {/* Header */}
                                             <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold">
+                                                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-medium">
                                                         Line {step.lineNumber || step.line_no || step.line}
                                                     </span>
                                                     <span className="text-xs text-slate-400">
                                                         Step {idx + 1}
                                                     </span>
                                                 </div>
-                                                {/* Understand Button - Mobile */}
+                                                {/* Understand Button - Mobile (Subtle indigo) */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleUnderstandClick(step, idx);
                                                     }}
-                                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${whyTargetStep?.lineNumber === (step.lineNumber || step.line_no || step.line) && showSIASidebar
-                                                        ? 'bg-indigo-600 text-white shadow-md'
-                                                        : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${whyTargetStep?.lineNumber === (step.lineNumber || step.line_no || step.line) && showSIASidebar
+                                                        ? 'bg-indigo-500 text-white shadow-sm'
+                                                        : 'bg-indigo-50 text-indigo-400 hover:bg-indigo-100 hover:text-indigo-500'
                                                         }`}
                                                     title="Ask questions or learn why this step matters"
                                                 >
@@ -684,15 +684,9 @@ const MobileImmersiveVisualizer = ({
 
             {/* SIA Sidebar Overlay - Chat-based mentor interface */}
             {showSIASidebar && (
-                <div className="fixed inset-0 z-[60]">
-                    {/* Backdrop */}
-                    <div
-                        className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity animate-[fadeSlideIn_0.2s_ease-out]"
-                        onClick={() => setShowSIASidebar(false)}
-                    />
-
-                    {/* Sidebar Panel */}
-                    <div className="absolute right-0 top-0 bottom-0 w-[90%] max-w-[360px] bg-white shadow-2xl flex flex-col border-l border-slate-200 animate-[slideInRight_0.3s_cubic-bezier(0.16,1,0.3,1)]">
+                <div className="fixed inset-0 z-[60] bg-white">
+                    {/* Full-screen Panel */}
+                    <div className="absolute inset-0 bg-white flex flex-col animate-[slideInRight_0.3s_cubic-bezier(0.16,1,0.3,1)]">
                         {/* AskSIAPanel v2 - Chat interface */}
                         <AskSIAPanel
                             stepContext={whyTargetStep ? {
