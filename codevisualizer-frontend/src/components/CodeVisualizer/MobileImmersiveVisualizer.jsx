@@ -1,6 +1,8 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Sparkles, ChevronLeft, Play, Code2, List, PanelRight, Rocket, X } from 'lucide-react';
+import { Sparkles, ChevronLeft, Play, Code2, List, PanelRight, Rocket, X, Reply } from 'lucide-react';
 import EnterpriseVisualizer from './EnterpriseVisualizer';
+import AskSIAPanel from './AskSIAPanel';
+import { whyService } from '../../services/WhyService';
 
 // CSS animation for smooth card appearance
 const cardAnimationStyles = `
@@ -50,6 +52,12 @@ const MobileImmersiveVisualizer = ({
     const [showCodeSidebar, setShowCodeSidebar] = useState(false);
     const [showEnterpriseModal, setShowEnterpriseModal] = useState(false);
 
+    // "The Why" feature state
+    const [showSIASidebar, setShowSIASidebar] = useState(false);
+    const [whyExplanation, setWhyExplanation] = useState(null);
+    const [isLoadingWhy, setIsLoadingWhy] = useState(false);
+    const [whyTargetStep, setWhyTargetStep] = useState(null);
+
     // Default: normal scroll
     const hasMoreSteps = visibleSteps.length < totalSteps;
 
@@ -90,6 +98,37 @@ const MobileImmersiveVisualizer = ({
 
         return () => container.removeEventListener('scroll', updateFocusedCard);
     }, [updateFocusedCard, visibleSteps.length]);
+
+    // "The Why" handler - fetch explanation for a specific step
+    const handleWhyClick = useCallback(async (step, stepIndex) => {
+        console.log(`[Why Mobile] Clicked on step ${stepIndex + 1}, line ${step.lineNumber}`);
+
+        // Open SIA sidebar and show loading
+        setShowSIASidebar(true);
+        setWhyTargetStep(step);
+        setIsLoadingWhy(true);
+        setWhyExplanation(null);
+
+        try {
+            const result = await whyService.getWhyExplanation({
+                fullCode: code,
+                lineNumber: step.lineNumber,
+                lineText: step.code,
+                phase: step.phase || 'execution',
+                sampleInput: null,
+                problemType: 'algorithm',
+                functionPurpose: ''
+            });
+
+            console.log(`[Why Mobile] Received explanation for line ${step.lineNumber}:`, result.cached ? 'CACHED' : 'FRESH');
+            setWhyExplanation(result.explanation);
+        } catch (error) {
+            console.error('[Why Mobile] Error:', error);
+            setWhyExplanation(`💡 Why this step matters\n\n❌ Error: ${error.message}`);
+        } finally {
+            setIsLoadingWhy(false);
+        }
+    }, [code]);
 
     // Syntax highlighting for code
     const highlightSyntax = (codeLine) => {
@@ -231,8 +270,15 @@ const MobileImmersiveVisualizer = ({
                         </button>
                     </div>
 
-                    {/* Right: Sidebar Button */}
-                    <div className="flex items-center z-10">
+                    {/* Right: Sidebar Buttons - SIA and Code */}
+                    <div className="flex items-center gap-1 z-10">
+                        <button
+                            onClick={() => setShowSIASidebar(true)}
+                            className={`p-2 rounded-full transition-colors ${showSIASidebar || isLoadingWhy ? 'text-indigo-600 bg-indigo-50' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'}`}
+                            title="Ask SIA"
+                        >
+                            <Sparkles className="w-5 h-5" />
+                        </button>
                         <button
                             onClick={() => setShowCodeSidebar(true)}
                             className="p-2 -mr-2 text-slate-500 hover:text-slate-900 rounded-full hover:bg-slate-100 transition-colors"
@@ -379,6 +425,21 @@ const MobileImmersiveVisualizer = ({
                                                         Step {idx + 1}
                                                     </span>
                                                 </div>
+                                                {/* The Why Button - Mobile */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleWhyClick(step, idx);
+                                                    }}
+                                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${whyTargetStep?.lineNumber === (step.lineNumber || step.line_no || step.line) && showSIASidebar
+                                                        ? 'bg-indigo-600 text-white shadow-md'
+                                                        : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                                                        }`}
+                                                    title="Understand why this line exists"
+                                                >
+                                                    <Reply className="w-3 h-3 transform rotate-180" />
+                                                    The Why?
+                                                </button>
                                             </div>
 
                                             {/* Code */}
@@ -588,6 +649,31 @@ const MobileImmersiveVisualizer = ({
                                 )
                             })}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SIA Sidebar Overlay - "The Why" Explanations */}
+            {showSIASidebar && (
+                <div className="fixed inset-0 z-[60]">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity animate-[fadeSlideIn_0.2s_ease-out]"
+                        onClick={() => setShowSIASidebar(false)}
+                    />
+
+                    {/* Sidebar Panel */}
+                    <div className="absolute right-0 top-0 bottom-0 w-[90%] max-w-[360px] bg-white shadow-2xl flex flex-col border-l border-slate-200 animate-[slideInRight_0.3s_cubic-bezier(0.16,1,0.3,1)]">
+                        {/* AskSIAPanel Content - Full height with close button */}
+                        <AskSIAPanel
+                            explanation={whyExplanation}
+                            lineNumber={whyTargetStep?.lineNumber || whyTargetStep?.line_no || whyTargetStep?.line}
+                            lineText={whyTargetStep?.code}
+                            isLoading={isLoadingWhy}
+                            isReadOnly={true}
+                            complexity={whyTargetStep?.complexity || 'simple'}
+                            onClose={() => setShowSIASidebar(false)}
+                        />
                     </div>
                 </div>
             )}
