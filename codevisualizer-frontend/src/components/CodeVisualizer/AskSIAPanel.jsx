@@ -230,7 +230,7 @@ const AskSIAPanel = ({
         // Assistant answer
         return (
             <div key={msg.id} className="flex justify-start mb-4">
-                <div className="max-w-[90%] bg-white border border-slate-200 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+                <div className="max-w-[90%] bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
                     <div className="prose prose-sm max-w-none">
                         <ReactMarkdown components={markdownComponents}>{msg.content}</ReactMarkdown>
                     </div>
@@ -306,7 +306,7 @@ const AskSIAPanel = ({
                 {/* Loading Answer */}
                 {isLoading && messages.length > 0 && (
                     <div className="flex justify-start mb-4">
-                        <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+                        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
                             <div className="flex items-center gap-2">
                                 <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />
                                 <span className="text-slate-500 text-sm">Thinking...</span>
