@@ -117,7 +117,8 @@ const MarkdownRenderer = ({ content, className = '' }) => {
                         // Helper to strip extra quotes/backticks that AI might add
                         const cleanContent = (text) => {
                             if (typeof text !== 'string') return text;
-                            return text.replace(/^['`]+|['`]+$/g, '');
+                            // Trim whitespace first, then remove surrounding backticks/quotes
+                            return text.trim().replace(/^['`]+|['`]+$/g, '');
                         };
 
                         // Inline code
@@ -127,7 +128,15 @@ const MarkdownRenderer = ({ content, className = '' }) => {
                                 : cleanContent(children);
 
                             return (
-                                <span className="font-bold text-slate-900">
+                                <span
+                                    style={{
+                                        fontWeight: '600',
+                                        color: '#0f172a', // slate-900
+                                        backgroundColor: 'transparent',
+                                        border: 'none',
+                                        fontFamily: 'inherit' // Ensure it doesn't look like code
+                                    }}
+                                >
                                     {cleanedChildren}
                                 </span>
                             );
@@ -138,7 +147,15 @@ const MarkdownRenderer = ({ content, className = '' }) => {
                         // Fallback for single line code that looks like text
                         if (shouldRenderAsInlineCode(codeString, lang)) {
                             return (
-                                <span className="font-bold text-slate-900">
+                                <span
+                                    style={{
+                                        fontWeight: '600',
+                                        color: '#0f172a', // slate-900
+                                        backgroundColor: 'transparent',
+                                        border: 'none',
+                                        fontFamily: 'inherit'
+                                    }}
+                                >
                                     {cleanContent(codeString)}
                                 </span>
                             );

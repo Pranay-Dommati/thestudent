@@ -776,18 +776,20 @@ const ImmersiveVisualizer = ({
 
                     {rightPanelTab === 'asksia' && (
                         /* Ask SIA Panel v2 - Chat-based mentor interface */
-                        <AskSIAPanel
-                            stepContext={whyTargetStep ? {
-                                lineNumber: whyTargetStep.lineNumber,
-                                code: whyTargetStep.code,
-                                variables: whyTargetStep.variables || {}
-                            } : null}
-                            fullCode={code}
-                            onFetchWhy={handleFetchWhy}
-                            onAskQuestion={handleAskQuestion}
-                            onClearContext={handleClearContext}
-                            hideHeader={true}
-                        />
+                        <div className="flex-1 min-h-0 overflow-hidden relative bg-white">
+                            <AskSIAPanel
+                                stepContext={whyTargetStep ? {
+                                    lineNumber: whyTargetStep.lineNumber,
+                                    code: whyTargetStep.code,
+                                    variables: whyTargetStep.variables || {}
+                                } : null}
+                                fullCode={code}
+                                onFetchWhy={handleFetchWhy}
+                                onAskQuestion={handleAskQuestion}
+                                onClearContext={handleClearContext}
+                                hideHeader={true}
+                            />
+                        </div>
                     )}
                 </div>
 

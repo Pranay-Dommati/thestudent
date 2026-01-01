@@ -47,14 +47,24 @@ const AskSIAPanel = ({
     const messages = externalMessages !== null ? externalMessages : internalMessages;
     const setMessages = setExternalMessages || setInternalMessages;
 
+    const messagesContainerRef = useRef(null);
     const inputRef = useRef(null);
-    const messagesEndRef = useRef(null);
     const prevStepRef = useRef(null);
+
     const lastMessageRef = useRef(null);
 
-    // Scroll to the start of the latest message (not the very bottom)
-    const scrollToLatestMessage = () => {
-        lastMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Scroll to the START of the new message (so user sees the top of it)
+    const scrollToNewMessage = () => {
+        if (messagesContainerRef.current && lastMessageRef.current) {
+            const container = messagesContainerRef.current;
+            const messageTop = lastMessageRef.current.offsetTop;
+
+            // Scroll container to show the start of the message with a little buffer
+            container.scrollTo({
+                top: messageTop - 20, // 20px buffer for breathing room
+                behavior: 'smooth'
+            });
+        }
     };
 
     // Auto-generate "Why" when step context changes (PERSISTENT CHAT)
@@ -86,7 +96,7 @@ const AskSIAPanel = ({
         setMessages(prev => [...prev, systemUserMessage]);
 
         // Scroll to the new message after a brief delay for render
-        setTimeout(scrollToLatestMessage, 100);
+        setTimeout(scrollToNewMessage, 100);
 
         setIsLoading(true);
         try {
@@ -101,7 +111,7 @@ const AskSIAPanel = ({
                     lineNumber: stepContext.lineNumber
                 }]);
                 // Scroll to show the response
-                setTimeout(scrollToLatestMessage, 100);
+                setTimeout(scrollToNewMessage, 100);
             }
         } catch (error) {
             console.error('[AskSIA] Why fetch error:', error);
@@ -136,7 +146,7 @@ const AskSIAPanel = ({
         setMessages(prev => [...prev, userMessage]);
 
         // Scroll to show the user's message
-        setTimeout(scrollToLatestMessage, 100);
+        setTimeout(scrollToNewMessage, 50);
 
         // Get AI response with full conversation history
         setIsLoading(true);
@@ -160,7 +170,7 @@ const AskSIAPanel = ({
                     lineNumber: stepContext?.lineNumber || null
                 }]);
                 // Scroll to show the AI response
-                setTimeout(scrollToLatestMessage, 100);
+                setTimeout(scrollToNewMessage, 100);
             }
         } catch (error) {
             console.error('[AskSIA] Question error:', error);
@@ -275,7 +285,10 @@ const AskSIAPanel = ({
             )}
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div
+                ref={messagesContainerRef}
+                className="flex-1 overflow-y-auto p-4 relative"
+            >
                 {/* Empty State */}
                 {messages.length === 0 && !isLoading && !stepContext && (
                     <div className="flex flex-col items-center justify-center h-full text-center py-8">
@@ -316,7 +329,7 @@ const AskSIAPanel = ({
                     </div>
                 )}
 
-                <div ref={messagesEndRef} />
+
             </div>
 
             {/* Input Area */}
