@@ -24,6 +24,40 @@ import MarkdownRenderer from '../Shared/MarkdownRenderer';
  * - setExternalMessages: Optional - pass to lift state up to parent
  * - externalChatId: Optional - pass to lift state up to parent
  */
+// Isolated Input Component to prevent re-renders of the heavy chat list
+const ChatInput = ({ onSend, isLoading, placeholder }) => {
+    const [value, setValue] = useState('');
+    const inputRef = useRef(null);
+
+    const onSubmit = (e) => {
+        e.preventDefault();
+        if (!value.trim() || isLoading) return;
+        onSend(value.trim());
+        setValue('');
+    };
+
+    return (
+        <form onSubmit={onSubmit} className="flex items-center gap-2">
+            <input
+                ref={inputRef}
+                type="text"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder={placeholder}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none text-sm transition-all bg-slate-50"
+                disabled={isLoading}
+            />
+            <button
+                type="submit"
+                disabled={!value.trim() || isLoading}
+                className="flex-shrink-0 p-2.5 rounded-xl bg-indigo-600 text-white disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors hover:bg-indigo-700"
+            >
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </button>
+        </form>
+    );
+};
+
 const AskSIAPanel = ({
     stepContext = null,
     fullCode = '',
@@ -39,7 +73,6 @@ const AskSIAPanel = ({
     // Chat state - use external if provided (for persistence), otherwise internal
     const [internalChatId] = useState(() => `chat_${Date.now()}`);
     const [internalMessages, setInternalMessages] = useState([]);
-    const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     // Use external state if provided, otherwise use internal
@@ -48,7 +81,7 @@ const AskSIAPanel = ({
     const setMessages = setExternalMessages || setInternalMessages;
 
     const messagesContainerRef = useRef(null);
-    const inputRef = useRef(null);
+
     const prevStepRef = useRef(null);
 
     const lastMessageRef = useRef(null);
@@ -128,12 +161,10 @@ const AskSIAPanel = ({
     };
 
     // Handle question submission
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!inputValue.trim() || isLoading) return;
+    const handleSend = async (questionText) => {
+        if (!questionText || isLoading) return;
 
-        const question = inputValue.trim();
-        setInputValue('');
+        const question = questionText;
 
         // Add user message
         const userMessage = {
@@ -334,24 +365,11 @@ const AskSIAPanel = ({
 
             {/* Input Area */}
             <div className="flex-shrink-0 p-3 border-t border-slate-200 bg-white">
-                <form onSubmit={handleSubmit} className="flex items-center gap-2">
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        placeholder={stepContext ? "Ask a question about this step…" : "Ask anything about this code…"}
-                        className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none text-sm transition-all bg-slate-50"
-                        disabled={isLoading}
-                    />
-                    <button
-                        type="submit"
-                        disabled={!inputValue.trim() || isLoading}
-                        className="flex-shrink-0 p-2.5 rounded-xl bg-indigo-600 text-white disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors hover:bg-indigo-700"
-                    >
-                        {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    </button>
-                </form>
+                <ChatInput
+                    onSend={handleSend}
+                    isLoading={isLoading}
+                    placeholder={stepContext ? "Ask a question about this step…" : "Ask anything about this code…"}
+                />
             </div>
         </div>
     );
