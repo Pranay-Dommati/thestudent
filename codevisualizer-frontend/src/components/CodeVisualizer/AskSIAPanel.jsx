@@ -20,6 +20,9 @@ import { Sparkles, MessageCircle, Loader2, Send, X } from 'lucide-react';
  * - onClearContext: Callback when user clears step context
  * - onClose: Optional callback for mobile close button
  * - hideHeader: Hide header on desktop
+ * - externalMessages: Optional - pass to lift state up to parent
+ * - setExternalMessages: Optional - pass to lift state up to parent
+ * - externalChatId: Optional - pass to lift state up to parent
  */
 const AskSIAPanel = ({
     stepContext = null,
@@ -28,26 +31,31 @@ const AskSIAPanel = ({
     onAskQuestion = null,
     onClearContext = null,
     onClose = null,
-    hideHeader = false
+    hideHeader = false,
+    externalMessages = null,
+    setExternalMessages = null,
+    externalChatId = null
 }) => {
-    // Chat state (durable across step changes)
-    const [chatId] = useState(() => `chat_${Date.now()}`);
-    const [messages, setMessages] = useState([]);
+    // Chat state - use external if provided (for persistence), otherwise internal
+    const [internalChatId] = useState(() => `chat_${Date.now()}`);
+    const [internalMessages, setInternalMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    // Use external state if provided, otherwise use internal
+    const chatId = externalChatId || internalChatId;
+    const messages = externalMessages !== null ? externalMessages : internalMessages;
+    const setMessages = setExternalMessages || setInternalMessages;
 
     const inputRef = useRef(null);
     const messagesEndRef = useRef(null);
     const prevStepRef = useRef(null);
+    const lastMessageRef = useRef(null);
 
-    // Auto-scroll to bottom when messages change
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Scroll to the start of the latest message (not the very bottom)
+    const scrollToLatestMessage = () => {
+        lastMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
-
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
 
     // Auto-generate "Why" when step context changes (PERSISTENT CHAT)
     useEffect(() => {
@@ -77,6 +85,9 @@ const AskSIAPanel = ({
         };
         setMessages(prev => [...prev, systemUserMessage]);
 
+        // Scroll to the new message after a brief delay for render
+        setTimeout(scrollToLatestMessage, 100);
+
         setIsLoading(true);
         try {
             const explanation = await onFetchWhy();
@@ -89,6 +100,8 @@ const AskSIAPanel = ({
                     content: explanation,
                     lineNumber: stepContext.lineNumber
                 }]);
+                // Scroll to show the response
+                setTimeout(scrollToLatestMessage, 100);
             }
         } catch (error) {
             console.error('[AskSIA] Why fetch error:', error);
@@ -122,6 +135,9 @@ const AskSIAPanel = ({
         };
         setMessages(prev => [...prev, userMessage]);
 
+        // Scroll to show the user's message
+        setTimeout(scrollToLatestMessage, 100);
+
         // Get AI response with full conversation history
         setIsLoading(true);
         try {
@@ -143,6 +159,8 @@ const AskSIAPanel = ({
                     content: answer,
                     lineNumber: stepContext?.lineNumber || null
                 }]);
+                // Scroll to show the AI response
+                setTimeout(scrollToLatestMessage, 100);
             }
         } catch (error) {
             console.error('[AskSIA] Question error:', error);
@@ -207,7 +225,7 @@ const AskSIAPanel = ({
         if (msg.type === 'why') {
             const cleanedContent = preprocessExplanation(msg.content);
             return (
-                <div key={msg.id} className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 mb-4">
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 mb-4">
                     <div className="flex items-center gap-2 mb-3">
                         <Sparkles className="w-4 h-4 text-indigo-600" />
                         <span className="text-sm font-semibold text-indigo-700">Why this step matters</span>
@@ -222,7 +240,7 @@ const AskSIAPanel = ({
         if (msg.role === 'user') {
             const isSystemPrompt = msg.type === 'system-prompt';
             return (
-                <div key={msg.id} className="flex justify-end mb-4">
+                <div className="flex justify-end mb-4">
                     <div className="max-w-[85%] bg-indigo-600 text-white rounded-2xl rounded-br-md px-4 py-2.5">
                         <p className="text-sm flex items-center gap-2">
                             {isSystemPrompt && <Sparkles className="w-3 h-3 opacity-70" />}
@@ -235,7 +253,7 @@ const AskSIAPanel = ({
 
         if (msg.type === 'error') {
             return (
-                <div key={msg.id} className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
                     <p className="text-red-700 text-sm">{msg.content}</p>
                 </div>
             );
@@ -243,7 +261,7 @@ const AskSIAPanel = ({
 
         // Assistant answer - full width like Why block
         return (
-            <div key={msg.id} className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 mb-4">
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 mb-4">
                 <div className="prose prose-sm max-w-none">
                     <ReactMarkdown components={markdownComponents}>{msg.content}</ReactMarkdown>
                 </div>
@@ -313,7 +331,11 @@ const AskSIAPanel = ({
                 )}
 
                 {/* Messages */}
-                {messages.map(renderMessage)}
+                {messages.map((msg, index) => (
+                    <div key={msg.id} ref={index === messages.length - 1 ? lastMessageRef : null}>
+                        {renderMessage(msg)}
+                    </div>
+                ))}
 
                 {/* Loading Answer */}
                 {isLoading && messages.length > 0 && (

@@ -59,6 +59,10 @@ const MobileImmersiveVisualizer = ({
     const [isLoadingWhy, setIsLoadingWhy] = useState(false);
     const [whyTargetStep, setWhyTargetStep] = useState(null);
 
+    // Lifted chat state for persistence across sidebar open/close
+    const [chatMessages, setChatMessages] = useState([]);
+    const [chatId] = useState(() => `chat_${Date.now()}`);
+
     // Default: normal scroll
     const hasMoreSteps = visibleSteps.length < totalSteps;
 
@@ -699,6 +703,9 @@ const MobileImmersiveVisualizer = ({
                             onAskQuestion={handleAskQuestion}
                             onClearContext={handleClearContext}
                             onClose={() => setShowSIASidebar(false)}
+                            externalMessages={chatMessages}
+                            setExternalMessages={setChatMessages}
+                            externalChatId={chatId}
                         />
                     </div>
                 </div>
