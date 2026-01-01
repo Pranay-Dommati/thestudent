@@ -1025,3 +1025,170 @@ def generate_why_explanation(request):
             "error": str(e)
         }, status=500)
 
+
+# =============================================================================
+# "ASK STEP" — CONTEXTUAL QUESTION ANSWERING ENDPOINT
+# =============================================================================
+@csrf_exempt
+@require_http_methods(["POST"])
+def ask_step(request):
+    """
+    Answer a user question about a specific step/line of code.
+    
+    Uses context injection to ensure answers are scoped to the current step.
+    Part of the "Understand" feature - Ask mode.
+    
+    Request body:
+    {
+        "fullCode": "...",           # Full source code
+        "lineNumber": 5,             # Current line number (1-indexed)
+        "lineText": "...",           # Current line code
+        "variables": {...},          # Variables at this step
+        "question": "...",           # User's question
+        "whyExplanation": "..."      # Optional: existing Why explanation
+    }
+    
+    Response:
+    {
+        "success": true,
+        "answer": "..."              # AI-generated answer
+    }
+    """
+    try:
+        data = json.loads(request.body)
+        
+        # Required fields
+        full_code = data.get('fullCode', '')
+        line_number = data.get('lineNumber', 0)
+        line_text = data.get('lineText', '')
+        question = data.get('question', '')
+        
+        # Optional fields
+        variables = data.get('variables', {})
+        why_explanation = data.get('whyExplanation', '')
+        
+        # Validation
+        if not full_code or not question:
+            return JsonResponse({
+                "success": False,
+                "error": "Missing required fields: fullCode, question"
+            }, status=400)
+        
+        if len(question) > 500:
+            return JsonResponse({
+                "success": False,
+                "error": "Question too long (max 500 characters)"
+            }, status=400)
+        
+        # Determine mode: step-scoped or general
+        is_step_scoped = line_number > 0 and line_text
+        
+        # Format variables for context (only for step-scoped mode)
+        vars_str = ""
+        if is_step_scoped and variables:
+            var_items = []
+            for name, val in variables.items():
+                if isinstance(val, dict) and 'value' in val:
+                    var_items.append(f"{name} = {val['value']}")
+                else:
+                    var_items.append(f"{name} = {val}")
+            vars_str = ", ".join(var_items) if var_items else "No variables yet"
+        
+        # Build the context-injected prompt based on mode
+        if is_step_scoped:
+            system_prompt = """You are a senior DSA mentor. Answer ONLY in the context of the given step.
+
+RULES:
+- Keep answers concise (3-6 bullet points max)
+- Reference the specific line when explaining
+- Do NOT provide complete solutions
+- Do NOT answer questions unrelated to the current step
+- If asked about something outside the current step, politely redirect
+- Use the Why explanation as shared understanding if available
+
+CONTEXT:"""
+
+            context = f"""
+Code:
+```python
+{full_code}
+```
+
+Current Line: Line {line_number}: `{line_text}`
+Variables at this step: {vars_str}
+"""
+            if why_explanation:
+                context += f"\nExisting 'Why' explanation: {why_explanation}\n"
+            
+            user_prompt = f"""{context}
+
+USER QUESTION:
+{question}
+
+Provide a focused, educational answer about this specific line of code."""
+
+        else:
+            # General mode - no step context
+            system_prompt = """You are a DSA teaching assistant. Answer questions about the full code and algorithm.
+
+RULES:
+- Keep answers concise and educational
+- You may discuss complexity, edge cases, and alternatives
+- Do NOT provide complete different solutions unless asked
+- Focus on helping the learner understand
+
+CONTEXT:"""
+
+            context = f"""
+Code:
+```python
+{full_code}
+```
+"""
+            user_prompt = f"""{context}
+
+USER QUESTION:
+{question}
+
+Provide a helpful, educational answer about this code."""
+        
+        print(f"[AskStep] Mode: {'STEP-SCOPED' if is_step_scoped else 'GENERAL'}, Question: {question[:50]}...")
+
+        # Use the narrator's AI client directly
+        if not narrator or not narrator.is_available:
+            return JsonResponse({
+                "success": False,
+                "error": "AI service not available"
+            }, status=503)
+        
+        # Generate answer using Google Generative AI
+        import google.generativeai as genai
+        
+        # Configure the model (using same setup as narrator)
+        model = genai.GenerativeModel('gemini-2.0-flash')
+        
+        full_prompt = f"{system_prompt}\n{user_prompt}"
+        
+        response = model.generate_content(
+            full_prompt,
+            generation_config=genai.GenerationConfig(
+                max_output_tokens=500,
+                temperature=0.3,  # Lower for more focused answers
+            )
+        )
+        
+        answer = response.text.strip() if response.text else "I couldn't generate an answer. Please try rephrasing your question."
+        
+        print(f"[AskStep] Line {line_number}: Q='{question[:50]}...' -> Generated answer")
+        
+        return JsonResponse({
+            "success": True,
+            "answer": answer
+        })
+        
+    except Exception as e:
+        print(f"[AskStep] ERROR: {e}")
+        return JsonResponse({
+            "success": False,
+            "error": str(e)
+        }, status=500)

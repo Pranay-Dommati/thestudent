@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Sparkles, ChevronLeft, Play, Code2, List, PanelRight, Rocket, X, Reply } from 'lucide-react';
+import { Sparkles, ChevronLeft, Play, Code2, List, PanelRight, Rocket, X } from 'lucide-react';
 import EnterpriseVisualizer from './EnterpriseVisualizer';
 import AskSIAPanel from './AskSIAPanel';
 import { whyService } from '../../services/WhyService';
+import { askService } from '../../services/AskService';
 
 // CSS animation for smooth card appearance
 const cardAnimationStyles = `
@@ -99,36 +100,61 @@ const MobileImmersiveVisualizer = ({
         return () => container.removeEventListener('scroll', updateFocusedCard);
     }, [updateFocusedCard, visibleSteps.length]);
 
-    // "The Why" handler - fetch explanation for a specific step
-    const handleWhyClick = useCallback(async (step, stepIndex) => {
-        console.log(`[Why Mobile] Clicked on step ${stepIndex + 1}, line ${step.lineNumber}`);
-
-        // Open SIA sidebar and show loading
+    // "Understand" handler - open panel and select step
+    const handleUnderstandClick = useCallback((step, stepIndex) => {
+        console.log(`[Understand Mobile] Clicked on step ${stepIndex + 1}, line ${step.lineNumber}`);
         setShowSIASidebar(true);
         setWhyTargetStep(step);
-        setIsLoadingWhy(true);
-        setWhyExplanation(null);
+        setWhyExplanation(null); // Reset for new step
+    }, []);
+
+    // Fetch Why explanation (returns explanation for chat to use)
+    const handleFetchWhy = useCallback(async () => {
+        if (!whyTargetStep) return null;
+
+        console.log(`[Why Mobile] Fetching explanation for line ${whyTargetStep.lineNumber}`);
 
         try {
             const result = await whyService.getWhyExplanation({
                 fullCode: code,
-                lineNumber: step.lineNumber,
-                lineText: step.code,
-                phase: step.phase || 'execution',
+                lineNumber: whyTargetStep.lineNumber,
+                lineText: whyTargetStep.code,
+                phase: whyTargetStep.phase || 'execution',
                 sampleInput: null,
                 problemType: 'algorithm',
                 functionPurpose: ''
             });
-
-            console.log(`[Why Mobile] Received explanation for line ${step.lineNumber}:`, result.cached ? 'CACHED' : 'FRESH');
+            console.log(`[Why Mobile] Received:`, result.cached ? 'CACHED' : 'FRESH');
             setWhyExplanation(result.explanation);
+            return result.explanation;
         } catch (error) {
             console.error('[Why Mobile] Error:', error);
-            setWhyExplanation(`💡 Why this step matters\n\n❌ Error: ${error.message}`);
-        } finally {
-            setIsLoadingWhy(false);
+            throw error;
         }
-    }, [code]);
+    }, [code, whyTargetStep]);
+
+    // Ask question handler (supports both step-scoped and general)
+    const handleAskQuestion = useCallback(async (question, stepContext) => {
+        console.log(`[Ask Mobile] Question:`, question, stepContext ? `(Line ${stepContext.lineNumber})` : '(General)');
+
+        const answer = await askService.askStepQuestion({
+            fullCode: code,
+            lineNumber: stepContext?.lineNumber || 0,
+            lineText: stepContext?.code || '',
+            variables: stepContext?.variables || {},
+            question,
+            whyExplanation: whyExplanation
+        });
+
+        return answer;
+    }, [code, whyExplanation]);
+
+    // Clear step context (switch to general mode)
+    const handleClearContext = useCallback(() => {
+        console.log('[AskSIA Mobile] Clearing step context - switching to general mode');
+        setWhyTargetStep(null);
+        setWhyExplanation(null);
+    }, []);
 
     // Syntax highlighting for code
     const highlightSyntax = (codeLine) => {
@@ -425,20 +451,20 @@ const MobileImmersiveVisualizer = ({
                                                         Step {idx + 1}
                                                     </span>
                                                 </div>
-                                                {/* The Why Button - Mobile */}
+                                                {/* Understand Button - Mobile */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        handleWhyClick(step, idx);
+                                                        handleUnderstandClick(step, idx);
                                                     }}
                                                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${whyTargetStep?.lineNumber === (step.lineNumber || step.line_no || step.line) && showSIASidebar
                                                         ? 'bg-indigo-600 text-white shadow-md'
                                                         : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
                                                         }`}
-                                                    title="Understand why this line exists"
+                                                    title="Ask questions or learn why this step matters"
                                                 >
-                                                    <Reply className="w-3 h-3 transform rotate-180" />
-                                                    The Why?
+                                                    <Sparkles className="w-3 h-3" />
+                                                    Understand
                                                 </button>
                                             </div>
 
@@ -653,7 +679,7 @@ const MobileImmersiveVisualizer = ({
                 </div>
             )}
 
-            {/* SIA Sidebar Overlay - "The Why" Explanations */}
+            {/* SIA Sidebar Overlay - Chat-based mentor interface */}
             {showSIASidebar && (
                 <div className="fixed inset-0 z-[60]">
                     {/* Backdrop */}
@@ -664,14 +690,17 @@ const MobileImmersiveVisualizer = ({
 
                     {/* Sidebar Panel */}
                     <div className="absolute right-0 top-0 bottom-0 w-[90%] max-w-[360px] bg-white shadow-2xl flex flex-col border-l border-slate-200 animate-[slideInRight_0.3s_cubic-bezier(0.16,1,0.3,1)]">
-                        {/* AskSIAPanel Content - Full height with close button */}
+                        {/* AskSIAPanel v2 - Chat interface */}
                         <AskSIAPanel
-                            explanation={whyExplanation}
-                            lineNumber={whyTargetStep?.lineNumber || whyTargetStep?.line_no || whyTargetStep?.line}
-                            lineText={whyTargetStep?.code}
-                            isLoading={isLoadingWhy}
-                            isReadOnly={true}
-                            complexity={whyTargetStep?.complexity || 'simple'}
+                            stepContext={whyTargetStep ? {
+                                lineNumber: whyTargetStep.lineNumber || whyTargetStep.line_no || whyTargetStep.line,
+                                code: whyTargetStep.code,
+                                variables: whyTargetStep.variables || {}
+                            } : null}
+                            fullCode={code}
+                            onFetchWhy={handleFetchWhy}
+                            onAskQuestion={handleAskQuestion}
+                            onClearContext={handleClearContext}
                             onClose={() => setShowSIASidebar(false)}
                         />
                     </div>

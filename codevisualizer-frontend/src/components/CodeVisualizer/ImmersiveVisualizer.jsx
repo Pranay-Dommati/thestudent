@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Sparkles, Rocket, X, Reply } from 'lucide-react';
+import { Sparkles, Rocket, X } from 'lucide-react';
 import EnterpriseVisualizer from './EnterpriseVisualizer';
 import MobileImmersiveVisualizer from './MobileImmersiveVisualizer';
 import AskSIAPanel from './AskSIAPanel';
 import { whyService } from '../../services/WhyService';
+import { askService } from '../../services/AskService';
 
 const BATCH_SIZE = 6; // Number of steps to show/generate at a time
 
@@ -243,36 +244,61 @@ const ImmersiveVisualizer = ({
         };
     }, [resize, stopResizing]);
 
-    // "The Why" handler - fetch explanation for a specific step
-    const handleWhyClick = useCallback(async (step, stepIndex) => {
-        console.log(`[Why] Clicked on step ${stepIndex + 1}, line ${step.lineNumber}`);
-
-        // Switch to Ask SIA tab
+    // "Understand" handler - open panel and select step
+    const handleUnderstandClick = useCallback((step, stepIndex) => {
+        console.log(`[Understand] Clicked on step ${stepIndex + 1}, line ${step.lineNumber}`);
         setRightPanelTab('asksia');
         setWhyTargetStep(step);
-        setIsLoadingWhy(true);
-        setWhyExplanation(null);
+        setWhyExplanation(null); // Reset for new step
+    }, []);
+
+    // Fetch Why explanation (returns explanation for chat to use)
+    const handleFetchWhy = useCallback(async () => {
+        if (!whyTargetStep) return null;
+
+        console.log(`[Why] Fetching explanation for line ${whyTargetStep.lineNumber}`);
 
         try {
             const result = await whyService.getWhyExplanation({
                 fullCode: code,
-                lineNumber: step.lineNumber,
-                lineText: step.code,
-                phase: step.phase || 'execution',
-                sampleInput: null,  // Could be passed from parent if available
+                lineNumber: whyTargetStep.lineNumber,
+                lineText: whyTargetStep.code,
+                phase: whyTargetStep.phase || 'execution',
+                sampleInput: null,
                 problemType: 'algorithm',
                 functionPurpose: ''
             });
-
-            console.log(`[Why] Received explanation for line ${step.lineNumber}:`, result.cached ? 'CACHED' : 'FRESH');
+            console.log(`[Why] Received:`, result.cached ? 'CACHED' : 'FRESH');
             setWhyExplanation(result.explanation);
+            return result.explanation;
         } catch (error) {
             console.error('[Why] Error:', error);
-            setWhyExplanation(`💡 Why this step matters\n\n❌ Error: ${error.message}`);
-        } finally {
-            setIsLoadingWhy(false);
+            throw error;
         }
-    }, [code]);
+    }, [code, whyTargetStep]);
+
+    // Ask question handler (supports both step-scoped and general)
+    const handleAskQuestion = useCallback(async (question, stepContext) => {
+        console.log(`[Ask] Question:`, question, stepContext ? `(Line ${stepContext.lineNumber})` : '(General)');
+
+        const answer = await askService.askStepQuestion({
+            fullCode: code,
+            lineNumber: stepContext?.lineNumber || 0,
+            lineText: stepContext?.code || '',
+            variables: stepContext?.variables || {},
+            question,
+            whyExplanation: whyExplanation
+        });
+
+        return answer;
+    }, [code, whyExplanation]);
+
+    // Clear step context (switch to general mode)
+    const handleClearContext = useCallback(() => {
+        console.log('[AskSIA] Clearing step context - switching to general mode');
+        setWhyTargetStep(null);
+        setWhyExplanation(null);
+    }, []);
 
     // Load more explanations on-demand with SSE streaming
     const loadMoreExplanations = useCallback(async () => {
@@ -746,14 +772,18 @@ const ImmersiveVisualizer = ({
                     )}
 
                     {rightPanelTab === 'asksia' && (
-                        /* Ask SIA Panel - The Why Explanation */
+                        /* Ask SIA Panel v2 - Chat-based mentor interface */
                         <AskSIAPanel
-                            explanation={whyExplanation}
-                            lineNumber={whyTargetStep?.lineNumber}
-                            lineText={whyTargetStep?.code}
-                            isLoading={isLoadingWhy}
-                            isReadOnly={true}
-                            complexity={whyTargetStep?.complexity || 'simple'}
+                            stepContext={whyTargetStep ? {
+                                lineNumber: whyTargetStep.lineNumber,
+                                code: whyTargetStep.code,
+                                variables: whyTargetStep.variables || {}
+                            } : null}
+                            fullCode={code}
+                            onFetchWhy={handleFetchWhy}
+                            onAskQuestion={handleAskQuestion}
+                            onClearContext={handleClearContext}
+                            hideHeader={true}
                         />
                     )}
                 </div>
@@ -839,20 +869,20 @@ const ImmersiveVisualizer = ({
                                                     </span>
                                                     <span className="text-xs text-slate-400">Step {idx + 1}</span>
 
-                                                    {/* Why Button - THE WHY FEATURE */}
+                                                    {/* Understand Button */}
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleWhyClick(step, idx);
+                                                            handleUnderstandClick(step, idx);
                                                         }}
                                                         className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${whyTargetStep?.lineNumber === step.lineNumber && rightPanelTab === 'asksia'
                                                             ? 'bg-indigo-600 text-white shadow-md'
                                                             : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
                                                             }`}
-                                                        title="Understand why this line exists"
+                                                        title="Ask questions or learn why this step matters"
                                                     >
-                                                        <Reply className="w-3.5 h-3.5 transform rotate-180" />
-                                                        The Why?
+                                                        <Sparkles className="w-3.5 h-3.5" />
+                                                        Understand
                                                     </button>
                                                 </div>
 

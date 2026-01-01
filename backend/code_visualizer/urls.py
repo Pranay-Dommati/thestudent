@@ -29,4 +29,7 @@ urlpatterns = [
     
     # "The Why" — Line-specific explanations
     path('generate-why/', views.generate_why_explanation, name='generate_why_explanation'),
+    
+    # "Ask Step" — Contextual Q&A about a step
+    path('ask-step/', views.ask_step, name='ask_step'),
 ]
