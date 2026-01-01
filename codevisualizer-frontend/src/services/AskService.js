@@ -40,37 +40,52 @@ const checkRateLimit = () => {
 };
 
 /**
- * Ask a question about a specific step
+ * Ask a question about a specific step (ENTERPRISE-GRADE)
+ * 
+ * Separates chat memory from step context:
+ * - stepContext: Swappable per "Understand" click
+ * - conversation: Durable across step changes
+ * 
  * @param {Object} params
  * @param {string} params.fullCode - Complete source code
- * @param {number} params.lineNumber - Current line number
- * @param {string} params.lineText - Current line code
- * @param {Object} params.variables - Variables at this step
+ * @param {Object} [params.stepContext] - Current step context {line, code, variables}
+ * @param {Object} [params.conversation] - Conversation state {id, messages}
+ * @param {string} [params.intent] - 'explain' or 'question'
  * @param {string} params.question - User's question
- * @param {string} params.whyExplanation - Existing Why explanation (optional)
  * @returns {Promise<string>} - AI answer
  */
 export const askStepQuestion = async ({
     fullCode,
-    lineNumber,
-    lineText,
-    variables = {},
-    question,
-    whyExplanation = null
+    stepContext = null,
+    conversation = null,
+    intent = 'question',
+    question
 }) => {
     // Check rate limit first
     checkRateLimit();
+
+    // Smart history truncation: Keep last 10 messages (always include last exchange)
+    const truncateHistory = (messages) => {
+        if (!messages || messages.length <= 10) return messages || [];
+        const recent = messages.slice(-2);  // Last exchange
+        const older = messages.slice(0, -2).slice(-8);  // Fill remaining
+        return [...older, ...recent];
+    };
+
+    const truncatedConversation = conversation ? {
+        id: conversation.id,
+        messages: truncateHistory(conversation.messages)
+    } : { id: null, messages: [] };
 
     const response = await fetch(`${API_BASE_URL}/ask-step/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             fullCode,
-            lineNumber,
-            lineText,
-            variables,
-            question,
-            whyExplanation
+            stepContext,
+            conversation: truncatedConversation,
+            intent,
+            question
         })
     });
 

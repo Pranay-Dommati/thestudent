@@ -277,21 +277,24 @@ const ImmersiveVisualizer = ({
         }
     }, [code, whyTargetStep]);
 
-    // Ask question handler (supports both step-scoped and general)
-    const handleAskQuestion = useCallback(async (question, stepContext) => {
-        console.log(`[Ask] Question:`, question, stepContext ? `(Line ${stepContext.lineNumber})` : '(General)');
+    // Ask question handler (ENTERPRISE-GRADE: receives stepContext + conversation)
+    const handleAskQuestion = useCallback(async (question, { stepContext, conversation }) => {
+        console.log(`[Ask] Question:`, question, stepContext ? `(Line ${stepContext.lineNumber})` : '(General)', `History: ${conversation?.messages?.length || 0} msgs`);
 
         const answer = await askService.askStepQuestion({
             fullCode: code,
-            lineNumber: stepContext?.lineNumber || 0,
-            lineText: stepContext?.code || '',
-            variables: stepContext?.variables || {},
-            question,
-            whyExplanation: whyExplanation
+            stepContext: stepContext ? {
+                line: stepContext.lineNumber,
+                code: stepContext.code,
+                variables: stepContext.variables || {}
+            } : null,
+            conversation,
+            intent: 'question',
+            question
         });
 
         return answer;
-    }, [code, whyExplanation]);
+    }, [code]);
 
     // Clear step context (switch to general mode)
     const handleClearContext = useCallback(() => {

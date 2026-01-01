@@ -1035,37 +1035,74 @@ def ask_step(request):
     """
     Answer a user question about a specific step/line of code.
     
-    Uses context injection to ensure answers are scoped to the current step.
-    Part of the "Understand" feature - Ask mode.
+    ENTERPRISE-GRADE: Separates chat memory from step context.
+    - Chat memory: Durable across step changes
+    - Step context: Swappable per "Understand" click
     
-    Request body:
+    Request body (NEW format):
     {
-        "fullCode": "...",           # Full source code
-        "lineNumber": 5,             # Current line number (1-indexed)
-        "lineText": "...",           # Current line code
-        "variables": {...},          # Variables at this step
-        "question": "...",           # User's question
-        "whyExplanation": "..."      # Optional: existing Why explanation
+        "fullCode": "...",
+        "stepContext": {                 # Swappable per step (optional)
+            "line": 6,
+            "code": "if n > max_val:",
+            "variables": {"n": 5, "max_val": 10}
+        },
+        "conversation": {                # Durable across steps
+            "id": "chat_abc123",
+            "messages": [
+                {"role": "assistant", "content": "..."},
+                {"role": "user", "content": "..."}
+            ]
+        },
+        "intent": "explain | question",
+        "question": "..."
+    }
+    
+    Also supports LEGACY format for backwards compatibility:
+    {
+        "fullCode": "...",
+        "lineNumber": 5,
+        "lineText": "...",
+        "variables": {...},
+        "question": "...",
+        "whyExplanation": "..."
     }
     
     Response:
     {
         "success": true,
-        "answer": "..."              # AI-generated answer
+        "answer": "..."
     }
     """
     try:
         data = json.loads(request.body)
         
-        # Required fields
-        full_code = data.get('fullCode', '')
-        line_number = data.get('lineNumber', 0)
-        line_text = data.get('lineText', '')
-        question = data.get('question', '')
+        # Detect API format: NEW (stepContext) or LEGACY (lineNumber)
+        step_context = data.get('stepContext')
+        conversation = data.get('conversation', {})
         
-        # Optional fields
-        variables = data.get('variables', {})
-        why_explanation = data.get('whyExplanation', '')
+        if step_context is not None:
+            # NEW FORMAT: Enterprise-grade with separated layers
+            full_code = data.get('fullCode', '')
+            line_number = step_context.get('line', 0) if step_context else 0
+            line_text = step_context.get('code', '') if step_context else ''
+            variables = step_context.get('variables', {}) if step_context else {}
+            question = data.get('question', '')
+            intent = data.get('intent', 'question')
+            messages = conversation.get('messages', [])
+        else:
+            # LEGACY FORMAT: Backwards compatibility
+            full_code = data.get('fullCode', '')
+            line_number = data.get('lineNumber', 0)
+            line_text = data.get('lineText', '')
+            variables = data.get('variables', {})
+            question = data.get('question', '')
+            intent = 'question'
+            messages = []
+            # Convert whyExplanation to a message if present
+            why_explanation = data.get('whyExplanation', '')
+            if why_explanation:
+                messages = [{'role': 'assistant', 'content': why_explanation}]
         
         # Validation
         if not full_code or not question:
@@ -1084,7 +1121,7 @@ def ask_step(request):
         is_step_scoped = line_number > 0 and line_text
         
         # Format variables for context (only for step-scoped mode)
-        vars_str = ""
+        vars_str = "No variables yet"
         if is_step_scoped and variables:
             var_items = []
             for name, val in variables.items():
@@ -1094,65 +1131,75 @@ def ask_step(request):
                     var_items.append(f"{name} = {val}")
             vars_str = ", ".join(var_items) if var_items else "No variables yet"
         
-        # Build the context-injected prompt based on mode
+        # Smart history truncation: Always keep last exchange + older context
+        def truncate_history(msgs, max_messages=10):
+            if len(msgs) <= max_messages:
+                return msgs
+            # Always include last 2 messages (latest exchange)
+            recent = msgs[-2:]
+            # Fill remaining budget with older context
+            older = msgs[:-2][-(max_messages-2):]
+            return older + recent
+        
+        truncated_messages = truncate_history(messages, max_messages=10)
+        
+        # Format conversation history with clear labeling
+        history_str = ""
+        if truncated_messages:
+            history_lines = []
+            for msg in truncated_messages:
+                role = "User" if msg.get('role') == 'user' else "Assistant"
+                content = msg.get('content', '')[:500]  # Cap each message
+                history_lines.append(f"{role}: {content}")
+            history_str = "\n".join(history_lines)
+        
+        # Build the context-injected prompt with CLEAR SEPARATION
         if is_step_scoped:
-            system_prompt = """You are a senior DSA mentor. Answer ONLY in the context of the given step.
+            system_prompt = """You are a senior DSA mentor.
 
 RULES:
 - Keep answers concise (3-6 bullet points max)
 - Reference the specific line when explaining
+- Refer to conversation history when relevant
 - Do NOT provide complete solutions
-- Do NOT answer questions unrelated to the current step
-- If asked about something outside the current step, politely redirect
-- Use the Why explanation as shared understanding if available
+- If asked about something outside the current step, politely redirect"""
 
-CONTEXT:"""
-
-            context = f"""
-Code:
-```python
-{full_code}
-```
-
-Current Line: Line {line_number}: `{line_text}`
-Variables at this step: {vars_str}
-"""
-            if why_explanation:
-                context += f"\nExisting 'Why' explanation: {why_explanation}\n"
+            prompt_parts = [
+                f"CODE:\n```python\n{full_code}\n```",
+                f"\nSTEP CONTEXT:\nLine: {line_number}\nCode: `{line_text}`\nVariables: {vars_str}"
+            ]
             
-            user_prompt = f"""{context}
-
-USER QUESTION:
-{question}
-
-Provide a focused, educational answer about this specific line of code."""
+            if history_str:
+                prompt_parts.append(f"\nCONVERSATION HISTORY:\n{history_str}")
+            
+            prompt_parts.append(f"\nUSER QUESTION:\n{question}")
+            prompt_parts.append("\nProvide a focused, educational answer about this specific line of code.")
+            
+            user_prompt = "\n".join(prompt_parts)
 
         else:
             # General mode - no step context
-            system_prompt = """You are a DSA teaching assistant. Answer questions about the full code and algorithm.
+            system_prompt = """You are a DSA teaching assistant.
 
 RULES:
 - Keep answers concise and educational
+- Refer to conversation history when relevant
 - You may discuss complexity, edge cases, and alternatives
-- Do NOT provide complete different solutions unless asked
-- Focus on helping the learner understand
+- Do NOT provide complete different solutions unless asked"""
 
-CONTEXT:"""
-
-            context = f"""
-Code:
-```python
-{full_code}
-```
-"""
-            user_prompt = f"""{context}
-
-USER QUESTION:
-{question}
-
-Provide a helpful, educational answer about this code."""
+            prompt_parts = [
+                f"CODE:\n```python\n{full_code}\n```"
+            ]
+            
+            if history_str:
+                prompt_parts.append(f"\nCONVERSATION HISTORY:\n{history_str}")
+            
+            prompt_parts.append(f"\nUSER QUESTION:\n{question}")
+            prompt_parts.append("\nProvide a helpful, educational answer about this code.")
+            
+            user_prompt = "\n".join(prompt_parts)
         
-        print(f"[AskStep] Mode: {'STEP-SCOPED' if is_step_scoped else 'GENERAL'}, Question: {question[:50]}...")
+        print(f"[AskStep] Mode: {'STEP-SCOPED' if is_step_scoped else 'GENERAL'}, History: {len(truncated_messages)} msgs, Q: {question[:50]}...")
 
         # Use the narrator's AI client directly
         if not narrator or not narrator.is_available:
@@ -1167,13 +1214,13 @@ Provide a helpful, educational answer about this code."""
         # Configure the model (using same setup as narrator)
         model = genai.GenerativeModel('gemini-2.0-flash')
         
-        full_prompt = f"{system_prompt}\n{user_prompt}"
+        full_prompt = f"{system_prompt}\n\n{user_prompt}"
         
         response = model.generate_content(
             full_prompt,
             generation_config=genai.GenerationConfig(
-                max_output_tokens=500,
-                temperature=0.3,  # Lower for more focused answers
+                max_output_tokens=600,  # Slightly higher for context-aware answers
+                temperature=0.3,
             )
         )
         

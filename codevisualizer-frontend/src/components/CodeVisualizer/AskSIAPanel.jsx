@@ -30,11 +30,11 @@ const AskSIAPanel = ({
     onClose = null,
     hideHeader = false
 }) => {
-    // Chat state
+    // Chat state (durable across step changes)
+    const [chatId] = useState(() => `chat_${Date.now()}`);
     const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [whyLoaded, setWhyLoaded] = useState(false);
 
     const inputRef = useRef(null);
     const messagesEndRef = useRef(null);
@@ -49,47 +49,50 @@ const AskSIAPanel = ({
         scrollToBottom();
     }, [messages]);
 
-    // Auto-generate "Why" when step context changes
+    // Auto-generate "Why" when step context changes (PERSISTENT CHAT)
     useEffect(() => {
         const stepKey = stepContext?.lineNumber;
         const prevKey = prevStepRef.current?.lineNumber;
 
-        // If step changed, clear messages and fetch new Why
-        if (stepKey !== prevKey) {
-            // Clear all messages when step changes
-            setMessages([]);
-            setWhyLoaded(false);
-
-            // Fetch Why for new step
-            if (stepContext && onFetchWhy) {
-                fetchWhyExplanation();
-            }
+        // If step changed, append new Why to existing chat (NOT clear)
+        if (stepKey !== prevKey && stepContext && onFetchWhy) {
+            // Append new "Why" explanation to existing chat
+            fetchWhyExplanation();
         }
 
         prevStepRef.current = stepContext;
     }, [stepContext?.lineNumber]);
 
-    // Fetch Why explanation and add as first message
+    // Fetch Why explanation and APPEND to existing chat (persistent history)
     const fetchWhyExplanation = async () => {
         if (!stepContext || !onFetchWhy) return;
+
+        // First, add a system-generated "user" message to show what's being asked
+        const systemUserMessage = {
+            id: Date.now(),
+            role: 'user',
+            type: 'system-prompt',  // Special type for auto-generated prompts
+            content: `Line ${stepContext.lineNumber}: Why does this step matter?`,
+            lineNumber: stepContext.lineNumber
+        };
+        setMessages(prev => [...prev, systemUserMessage]);
 
         setIsLoading(true);
         try {
             const explanation = await onFetchWhy();
             if (explanation) {
-                // Set Why as the only message (messages cleared on step change)
-                setMessages([{
+                // APPEND AI response after the system prompt
+                setMessages(prev => [...prev, {
                     id: Date.now(),
                     role: 'assistant',
                     type: 'why',
                     content: explanation,
                     lineNumber: stepContext.lineNumber
                 }]);
-                setWhyLoaded(true);
             }
         } catch (error) {
             console.error('[AskSIA] Why fetch error:', error);
-            setMessages([{
+            setMessages(prev => [...prev, {
                 id: Date.now(),
                 role: 'assistant',
                 type: 'error',
@@ -119,11 +122,20 @@ const AskSIAPanel = ({
         };
         setMessages(prev => [...prev, userMessage]);
 
-        // Get AI response
+        // Get AI response with full conversation history
         setIsLoading(true);
         try {
             if (onAskQuestion) {
-                const answer = await onAskQuestion(question, stepContext);
+                // Build conversation object for context-aware AI
+                const conversationForAI = {
+                    id: chatId,
+                    messages: [...messages, userMessage].map(m => ({
+                        role: m.role,
+                        content: m.content
+                    }))
+                };
+
+                const answer = await onAskQuestion(question, { stepContext, conversation: conversationForAI });
                 setMessages(prev => [...prev, {
                     id: Date.now(),
                     role: 'assistant',
@@ -197,9 +209,7 @@ const AskSIAPanel = ({
             return (
                 <div key={msg.id} className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 mb-4">
                     <div className="flex items-center gap-2 mb-3">
-                        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                            <Sparkles className="w-3.5 h-3.5 text-white" />
-                        </div>
+                        <Sparkles className="w-4 h-4 text-indigo-600" />
                         <span className="text-sm font-semibold text-indigo-700">Why this step matters</span>
                     </div>
                     <div className="prose prose-sm max-w-none">
@@ -210,10 +220,14 @@ const AskSIAPanel = ({
         }
 
         if (msg.role === 'user') {
+            const isSystemPrompt = msg.type === 'system-prompt';
             return (
                 <div key={msg.id} className="flex justify-end mb-4">
                     <div className="max-w-[85%] bg-indigo-600 text-white rounded-2xl rounded-br-md px-4 py-2.5">
-                        <p className="text-sm">{msg.content}</p>
+                        <p className="text-sm flex items-center gap-2">
+                            {isSystemPrompt && <Sparkles className="w-3 h-3 opacity-70" />}
+                            {msg.content}
+                        </p>
                     </div>
                 </div>
             );
@@ -227,13 +241,11 @@ const AskSIAPanel = ({
             );
         }
 
-        // Assistant answer
+        // Assistant answer - full width like Why block
         return (
-            <div key={msg.id} className="flex justify-start mb-4">
-                <div className="max-w-[90%] bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
-                    <div className="prose prose-sm max-w-none">
-                        <ReactMarkdown components={markdownComponents}>{msg.content}</ReactMarkdown>
-                    </div>
+            <div key={msg.id} className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 mb-4">
+                <div className="prose prose-sm max-w-none">
+                    <ReactMarkdown components={markdownComponents}>{msg.content}</ReactMarkdown>
                 </div>
             </div>
         );

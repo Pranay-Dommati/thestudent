@@ -5,14 +5,14 @@ import { FaXTwitter } from "react-icons/fa6";
 
 const AuthFooter = () => {
     return (
-        <footer className="bg-slate-50 border-t border-slate-200 py-12">
+        <footer className="bg-white border-t border-slate-200 py-6 md:py-12 mt-auto">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
                 {/* Top Row: Links and Socials */}
-                <div className="flex flex-col md:flex-row justify-between items-center mb-8">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-6 md:mb-8">
 
                     {/* Navigation Links */}
-                    <div className="flex flex-wrap justify-center md:justify-start gap-8 mb-6 md:mb-0">
+                    <div className="flex flex-wrap justify-center gap-4 md:gap-8 mb-4 md:mb-0">
                         <Link to="/feedback" className="text-slate-600 hover:text-blue-600 text-sm transition-colors">
                             Feedback
                         </Link>
@@ -25,12 +25,12 @@ const AuthFooter = () => {
                     </div>
 
                     {/* Social Media Icons */}
-                    <div className="flex space-x-6">
+                    <div className="flex space-x-5">
                         <a
                             href="https://x.com/easylearnva"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-slate-400 hover:text-slate-800 text-xl transition-colors"
+                            className="text-slate-500 hover:text-slate-800 text-lg transition-colors"
                             title="X (Twitter)"
                         >
                             <FaXTwitter />
@@ -39,7 +39,7 @@ const AuthFooter = () => {
                             href="https://www.linkedin.com/company/easylearnova/?viewAsMember=true"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-slate-400 hover:text-blue-600 text-xl transition-colors"
+                            className="text-slate-500 hover:text-blue-600 text-lg transition-colors"
                             title="LinkedIn"
                         >
                             <FaLinkedin />
@@ -48,7 +48,7 @@ const AuthFooter = () => {
                             href="https://www.instagram.com/easylearnova"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-slate-400 hover:text-pink-600 text-xl transition-colors"
+                            className="text-slate-500 hover:text-pink-600 text-lg transition-colors"
                             title="Instagram"
                         >
                             <FaInstagram />
@@ -56,15 +56,12 @@ const AuthFooter = () => {
                     </div>
                 </div>
 
-                {/* Bottom Row: Copyright and Slogan */}
-                <div className="border-t border-slate-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-500">
-                    <p>
+                {/* Bottom Row: Copyright */}
+                <div className="border-t border-slate-200 pt-4 md:pt-8 flex flex-col items-center text-xs md:text-sm text-slate-500">
+                    <p className="text-center">
                         © {new Date().getFullYear()} Code Visualizer. All rights reserved.
                         <span className="mx-2">|</span>
                         <a href="https://easylearnova.com" className="hover:text-blue-600 transition-colors">Powered by EasyLearnova</a>
-                    </p>
-                    <p>
-                        Empowering learners worldwide.
                     </p>
                 </div>
             </div>
