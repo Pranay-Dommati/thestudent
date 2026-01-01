@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
 import { Sparkles, MessageCircle, Loader2, Send, X } from 'lucide-react';
+import MarkdownRenderer from '../Shared/MarkdownRenderer';
 
 /**
  * AskSIAPanel v2 — Chat-based DSA Mentor Interface
@@ -182,35 +182,6 @@ const AskSIAPanel = ({
         }
     };
 
-    // Custom markdown components
-    const markdownComponents = {
-        p: ({ children }) => <p className="text-slate-700 leading-relaxed mb-2 last:mb-0">{children}</p>,
-        strong: ({ children }) => <strong className="font-semibold text-slate-900">{children}</strong>,
-        code: ({ children, inline }) => inline ? (
-            <code className="px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-800 font-mono text-sm">{children}</code>
-        ) : (
-            <code className="font-mono text-sm">{children}</code>
-        ),
-        pre: ({ children }) => (
-            <pre
-                className="rounded-[10px] overflow-x-auto my-2 font-mono"
-                style={{
-                    backgroundColor: '#F6F8FF',
-                    border: '1px solid #E0E7FF',
-                    padding: '12px 14px',
-                    fontSize: '13.5px',
-                    lineHeight: 1.6,
-                    color: '#1E293B'
-                }}
-            >
-                {children}
-            </pre>
-        ),
-        ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-        ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-        li: ({ children }) => <li className="text-slate-700">{children}</li>,
-    };
-
     // Strip duplicate "Why this step matters" header from explanation content
     const preprocessExplanation = (text) => {
         if (!text) return '';
@@ -230,9 +201,7 @@ const AskSIAPanel = ({
                         <Sparkles className="w-4 h-4 text-indigo-600" />
                         <span className="text-sm font-semibold text-indigo-700">Why this step matters</span>
                     </div>
-                    <div className="prose prose-sm max-w-none">
-                        <ReactMarkdown components={markdownComponents}>{cleanedContent}</ReactMarkdown>
-                    </div>
+                    <MarkdownRenderer content={cleanedContent} />
                 </div>
             );
         }
@@ -262,9 +231,7 @@ const AskSIAPanel = ({
         // Assistant answer - full width like Why block
         return (
             <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 mb-4">
-                <div className="prose prose-sm max-w-none">
-                    <ReactMarkdown components={markdownComponents}>{msg.content}</ReactMarkdown>
-                </div>
+                <MarkdownRenderer content={msg.content} />
             </div>
         );
     };
