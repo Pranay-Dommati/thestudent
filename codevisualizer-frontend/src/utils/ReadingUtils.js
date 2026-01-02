@@ -156,6 +156,14 @@ export const preSanitizeMarkdown = (md) => {
     let out = md;
 
     try {
+        // Helper to escape underscores in math content
+        // Target underscores followed by at least 2 letters (e.g. max_val => max\_val).
+        // Avoid single-letter subscripts (e.g. x_i, y_1) which are valid math.
+        const escapeUnderscoresInMath = (text) => {
+            if (!text) return '';
+            return text.replace(/([a-zA-Z0-9]+)_([a-zA-Z]{2,})(?=\b|[^a-zA-Z0-9])/g, '$1\\_$2');
+        };
+
         // Normalize Windows newlines
         out = out.replace(/\r\n?/g, '\n');
 
@@ -173,8 +181,11 @@ export const preSanitizeMarkdown = (md) => {
 
             // Convert math-like fenced content (even if labeled 'code') to KaTeX-friendly math
             if (likelyMath) {
-                const isMulti = /\n/.test(content) || content.length > 40 || /\\(frac|sum|int|sqrt)/.test(content);
-                return isMulti ? `$$\n${content}\n$$` : `$${content}$`;
+                // Fix variable underscores in the likely math content so new_start doesn't become new_{start}
+                // We assume that in code-like descriptions, multi-char subscripts are actually variable names.
+                const fixedContent = escapeUnderscoresInMath(content);
+                const isMulti = /\n/.test(fixedContent) || fixedContent.length > 40 || /\\(frac|sum|int|sqrt)/.test(fixedContent);
+                return isMulti ? `$$\n${fixedContent}\n$$` : `$${fixedContent}$`;
             }
 
             // Keep real programming code as-is (only for real languages or strong code patterns)
@@ -204,33 +215,35 @@ export const preSanitizeMarkdown = (md) => {
             return contentLines.map(l => `> ${l}`).join('\n');
         });
 
+
+
         // Handle inline backticks - keep as code unless clearly math
         out = out.replace(/`([^`]+)`/g, (m, tok) => {
             const t = tok.trim();
             if (isMathLike(t)) {
-                return /\s|\n/.test(t) ? `$$${t}$$` : `$${t}$`;
+                // Escape underscores in what we decided is math
+                const fixedT = escapeUnderscoresInMath(t);
+                return /\s|\n/.test(fixedT) ? `$$${fixedT}$$` : `$${fixedT}$`;
             }
             return m; // keep regular inline code
         });
 
-        // Handle possible inline LaTeX ($...$) that should be code (e.g. variable names like max_val)
-        // If the content inside $...$ is NOT identified as math (e.g. it's just a variable name with underscore),
-        // convert it to code backticks so it renders as text/code instead of KaTeX math.
+        // 1. Handle Display Math ($$...$$) first to prevent overlap
+        out = out.replace(/\$\$([\s\S]*?)\$\$/g, (m, content) => {
+            return `$$${escapeUnderscoresInMath(content)}$$`;
+        });
+
+        // 2. Handle Inline LaTeX ($...$)
         out = out.replace(/\$([^$\n]+)\$/g, (m, content) => {
             const t = content.trim();
-            // If we've determined it's definitely code (like arr[i] or max_val), convert to code
-            // Note: isMathLike returns FALSE for max_val and arr[i] due to our previous fix
-            if (!isMathLike(t)) {
+
+            // If strictly code-like (no other math symbols), rely on backticks
+            if (!isMathLike(t) && /^[a-zA-Z0-9_.[\]()]+$/.test(t)) {
                 return `\`${t}\``;
             }
 
-            // If it IS math (e.g. boolean logic with > or ->), but contains snake_case variables,
-            // we need to escape `_` to `\_` for those variables so they don't render as subscripts.
-            // We target underscores followed by at least 2 letters (e.g. max_val => max\_val).
-            // We avoid single-letter subscripts (e.g. x_i, y_1) which are valid math.
-            let fixedContent = content.replace(/([a-zA-Z0-9]+)_([a-zA-Z]{2,})(?=\b|[^a-zA-Z0-9])/g, '$1\\_$2');
-
-            return `$${fixedContent}$`;
+            // Otherwise treat as math and escape underscores
+            return `$${escapeUnderscoresInMath(content)}$`;
         });
 
         return out;

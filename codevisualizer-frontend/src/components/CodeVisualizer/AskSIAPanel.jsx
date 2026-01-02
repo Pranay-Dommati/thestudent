@@ -296,25 +296,6 @@ const AskSIAPanel = ({
                 </div>
             )}
 
-            {/* Step Context Pill */}
-            {stepContext && (
-                <div className="flex-shrink-0 px-4 py-3 border-b border-slate-200 bg-white">
-                    <div className="flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs text-indigo-600 font-medium mb-0.5">Asking about Line {stepContext.lineNumber}:</p>
-                            <code className="text-sm font-mono text-slate-800 truncate block">{stepContext.code}</code>
-                        </div>
-                        <button
-                            onClick={handleClearContext}
-                            className="ml-3 p-1.5 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-100 rounded-full transition-colors flex-shrink-0"
-                            title="Remove step context (chat becomes general)"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-            )}
-
             {/* Messages Area */}
             <div
                 ref={messagesContainerRef}
@@ -363,8 +344,27 @@ const AskSIAPanel = ({
 
             </div>
 
+            {/* Step Context Pill */}
+            {stepContext && (
+                <div className="flex-shrink-0 px-4 py-2 border-t border-indigo-100 bg-indigo-50/50">
+                    <div className="flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs text-indigo-600 font-medium mb-0.5">Asking about Line {stepContext.lineNumber}:</p>
+                            <code className="text-sm font-mono text-slate-800 truncate block">{stepContext.code}</code>
+                        </div>
+                        <button
+                            onClick={handleClearContext}
+                            className="ml-3 p-1.5 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-100 rounded-full transition-colors flex-shrink-0"
+                            title="Remove step context (chat becomes general)"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Input Area */}
-            <div className="flex-shrink-0 p-3 border-t border-slate-200 bg-white">
+            <div className={`flex-shrink-0 p-3 bg-white ${!stepContext ? 'border-t border-slate-200' : ''}`}>
                 <ChatInput
                     onSend={handleSend}
                     isLoading={isLoading}
