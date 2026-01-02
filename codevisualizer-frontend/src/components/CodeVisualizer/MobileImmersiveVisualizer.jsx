@@ -128,9 +128,13 @@ const MobileImmersiveVisualizer = ({
                 problemType: 'algorithm',
                 functionPurpose: ''
             });
-            console.log(`[Why Mobile] Received:`, result.cached ? 'CACHED' : 'FRESH');
+            console.log(`[Why Mobile] Received:`, result.cached ? 'CACHED' : 'FRESH', result.blocks ? `(${result.blocks.length} blocks)` : '(legacy)');
             setWhyExplanation(result.explanation);
-            return result.explanation;
+            // Return full result with blocks for structured rendering
+            return {
+                explanation: result.explanation,
+                blocks: result.blocks || null
+            };
         } catch (error) {
             console.error('[Why Mobile] Error:', error);
             throw error;

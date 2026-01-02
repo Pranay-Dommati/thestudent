@@ -113,14 +113,37 @@ const StructuredBlockRenderer = ({ blocks, fallbackContent = null }) => {
                                 {items.map((item, i) => (
                                     <li key={i} className="text-slate-700 text-sm flex items-start gap-2">
                                         <span className="text-indigo-500 mt-0.5">•</span>
-                                        <span>{item}</span>
+                                        <div className="flex-1">
+                                            <ReactMarkdown
+                                                components={{
+                                                    p: Fragment,
+                                                    code: ({ node, inline, className, children, ...props }) => {
+                                                        return <CodeChip code={children} />;
+                                                    }
+                                                }}
+                                            >
+                                                {item}
+                                            </ReactMarkdown>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>
                         );
 
                     case 'math':
-                        // Only math blocks go through KaTeX
+                        // Heuristic: If it looks like text (no latex symbols, has spaces, long), render as text
+                        // This prevents "SpaceComplexity:O(n)" squashed rendering
+                        const isLikelyText = !content.includes('\\') && content.includes(' ') && content.length > 15 && !/[=^<>]/.test(content);
+
+                        if (isLikelyText) {
+                            return (
+                                <div key={key} className="text-slate-700 text-sm leading-relaxed">
+                                    <ReactMarkdown components={{ p: Fragment }}>{content}</ReactMarkdown>
+                                </div>
+                            );
+                        }
+
+                        // Only true math blocks go through KaTeX
                         try {
                             const isBlock = content && (content.includes('\\frac') || content.includes('\\sum') || content.length > 30);
                             const mathHtml = katex.renderToString(content, {
@@ -139,7 +162,7 @@ const StructuredBlockRenderer = ({ blocks, fallbackContent = null }) => {
                             return (
                                 <span
                                     key={key}
-                                    className="inline"
+                                    className="inline font-serif text-slate-800"
                                     dangerouslySetInnerHTML={{ __html: mathHtml }}
                                 />
                             );
@@ -153,15 +176,15 @@ const StructuredBlockRenderer = ({ blocks, fallbackContent = null }) => {
                         }
 
                     default:
-                        // Unknown block type - render as text
+                        // Unknown block type or fallback - render as text using ReactMarkdown
                         return (
-                            <p key={key} className="text-slate-700 text-sm">
-                                {content || JSON.stringify(block)}
-                            </p>
+                            <div key={key} className="text-slate-700 text-sm leading-relaxed">
+                                <ReactMarkdown components={{ p: Fragment }}>{content || JSON.stringify(block)}</ReactMarkdown>
+                            </div>
                         );
                 }
             })}
-        </div>
+        </div >
     );
 };
 

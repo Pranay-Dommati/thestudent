@@ -1174,7 +1174,7 @@ RULES:
 - Keep answers concise (3-6 blocks max)
 - ALL major code logic goes in "code" blocks
 - "text" blocks contain plain English (markdown for bold/inline code OK)
-- Respond with ONLY the JSON object"""
+- Respond with a SINGLE valid JSON object containing the "blocks" array. Do NOT output multiple JSON objects."""
 
             prompt_parts = [
                 f"CODE:\n```python\n{full_code}\n```",
@@ -1205,7 +1205,7 @@ RULES:
 - ALL major code logic goes in "code" blocks
 - "text" blocks contain plain English (markdown for bold/inline code OK)
 - Math ONLY for complexity (O notation, formulas)
-- Respond with ONLY the JSON object"""
+- Respond with a SINGLE valid JSON object containing the "blocks" array. Do NOT output multiple JSON objects."""
 
             prompt_parts = [
                 f"CODE:\n```python\n{full_code}\n```"
@@ -1252,14 +1252,48 @@ RULES:
         
         try:
             # Extract JSON from response
+            # Robust JSON extraction
             json_text = raw_response
             if '```json' in json_text:
                 json_text = json_text.split('```json')[1].split('```')[0].strip()
             elif '```' in json_text:
                 json_text = json_text.split('```')[1].split('```')[0].strip()
             
-            parsed = json.loads(json_text)
-            blocks = parsed.get('blocks', [])
+            try:
+                # Attempt 1: Standard parsers
+                parsed = json.loads(json_text)
+                if isinstance(parsed, dict) and 'blocks' in parsed:
+                    blocks = parsed['blocks']
+                elif isinstance(parsed, list):
+                    blocks = parsed
+                else:
+                    # It's a single object but not the wrapper we wanted?
+                    # valid JSON but invalid structure - treat as single block if it has content
+                    blocks = [parsed] if 'content' in parsed else []
+            except json.JSONDecodeError:
+                # Attempt 2: Handle NDJSON (JSON Lines) or multiple objects
+                # This happens if AI forgets the comma or the wrapper array
+                blocks = []
+                import re
+                # Find top-level JSON objects loosely
+                # This regex matches { ... } non-greedily, but effectively for single-line objects
+                # For multi-line, it's harder, so we'll try line-by-line first
+                
+                lines = json_text.splitlines()
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith('{') and line.endswith('}'):
+                        try:
+                            blocks.append(json.loads(line))
+                        except:
+                            continue
+                
+                if not blocks:
+                     # Attempt 3: Ultimate Fallback
+                     # If it's not JSON at all, maybe the AI just refused to use JSON and sent text?
+                     # We'll treat the whole thing as one text block.
+                     print(f"[AskStep] ⚠️ Parsing failed completely. Fallback to raw text.")
+                     blocks = [{"type": "text", "content": raw_response}]
             
             # Build legacy answer from blocks
             legacy_parts = []

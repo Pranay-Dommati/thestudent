@@ -297,10 +297,33 @@ class WhyExplainer:
                     json_text = json_text.split('```')[1].split('```')[0].strip()
                 
                 import json
-                parsed = json.loads(json_text)
-                blocks = parsed.get('blocks', [])
-                print(f"[Why #{request_id}] ✓ Parsed {len(blocks)} structured blocks")
-            except (json.JSONDecodeError, IndexError, KeyError) as parse_error:
+                try:
+                    # Attempt 1: Standard parsers
+                    parsed = json.loads(json_text)
+                    if isinstance(parsed, dict) and 'blocks' in parsed:
+                        blocks = parsed['blocks']
+                    elif isinstance(parsed, list):
+                        blocks = parsed
+                    else:
+                        # Valid JSON but not what we expected
+                        blocks = [parsed] if 'content' in parsed else []
+                    print(f"[Why #{request_id}] ✓ Parsed {len(blocks)} structured blocks")
+                except json.JSONDecodeError:
+                    # Attempt 2: Handle NDJSON (JSON Lines) or multiple objects
+                    blocks = []
+                    lines = json_text.splitlines()
+                    for line in lines:
+                        line = line.strip()
+                        if line.startswith('{') and line.endswith('}'):
+                            try:
+                                blocks.append(json.loads(line))
+                            except:
+                                continue
+                    
+                    if not blocks:
+                         raise ValueError("Could not extract blocks from JSON")
+
+            except (json.JSONDecodeError, IndexError, KeyError, ValueError) as parse_error:
                 print(f"[Why #{request_id}] ⚠️ JSON parse failed: {parse_error}")
                 print(f"[Why #{request_id}] Falling back to legacy text format")
                 # Fallback: wrap raw response as a single text block
