@@ -1271,9 +1271,23 @@ RULES:
                     # valid JSON but invalid structure - treat as single block if it has content
                     blocks = [parsed] if 'content' in parsed else []
             except json.JSONDecodeError:
-                # Attempt 2: Handle NDJSON (JSON Lines) or multiple objects
-                # This happens if AI forgets the comma or the wrapper array
-                blocks = []
+                # Attempt 1.5: Substring extraction (Chatty AI fix)
+                # Find first '{' and last '}' to extract potential JSON from wrapper text
+                try:
+                    s_idx = json_text.find('{')
+                    e_idx = json_text.rfind('}')
+                    if s_idx != -1 and e_idx != -1 and s_idx < e_idx:
+                        candidate = json_text[s_idx : e_idx + 1]
+                        parsed_sub = json.loads(candidate)
+                        if isinstance(parsed_sub, dict) and 'blocks' in parsed_sub:
+                            blocks = parsed_sub['blocks']
+                except:
+                    pass
+
+                if not blocks:
+                    # Attempt 2: Handle NDJSON (JSON Lines) or multiple objects
+                    # This happens if AI forgets the comma or the wrapper array
+                    blocks = []
                 import re
                 # Find top-level JSON objects loosely
                 # This regex matches { ... } non-greedily, but effectively for single-line objects
