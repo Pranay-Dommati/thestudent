@@ -56,6 +56,14 @@ export const isMathLike = (s) => {
         return true;
     }
 
+    // Strong code indicators that override generic math checks
+    // 1. Array indexing: word followed by [something]
+    if (/\w+\[.*\]/.test(t)) return false;
+
+    // 2. Snake_case variables (word_word) where the suffix is multiple letters (e.g., max_val)
+    // We allow x_1, x_i, y_0 (single char suffix) as they might be valid math subscripts
+    if (/[a-zA-Z0-9]+_[a-zA-Z0-9]{2,}/.test(t)) return false;
+
     // Derivatives and powers
     if (/(d[xyzt]|dx|dy|dt)\s*\/(d[xyzt]|dx|dy|dt)\b/.test(t)) {
         return true; // dy/dx
@@ -203,6 +211,26 @@ export const preSanitizeMarkdown = (md) => {
                 return /\s|\n/.test(t) ? `$$${t}$$` : `$${t}$`;
             }
             return m; // keep regular inline code
+        });
+
+        // Handle possible inline LaTeX ($...$) that should be code (e.g. variable names like max_val)
+        // If the content inside $...$ is NOT identified as math (e.g. it's just a variable name with underscore),
+        // convert it to code backticks so it renders as text/code instead of KaTeX math.
+        out = out.replace(/\$([^$\n]+)\$/g, (m, content) => {
+            const t = content.trim();
+            // If we've determined it's definitely code (like arr[i] or max_val), convert to code
+            // Note: isMathLike returns FALSE for max_val and arr[i] due to our previous fix
+            if (!isMathLike(t)) {
+                return `\`${t}\``;
+            }
+
+            // If it IS math (e.g. boolean logic with > or ->), but contains snake_case variables,
+            // we need to escape `_` to `\_` for those variables so they don't render as subscripts.
+            // We target underscores followed by at least 2 letters (e.g. max_val => max\_val).
+            // We avoid single-letter subscripts (e.g. x_i, y_1) which are valid math.
+            let fixedContent = content.replace(/([a-zA-Z0-9]+)_([a-zA-Z]{2,})(?=\b|[^a-zA-Z0-9])/g, '$1\\_$2');
+
+            return `$${fixedContent}$`;
         });
 
         return out;
