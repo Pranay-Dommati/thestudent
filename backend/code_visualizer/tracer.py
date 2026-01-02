@@ -53,6 +53,9 @@ class PythonTracer:
         self.on_frame = None
         # Track ALL user-defined functions to allow tracing nested/helper functions
         self.user_defined_functions: set = set()
+        # Virtual Assignment Step tracking
+        self.pending_assignment_call: Optional[Dict[str, Any]] = None  # Assignment awaiting call
+        self.call_stack: List[Dict[str, Any]] = []  # Stack of pending assignments per call depth
         
     def _safe_copy(self, value: Any) -> Any:
         if value is None:
@@ -327,6 +330,59 @@ class PythonTracer:
         line_no = frame.f_lineno
         func_name = frame.f_code.co_name
         
+        # VIRTUAL ASSIGNMENT: Handle call/return BEFORE the filter (for silent tracking)
+        if event == 'call' and func_name in self.user_defined_functions:
+            # Push pending assignment to call stack when entering a user function
+            if self.pending_assignment_call and self.pending_assignment_call['function'] == func_name:
+                self.call_stack.append(self.pending_assignment_call)
+                self.pending_assignment_call = None
+            # Continue to allow normal tracing (don't create a frame for 'call' itself)
+        
+        elif event == 'return' and func_name in self.user_defined_functions:
+            # Inject synthetic step when returning from a tracked function call
+            if self.call_stack and self.call_stack[-1]['function'] == func_name:
+                assignment_info = self.call_stack.pop()
+                return_value = self._safe_copy(arg)
+                
+                # Format the return value for display
+                if return_value == '':
+                    display_value = '""'
+                elif isinstance(return_value, str):
+                    display_value = f'"{return_value}"'
+                else:
+                    display_value = str(return_value)
+                
+                self.step_count += 1
+                
+                # Create synthetic step showing the assignment
+                synthetic_code = f"{assignment_info['variable']} ← {display_value}"
+                
+                # Get the caller's locals
+                caller_frame = frame.f_back
+                caller_locals = {}
+                if caller_frame and caller_frame.f_code.co_filename == '<user_code>':
+                    caller_locals = self._serialize_locals(dict(caller_frame.f_locals))
+                
+                synthetic_frame = TraceFrame(
+                    step=self.step_count,
+                    line=assignment_info['call_line'],
+                    code=synthetic_code,
+                    event='synthetic_assignment',
+                    locals=caller_locals,
+                    changed_vars=[assignment_info['variable']],
+                    function_name=assignment_info['caller_func'] if assignment_info['caller_func'] != '<module>' else None
+                )
+                synthetic_frame.explanation = f"Assignment completed: {assignment_info['variable']} = {display_value}"
+                
+                self.frames.append(synthetic_frame)
+                if self.on_frame:
+                    try:
+                        self.on_frame(synthetic_frame.to_dict())
+                    except Exception:
+                        pass
+            # Continue to allow normal tracing (don't create a frame for 'return' itself)
+        
+        # Now apply the normal filter (this will skip call/return events)
         if not self._should_include_frame(line_no, func_name, event):
             return self._trace_callback
         
@@ -341,6 +397,22 @@ class PythonTracer:
             
             # Also track actual changes for internal state (needed for next comparison)
             self._detect_changed_vars(current_locals)
+            
+            # VIRTUAL ASSIGNMENT: Detect assignment with function call pattern
+            # e.g., "result = some_func(...)" or "odd_len = expand(i, i)"
+            assignment_call_match = re.match(r'^\s*(\w+)\s*=\s*(\w+)\s*\(', code_line)
+            if assignment_call_match:
+                var_name = assignment_call_match.group(1)
+                func_called = assignment_call_match.group(2)
+                # Check if the function being called is a user-defined function
+                if func_called in self.user_defined_functions:
+                    self.pending_assignment_call = {
+                        'variable': var_name,
+                        'function': func_called,
+                        'call_line': line_no,
+                        'call_code': code_line.strip(),
+                        'caller_func': func_name
+                    }
             
             trace_frame = TraceFrame(
                 step=self.step_count,
@@ -394,6 +466,9 @@ class PythonTracer:
         self.function_start_line = 0
         self.function_end_line = 0
         self.on_frame = on_frame
+        # Reset virtual assignment tracking
+        self.pending_assignment_call = None
+        self.call_stack = []
         
         self.source_lines = code.split('\n')
         self._analyze_code_structure(code)

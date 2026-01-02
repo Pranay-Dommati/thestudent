@@ -533,7 +533,7 @@ const MobileImmersiveVisualizer = ({
                                                                     >
                                                                         <span className="font-semibold">{name}</span>
                                                                         <span className="text-slate-400">=</span>
-                                                                        <span>{value.length > 15 ? value.slice(0, 15) + '...' : value}</span>
+                                                                        <span>{value === '' ? '""' : (value.length > 15 ? value.slice(0, 15) + '...' : value)}</span>
                                                                     </span>
                                                                 );
                                                             })}

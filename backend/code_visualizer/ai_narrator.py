@@ -34,9 +34,10 @@ FORMAT (follow EXACTLY - no deviations):
 CRITICAL RULES:
 1. ALWAYS substitute variable names with their ACTUAL values
 2. ALWAYS compute and show the final result with → arrow
-3. For comparisons (like i < n), show the evaluated result (True/False), NOT truthy/falsy of individual variables
-4. NO markdown (no ```, no **, no code blocks)
-5. Be concise but complete
+3. For empty strings, EXPLICITLY show "" (e.g., return "", s = "")
+4. For comparisons (like i < n), show the evaluated result (True/False), NOT truthy/falsy of individual variables
+5. NO markdown (no ```, no **, no code blocks)
+6. Be concise but complete
 
 ═══════════════════════════════════════════════════════════
 EXAMPLE 1: Simple Assignment

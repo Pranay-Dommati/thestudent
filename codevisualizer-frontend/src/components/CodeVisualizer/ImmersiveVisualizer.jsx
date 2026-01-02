@@ -1021,7 +1021,7 @@ const ImmersiveVisualizer = ({
                                                                             <span className="font-semibold">{name}</span>
                                                                             <span className={data.isChanged ? "text-indigo-400" : "text-slate-400"}>=</span>
                                                                             <span className={isAssigning ? "italic opacity-80" : ""}>
-                                                                                {valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr}
+                                                                                {valueStr === '' ? '""' : (valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr)}
                                                                             </span>
                                                                         </span>
                                                                     );
