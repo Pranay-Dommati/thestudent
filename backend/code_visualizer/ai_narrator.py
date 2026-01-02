@@ -34,7 +34,7 @@ FORMAT (follow EXACTLY - no deviations):
 CRITICAL RULES:
 1. ALWAYS substitute variable names with their ACTUAL values
 2. ALWAYS compute and show the final result with → arrow
-3. For truthy/falsy checks, show the actual value and whether it's truthy/falsy
+3. For comparisons (like i < n), show the evaluated result (True/False), NOT truthy/falsy of individual variables
 4. NO markdown (no ```, no **, no code blocks)
 5. Be concise but complete
 
@@ -269,14 +269,9 @@ class AINarrator:
         if substitution_vars:
             var_list = []
             for name, val in substitution_vars.items():
-                # Determine truthy/falsy
-                try:
-                    is_truthy = bool(val) if val is not None else False
-                except:
-                    is_truthy = val is not None
-                truthy_str = "truthy" if is_truthy else "falsy"
                 var_type = type(val).__name__ if val is not None else "NoneType"
-                var_list.append(f"  {name} = {val} (type: {var_type}, {truthy_str})")
+                # Simplified: just show the value and type, no truthy/falsy (often misleading)
+                var_list.append(f"  {name} = {val} (type: {var_type})")
             context_parts.append("VARIABLES FOR SUBSTITUTION (before this line executes):\n" + "\n".join(var_list))
         else:
             context_parts.append("VARIABLES FOR SUBSTITUTION: (none)")

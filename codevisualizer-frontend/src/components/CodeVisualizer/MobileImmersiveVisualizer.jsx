@@ -480,9 +480,9 @@ const MobileImmersiveVisualizer = ({
                                             </div>
 
                                             {/* Code */}
-                                            <div className="px-3 py-2 bg-white border-b border-slate-100">
-                                                <div className="font-mono text-sm text-slate-800 whitespace-pre overflow-x-auto">
-                                                    {highlightSyntax(step.code)}
+                                            <div className="py-2 bg-white border-b border-slate-100 overflow-x-auto">
+                                                <div className="font-mono text-sm text-slate-800 whitespace-pre px-3">
+                                                    {highlightSyntax(step.code?.trim() || step.code)}
                                                 </div>
                                             </div>
 
@@ -511,30 +511,33 @@ const MobileImmersiveVisualizer = ({
                                                 </div>
                                             )}
 
-                                            {/* Variables */}
+                                            {/* Variables - Horizontal scroll like desktop */}
                                             {step.variables && Object.keys(step.variables).length > 0 && (
-                                                <div className="px-3 py-2 border-t border-slate-100">
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {Object.entries(step.variables).map(([name, data]) => {
-                                                            const value = data.value !== undefined
-                                                                ? (typeof data.value === 'object' ? JSON.stringify(data.value) : String(data.value))
-                                                                : 'undefined';
-                                                            const isChanged = step.changedVars?.includes(name);
+                                                <div className="px-3 py-2 border-t border-slate-100 overflow-x-auto">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-slate-500 font-medium shrink-0">Variables:</span>
+                                                        <div className="flex gap-1.5">
+                                                            {Object.entries(step.variables).map(([name, data]) => {
+                                                                const value = data.value !== undefined
+                                                                    ? (typeof data.value === 'object' ? JSON.stringify(data.value) : String(data.value))
+                                                                    : 'undefined';
+                                                                const isChanged = step.changedVars?.includes(name);
 
-                                                            return (
-                                                                <span
-                                                                    key={name}
-                                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono ${isChanged
-                                                                        ? 'bg-indigo-100 text-indigo-700'
-                                                                        : 'bg-slate-100 text-slate-600'
-                                                                        }`}
-                                                                >
-                                                                    <span className="font-semibold">{name}</span>
-                                                                    <span className="text-slate-400">=</span>
-                                                                    <span>{value.length > 15 ? value.slice(0, 15) + '...' : value}</span>
-                                                                </span>
-                                                            );
-                                                        })}
+                                                                return (
+                                                                    <span
+                                                                        key={name}
+                                                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono whitespace-nowrap shrink-0 ${isChanged
+                                                                            ? 'bg-indigo-100 text-indigo-700'
+                                                                            : 'bg-slate-100 text-slate-600'
+                                                                            }`}
+                                                                    >
+                                                                        <span className="font-semibold">{name}</span>
+                                                                        <span className="text-slate-400">=</span>
+                                                                        <span>{value.length > 15 ? value.slice(0, 15) + '...' : value}</span>
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             )}
