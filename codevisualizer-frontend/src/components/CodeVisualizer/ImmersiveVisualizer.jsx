@@ -256,7 +256,7 @@ const ImmersiveVisualizer = ({
         setWhyExplanation(null); // Reset for new step
     }, []);
 
-    // Fetch Why explanation (returns explanation for chat to use)
+    // Fetch Why explanation (returns full result with blocks for structured rendering)
     const handleFetchWhy = useCallback(async () => {
         if (!whyTargetStep) return null;
 
@@ -272,9 +272,13 @@ const ImmersiveVisualizer = ({
                 problemType: 'algorithm',
                 functionPurpose: ''
             });
-            console.log(`[Why] Received:`, result.cached ? 'CACHED' : 'FRESH');
+            console.log(`[Why] Received:`, result.cached ? 'CACHED' : 'FRESH', result.blocks ? `(${result.blocks.length} blocks)` : '(legacy)');
             setWhyExplanation(result.explanation);
-            return result.explanation;
+            // Return full result with blocks for structured rendering
+            return {
+                explanation: result.explanation,
+                blocks: result.blocks || null
+            };
         } catch (error) {
             console.error('[Why] Error:', error);
             throw error;

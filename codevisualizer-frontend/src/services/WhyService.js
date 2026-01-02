@@ -106,13 +106,14 @@ class WhyService {
             // Store in client cache
             const result = {
                 explanation: data.explanation,
+                blocks: data.blocks || null,  // Structured blocks for enterprise rendering
                 lineNumber: data.line_number,
                 complexity: data.complexity,
                 cached: data.cached || false
             };
 
             this.cache.set(cacheKey, result);
-            console.log(`[WhyService] Cached explanation for line ${lineNumber}`);
+            console.log(`[WhyService] Cached explanation for line ${lineNumber}${data.blocks ? ` (${data.blocks.length} blocks)` : ''}`);
 
             return result;
 

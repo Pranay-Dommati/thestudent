@@ -100,7 +100,11 @@ export const askStepQuestion = async ({
         throw new Error(data.error || 'Failed to get answer');
     }
 
-    return data.answer;
+    // Return full response with blocks for structured rendering
+    return {
+        answer: data.answer,
+        blocks: data.blocks || null  // Structured blocks for enterprise rendering
+    };
 };
 
 /**

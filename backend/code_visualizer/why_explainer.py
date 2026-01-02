@@ -31,123 +31,52 @@ except ImportError:
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 # =============================================================================
-# SYSTEM PROMPT — "THE WHY" (PRODUCTION READY)
+# SYSTEM PROMPT — "THE WHY" (STRUCTURED BLOCKS - ENTERPRISE GRADE)
 # =============================================================================
 WHY_SYSTEM_PROMPT = """You are a senior computer science instructor.
 
 Your task is to explain WHY a specific line of code exists in an algorithm.
 
-Strict rules:
-- Explain ONLY the given line.
-- Use full code context internally but do NOT explain other lines.
-- Match explanation depth to line complexity.
-- For simple assignments, give brief, direct intent (1-2 sentences max).
-- For simple loops (for/while without AND/OR), give brief purpose (1-2 sentences).
-- For control-flow or compound conditions, explain each condition separately.
-- Use concrete success and failure examples when relevant.
-- Do NOT be conversational or wordy.
-- Do NOT ask questions.
-- Do NOT mention AI, prompts, or models.
-- Output must be structured and concise.
+RESPONSE FORMAT:
+You MUST respond with a valid JSON object containing an array of "blocks".
+Each block has a "type" and "content" field.
 
-OUTPUT FORMAT:
+Block types:
+- "heading": Section headers (e.g., "Why this step matters")
+- "text": Plain explanatory text (NO code syntax, NO variables, NO operators)
+- "code": Any code, variable names, conditions, operators (e.g., "while i <= 5", "max_val", "n > 0")
+- "list": Array of bullet points
 
-For SIMPLE lines (assignments, simple operations):
-💡 Why this step matters
+EXAMPLE RESPONSE:
+{
+  "blocks": [
+    {"type": "heading", "content": "💡 Why this step matters"},
+    {"type": "text", "content": "This line controls how long the loop runs."},
+    {"type": "code", "content": "while i <= 5"},
+    {"type": "text", "content": "The loop continues as long as the condition is true."},
+    {"type": "list", "items": ["Initializes at 1", "Increments each iteration", "Stops when exceeding 5"]}
+  ]
+}
 
-[1-2 SHORT sentences. Be direct. Example: "This initializes result with the first element, giving the algorithm a starting maximum to compare against."]
+CRITICAL RULES:
+1. ALL major code logic/conditions MUST go in type="code" blocks
+   - Examples: "while i <= 5", "max_val = 0"
+2. "text" blocks contain plain English explanations
+   - You MAY use **bold** for emphasis
+   - You MAY use `backticks` for inline variable mentions (e.g. "The variable `i` is...")
+   - Do NOT use LaTeX or math notation
+3. Keep blocks granular - do not put huge paragraphs in one text block
+4. Keep responses concise - 3-6 blocks maximum for simple lines
 
-For SIMPLE LOOPS (for/while WITHOUT 'and'/'or' in the condition):
-💡 Why this step matters
+RESPONSE DEPTH BY LINE TYPE:
+- Simple assignments: 2-3 blocks (heading + 1-2 text/code)
+- Simple loops: 3-4 blocks 
+- Conditions with if/elif: 4-6 blocks with success/failure explanation
+- Compound conditions: 5-8 blocks explaining each part
 
-[1-2 SHORT sentences explaining the loop's purpose. Example: "This loop iterates through each element in nums, allowing comparison against the current maximum."]
+Always start with: {"type": "heading", "content": "💡 Why this step matters"}
 
-For SINGLE CONDITION lines (if/elif with one check):
-💡 Why this step matters
-
-This line contains a single condition, and it is necessary.
-
-**Condition:** **[exact condition text]**
-[What this condition checks]
-
-**Why this condition is required:**
-[Brief explanation]
-
-**Failure case:**
-Check condition:
-```python
-[var] [op] [var] → [evaluated] → ❌
-```
-
-This means:
-- [algorithm decision]
-- [what action happens (e.g. skip/continue)]
-- [what happens next]
-
-**Success case:**
-Check condition:
-```python
-[var] [op] [var] → [evaluated] → ✅
-```
-
-This means:
-- [algorithm decision]
-- [what action happens]
-- [what happens next]
-
-For COMPOUND lines (loops or conditions with multiple checks using 'and'/'or'):
-💡 Why this step matters
-
-This line contains [N] conditions, and all are necessary.
-
-**Condition 1:** **[exact condition text]**
-[Explain what this condition checks]
-
-**Condition 2:** **[exact condition text]**
-[Explain what this condition checks]
-
-**Why all conditions together are required:**
-[Explain why they work together]
-
-**Failure case:**
-Check condition:
-```python
-[var] [op] [var] → [evaluated] → ❌
-```
-
-This means:
-- [algorithm decision]
-- [what action happens]
-- [what happens next]
-
-**Success case:**
-Check condition:
-```python
-[var] [op] [var] → [evaluated] → ✅
-```
-
-This means:
-- [algorithm decision]
-- [what action happens]
-- [what happens next]
-
-RULES:
-- Start with "💡 Why this step matters" header
-- Use **bold** for condition labels
-- Be educational but CONCISE — no fluff
-- For simple lines AND simple loops, keep it to 1-2 direct sentences
-- ONLY use the compound format when the line has 'and' or 'or' keywords
-- Focus on the WHY, not the WHAT
-- For Failure/Success cases:
-    - ALWAYS start with "**Failure case:**" or "**Success case:**"
-    - ALWAYS put "Check condition:" on its own line
-    - ALWAYS put the expression inside TRIPLE backticks (```python ... ```) to make it a code block
-    - ALWAYS use the bullet list for "This means:"
-- NEVER write Failure/Success as paragraphs or essay form
-- NEVER use single backticks (`) for individual variables like `n` or `result`
-- ONLY use triple backticks for the Check condition code block
-- For inline variable mentions in explanations, use plain text or **bold** for emphasis
-- Show HOW the algorithm THINKS, not just describe it"""
+Respond with ONLY the JSON object, no other text."""
 
 
 # =============================================================================
@@ -298,7 +227,9 @@ class WhyExplainer:
         cached_explanation = self.cache.get(full_code, line_number)
         if cached_explanation:
             print(f"[Why #{request_id}] ✓ CACHE HIT - returning {len(cached_explanation)} chars")
+            # Note: Cached responses are legacy markdown format, so blocks is empty/null
             return {
+                'blocks': None,  # Indicates frontend should use legacy 'explanation'
                 'explanation': cached_explanation,
                 'cached': True,
                 'line_number': line_number,
@@ -345,31 +276,50 @@ class WhyExplainer:
                 config=types.GenerateContentConfig(
                     system_instruction=WHY_SYSTEM_PROMPT,
                     temperature=0.1,  # Very low for determinism
-                    max_output_tokens=2500,  # Increased for complex multi-condition explanations
+                    max_output_tokens=2500,
                 )
             )
             
             elapsed = time.time() - start_time
-            explanation = response.text.strip()
+            raw_response = response.text.strip()
             
             print(f"[Why #{request_id}] ✓ AI responded in {elapsed:.2f}s")
-            print(f"[Why #{request_id}] Response length: {len(explanation)} chars")
+            print(f"[Why #{request_id}] Response length: {len(raw_response)} chars")
             
-            # Warn if response seems truncated
-            if len(explanation) < 200:
-                print(f"[Why #{request_id}] ⚠️ WARNING: Response seems truncated! Only {len(explanation)} chars")
+            # Parse JSON response
+            blocks = None
+            try:
+                # Try to extract JSON from response (handle potential markdown wrapping)
+                json_text = raw_response
+                if '```json' in json_text:
+                    json_text = json_text.split('```json')[1].split('```')[0].strip()
+                elif '```' in json_text:
+                    json_text = json_text.split('```')[1].split('```')[0].strip()
+                
+                import json
+                parsed = json.loads(json_text)
+                blocks = parsed.get('blocks', [])
+                print(f"[Why #{request_id}] ✓ Parsed {len(blocks)} structured blocks")
+            except (json.JSONDecodeError, IndexError, KeyError) as parse_error:
+                print(f"[Why #{request_id}] ⚠️ JSON parse failed: {parse_error}")
+                print(f"[Why #{request_id}] Falling back to legacy text format")
+                # Fallback: wrap raw response as a single text block
+                blocks = [
+                    {"type": "heading", "content": "💡 Why this step matters"},
+                    {"type": "text", "content": raw_response}
+                ]
             
-            # Ensure it starts with the header
-            if not explanation.startswith('💡'):
-                explanation = f"💡 Why this step matters\n\n{explanation}"
+            # Build result with both structured blocks AND legacy explanation for backwards compatibility
+            legacy_explanation = self._blocks_to_markdown(blocks)
             
-            # Cache the result (will skip if too short)
-            self.cache.set(full_code, line_number, explanation)
+            # Cache the result
+            self.cache.set(full_code, line_number, legacy_explanation)
             
             print(f"[Why #{request_id}] ========== REQUEST COMPLETE ==========\n")
             
             return {
-                'explanation': explanation,
+                'blocks': blocks,  # NEW: Structured blocks for enterprise rendering
+                'explanation': legacy_explanation,  # LEGACY: For backwards compatibility
                 'cached': False,
                 'line_number': line_number,
                 'complexity': complexity
@@ -379,13 +329,45 @@ class WhyExplainer:
             elapsed = time.time() - start_time if 'start_time' in dir() else 0
             print(f"[Why #{request_id}] ✗ ERROR after {elapsed:.2f}s: {type(e).__name__}: {str(e)}")
             print(f"[Why #{request_id}] ========== REQUEST FAILED ==========\n")
-            error_msg = f"💡 Why this step matters\n\n❌ Error generating explanation: {str(e)}"
+            error_blocks = [
+                {"type": "heading", "content": "💡 Why this step matters"},
+                {"type": "text", "content": f"❌ Error generating explanation: {str(e)}"}
+            ]
             return {
-                'explanation': error_msg,
+                'blocks': error_blocks,
+                'explanation': f"💡 Why this step matters\n\n❌ Error generating explanation: {str(e)}",
                 'cached': False,
                 'line_number': line_number,
                 'complexity': 'error'
             }
+    
+    def _blocks_to_markdown(self, blocks: list) -> str:
+        """Convert structured blocks to legacy markdown for backwards compatibility."""
+        if not blocks:
+            return ""
+        
+        parts = []
+        for block in blocks:
+            block_type = block.get('type', 'text')
+            content = block.get('content', '')
+            
+            if block_type == 'heading':
+                parts.append(content)
+                parts.append("")  # Empty line after heading
+            elif block_type == 'text':
+                parts.append(content)
+            elif block_type == 'code':
+                # Wrap code in backticks for legacy markdown
+                parts.append(f"`{content}`")
+            elif block_type == 'list':
+                items = block.get('items', [])
+                for item in items:
+                    parts.append(f"• {item}")
+            elif block_type == 'math':
+                # Wrap math in dollar signs for KaTeX
+                parts.append(f"${content}$")
+        
+        return "\n".join(parts)
     
     def _build_prompt(
         self,

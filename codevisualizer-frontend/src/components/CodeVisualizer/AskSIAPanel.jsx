@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, MessageCircle, Loader2, Send, X } from 'lucide-react';
 import MarkdownRenderer from '../Shared/MarkdownRenderer';
+import StructuredBlockRenderer from '../Shared/StructuredBlockRenderer';
 
 /**
  * AskSIAPanel v2 — Chat-based DSA Mentor Interface
@@ -133,14 +134,17 @@ const AskSIAPanel = ({
 
         setIsLoading(true);
         try {
-            const explanation = await onFetchWhy();
-            if (explanation) {
+            const response = await onFetchWhy();
+            if (response) {
+                // Response now includes both explanation and blocks for structured rendering
+                const { explanation, blocks } = response;
                 // APPEND AI response after the system prompt
                 setMessages(prev => [...prev, {
                     id: Date.now(),
                     role: 'assistant',
                     type: 'why',
                     content: explanation,
+                    blocks: blocks,  // Structured blocks for enterprise rendering
                     lineNumber: stepContext.lineNumber
                 }]);
                 // Scroll to show the response
@@ -192,12 +196,15 @@ const AskSIAPanel = ({
                     }))
                 };
 
-                const answer = await onAskQuestion(question, { stepContext, conversation: conversationForAI });
+                const response = await onAskQuestion(question, { stepContext, conversation: conversationForAI });
+                // Response now includes both answer and blocks for structured rendering
+                const { answer, blocks } = response;
                 setMessages(prev => [...prev, {
                     id: Date.now(),
                     role: 'assistant',
                     type: 'answer',
                     content: answer,
+                    blocks: blocks,  // Structured blocks for enterprise rendering
                     lineNumber: stepContext?.lineNumber || null
                 }]);
                 // Scroll to show the AI response
@@ -242,7 +249,15 @@ const AskSIAPanel = ({
                         <Sparkles className="w-4 h-4 text-indigo-600" />
                         <span className="text-sm font-semibold text-indigo-700">Why this step matters</span>
                     </div>
-                    <MarkdownRenderer content={cleanedContent} />
+                    {msg.blocks && Array.isArray(msg.blocks) && msg.blocks.length > 0 ? (
+                        <StructuredBlockRenderer
+                            blocks={msg.blocks.filter(b =>
+                                !(b.type === 'heading' && b.content.includes('Why this step matters'))
+                            )}
+                        />
+                    ) : (
+                        <MarkdownRenderer content={cleanedContent} />
+                    )}
                 </div>
             );
         }
@@ -270,9 +285,14 @@ const AskSIAPanel = ({
         }
 
         // Assistant answer - full width like Why block
+        // Use StructuredBlockRenderer if blocks are available, otherwise fall back to MarkdownRenderer
         return (
             <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 mb-4 overflow-hidden">
-                <MarkdownRenderer content={msg.content} />
+                {msg.blocks && Array.isArray(msg.blocks) && msg.blocks.length > 0 ? (
+                    <StructuredBlockRenderer blocks={msg.blocks} />
+                ) : (
+                    <MarkdownRenderer content={msg.content} />
+                )}
             </div>
         );
     };

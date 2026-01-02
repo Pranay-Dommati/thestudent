@@ -1157,16 +1157,28 @@ def ask_step(request):
         if is_step_scoped:
             system_prompt = """You are a senior DSA mentor.
 
+RESPONSE FORMAT:
+Return a JSON object with "blocks" array. Block types:
+- "text": Plain explanations (NO code/variables/operators)
+- "code": Any code, variables, conditions (e.g., "while i <= 5", "max_val")
+- "list": {"type": "list", "items": ["point 1", "point 2"]}
+
+EXAMPLE:
+{"blocks": [
+  {"type": "text", "content": "This line controls the loop."},
+  {"type": "code", "content": "i <= 5"},
+  {"type": "list", "items": ["Checks value", "Continues if true"]}
+]}
+
 RULES:
-- Keep answers concise (3-6 bullet points max)
-- Reference the specific line when explaining
-- Refer to conversation history when relevant
-- Do NOT provide complete solutions
-- If asked about something outside the current step, politely redirect"""
+- Keep answers concise (3-6 blocks max)
+- ALL major code logic goes in "code" blocks
+- "text" blocks contain plain English (markdown for bold/inline code OK)
+- Respond with ONLY the JSON object"""
 
             prompt_parts = [
                 f"CODE:\n```python\n{full_code}\n```",
-                f"\nSTEP CONTEXT:\nLine: {line_number}\nCode: `{line_text}`\nVariables: {vars_str}"
+                f"\nSTEP CONTEXT:\nLine: {line_number}\nCode: {line_text}\nVariables: {vars_str}"
             ]
             
             if history_str:
@@ -1181,11 +1193,19 @@ RULES:
             # General mode - no step context
             system_prompt = """You are a DSA teaching assistant.
 
+RESPONSE FORMAT:
+Return a JSON object with "blocks" array. Block types:
+- "text": Plain explanations (NO code/variables/operators)
+- "code": Any code, variables, conditions
+- "list": {"type": "list", "items": ["item 1", "item 2"]}
+- "math": For complexity analysis (e.g., "O(n log n)")
+
 RULES:
 - Keep answers concise and educational
-- Refer to conversation history when relevant
-- You may discuss complexity, edge cases, and alternatives
-- Do NOT provide complete different solutions unless asked"""
+- ALL major code logic goes in "code" blocks
+- "text" blocks contain plain English (markdown for bold/inline code OK)
+- Math ONLY for complexity (O notation, formulas)
+- Respond with ONLY the JSON object"""
 
             prompt_parts = [
                 f"CODE:\n```python\n{full_code}\n```"
@@ -1219,18 +1239,56 @@ RULES:
         response = model.generate_content(
             full_prompt,
             generation_config=genai.GenerationConfig(
-                max_output_tokens=600,  # Slightly higher for context-aware answers
-                temperature=0.3,
+                max_output_tokens=800,
+                temperature=0.2,  # Lower for more consistent JSON
             )
         )
         
-        answer = response.text.strip() if response.text else "I couldn't generate an answer. Please try rephrasing your question."
+        raw_response = response.text.strip() if response.text else ""
+        
+        # Parse JSON response
+        blocks = None
+        legacy_answer = raw_response
+        
+        try:
+            # Extract JSON from response
+            json_text = raw_response
+            if '```json' in json_text:
+                json_text = json_text.split('```json')[1].split('```')[0].strip()
+            elif '```' in json_text:
+                json_text = json_text.split('```')[1].split('```')[0].strip()
+            
+            parsed = json.loads(json_text)
+            blocks = parsed.get('blocks', [])
+            
+            # Build legacy answer from blocks
+            legacy_parts = []
+            for block in blocks:
+                block_type = block.get('type', 'text')
+                content = block.get('content', '')
+                if block_type == 'code':
+                    legacy_parts.append(f"`{content}`")
+                elif block_type == 'list':
+                    for item in block.get('items', []):
+                        legacy_parts.append(f"• {item}")
+                elif block_type == 'math':
+                    legacy_parts.append(f"${content}$")
+                else:
+                    legacy_parts.append(content)
+            legacy_answer = "\n".join(legacy_parts)
+            
+            print(f"[AskStep] ✓ Parsed {len(blocks)} structured blocks")
+        except (json.JSONDecodeError, IndexError, KeyError) as e:
+            print(f"[AskStep] ⚠️ JSON parse failed: {e}, using raw response")
+            # Fallback: wrap as single text block
+            blocks = [{"type": "text", "content": raw_response}]
         
         print(f"[AskStep] Line {line_number}: Q='{question[:50]}...' -> Generated answer")
         
         return JsonResponse({
             "success": True,
-            "answer": answer
+            "blocks": blocks,  # NEW: Structured blocks for enterprise rendering
+            "answer": legacy_answer  # LEGACY: For backwards compatibility
         })
         
     except Exception as e:
