@@ -135,7 +135,7 @@ function CodeVisualizerPage() {
                             if (prev.length > 0) return prev;
                             return prev;
                         });
-                    }, 5000);
+                    }, 30000);
                 };
 
                 while (true) {

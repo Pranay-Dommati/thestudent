@@ -51,6 +51,8 @@ class PythonTracer:
         self.function_start_line: int = 0
         self.function_end_line: int = 0
         self.on_frame = None
+        # Track ALL user-defined functions to allow tracing nested/helper functions
+        self.user_defined_functions: set = set()
         
     def _safe_copy(self, value: Any) -> Any:
         if value is None:
@@ -163,6 +165,14 @@ class PythonTracer:
     def _analyze_code_structure(self, code: str) -> None:
         try:
             tree = ast.parse(code)
+            
+            # First pass: collect ALL function definitions
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    # Add ALL functions to the set (including nested/helper functions)
+                    self.user_defined_functions.add(node.name)
+            
+            # Second pass: identify the main/target function for filtering boilerplate
             for node in ast.walk(tree):
                 if isinstance(node, ast.ClassDef):
                     class_name = node.name
@@ -229,12 +239,17 @@ class PythonTracer:
     def _should_include_frame(self, line_no: int, func_name: str, event: str) -> bool:
         if self._is_boilerplate_line(line_no, func_name, event):
             return False
-        if self.target_function_name and func_name == self.target_function_name:
+        
+        # Allow tracing ANY user-defined function (main function OR nested/helper functions)
+        if func_name in self.user_defined_functions:
             if event in ('call', 'return'):
-                return False
+                return False  # Skip call/return events, only trace 'line' events
             return True
-        if not self.target_function_name:
+        
+        # If no target function set, trace everything in <module>
+        if not self.target_function_name and func_name == '<module>':
             return True
+            
         return False
     
     def _generate_explanation(self, frame: TraceFrame) -> str:
