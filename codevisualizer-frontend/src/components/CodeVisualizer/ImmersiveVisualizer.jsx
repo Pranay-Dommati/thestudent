@@ -51,6 +51,10 @@ const ImmersiveVisualizer = ({
     const [isLoadingWhy, setIsLoadingWhy] = useState(false);
     const [whyTargetStep, setWhyTargetStep] = useState(null);
 
+    // Chat state persistence for AskSIAPanel (so messages persist across tab switches)
+    const [chatMessages, setChatMessages] = useState([]);
+    const [chatId] = useState(() => `chat_${Date.now()}`);
+
     const scrollContainerRef = useRef(null);
     const latestStepRef = useRef(null);
     const prevStepsLengthRef = useRef(0);
@@ -803,6 +807,9 @@ const ImmersiveVisualizer = ({
                                 onAskQuestion={handleAskQuestion}
                                 onClearContext={handleClearContext}
                                 hideHeader={true}
+                                externalMessages={chatMessages}
+                                setExternalMessages={setChatMessages}
+                                externalChatId={chatId}
                             />
                         </div>
                     )}
