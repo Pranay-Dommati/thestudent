@@ -36,6 +36,44 @@ const MarkdownRenderer = ({ content, className = '' }) => {
     return (
         <div className={`markdown-content prose prose-lg max-w-none ${className}`}>
             <style>{`
+          .markdown-content {
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            word-break: break-word;
+          }
+          .markdown-content .katex-display {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 0.5rem 0;
+            margin: 0;
+          }
+          .markdown-content .katex {
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+          }
+          .markdown-content p {
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+          }
+          /* Custom scrollbar for KaTeX math formulas */
+          .markdown-content .katex-display::-webkit-scrollbar,
+          .markdown-content .katex::-webkit-scrollbar {
+            height: 5px;
+          }
+          .markdown-content .katex-display::-webkit-scrollbar-track,
+          .markdown-content .katex::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .markdown-content .katex-display::-webkit-scrollbar-thumb,
+          .markdown-content .katex::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+          }
+          .markdown-content .katex-display::-webkit-scrollbar-thumb:hover,
+          .markdown-content .katex::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+          }
           @media (max-width: 640px) {
             .markdown-content ul,
             .markdown-content ol {

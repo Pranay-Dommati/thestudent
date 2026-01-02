@@ -237,7 +237,7 @@ const AskSIAPanel = ({
         if (msg.type === 'why') {
             const cleanedContent = preprocessExplanation(msg.content);
             return (
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 mb-4">
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 mb-4 overflow-hidden">
                     <div className="flex items-center gap-2 mb-3">
                         <Sparkles className="w-4 h-4 text-indigo-600" />
                         <span className="text-sm font-semibold text-indigo-700">Why this step matters</span>
@@ -271,7 +271,7 @@ const AskSIAPanel = ({
 
         // Assistant answer - full width like Why block
         return (
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 mb-4">
+            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-4 mb-4 overflow-hidden">
                 <MarkdownRenderer content={msg.content} />
             </div>
         );

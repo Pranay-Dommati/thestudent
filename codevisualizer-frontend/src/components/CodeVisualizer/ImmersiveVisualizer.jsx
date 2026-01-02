@@ -638,6 +638,21 @@ const ImmersiveVisualizer = ({
     return (
         <div className="fixed inset-0 z-50 bg-[#F8FAFC] flex flex-col overflow-hidden font-sans">
             {/* MINIMAL TOP BAR - No gradients, pure calm */}
+            <style>{`
+                .variables-scroll-container::-webkit-scrollbar {
+                    height: 5px;
+                }
+                .variables-scroll-container::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .variables-scroll-container::-webkit-scrollbar-thumb {
+                    background: #cbd5e1;
+                    border-radius: 10px;
+                }
+                .variables-scroll-container::-webkit-scrollbar-thumb:hover {
+                    background: #94a3b8;
+                }
+            `}</style>
             <header className="flex-shrink-0 flex items-center justify-between px-6 py-3 bg-white border-b border-slate-200">
                 <div className="flex items-center gap-4">
                     <button
@@ -918,7 +933,7 @@ const ImmersiveVisualizer = ({
                                                 {(step.variables && Object.keys(step.variables).length > 0) || (step.computed_values && Object.keys(step.computed_values).length > 0) || (step.changedVars && step.changedVars.length > 0) ? (
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-xs text-slate-500 font-medium shrink-0">Variables:</span>
-                                                        <div className="flex-1 flex items-center gap-2 overflow-x-auto pb-2 -mb-2 pt-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent px-1">
+                                                        <div className="flex-1 flex items-center gap-2 overflow-x-auto pb-2 -mb-2 pt-1 variables-scroll-container px-1">
                                                             {(() => {
                                                                 const allVars = new Map();
 
