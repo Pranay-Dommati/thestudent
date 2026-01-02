@@ -93,8 +93,8 @@ const MarkdownRenderer = ({ content, className = '' }) => {
 
                         return <p className="text-gray-700 leading-relaxed mb-4 text-base">{children}</p>;
                     },
-                    ul: ({ children }) => <ul className="space-y-2 mb-4 ml-4 list-none">{children}</ul>,
-                    ol: ({ children }) => <ol className="space-y-2 mb-4 ml-4 list-decimal marker:text-indigo-500 marker:font-semibold">{children}</ol>,
+                    ul: ({ children }) => <ul className="space-y-2 mb-4 ml-0 pl-0 list-none">{children}</ul>,
+                    ol: ({ children }) => <ol className="space-y-2 mb-4 ml-0 pl-0 list-decimal marker:text-indigo-500 marker:font-semibold">{children}</ol>,
                     li: ({ children }) => (
                         <li className="flex items-start text-gray-700">
                             {/* Hacky check to see if parent is UL or OL isn't easy in ReactMarkdown without inspecting props key/index behavior more deeply, 
