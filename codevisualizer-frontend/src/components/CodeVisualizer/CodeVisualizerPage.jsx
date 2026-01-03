@@ -193,7 +193,8 @@ function CodeVisualizerPage() {
                                         output: frame.output,
                                         // SSOT: Deterministic dry-run from tracer
                                         dry_run: frame.dry_run,
-                                        loop_info: frame.loop_info
+                                        loop_info: frame.loop_info,
+                                        var_transitions: frame.var_transitions  // For showing value transitions
                                     };
 
                                     // Add step progressively

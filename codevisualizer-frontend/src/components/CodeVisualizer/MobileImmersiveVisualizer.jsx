@@ -523,17 +523,38 @@ const MobileImmersiveVisualizer = ({
                                                                     : 'undefined';
                                                                 const isChanged = step.changedVars?.includes(name);
 
+                                                                // Check for variable transition (from -> to)
+                                                                const transition = step.var_transitions?.find(t => t.name === name);
+                                                                const hasTransition = transition && transition.from !== undefined && transition.to !== undefined;
+
+                                                                // Format values for display
+                                                                const displayValue = value === '' ? '""' : (value.length > 15 ? value.slice(0, 15) + '...' : value);
+                                                                const fromStr = hasTransition ? (typeof transition.from === 'object' ? JSON.stringify(transition.from) : String(transition.from)) : null;
+                                                                const toStr = hasTransition ? (typeof transition.to === 'object' ? JSON.stringify(transition.to) : String(transition.to)) : null;
+                                                                const displayFrom = fromStr === '' ? '""' : (fromStr && fromStr.length > 10 ? fromStr.slice(0, 10) + '...' : fromStr);
+                                                                const displayTo = toStr === '' ? '""' : (toStr && toStr.length > 10 ? toStr.slice(0, 10) + '...' : toStr);
+
                                                                 return (
                                                                     <span
                                                                         key={name}
-                                                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono whitespace-nowrap shrink-0 ${isChanged
-                                                                            ? 'bg-indigo-100 text-indigo-700'
-                                                                            : 'bg-slate-100 text-slate-600'
+                                                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono whitespace-nowrap shrink-0 ${hasTransition
+                                                                            ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300'
+                                                                            : isChanged
+                                                                                ? 'bg-indigo-100 text-indigo-700'
+                                                                                : 'bg-slate-100 text-slate-600'
                                                                             }`}
                                                                     >
                                                                         <span className="font-semibold">{name}</span>
-                                                                        <span className="text-slate-400">=</span>
-                                                                        <span>{value === '' ? '""' : (value.length > 15 ? value.slice(0, 15) + '...' : value)}</span>
+                                                                        <span className={hasTransition ? "text-emerald-400" : "text-slate-400"}>=</span>
+                                                                        {hasTransition ? (
+                                                                            <>
+                                                                                <span className="opacity-60 line-through">{displayFrom}</span>
+                                                                                <span className="text-emerald-600 font-bold">→</span>
+                                                                                <span className="font-bold">{displayTo}</span>
+                                                                            </>
+                                                                        ) : (
+                                                                            <span>{displayValue}</span>
+                                                                        )}
                                                                     </span>
                                                                 );
                                                             })}

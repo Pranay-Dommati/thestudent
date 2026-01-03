@@ -1008,21 +1008,42 @@ const ImmersiveVisualizer = ({
 
                                                                     const isAssigning = data.value === undefined;
 
+                                                                    // Check for variable transition (from -> to)
+                                                                    const transition = step.var_transitions?.find(t => t.name === name);
+                                                                    const hasTransition = transition && transition.from !== undefined && transition.to !== undefined;
+
+                                                                    // Format values for display
+                                                                    const displayValue = valueStr === '' ? '""' : (valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr);
+                                                                    const fromStr = hasTransition ? (typeof transition.from === 'object' ? JSON.stringify(transition.from) : String(transition.from)) : null;
+                                                                    const toStr = hasTransition ? (typeof transition.to === 'object' ? JSON.stringify(transition.to) : String(transition.to)) : null;
+                                                                    const displayFrom = fromStr === '' ? '""' : (fromStr && fromStr.length > 20 ? fromStr.slice(0, 20) + '...' : fromStr);
+                                                                    const displayTo = toStr === '' ? '""' : (toStr && toStr.length > 20 ? toStr.slice(0, 20) + '...' : toStr);
+
                                                                     return (
                                                                         <span
                                                                             key={name}
-                                                                            className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-mono ${data.isChanged
-                                                                                ? isAssigning
-                                                                                    ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-300'
-                                                                                    : 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300'
-                                                                                : 'bg-slate-100 text-slate-700'
+                                                                            className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-mono ${hasTransition
+                                                                                ? 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-300'
+                                                                                : data.isChanged
+                                                                                    ? isAssigning
+                                                                                        ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-300'
+                                                                                        : 'bg-indigo-100 text-indigo-700 ring-2 ring-indigo-300'
+                                                                                    : 'bg-slate-100 text-slate-700'
                                                                                 }`}
                                                                         >
                                                                             <span className="font-semibold">{name}</span>
-                                                                            <span className={data.isChanged ? "text-indigo-400" : "text-slate-400"}>=</span>
-                                                                            <span className={isAssigning ? "italic opacity-80" : ""}>
-                                                                                {valueStr === '' ? '""' : (valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr)}
-                                                                            </span>
+                                                                            <span className={hasTransition ? "text-emerald-400" : data.isChanged ? "text-indigo-400" : "text-slate-400"}>=</span>
+                                                                            {hasTransition ? (
+                                                                                <>
+                                                                                    <span className="opacity-60 line-through">{displayFrom}</span>
+                                                                                    <span className="text-emerald-600 font-bold">→</span>
+                                                                                    <span className="font-bold">{displayTo}</span>
+                                                                                </>
+                                                                            ) : (
+                                                                                <span className={isAssigning ? "italic opacity-80" : ""}>
+                                                                                    {displayValue}
+                                                                                </span>
+                                                                            )}
                                                                         </span>
                                                                     );
                                                                 });

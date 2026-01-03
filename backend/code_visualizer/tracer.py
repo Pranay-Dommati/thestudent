@@ -25,6 +25,7 @@ class TraceFrame:
     function_name: Optional[str] = None
     return_value: Optional[Any] = None
     explanation: Optional[str] = None
+    var_transitions: Optional[List[Dict[str, Any]]] = None  # [{name, from, to}]
     
     def to_dict(self) -> dict:
         return asdict(self)
@@ -395,6 +396,62 @@ class PythonTracer:
             # Predict what THIS line will change (based on code analysis)
             predicted_changes = self._predict_changed_vars(code_line, current_locals)
             
+            # Compute VARIABLE TRANSITIONS: old value -> PREDICTED new value
+            # For assignments, we predict the NEW value by evaluating the RHS
+            var_transitions = []
+            
+            # Simple assignment: x = y or x = expr
+            simple_assign = re.match(r'^\s*(\w+)\s*=\s*(.+)$', code_line.strip())
+            if simple_assign and '==' not in code_line and '!=' not in code_line:
+                var_name = simple_assign.group(1)
+                rhs = simple_assign.group(2).strip()
+                
+                # Get old value
+                old_val = None
+                if var_name in self.previous_locals:
+                    old_data = self.previous_locals[var_name]
+                    old_val = old_data.get('value') if isinstance(old_data, dict) else old_data
+                
+                # Try to predict new value from RHS
+                new_val = None
+                # Case 1: RHS is a simple variable name
+                if re.match(r'^\w+$', rhs) and rhs in current_locals:
+                    new_val = self._safe_copy(current_locals[rhs])
+                # Case 2: RHS is array indexing like arr[0]
+                elif re.match(r'^(\w+)\[(\d+)\]$', rhs):
+                    m = re.match(r'^(\w+)\[(\d+)\]$', rhs)
+                    arr_name, idx = m.group(1), int(m.group(2))
+                    if arr_name in current_locals:
+                        arr = current_locals[arr_name]
+                        if isinstance(arr, (list, tuple)) and 0 <= idx < len(arr):
+                            new_val = self._safe_copy(arr[idx])
+                # Case 3: Augmented assignment like x += 1, x -= 1
+                aug_match = re.match(r'^\s*(\w+)\s*([+\-*/])=\s*(.+)$', code_line.strip())
+                if aug_match:
+                    var_name = aug_match.group(1)
+                    op = aug_match.group(2)
+                    operand = aug_match.group(3).strip()
+                    if var_name in current_locals:
+                        old_val = self._safe_copy(current_locals[var_name])
+                        try:
+                            operand_val = int(operand) if operand.isdigit() else (current_locals.get(operand) if operand in current_locals else None)
+                            if operand_val is not None and isinstance(old_val, (int, float)):
+                                if op == '+': new_val = old_val + operand_val
+                                elif op == '-': new_val = old_val - operand_val
+                                elif op == '*': new_val = old_val * operand_val
+                                elif op == '/' and operand_val != 0: new_val = old_val / operand_val
+                        except:
+                            pass
+                
+                # Add transition if we predicted a change
+                if new_val is not None and old_val != new_val:
+                    var_transitions.append({
+                        'name': var_name,
+                        'from': old_val,
+                        'to': new_val
+                    })
+                    print(f"[TRANSITION] {var_name}: {old_val} -> {new_val}")
+            
             # Also track actual changes for internal state (needed for next comparison)
             self._detect_changed_vars(current_locals)
             
@@ -421,7 +478,8 @@ class PythonTracer:
                 event=event,
                 locals=serialized_locals,
                 changed_vars=predicted_changes,
-                function_name=func_name if func_name != '<module>' else None
+                function_name=func_name if func_name != '<module>' else None,
+                var_transitions=var_transitions if var_transitions else None
             )
             trace_frame.explanation = self._generate_explanation(trace_frame)
             self.frames.append(trace_frame)
