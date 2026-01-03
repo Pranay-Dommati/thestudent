@@ -399,15 +399,17 @@ const ImmersiveVisualizer = ({
                             if (data.type === 'explanation') {
                                 console.log(`[Progressive] Step ${data.index + 1}: Received explanation`, data.explanation ? '✅' : '❌ NULL');
 
-                                // Create the step with the explanation
+                                // Create the step with the explanation AND var_transitions from backend
                                 const stepWithExplanation = {
                                     ...updatedSteps[data.index],
-                                    explanation: data.explanation
+                                    explanation: data.explanation,
+                                    // Use var_transitions from on-demand response (backend retrieves from store)
+                                    var_transitions: data.var_transitions || updatedSteps[data.index]?.var_transitions
                                 };
 
                                 // Update the local tracking array
                                 updatedSteps[data.index] = stepWithExplanation;
-                                console.log(`[Progressive] Step ${data.index + 1}: Prepared step with explanation:`, !!stepWithExplanation.explanation);
+                                console.log(`[Progressive] Step ${data.index + 1}: Prepared step with explanation:`, !!stepWithExplanation.explanation, 'var_transitions:', stepWithExplanation.var_transitions);
 
                                 // Scroll to first step of the new batch
                                 if (data.index === currentCount) {
@@ -1023,20 +1025,30 @@ const ImmersiveVisualizer = ({
 
                                                                 // 5. Render
                                                                 return sortedVars.map(([name, data]) => {
-                                                                    let valueStr;
-                                                                    if (data.value === undefined) {
-                                                                        valueStr = "assigning...";
-                                                                    } else {
-                                                                        valueStr = typeof data.value === 'object'
-                                                                            ? JSON.stringify(data.value)
-                                                                            : String(data.value);
-                                                                    }
-
-                                                                    const isAssigning = data.value === undefined;
-
-                                                                    // Check for variable transition (from -> to)
+                                                                    // Check for variable transition FIRST (from -> to)
                                                                     const transition = step.var_transitions?.find(t => t.name === name);
                                                                     const hasTransition = transition && transition.from !== undefined && transition.to !== undefined;
+
+                                                                    // DEBUG: Log step 7+ transition data
+                                                                    if (idx >= 6) {
+                                                                        console.log(`[DEBUG STEP ${idx + 1}] Variable: ${name}, hasTransition: ${hasTransition}, var_transitions:`, step.var_transitions, 'transition:', transition);
+                                                                    }
+
+                                                                    // Use transition's TO value if available, otherwise fall back to data.value
+                                                                    let actualValue = hasTransition ? transition.to : data.value;
+
+                                                                    let valueStr;
+                                                                    if (actualValue === undefined) {
+                                                                        valueStr = "assigning...";
+                                                                    } else {
+                                                                        valueStr = typeof actualValue === 'object'
+                                                                            ? JSON.stringify(actualValue)
+                                                                            : String(actualValue);
+                                                                    }
+
+                                                                    const isAssigning = actualValue === undefined;
+
+                                                                    // Check for variable transition (from -> to) - already computed above
 
                                                                     // Format values for display
                                                                     const displayValue = valueStr === '' ? '""' : (valueStr.length > 50 ? valueStr.slice(0, 50) + '...' : valueStr);

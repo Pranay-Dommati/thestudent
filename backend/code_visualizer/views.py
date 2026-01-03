@@ -718,8 +718,14 @@ def generate_explanations_stream(request):
                     state_after=state_after
                 )
                 
-                # Stream each explanation immediately
-                yield "data: " + json.dumps({'type': 'explanation', 'index': frame_idx, 'explanation': ai_narration}) + "\n\n"
+                # Stream each explanation immediately (include var_transitions for on-demand steps)
+                var_transitions = frame.get('var_transitions')
+                yield "data: " + json.dumps({
+                    'type': 'explanation', 
+                    'index': frame_idx, 
+                    'explanation': ai_narration,
+                    'var_transitions': var_transitions  # Include transitions for frontend display
+                }) + "\n\n"
             
             yield "data: " + json.dumps({'type': 'complete', 'count': len(frames_to_process)}) + "\n\n"
         
@@ -814,6 +820,9 @@ def trace_stream(request):
                 # If we have a buffered frame, compute its transition and emit it
                 if buffered_frame[0] is not None:
                     compute_single_transition(buffered_frame[0], frame_dict)
+                    prev_step = buffered_frame[0].get('step', '?')
+                    prev_transitions = buffered_frame[0].get('var_transitions')
+                    print(f"[STREAM DEBUG] Emitting frame step={prev_step}, var_transitions={prev_transitions}")
                     frame_queue.put({'type': 'frame', 'frame': buffered_frame[0]})
                 
                 # Generate AI explanation for this frame
