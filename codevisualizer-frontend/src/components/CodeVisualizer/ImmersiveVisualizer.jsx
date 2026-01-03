@@ -123,6 +123,32 @@ const ImmersiveVisualizer = ({
         }
     }, [steps, isOpen, isLoading, displayedStepsCount]);
 
+    // SYNC TRANSITIONS: When steps prop is updated with var_transitions (same length),
+    // update visibleSteps to reflect the new data
+    useEffect(() => {
+        if (!isOpen || isLoading) return;
+        if (visibleSteps.length === 0) return;
+
+        // Check if any visible step needs transition update
+        let hasUpdates = false;
+        const updatedVisibleSteps = visibleSteps.map((visStep, idx) => {
+            const sourceStep = steps[idx];
+            if (!sourceStep) return visStep;
+
+            // If source step has transitions but visible step doesn't, update it
+            if (sourceStep.var_transitions && !visStep.var_transitions) {
+                hasUpdates = true;
+                return { ...visStep, var_transitions: sourceStep.var_transitions };
+            }
+            return visStep;
+        });
+
+        if (hasUpdates) {
+            console.log('[Immersive] Syncing transitions to visible steps');
+            setVisibleSteps(updatedVisibleSteps);
+        }
+    }, [steps, isOpen, isLoading]);
+
     // Reveal next pending step (streamed) without relying on card animations
     useEffect(() => {
         if (!isOpen || isLoading) return;

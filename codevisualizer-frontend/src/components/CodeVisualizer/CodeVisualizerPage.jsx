@@ -212,6 +212,23 @@ function CodeVisualizerPage() {
                                     setIsLoadingTrace(false);
                                     setIsRunning(false);
                                 }
+
+                                // DETERMINISTIC TRANSITION ENGINE: Update frames with transitions
+                                // Transitions are computed post-execution by comparing consecutive locals
+                                if (data.type === 'transition') {
+                                    const { index, var_transitions } = data;
+                                    console.log(`[SSE] Transition update for frame ${index}:`, var_transitions);
+                                    setSteps(prev => {
+                                        const updated = [...prev];
+                                        if (updated[index]) {
+                                            updated[index] = {
+                                                ...updated[index],
+                                                var_transitions: var_transitions
+                                            };
+                                        }
+                                        return updated;
+                                    });
+                                }
                             } catch (parseError) {
                                 console.error('Failed to parse SSE data:', parseError);
                             }
