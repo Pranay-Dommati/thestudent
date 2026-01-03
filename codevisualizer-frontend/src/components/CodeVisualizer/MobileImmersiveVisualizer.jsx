@@ -547,11 +547,17 @@ const MobileImmersiveVisualizer = ({
                                                                         <span className="font-semibold">{name}</span>
                                                                         <span className={hasTransition ? "text-emerald-400" : "text-slate-400"}>=</span>
                                                                         {hasTransition ? (
-                                                                            <>
-                                                                                <span className="opacity-60 line-through">{displayFrom}</span>
-                                                                                <span className="text-emerald-600 font-bold">→</span>
+                                                                            transition.from !== null ? (
+                                                                                // Transition: old -> new
+                                                                                <>
+                                                                                    <span className="opacity-60 line-through">{displayFrom}</span>
+                                                                                    <span className="text-emerald-600 font-bold">→</span>
+                                                                                    <span className="font-bold">{displayTo}</span>
+                                                                                </>
+                                                                            ) : (
+                                                                                // New variable creation: just show value
                                                                                 <span className="font-bold">{displayTo}</span>
-                                                                            </>
+                                                                            )
                                                                         ) : (
                                                                             <span>{displayValue}</span>
                                                                         )}

@@ -26,6 +26,7 @@ class TraceFrame:
     return_value: Optional[Any] = None
     explanation: Optional[str] = None
     var_transitions: Optional[List[Dict[str, Any]]] = None  # [{name, from, to}]
+    loop_info: Optional[Dict[str, Any]] = None  # {iteration, total, value, variable, finished}
     
     def to_dict(self) -> dict:
         return asdict(self)
@@ -57,6 +58,9 @@ class PythonTracer:
         # Virtual Assignment Step tracking
         self.pending_assignment_call: Optional[Dict[str, Any]] = None  # Assignment awaiting call
         self.call_stack: List[Dict[str, Any]] = []  # Stack of pending assignments per call depth
+        # Loop tracking: maps (line_no, iterable_id) -> iteration_count
+        self.loop_iterations: Dict[tuple, int] = {}
+        self.loop_iterables: Dict[int, Any] = {}  # maps line_no -> iterable for tracking
         
     def _safe_copy(self, value: Any) -> Any:
         if value is None:
@@ -400,13 +404,72 @@ class PythonTracer:
             # For assignments, we predict the NEW value by evaluating the RHS
             var_transitions = []
             
+            # Handle FOR loops: for x in iterable:
+            for_match = re.match(r'^\s*for\s+(\w+)\s+in\s+(\w+)', code_line.strip())
+            loop_info = None  # Will be set if this is a for loop
+            
+            if for_match:
+                var_name = for_match.group(1)
+                iterable_name = for_match.group(2)
+                
+                # Get the iterable to compute total iterations
+                iterable = current_locals.get(iterable_name)
+                total_iterations = len(iterable) if isinstance(iterable, (list, tuple, str)) else None
+                
+                # Track loop iteration: use line_no as key
+                if line_no not in self.loop_iterations:
+                    self.loop_iterations[line_no] = 0
+                    self.loop_iterables[line_no] = iterable
+                
+                # Increment iteration count
+                self.loop_iterations[line_no] += 1
+                current_iteration = self.loop_iterations[line_no]
+                
+                # Get old value (None if first iteration, otherwise previous value)
+                old_val = None
+                if var_name in self.previous_locals:
+                    old_data = self.previous_locals[var_name]
+                    old_val = old_data.get('value') if isinstance(old_data, dict) else old_data
+                
+                # CRITICAL: Python's LINE event fires BEFORE for loop assigns new value
+                # So current_locals has the OLD value from previous iteration
+                # We must ALWAYS predict from iterable based on iteration index
+                new_val = None
+                if iterable and isinstance(iterable, (list, tuple, str)):
+                    idx = current_iteration - 1  # 0-indexed
+                    if 0 <= idx < len(iterable):
+                        new_val = self._safe_copy(iterable[idx])
+                
+                print(f"[FOR DEBUG] Line {line_no}: iteration={current_iteration}/{total_iterations}, var={var_name}, old={old_val}, new={new_val}")
+                
+                if new_val is not None and new_val != old_val:
+                    var_transitions.append({
+                        'name': var_name,
+                        'from': old_val,
+                        'to': new_val
+                    })
+                    print(f"[TRANSITION] FOR {var_name}: {old_val} -> {new_val}")
+                
+                # Generate loop_info for AI narrator
+                loop_info = {
+                    'iteration': current_iteration,
+                    'total': total_iterations,
+                    'value': new_val,
+                    'variable': var_name,
+                    'finished': False
+                }
+            
             # Simple assignment: x = y or x = expr
             simple_assign = re.match(r'^\s*(\w+)\s*=\s*(.+)$', code_line.strip())
-            if simple_assign and '==' not in code_line and '!=' not in code_line:
+            if simple_assign and '==' not in code_line and '!=' not in code_line and not for_match:
                 var_name = simple_assign.group(1)
                 rhs = simple_assign.group(2).strip()
                 
-                # Get old value
+                # Strip inline comments from RHS (e.g., "arr[0] # comment" -> "arr[0]")
+                if '#' in rhs:
+                    rhs = rhs.split('#')[0].strip()
+                
+                # Get old value (None if new variable)
                 old_val = None
                 if var_name in self.previous_locals:
                     old_data = self.previous_locals[var_name]
@@ -414,9 +477,11 @@ class PythonTracer:
                 
                 # Try to predict new value from RHS
                 new_val = None
+                
                 # Case 1: RHS is a simple variable name
                 if re.match(r'^\w+$', rhs) and rhs in current_locals:
                     new_val = self._safe_copy(current_locals[rhs])
+                
                 # Case 2: RHS is array indexing like arr[0]
                 elif re.match(r'^(\w+)\[(\d+)\]$', rhs):
                     m = re.match(r'^(\w+)\[(\d+)\]$', rhs)
@@ -425,7 +490,24 @@ class PythonTracer:
                         arr = current_locals[arr_name]
                         if isinstance(arr, (list, tuple)) and 0 <= idx < len(arr):
                             new_val = self._safe_copy(arr[idx])
-                # Case 3: Augmented assignment like x += 1, x -= 1
+                
+                # Case 3: RHS is a literal (list, number, string, etc.)
+                elif rhs.startswith('[') or rhs.startswith('{') or rhs.startswith('('):
+                    # Try to safely evaluate literal
+                    try:
+                        import ast
+                        new_val = ast.literal_eval(rhs)
+                    except:
+                        pass
+                elif rhs.isdigit() or (rhs.startswith('-') and rhs[1:].isdigit()):
+                    new_val = int(rhs)
+                elif rhs.startswith('"') or rhs.startswith("'"):
+                    try:
+                        new_val = ast.literal_eval(rhs)
+                    except:
+                        pass
+                
+                # Case 4: Augmented assignment like x += 1, x -= 1
                 aug_match = re.match(r'^\s*(\w+)\s*([+\-*/])=\s*(.+)$', code_line.strip())
                 if aug_match:
                     var_name = aug_match.group(1)
@@ -443,11 +525,11 @@ class PythonTracer:
                         except:
                             pass
                 
-                # Add transition if we predicted a change
-                if new_val is not None and old_val != new_val:
+                # Add transition if we predicted ANY change (including new variable creation)
+                if new_val is not None and new_val != old_val:
                     var_transitions.append({
                         'name': var_name,
-                        'from': old_val,
+                        'from': old_val,  # Will be None for new variables
                         'to': new_val
                     })
                     print(f"[TRANSITION] {var_name}: {old_val} -> {new_val}")
@@ -479,7 +561,8 @@ class PythonTracer:
                 locals=serialized_locals,
                 changed_vars=predicted_changes,
                 function_name=func_name if func_name != '<module>' else None,
-                var_transitions=var_transitions if var_transitions else None
+                var_transitions=var_transitions if var_transitions else None,
+                loop_info=loop_info
             )
             trace_frame.explanation = self._generate_explanation(trace_frame)
             self.frames.append(trace_frame)
@@ -527,6 +610,9 @@ class PythonTracer:
         # Reset virtual assignment tracking
         self.pending_assignment_call = None
         self.call_stack = []
+        # Reset loop tracking
+        self.loop_iterations = {}
+        self.loop_iterables = {}
         
         self.source_lines = code.split('\n')
         self._analyze_code_structure(code)
