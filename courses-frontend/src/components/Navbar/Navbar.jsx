@@ -212,33 +212,15 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                             // Skeleton for desktop nav links while loading
                             <div className="flex items-center justify-center flex-1 max-w-[600px]">
                                 <div className="flex items-center space-x-8">
-                                    <div className={`h-5 w-12 rounded ${isScrolled || initialStyle === 'light'
-                                        ? 'bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100'
-                                        : 'bg-gradient-to-r from-white/20 via-white/40 to-white/20'
-                                        } relative overflow-hidden`}>
-                                        <div className={`absolute inset-0 ${isScrolled || initialStyle === 'light'
-                                            ? 'bg-gradient-to-r from-transparent via-white/60 to-transparent'
-                                            : 'bg-gradient-to-r from-transparent via-white/30 to-transparent'
-                                            } animate-shimmer`}></div>
-                                    </div>
-                                    <div className={`h-5 w-16 rounded ${isScrolled || initialStyle === 'light'
-                                        ? 'bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100'
-                                        : 'bg-gradient-to-r from-white/20 via-white/40 to-white/20'
-                                        } relative overflow-hidden`}>
-                                        <div className={`absolute inset-0 ${isScrolled || initialStyle === 'light'
-                                            ? 'bg-gradient-to-r from-transparent via-white/60 to-transparent'
-                                            : 'bg-gradient-to-r from-transparent via-white/30 to-transparent'
-                                            } animate-shimmer`}></div>
-                                    </div>
-                                    <div className={`h-5 w-24 rounded ${isScrolled || initialStyle === 'light'
-                                        ? 'bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100'
-                                        : 'bg-gradient-to-r from-white/20 via-white/40 to-white/20'
-                                        } relative overflow-hidden`}>
-                                        <div className={`absolute inset-0 ${isScrolled || initialStyle === 'light'
-                                            ? 'bg-gradient-to-r from-transparent via-white/60 to-transparent'
-                                            : 'bg-gradient-to-r from-transparent via-white/30 to-transparent'
-                                            } animate-shimmer`}></div>
-                                    </div>
+                                    {/* Simple subtle skeleton bars */}
+                                    <div className={`h-4 w-16 rounded-full ${isScrolled || initialStyle === 'light'
+                                        ? 'bg-gray-200/60'
+                                        : 'bg-white/20'
+                                        }`}></div>
+                                    <div className={`h-4 w-20 rounded-full ${isScrolled || initialStyle === 'light'
+                                        ? 'bg-gray-200/60'
+                                        : 'bg-white/20'
+                                        }`}></div>
                                 </div>
                             </div>
                         ) : (
