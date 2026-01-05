@@ -3,6 +3,7 @@ import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { FaGraduationCap, FaBook, FaUniversity, FaLaptopCode } from 'react-icons/fa';
 import Footer from "../Footer/Footer";
 import CourseHero from "./CourseHero/CourseHero";
+import SEO from "../SEO/SEO";
 import logger from '../../utils/logger';
 import api from '../../utils/axios';
 import { courseCache } from '../../utils/courseCache';
@@ -182,6 +183,12 @@ const Courses = () => {
 
     return (
         <>
+            <SEO
+                title="Free Online Courses - CBSE & State Board | EasyLearnova"
+                description="Explore free online courses for 10th, 11th, 12th standard students. CBSE and State Board playlists for Mathematics, Science, English and more."
+                keywords="free online courses, CBSE courses, state board courses, 10th standard, 11th standard, 12th standard, school courses"
+                canonical="https://courses.easylearnova.com/"
+            />
             <CourseHero />
             <div className="bg-gray-50 pt-7">
                 <div className="container mx-auto px-4 py-12">

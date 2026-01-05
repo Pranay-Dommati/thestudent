@@ -182,7 +182,7 @@ const TenthStandard = () => {
                 title="10th Standard Courses - CBSE & State Board Free Learning"
                 description="Explore 10th standard courses: CBSE and state board playlists for Mathematics, Science, English & more. Prepare for board exams with structured lessons."
                 keywords="10th standard courses, CBSE 10th, state board 10th, board exam preparation, 10th class subjects, free 10th courses"
-                canonical="https://easylearnova.com/courses/10th"
+                canonical="https://courses.easylearnova.com/10th"
             />
             <div className={`container mx-auto px-4 ${containerPadding}`}>
                 {/* Mobile-only friendly selector */}

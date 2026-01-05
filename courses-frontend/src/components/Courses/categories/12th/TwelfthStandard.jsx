@@ -191,7 +191,7 @@ const TwelfthStandard = () => {
                 title="12th Standard Courses - CBSE & State Board College Prep"
                 description="Ace board exams with 12th standard courses: free CBSE and state board playlists. Complete your school journey and prepare for college entrance exams."
                 keywords="12th standard courses, CBSE 12th, state board 12th, board exam preparation, college preparation, class 12 science"
-                canonical="https://easylearnova.com/courses/12th"
+                canonical="https://courses.easylearnova.com/12th"
             />
             <div className={`container mx-auto px-4 ${containerPadding}`}>
                 <MobileBoardSelector

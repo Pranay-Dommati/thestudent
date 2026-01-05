@@ -176,7 +176,8 @@ const NinthStandard = () => {
                 title="9th Standard Courses - CBSE & State Board Preparation"
                 description="Explore 9th standard courses with free CBSE and state board playlists. Prepare for high school with structured Science, Math, Social Science lessons."
                 keywords="9th standard courses, CBSE 9th, state board 9th, class 9 free courses, 9th grade playlists"
-                canonical="https://easylearnova.com/courses/9th"
+                canonical="https://courses.easylearnova.com/"
+                noindex={true}
             />
             <div className={`container mx-auto px-4 ${containerPadding}`}>
                 <MobileBoardSelector

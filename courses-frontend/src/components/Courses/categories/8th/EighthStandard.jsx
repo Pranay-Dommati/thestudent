@@ -205,7 +205,8 @@ const EighthStandard = () => {
                 title="8th Standard Courses - CBSE & State Board Advanced Foundation"
                 description="Explore 8th standard courses: CBSE and state board playlists for Mathematics, Science, English, Social Studies & more. Strengthen concepts with free lessons."
                 keywords="8th standard courses, CBSE 8th, state board 8th, 8th class subjects, middle school advanced, free 8th grade courses"
-                canonical="https://easylearnova.com/courses/8th"
+                canonical="https://courses.easylearnova.com/"
+                noindex={true}
             />
             <div className={`container mx-auto px-4 ${containerPadding}`}>
                 <MobileBoardSelector

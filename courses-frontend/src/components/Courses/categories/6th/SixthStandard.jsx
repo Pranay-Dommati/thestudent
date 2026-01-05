@@ -180,7 +180,8 @@ const SixthStandard = () => {
                 title="6th Standard Courses - CBSE & State Board Foundation Learning"
                 description="Explore 6th standard courses: CBSE and state board playlists for Mathematics, Science, English, Social Studies & more. Build strong foundations with free lessons."
                 keywords="6th standard courses, CBSE 6th, state board 6th, 6th class subjects, foundation courses, free 6th grade courses"
-                canonical="https://easylearnova.com/courses/6th"
+                canonical="https://courses.easylearnova.com/"
+                noindex={true}
             />
             <div className={`container mx-auto px-4 ${containerPadding}`}>
                 <MobileBoardSelector

@@ -202,7 +202,7 @@ const EleventhStandard = () => {
                 title="11th Standard Courses - CBSE & State Board JEE/NEET Prep"
                 description="Master 11th standard courses with free CBSE and state board playlists. Excel in Physics, Chemistry, Biology, Math for JEE/NEET preparation."
                 keywords="11th standard courses, CBSE 11th, state board 11th, JEE preparation, NEET preparation, class 11 science"
-                canonical="https://easylearnova.com/courses/11th"
+                canonical="https://courses.easylearnova.com/11th"
             />
             <div className={`container mx-auto px-4 ${containerPadding}`}>
                 <MobileBoardSelector

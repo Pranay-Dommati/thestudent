@@ -171,7 +171,8 @@ const SeventhStandard = () => {
                 title="7th Standard Courses - CBSE & State Board Progressive Learning"
                 description="Explore 7th standard courses: CBSE and state board playlists for Mathematics, Science, English, Social Studies & more. Progress with structured lessons."
                 keywords="7th standard courses, CBSE 7th, state board 7th, 7th class subjects, middle school courses, free 7th grade courses"
-                canonical="https://easylearnova.com/courses/7th"
+                canonical="https://courses.easylearnova.com/"
+                noindex={true}
             />
             <div className={`container mx-auto px-4 ${containerPadding}`}>
                 <MobileBoardSelector
