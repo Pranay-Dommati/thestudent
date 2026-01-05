@@ -1,3 +1,7 @@
+# ❌ Kill legacy /courses forever
+RewriteEngine On
+RewriteRule ^courses/?$ - [G,L]
+
 ## SPA routing for React/Vite on Apache (Hostinger)
 ## This file resides in frontend/public so Vite copies it into dist/ on build.
 
