@@ -1332,17 +1332,33 @@ RULES:
                 "error": "AI service not available"
             }, status=503)
         
-        # Generate answer using Google Generative AI
-        import google.generativeai as genai
+        # Generate answer using Google GenAI (new SDK)
+        import os
+        try:
+            from google import genai
+            from google.genai import types
+        except ImportError:
+            return JsonResponse({
+                "success": False,
+                "error": "Google GenAI SDK not installed"
+            }, status=503)
         
-        # Configure the model (using same setup as narrator)
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        # Create client with API key
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            return JsonResponse({
+                "success": False,
+                "error": "GEMINI_API_KEY not configured"
+            }, status=503)
+        
+        client = genai.Client(api_key=api_key)
         
         full_prompt = f"{system_prompt}\n\n{user_prompt}"
         
-        response = model.generate_content(
-            full_prompt,
-            generation_config=genai.GenerationConfig(
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=full_prompt,
+            config=types.GenerateContentConfig(
                 max_output_tokens=800,
                 temperature=0.2,  # Lower for more consistent JSON
             )

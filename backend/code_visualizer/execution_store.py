@@ -22,8 +22,8 @@ from threading import Lock
 from django.core.cache import cache
 
 # Configuration
-EXECUTION_TTL_SECONDS = 3600  # 1 hour
-MAX_EXECUTIONS_IN_MEMORY = 100  # Fallback limit for in-memory store
+EXECUTION_TTL_SECONDS = 7200  # 2 hours - extended to support longer learning sessions
+MAX_EXECUTIONS_IN_MEMORY = 500  # Increased capacity for production traffic
 
 # In-memory fallback store (used if cache is not available)
 _memory_store: Dict[str, Dict[str, Any]] = {}
@@ -67,12 +67,14 @@ def store_execution(frames: List[Dict[str, Any]], source_lines: List[str], metad
     """
     execution_id = str(uuid.uuid4())
     
+    current_time = time.time()
     execution_data = {
         'execution_id': execution_id,
         'frames': frames,
         'source_lines': source_lines,
         'metadata': metadata or {},
-        'created_at': time.time(),
+        'created_at': current_time,
+        'last_accessed': current_time,  # Track last access for LRU eviction
         'total_frames': len(frames),
     }
     
@@ -106,10 +108,16 @@ def get_execution(execution_id: str) -> Optional[Dict[str, Any]]:
     if use_cache:
         result = cache.get(f'execution:{execution_id}')
         print(f"[EXEC STORE] Cache get result: {result is not None}")
+        # Refresh TTL on access by re-setting (touch pattern)
+        if result:
+            cache.set(f'execution:{execution_id}', result, EXECUTION_TTL_SECONDS)
         return result
     else:
         with _memory_store_lock:
             result = _memory_store.get(execution_id)
+            # Update last_accessed timestamp for LRU eviction
+            if result:
+                result['last_accessed'] = time.time()
             print(f"[EXEC STORE] Memory get result: {result is not None}, store has {len(_memory_store)} executions, keys={list(_memory_store.keys())[:3]}")
             return result
 
@@ -180,21 +188,35 @@ def delete_execution(execution_id: str) -> bool:
 
 def _cleanup_old_executions():
     """
-    Remove oldest executions when memory limit is reached.
+    Remove least-recently-accessed executions when memory limit is reached.
+    Uses last_accessed timestamp for true LRU (Least Recently Used) eviction.
     Only used for in-memory store fallback.
     """
     if not _memory_store:
         return
     
-    # Sort by creation time and remove oldest 20%
-    sorted_executions = sorted(
-        _memory_store.items(),
-        key=lambda x: x[1].get('created_at', 0)
-    )
+    current_time = time.time()
     
-    remove_count = max(1, len(sorted_executions) // 5)  # Remove 20%
-    for execution_id, _ in sorted_executions[:remove_count]:
-        del _memory_store[execution_id]
+    # First, remove any expired entries (older than TTL)
+    expired_ids = [
+        eid for eid, data in _memory_store.items()
+        if current_time - data.get('last_accessed', data.get('created_at', 0)) > EXECUTION_TTL_SECONDS
+    ]
+    for eid in expired_ids:
+        del _memory_store[eid]
+        print(f"[EXEC STORE] Expired execution {eid[:8]}...")
+    
+    # If still over limit, remove least-recently-accessed 20%
+    if len(_memory_store) >= MAX_EXECUTIONS_IN_MEMORY:
+        sorted_executions = sorted(
+            _memory_store.items(),
+            key=lambda x: x[1].get('last_accessed', x[1].get('created_at', 0))
+        )
+        
+        remove_count = max(1, len(sorted_executions) // 5)  # Remove 20%
+        for execution_id, _ in sorted_executions[:remove_count]:
+            del _memory_store[execution_id]
+            print(f"[EXEC STORE] LRU evicted execution {execution_id[:8]}...")
 
 
 def get_store_stats() -> Dict[str, Any]:
