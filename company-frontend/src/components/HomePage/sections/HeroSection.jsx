@@ -22,14 +22,19 @@ const HeroSection = () => {
             <div className="container mx-auto px-6 py-20 relative z-10">
                 <div className="max-w-4xl mx-auto text-center sm:text-center text-left">
 
+                    {/* SEO: Screen-reader-only H1 for crawlers - always visible in DOM */}
+                    <h1 className="sr-only">
+                        EasyLearnova – Focused Learning Systems for School Students and Engineers
+                    </h1>
+
                     {/* Main heading: Distinct Mobile vs Desktop Layouts */}
 
                     {/* MOBILE: Industry Standard Structure (Left aligned, 3 layers) */}
                     <div className="sm:hidden text-left">
                         {/* 1. Headline */}
-                        <h1 className="text-4xl font-bold text-slate-900 leading-tight mb-6">
+                        <h2 className="text-4xl font-bold text-slate-900 leading-tight mb-6">
                             Structured Learning,<br />Built for Students.
-                        </h1>
+                        </h2>
 
                         {/* 2. Scope Block (Compact List) */}
                         <ul className="text-base text-slate-600 space-y-2 mb-4">
@@ -49,11 +54,11 @@ const HeroSection = () => {
                         </p>
                     </div>
 
-                    {/* DESKTOP: Balanced (Equal Weight) - UNCHANGED */}
-                    <h1 className="hidden sm:block text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] mb-8 tracking-wide">
+                    {/* DESKTOP: Balanced (Equal Weight) */}
+                    <h2 className="hidden sm:block text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] mb-8 tracking-wide">
                         <span className="block">Structured Learning for School Students.</span>
                         <span className="block">Visual Code Understanding for Engineers.</span>
-                    </h1>
+                    </h2>
 
                     {/* Subheading (Desktop Only now, since Mobile has its own Tagline) */}
                     <p className="hidden sm:block text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto mb-10 leading-relaxed font-normal">
