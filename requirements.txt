@@ -31,3 +31,4 @@ google-genai>=1.0.0
 # Redis cache for DRF throttling (production)
 django-redis>=5.4.0
 
+posthog

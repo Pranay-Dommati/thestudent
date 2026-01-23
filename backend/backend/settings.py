@@ -606,6 +606,10 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 GOOGLE_SEARCH_API_KEY = os.environ.get('GOOGLE_SEARCH_API_KEY', '')
 GOOGLE_SEARCH_ENGINE_ID = os.environ.get('GOOGLE_SEARCH_ENGINE_ID', 'b5d49b623e0054ad9')
 
+# PostHog Analytics
+POSTHOG_API_KEY = os.environ.get('VITE_PUBLIC_POSTHOG_KEY', '')
+POSTHOG_HOST = os.environ.get('VITE_PUBLIC_POSTHOG_HOST', 'https://us.i.posthog.com')
+
 # Google OAuth2 Settings
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.environ.get('GOOGLE_OAUTH2_CLIENT_ID', '')
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.environ.get('GOOGLE_OAUTH2_CLIENT_SECRET', '')

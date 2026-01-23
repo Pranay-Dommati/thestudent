@@ -8,6 +8,15 @@ from .models import UserActivity
 from django.db.models import Count, Min, Max, Sum, Case, When, IntegerField
 
 
+import posthog
+from django.conf import settings
+from uuid import uuid4
+
+# Initialize PostHog once at module load
+if settings.POSTHOG_API_KEY:
+    posthog.project_api_key = settings.POSTHOG_API_KEY
+    posthog.host = settings.POSTHOG_HOST
+
 @api_view(["POST"])  # accepts a single event
 @permission_classes([AllowAny])
 def track_activity(request):
@@ -26,12 +35,32 @@ def track_activity(request):
     }
     """
     data = request.data or {}
-    session_id = data.get("session_id")
+    
+    # 1. Extract IDs from Headers (Critical for Session Consistency)
+    header_session_id = request.headers.get("X-PostHog-Session-Id")
+    header_distinct_id = request.headers.get("X-PostHog-Distinct-Id")
+    
+    # Fallback to body if headers missing (e.g. manual calls)
+    session_id = header_session_id or data.get("session_id")
+    # If no distinct_id in header, check user or fallback to session_id
+    distinct_id = header_distinct_id
+    if not distinct_id:
+        if request.user and request.user.is_authenticated:
+            distinct_id = str(request.user.id)
+        else:
+            distinct_id = session_id 
+
+    # Fallback strategy: if absolutely no session_id, generate one to prevent data loss
+    if not session_id:
+        session_id = f"server-{uuid4()}"
+        if not distinct_id:
+            distinct_id = session_id
+
     event_type = data.get("event_type")
     metadata = data.get("metadata") or {}
 
-    if not session_id or not event_type:
-        return Response({"error": "session_id and event_type are required"}, status=status.HTTP_400_BAD_REQUEST)
+    if not event_type:
+        return Response({"error": "event_type is required"}, status=status.HTTP_400_BAD_REQUEST)
 
     feature = data.get("feature")
     latency_ms = data.get("latency_ms")
@@ -46,6 +75,7 @@ def track_activity(request):
         except Exception:
             client_dt = None
 
+    # Track in DB
     UserActivity.objects.create(
         session_id=session_id,
         user=request.user if request.user and request.user.is_authenticated else None,
@@ -58,29 +88,67 @@ def track_activity(request):
         client_ts=client_dt,
     )
 
+    # Track in PostHog (Server-side capture)
+    if settings.POSTHOG_API_KEY:
+        try:
+            properties = {
+                '$session_id': session_id,
+                'feature': feature,
+                'success': success,
+                'latency_ms': latency_ms,
+                'error_code': error_code,
+                **metadata,
+            }
+            posthog.capture(
+                distinct_id=distinct_id,
+                event=event_type,
+                properties=properties
+            )
+        except Exception as e:
+            # Don't fail the request if PostHog tracking fails
+            pass
+
     return Response({"status": "ok"}, status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])  # accepts a batch of events
 @permission_classes([AllowAny])
 def track_activity_bulk(request):
-    """Track multiple analytics events in a single request.
-
-    Expected JSON body:
-    { "events": [ { ...event }, ... ] }
-    """
+    """Track multiple analytics events in a single request."""
     payload = request.data or {}
     events = payload.get("events") or []
     if not isinstance(events, list) or not events:
         return Response({"error": "events must be a non-empty list"}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Headers apply to the whole batch if they exist
+    header_session_id = request.headers.get("X-PostHog-Session-Id")
+    header_distinct_id = request.headers.get("X-PostHog-Distinct-Id")
+
     created = 0
     for data in events:
         try:
-            session_id = data.get("session_id")
+            # Per-event extraction with header fallback
+            # We strictly respect the event's own session_id if present, else fallback to header
+            event_session_id = data.get("session_id") or header_session_id
+            
+            # For distinct_id, usually the batch comes from one user/session. 
+            # If header distinct_id is present, use it. Else check user.
+            event_distinct_id = header_distinct_id
+            if not event_distinct_id:
+                if request.user and request.user.is_authenticated:
+                    event_distinct_id = str(request.user.id)
+                else:
+                    event_distinct_id = event_session_id
+
+            if not event_session_id:
+                 event_session_id = f"server-{uuid4()}"
+                 if not event_distinct_id:
+                     event_distinct_id = event_session_id
+
             event_type = data.get("event_type")
-            if not session_id or not event_type:
+            if not event_type:
                 continue
+                
             metadata = data.get("metadata") or {}
             feature = data.get("feature")
             latency_ms = data.get("latency_ms")
@@ -95,8 +163,9 @@ def track_activity_bulk(request):
                 except Exception:
                     client_dt = None
 
+            # DB Create
             UserActivity.objects.create(
-                session_id=session_id,
+                session_id=event_session_id,
                 user=request.user if request.user and request.user.is_authenticated else None,
                 event_type=event_type,
                 feature=feature,
@@ -107,6 +176,23 @@ def track_activity_bulk(request):
                 client_ts=client_dt,
             )
             created += 1
+
+            # PostHog Capture
+            if settings.POSTHOG_API_KEY:
+                properties = {
+                    '$session_id': event_session_id,
+                    'feature': feature,
+                    'success': success,
+                    'latency_ms': latency_ms,
+                    'error_code': error_code,
+                    **metadata,
+                }
+                posthog.capture(
+                    distinct_id=event_distinct_id,
+                    event=event_type,
+                    properties=properties
+                )
+
         except Exception:
             # best-effort; skip bad events
             continue
