@@ -470,14 +470,37 @@ function CodeVisualizerPage() {
                     </div>
 
                     {/* Hero Section */}
-                    <div className="relative text-center px-6 pb-12 pt-2">
+                    <div className="relative text-center px-6 pb-6 pt-2">
                         <p className="text-white/90 text-base font-medium">See your Python code come alive</p>
                         <p className="text-white/60 text-sm mt-1">Step-by-step execution visualization</p>
                     </div>
+
+                    {/* Mobile Beta Banner */}
+                    {showBetaBanner && (
+                        <div className="mb-4 bg-white shadow-sm">
+                            <div className="h-9 flex items-center justify-between px-4">
+                                <div className="flex-1" />
+                                <p className="text-xs font-medium text-slate-700 tracking-wide">
+                                    Beta Version · Experimental · Testing Stage
+                                </p>
+                                <div className="flex-1 flex justify-end">
+                                    <button
+                                        onClick={() => setShowBetaBanner(false)}
+                                        className="text-slate-400 hover:text-slate-600 transition-colors p-1"
+                                        aria-label="Dismiss"
+                                    >
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Mobile Editor - Clean, no card look */}
-                <div className="flex-1 flex flex-col bg-white -mt-3 rounded-t-2xl relative z-10">
+                <div className="flex-1 flex flex-col bg-white rounded-t-2xl relative z-10">
                     {/* Simple Editor Header */}
                     <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
                         <div className="flex items-center gap-2.5">
