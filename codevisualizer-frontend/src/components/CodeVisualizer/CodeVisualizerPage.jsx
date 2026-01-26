@@ -38,6 +38,9 @@ function CodeVisualizerPage() {
     const [isLoadingTrace, setIsLoadingTrace] = useState(false);
     const [loadingPhase, setLoadingPhase] = useState(0);
 
+    // Banner state
+    const [showBetaBanner, setShowBetaBanner] = useState(true);
+
     // Input generator instance (memoized)
     const inputGenerator = useMemo(() => new ConstraintAwareGenerator(), []);
 
@@ -556,7 +559,33 @@ function CodeVisualizerPage() {
                 </div >
 
                 {/* Main Content - Editor centered and prominent */}
-                < main className="relative z-10 min-h-screen flex items-center justify-center px-4" >
+                <main className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4">
+                    {/* Public Beta Status Pill */}
+                    {/* Public Beta Status Band */}
+                    {showBetaBanner && (
+                        <div className="absolute left-0 right-0 top-24 z-20 animate-fade-in-down bg-white shadow-sm">
+                            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                                <div className="h-10 flex items-center justify-between">
+                                    <div className="flex-1" />
+                                    <p className="text-sm font-medium text-slate-700 tracking-wide">
+                                        Beta Version · Experimental · Testing Stage
+                                    </p>
+                                    <div className="flex-1 flex justify-end">
+                                        <button
+                                            onClick={() => setShowBetaBanner(false)}
+                                            className="text-slate-400 hover:text-slate-600 transition-colors p-1"
+                                            aria-label="Dismiss"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="w-full max-w-4xl">
                         <CodeEditor
                             code={code}
@@ -572,7 +601,7 @@ function CodeVisualizerPage() {
                             isMobile={false}
                         />
                     </div>
-                </main >
+                </main>
             </div >
 
             {/* Input Modal */}

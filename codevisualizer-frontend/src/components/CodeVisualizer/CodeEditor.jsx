@@ -267,6 +267,7 @@ const CodeEditor = ({
                         <div>
                             <h1 className="text-slate-800 font-semibold text-sm leading-tight">Code Visualizer</h1>
                             <p className="text-slate-500 text-xs">Paste Python code to visualize</p>
+
                         </div>
                     </div>
                 </div>
@@ -401,6 +402,8 @@ const CodeEditor = ({
                         )}
                     </button>
                 </div>
+
+
             </div>
         </div>
     );

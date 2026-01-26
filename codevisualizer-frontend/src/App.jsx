@@ -38,7 +38,7 @@ const Layout = ({ children }) => {
     // Use transparent navbar on homepage and code-visualizer, light on others
     const isHomePage = location.pathname === '/' || location.pathname === '/code-visualizer';
     const navStyle = isHomePage ? 'transparent' : 'light';
-    
+
     // Hide navbar on mobile for homepage (has its own mobile header)
     const hideNavOnMobile = isHomePage;
 
