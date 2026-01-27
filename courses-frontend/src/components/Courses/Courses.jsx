@@ -245,7 +245,7 @@ const Courses = () => {
                                         {/* Coming Soon Placeholder */}
                                         <div className="bg-gradient-to-r from-indigo-50 to-slate-50 rounded-xl border border-indigo-100/50 py-12 px-6 text-center">
                                             <p className="text-gray-500">
-                                                Original courses crafted by EasyLearnova — coming soon.
+                                                Original courses created by EasyLearnova, with structured lessons and clear explanations.
                                             </p>
                                         </div>
                                     </section>
@@ -254,9 +254,9 @@ const Courses = () => {
                                     <section>
                                         <div className="mb-6">
                                             <div className="flex items-center gap-3 mb-2">
-                                                <div className="w-1 h-6 bg-red-500 rounded-full"></div>
+                                                <div className="w-1 h-6 bg-gray-400 rounded-full"></div>
                                                 <h3 className="text-xl font-semibold text-gray-900">
-                                                    Youtube Curated
+                                                    YouTube Curated
                                                 </h3>
                                             </div>
                                             <p className="text-sm text-gray-400 ml-4">
@@ -327,6 +327,11 @@ const Courses = () => {
                                                                 <span className="bg-white text-gray-900 px-4 py-2 rounded-full font-bold text-sm transform scale-90 group-hover:scale-100 transition-transform duration-300 shadow-lg">
                                                                     Preview Course
                                                                 </span>
+                                                            </div>
+
+                                                            {/* Curated Badge */}
+                                                            <div className="absolute top-2 left-2 bg-gray-900/80 backdrop-blur px-2 py-1 rounded-md text-xs font-medium text-white z-20 flex items-center gap-1">
+                                                                <span>📺</span> Curated
                                                             </div>
 
                                                             {course.class && course.class !== 'Engineering' && (
