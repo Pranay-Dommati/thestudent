@@ -228,98 +228,135 @@ const Courses = () => {
 
                             {/* View Content */}
                             {viewMode === 'discovery' ? (
-                                // Discovery View
-                                loadingCourses ? (
-                                    // Skeleton Cards
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                        {[...Array(4)].map((_, i) => (
-                                            <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-pulse">
-                                                <div className="aspect-video bg-gray-200" />
-                                                <div className="p-4 space-y-3">
-                                                    <div className="h-4 bg-gray-200 rounded w-3/4" />
-                                                    <div className="h-3 bg-gray-200 rounded w-1/2" />
-                                                    <div className="flex gap-2 pt-2">
-                                                        <div className="h-6 bg-gray-200 rounded-full w-16" />
-                                                        <div className="h-6 bg-gray-200 rounded-full w-20" />
-                                                    </div>
-                                                </div>
+                                // Discovery View with Two Sections
+                                <div className="space-y-14">
+                                    {/* Section 1: EasyLearnova Originals */}
+                                    <section>
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-1 h-6 bg-indigo-500 rounded-full"></div>
+                                            <h3 className="text-xl font-semibold text-gray-900">
+                                                EasyLearnova Originals
+                                            </h3>
+                                            <span className="bg-indigo-50 text-indigo-600 text-xs font-medium px-2.5 py-1 rounded-full">
+                                                Coming Soon
+                                            </span>
+                                        </div>
+
+                                        {/* Coming Soon Placeholder */}
+                                        <div className="bg-gradient-to-r from-indigo-50 to-slate-50 rounded-xl border border-indigo-100/50 py-12 px-6 text-center">
+                                            <p className="text-gray-500">
+                                                Original courses crafted by EasyLearnova — coming soon.
+                                            </p>
+                                        </div>
+                                    </section>
+
+                                    {/* Section 2: Youtube Curated */}
+                                    <section>
+                                        <div className="mb-6">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <div className="w-1 h-6 bg-red-500 rounded-full"></div>
+                                                <h3 className="text-xl font-semibold text-gray-900">
+                                                    Youtube Curated
+                                                </h3>
                                             </div>
-                                        ))}
-                                    </div>
-                                ) : allCourses.length > 0 ? (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                        {allCourses.map((course) => (
-                                            <div
-                                                key={course.id}
-                                                onClick={() => {
-                                                    // Navigate based on course_type from API
-                                                    // API returns: class: "10th - state", category: "Mathematics", course_type: "school"
-                                                    if (course.course_type === 'school' && course.class && course.category) {
-                                                        // Parse "10th - state" to get class_level and board
-                                                        const classString = course.class || '';
-                                                        const [classLevel, boardPart] = classString.split(' - ').map(s => s?.trim());
-                                                        const subject = (course.category || '').toLowerCase();
+                                            <p className="text-sm text-gray-400 ml-4">
+                                                This course uses publicly available YouTube videos. All rights belong to respective creators.
+                                            </p>
+                                        </div>
 
-                                                        if (classLevel && boardPart && subject) {
-                                                            const board = boardPart.toLowerCase();
-                                                            let path;
-                                                            if (board === 'state') {
-                                                                // Default to 'ts' for state board (Telangana State)
-                                                                path = `/${classLevel}/state/ts/${subject}?courseId=${course.id}`;
-                                                            } else {
-                                                                // CBSE or other boards
-                                                                path = `/${classLevel}/${board}/${subject}?courseId=${course.id}`;
-                                                            }
-                                                            navigate(path);
-                                                            return;
-                                                        }
-                                                    }
-                                                    // Fallback: Navigate to course details page
-                                                    navigate(`/${course.id}`);
-                                                }}
-                                                className="bg-white rounded-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden cursor-pointer border border-gray-100/80 group transform"
-                                            >
-                                                {/* Thumbnail */}
-                                                <div className="aspect-video relative overflow-hidden bg-gray-100">
-                                                    <img
-                                                        src={course.thumbnail || `https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80&text=${encodeURIComponent(course.subject || 'Course')}`}
-                                                        alt={course.title}
-                                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                                                    />
-
-                                                    {/* Hover CTA */}
-                                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
-                                                        <span className="bg-white text-gray-900 px-4 py-2 rounded-full font-bold text-sm transform scale-90 group-hover:scale-100 transition-transform duration-300 shadow-lg">
-                                                            Preview Course
-                                                        </span>
-                                                    </div>
-
-                                                    {course.class && course.class !== 'Engineering' && (
-                                                        <div className="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded-md text-xs font-semibold text-gray-700 shadow-sm z-20">
-                                                            {course.class}
+                                        {loadingCourses ? (
+                                            // Skeleton Cards
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                                {[...Array(4)].map((_, i) => (
+                                                    <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-pulse">
+                                                        <div className="aspect-video bg-gray-200" />
+                                                        <div className="p-4 space-y-3">
+                                                            <div className="h-4 bg-gray-200 rounded w-3/4" />
+                                                            <div className="h-3 bg-gray-200 rounded w-1/2" />
+                                                            <div className="flex gap-2 pt-2">
+                                                                <div className="h-6 bg-gray-200 rounded-full w-16" />
+                                                                <div className="h-6 bg-gray-200 rounded-full w-20" />
+                                                            </div>
                                                         </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Details */}
-                                                <div className="p-5">
-                                                    <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">
-                                                        {course.title}
-                                                    </h3>
-                                                    <div className="flex items-center text-sm text-gray-500 mb-3">
-                                                        <span>{course.category}</span>
                                                     </div>
-                                                </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
-                                        <div className="text-gray-400 text-5xl mb-4">🔍</div>
-                                        <h3 className="text-lg font-semibold text-gray-900 mb-1">No courses found</h3>
-                                        <p className="text-gray-500">Check back later for new content.</p>
-                                    </div>
-                                )
+                                        ) : allCourses.length > 0 ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                                {allCourses.map((course) => (
+                                                    <div
+                                                        key={course.id}
+                                                        onClick={() => {
+                                                            // Navigate based on course_type from API
+                                                            // API returns: class: "10th - state", category: "Mathematics", course_type: "school"
+                                                            if (course.course_type === 'school' && course.class && course.category) {
+                                                                // Parse "10th - state" to get class_level and board
+                                                                const classString = course.class || '';
+                                                                const [classLevel, boardPart] = classString.split(' - ').map(s => s?.trim());
+                                                                const subject = (course.category || '').toLowerCase();
+
+                                                                if (classLevel && boardPart && subject) {
+                                                                    const board = boardPart.toLowerCase();
+                                                                    let path;
+                                                                    if (board === 'state') {
+                                                                        // Default to 'ts' for state board (Telangana State)
+                                                                        path = `/${classLevel}/state/ts/${subject}?courseId=${course.id}`;
+                                                                    } else {
+                                                                        // CBSE or other boards
+                                                                        path = `/${classLevel}/${board}/${subject}?courseId=${course.id}`;
+                                                                    }
+                                                                    navigate(path);
+                                                                    return;
+                                                                }
+                                                            }
+                                                            // Fallback: Navigate to course details page
+                                                            navigate(`/${course.id}`);
+                                                        }}
+                                                        className="bg-white rounded-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden cursor-pointer border border-gray-100/80 group transform"
+                                                    >
+                                                        {/* Thumbnail */}
+                                                        <div className="aspect-video relative overflow-hidden bg-gray-100">
+                                                            <img
+                                                                src={course.thumbnail || `https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80&text=${encodeURIComponent(course.subject || 'Course')}`}
+                                                                alt={course.title}
+                                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                                            />
+
+                                                            {/* Hover CTA */}
+                                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                                                                <span className="bg-white text-gray-900 px-4 py-2 rounded-full font-bold text-sm transform scale-90 group-hover:scale-100 transition-transform duration-300 shadow-lg">
+                                                                    Preview Course
+                                                                </span>
+                                                            </div>
+
+                                                            {course.class && course.class !== 'Engineering' && (
+                                                                <div className="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded-md text-xs font-semibold text-gray-700 shadow-sm z-20">
+                                                                    {course.class}
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Details */}
+                                                        <div className="p-5">
+                                                            <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">
+                                                                {course.title}
+                                                            </h3>
+                                                            <div className="flex items-center text-sm text-gray-500 mb-3">
+                                                                <span>{course.category}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
+                                                <div className="text-gray-400 text-5xl mb-4">🔍</div>
+                                                <h3 className="text-lg font-semibold text-gray-900 mb-1">No courses found</h3>
+                                                <p className="text-gray-500">Check back later for new content.</p>
+                                            </div>
+                                        )}
+                                    </section>
+                                </div>
                             ) : (
                                 // Class Selection View (Existing Logic)
                                 loading ? (
