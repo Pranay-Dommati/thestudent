@@ -16,6 +16,12 @@ class BaseCourse(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_published = models.BooleanField(default=False)
     
+    SOURCE_TYPE_CHOICES = (
+        ('youtube', 'YouTube Curated'),
+        ('original', 'EasyLearnova Original'),
+    )
+    source_type = models.CharField(max_length=20, choices=SOURCE_TYPE_CHOICES, default='youtube')
+    
     class Meta:
         abstract = True
 

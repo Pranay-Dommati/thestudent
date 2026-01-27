@@ -13,6 +13,7 @@ import logger from '../../utils/logger';
 import { stateCodeToName } from '../../utils/stateMapping';
 import cache, { schoolCourseKey } from '../../services/cacheService';
 import { getSchoolCourseById, getSchoolCourses } from '../../services/courseApi';
+import NotFound from '../NotFound/NotFound';
 
 // Use shared axios instance baseURL and dev proxy for API calls
 
@@ -455,7 +456,7 @@ const SchoolCourseDetails = () => {
 
     if (loading) return <LoadingSpinner />;
 
-    if (!course) return <div className="p-8 text-center">Course not found</div>;
+    if (!course) return <NotFound />;
 
     return (
         <>
