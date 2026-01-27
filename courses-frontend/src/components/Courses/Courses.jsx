@@ -277,8 +277,8 @@ const Courses = () => {
                                                                 alt={course.title}
                                                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                                                             />
-                                                            <div className="absolute top-2 left-2 bg-indigo-600 px-2 py-1 rounded-md text-xs font-medium text-white z-20 flex items-center gap-1">
-                                                                <span>✨</span> Original
+                                                            <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md border border-indigo-100 text-indigo-600 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider shadow-sm z-20 flex items-center gap-1.5">
+                                                                <span className="text-yellow-500 text-xs">★</span> <span>Original</span>
                                                             </div>
                                                         </div>
                                                         <div className="p-5">
@@ -365,8 +365,8 @@ const Courses = () => {
                                                                     Preview Course
                                                                 </span>
                                                             </div>
-                                                            <div className="absolute top-2 left-2 bg-gray-900/80 backdrop-blur px-2 py-1 rounded-md text-xs font-medium text-white z-20 flex items-center gap-1">
-                                                                <span>📺</span> Curated
+                                                            <div className="absolute top-3 right-3 bg-gray-900/60 backdrop-blur-sm px-2.5 py-1 rounded-md text-[10px] font-medium text-white z-20 flex items-center gap-1.5 border border-white/10">
+                                                                <span>▶</span> <span>Curated</span>
                                                             </div>
                                                         </div>
                                                         <div className="p-5">

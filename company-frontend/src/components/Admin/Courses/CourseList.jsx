@@ -72,8 +72,8 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete, refreshTrigger }) 
                     </div>          <button
                         onClick={() => navigate('/admin-p/add-course?new=true')}
                         className={`w-full sm:w-auto flex items-center justify-center px-4 py-2.5 rounded-lg ${isDarkMode
-                                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
                             } transition-colors shadow-sm font-medium`}
                     >
                         <FaPlus className="mr-2 text-sm" /> Add New Course
@@ -92,8 +92,8 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete, refreshTrigger }) 
                             type="text"
                             placeholder="Search courses by title, category or type..."
                             className={`block w-full pl-10 pr-4 py-3 rounded-lg text-sm ${isDarkMode
-                                    ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500'
-                                    : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:ring-blue-600 focus:border-blue-500'
+                                ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500'
+                                : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:ring-blue-600 focus:border-blue-500'
                                 } border shadow-sm transition-colors`}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -106,8 +106,8 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete, refreshTrigger }) 
                             value={filters.type}
                             onChange={handleFilterChange}
                             className={`px-4 py-3 text-sm rounded-lg border shadow-sm ${isDarkMode
-                                    ? 'bg-gray-700 border-gray-600 text-white'
-                                    : 'bg-white border-gray-300 text-gray-900'
+                                ? 'bg-gray-700 border-gray-600 text-white'
+                                : 'bg-white border-gray-300 text-gray-900'
                                 }`}
                         >
                             <option value="all">All Course Types</option>
@@ -118,8 +118,8 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete, refreshTrigger }) 
                         <button
                             onClick={() => setFilterOpen(!filterOpen)}
                             className={`flex items-center justify-center px-4 py-3 border text-sm rounded-lg ${isDarkMode
-                                    ? 'border-gray-600 bg-gray-700 hover:bg-gray-600 text-white'
-                                    : 'border-gray-300 hover:bg-gray-50 text-gray-700'
+                                ? 'border-gray-600 bg-gray-700 hover:bg-gray-600 text-white'
+                                : 'border-gray-300 hover:bg-gray-50 text-gray-700'
                                 } transition-colors`}
                         >
                             <FaFilter className="mr-2" /> Advanced Filters
@@ -172,8 +172,8 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete, refreshTrigger }) 
                                     <div className="flex-1 min-w-0">
                                         <div className="flex flex-wrap gap-2 mb-1">
                                             <span className={`px-2.5 py-0.5 text-xs rounded-full ${course.course_type === 'engineering'
-                                                    ? isDarkMode ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-100 text-purple-800'
-                                                    : isDarkMode ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-800'
+                                                ? isDarkMode ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-100 text-purple-800'
+                                                : isDarkMode ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-800'
                                                 }`}>
                                                 {course.course_type === 'engineering' ? 'Engineering' : 'School'}
                                             </span>
@@ -196,6 +196,19 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete, refreshTrigger }) 
                                                     Draft
                                                 </span>
                                             )}
+
+                                            {/* Source Type Badge */}
+                                            {course.source_type === 'original' ? (
+                                                <span className={`px-2.5 py-0.5 text-xs rounded-full ${isDarkMode ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-100 text-indigo-800'
+                                                    }`}>
+                                                    Original
+                                                </span>
+                                            ) : (
+                                                <span className={`px-2.5 py-0.5 text-xs rounded-full ${isDarkMode ? 'bg-orange-900/50 text-orange-300' : 'bg-orange-100 text-orange-800'
+                                                    }`}>
+                                                    YouTube
+                                                </span>
+                                            )}
                                         </div>
 
                                         <h3 className={`font-medium text-base sm:text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -214,8 +227,8 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete, refreshTrigger }) 
                                         <button
                                             onClick={() => handleEdit(course.id, course.course_type)}
                                             className={`p-2.5 rounded-lg ${isDarkMode
-                                                    ? 'bg-gray-700 text-blue-400 hover:bg-gray-600'
-                                                    : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                                ? 'bg-gray-700 text-blue-400 hover:bg-gray-600'
+                                                : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                                                 } transition-colors`}
                                             aria-label={`Edit ${course.course_type} course`}
                                         >
@@ -224,8 +237,8 @@ const CourseList = ({ onAddNew, isDarkMode, onEdit, onDelete, refreshTrigger }) 
                                         <button
                                             onClick={() => handleDelete(course)}
                                             className={`p-2.5 rounded-lg ${isDarkMode
-                                                    ? 'bg-gray-700 text-red-400 hover:bg-gray-600'
-                                                    : 'bg-red-50 text-red-600 hover:bg-red-100'
+                                                ? 'bg-gray-700 text-red-400 hover:bg-gray-600'
+                                                : 'bg-red-50 text-red-600 hover:bg-red-100'
                                                 } transition-colors`}
                                             aria-label={`Delete ${course.course_type} course`}
                                         >
