@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import logger from '../../../../utils/logger';
 import { motion } from 'framer-motion';
-import { FaPlay, FaBookReader } from 'react-icons/fa';
-import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import BackButton from '../../components/BackButton';
 import MobileBoardSelector from '../../shared/MobileBoardSelector';
 import { stateBoards } from '../../data/states';
 import { getSchoolCourses } from '../../../../services/courseApi';
-import { checkBoardAvailability, getOptimisticBoardAvailability } from '../../../../utils/courseAvailability';
+import { checkBoardAvailability, checkStateAvailability, getOptimisticBoardAvailability } from '../../../../utils/courseAvailability';
+import { SegregatedCourseSections } from '../../shared/CourseCard';
 import Footer from '../../../Footer/Footer';
 import SEO from '../../../SEO/SEO';
 
@@ -34,6 +34,8 @@ const NinthStandard = () => {
     const [loading, setLoading] = useState(false);
     const [availableBoards, setAvailableBoards] = useState([]);
     const [checkingAvailability, setCheckingAvailability] = useState(true);
+    const [availableStates, setAvailableStates] = useState([]);
+    const [checkingStates, setCheckingStates] = useState(false);
 
     // Check board availability
     useEffect(() => {
@@ -122,9 +124,21 @@ const NinthStandard = () => {
         }
     }, [selectedBoard, stateId]);
 
-    const handleBoardSelect = (boardId) => {
+    const handleBoardSelect = async (boardId) => {
         if (boardId === 'state') {
+            // Dynamically check which states have courses
             setShowStateBoards(true);
+            setCheckingStates(true);
+            setAvailableStates([]);
+            try {
+                const states = await checkStateAvailability('9th');
+                setAvailableStates(states);
+            } catch (error) {
+                logger.error('Error checking state availability:', error);
+                setAvailableStates([]);
+            } finally {
+                setCheckingStates(false);
+            }
         } else {
             setSelectedBoard(boardId);
             navigate(`/9th/${boardId}`);
@@ -182,13 +196,13 @@ const NinthStandard = () => {
             <div className={`container mx-auto px-4 ${containerPadding}`}>
                 <MobileBoardSelector
                     availableBoards={availableBoards}
-                    availableStates={[]}
+                    availableStates={availableStates}
                     checkingAvailability={checkingAvailability}
-                    checkingStates={false}
+                    checkingStates={checkingStates}
                     isBoardSelection={!selectedBoard && !showStateBoards}
                     isStateSelection={showStateBoards}
                     onSelectBoard={handleBoardSelect}
-                    onSelectState={() => { }}
+                    onSelectState={handleStateSelect}
                     onBack={handleBack}
                 />
 
@@ -207,64 +221,15 @@ const NinthStandard = () => {
                                 <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
                             </div>
                         ) : courses.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-4 lg:gap-6 px-4 sm:px-0">
-                                {courses.map((course) => {
-                                    // Format board name for display
-                                    let boardDisplay = selectedBoard.includes('state')
-                                        ? `State · ${stateBoards.find(s => selectedBoard.includes(s.id))?.name || 'TS'}`
-                                        : boards.find(b => b.id === selectedBoard)?.name || 'CBSE';
-
-                                    return (
-                                        <Link
-                                            to={`${(selectedBoard.includes('state')
-                                                ? `/9th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}`
-                                                : `/9th/${selectedBoard}/${course.subject.toLowerCase()}`)}?courseId=${encodeURIComponent(course.id)}`}
-                                            key={course.id}
-                                        >
-                                            <motion.div
-                                                whileHover={{ scale: 1.02 }}
-                                                whileTap={{ scale: 0.98 }}
-                                                className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden cursor-pointer h-full"
-                                            >
-                                                {/* Course thumbnail */}
-                                                <div className="relative pb-[56.25%] rounded-t-xl overflow-hidden">
-                                                    <img
-                                                        src={course.thumbnail || `https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80&text=${encodeURIComponent(course.subject)}`}
-                                                        alt={course.title}
-                                                        className="absolute inset-0 w-full h-full object-cover"
-                                                    />
-                                                </div>
-
-                                                {/* Course info with better mobile spacing */}
-                                                <div className="p-4 sm:p-4 lg:p-5">
-                                                    <h3 className="font-semibold text-gray-900 mb-2 sm:mb-2 line-clamp-2 text-base sm:text-base leading-tight">
-                                                        {course.title}
-                                                    </h3>
-
-                                                    <div className="flex items-center text-sm sm:text-sm text-gray-500 mb-3 sm:mb-3">
-                                                        <span>{course.duration}+ hours</span>
-                                                    </div>
-
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center min-w-0 flex-1 mr-2">
-                                                            <div className="h-6 w-6 sm:h-6 sm:w-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-medium text-indigo-600 flex-shrink-0">
-                                                                {SUBJECT_ICONS[course.subject] || course.subject[0]}
-                                                            </div>
-                                                            <span className="ml-2 sm:ml-2 text-sm sm:text-sm text-gray-600 truncate">{course.subject}</span>
-                                                        </div>
-
-                                                        <div className="flex items-center flex-shrink-0">
-                                                            <span className="bg-blue-100 text-blue-800 text-xs px-2 sm:px-2 py-1 sm:py-1 rounded-full font-medium whitespace-nowrap">
-                                                                {boardDisplay}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </motion.div>
-                                        </Link>
-                                    );
-                                })}
-                            </div>
+                            <SegregatedCourseSections
+                                courses={courses}
+                                getLinkTo={(course) => `${(selectedBoard.includes('state')
+                                    ? `/9th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}`
+                                    : `/9th/${selectedBoard}/${course.subject.toLowerCase()}`)}?courseId=${encodeURIComponent(course.id)}`}
+                                getBoardDisplay={() => selectedBoard.includes('state')
+                                    ? `State · ${stateBoards.find(s => selectedBoard.includes(s.id))?.name || 'TS'}`
+                                    : boards.find(b => b.id === selectedBoard)?.name || 'CBSE'}
+                            />
                         ) : (
                             <div className="text-center py-12">
                                 <p className="text-gray-500">No courses found for this selection.</p>
@@ -279,22 +244,36 @@ const NinthStandard = () => {
                             subtitle="Choose your state board"
                             onBack={handleBack}
                         />
-                        <div className="space-y-8">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                {stateBoards.map((state) => (
-                                    <motion.button
-                                        key={state.id}
-                                        onClick={() => handleStateSelect(state.id)}
-                                        className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
-                                        whileHover={{ y: -5 }}
-                                        whileTap={{ scale: 0.98 }}
-                                    >
-                                        <h3 className="text-xl font-bold text-gray-900 mb-2">{state.name}</h3>
-                                        <p className="text-gray-500 text-sm">{state.fullName}</p>
-                                    </motion.button>
-                                ))}
+                        {checkingStates ? (
+                            <div className="flex justify-center my-12">
+                                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
                             </div>
-                        </div>
+                        ) : availableStates.length > 0 ? (
+                            <div className="space-y-8">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                    {availableStates.map((state) => (
+                                        <motion.button
+                                            key={state.id}
+                                            onClick={() => handleStateSelect(state.id)}
+                                            className="group p-6 bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
+                                            whileHover={{ y: -5 }}
+                                            whileTap={{ scale: 0.98 }}
+                                        >
+                                            <h3 className="text-xl font-bold text-gray-900 mb-2">{state.name}</h3>
+                                            <p className="text-gray-500 text-sm">{state.fullName}</p>
+                                        </motion.button>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center py-12">
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-8">
+                                    <h3 className="text-xl font-semibold text-yellow-800 mb-2">No State Courses Available Yet</h3>
+                                    <p className="text-yellow-700">State board courses for 9th standard are being prepared and will be available soon.</p>
+                                    <p className="text-sm text-yellow-600 mt-2">Please check back later or try a different class.</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="hidden md:block">

@@ -232,16 +232,19 @@ const Courses = () => {
                                 <div className="space-y-14">
                                     {/* Section 1: EasyLearnova Originals */}
                                     <section>
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <div className="w-1 h-6 bg-indigo-500 rounded-full"></div>
-                                            <h3 className="text-xl font-semibold text-gray-900">
-                                                EasyLearnova Originals
-                                            </h3>
-                                            {allCourses.filter(c => c.source_type === 'original').length === 0 && (
-                                                <span className="bg-indigo-50 text-indigo-600 text-xs font-medium px-2.5 py-1 rounded-full">
-                                                    Coming Soon
-                                                </span>
-                                            )}
+                                        <div className="mb-6">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <div className="w-1 h-6 bg-indigo-500 rounded-full"></div>
+                                                <h3 className="text-xl font-semibold text-gray-900">
+                                                    EasyLearnova Originals
+                                                </h3>
+                                                {allCourses.filter(c => c.source_type === 'original').length === 0 && (
+                                                    <span className="bg-indigo-50 text-indigo-600 text-xs font-medium px-2.5 py-1 rounded-full">
+                                                        Coming Soon
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-gray-400 ml-4">Expert-crafted courses designed by our educators</p>
                                         </div>
 
                                         {allCourses.filter(c => c.source_type === 'original').length > 0 ? (
