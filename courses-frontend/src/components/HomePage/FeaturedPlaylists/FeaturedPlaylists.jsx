@@ -281,7 +281,7 @@ const FeaturedPlaylists = () => {
     const hasMoreCourses = allFilteredCourses.length > displayedCourses.length;
 
     return (
-        <section ref={sectionRef} className="py-6 sm:py-8 lg:py-12 xl:pt-0 xl:pb-16 px-3 sm:px-4 bg-[#F9FAFB]">
+        <section id="courses" ref={sectionRef} className="py-6 sm:py-8 lg:py-12 xl:pt-0 xl:pb-16 px-3 sm:px-4 bg-[#F9FAFB]">
             <div className="container mx-auto">
                 {/* Header section - mobile vs desktop optimized */}
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4 sm:mb-6 lg:mb-10">
@@ -317,8 +317,8 @@ const FeaturedPlaylists = () => {
                                 key={category.id}
                                 onClick={() => setActiveCategory(category.id)}
                                 className={`px-2.5 sm:px-3 lg:px-4 py-1 sm:py-1.5 lg:py-2 rounded-full text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${activeCategory === category.id
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white text-gray-700 hover:bg-gray-100'
                                     }`}
                             >
                                 {category.name}

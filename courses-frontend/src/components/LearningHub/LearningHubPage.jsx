@@ -328,7 +328,7 @@ const LearningHubPage = () => {
                                             </div>
                                         </div>
                                         <Link
-                                            to="/"
+                                            to="/#courses"
                                             className="btn-clickable pointer-events-auto bg-white text-indigo-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-50 transition-colors cursor-pointer relative z-50 shadow-sm border border-gray-200"
                                             style={{
                                                 pointerEvents: 'auto',

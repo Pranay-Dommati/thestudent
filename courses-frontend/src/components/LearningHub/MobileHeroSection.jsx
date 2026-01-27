@@ -39,7 +39,7 @@ const MobileHeroSection = ({ user }) => {
                 </Link>
 
                 <Link
-                    to="/courses"
+                    to="/#courses"
                     className="bg-indigo-500 text-white font-medium rounded-lg px-4 py-2.5 text-center flex items-center justify-center border border-indigo-400"
                 >
                     <FaBookOpen className="mr-2" /> Explore Expert Courses

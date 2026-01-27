@@ -6,10 +6,25 @@ import TrustSection from "./TrustSection/TrustSection";
 import Footer from "../Footer/Footer";
 import SEO from "../SEO/SEO";
 import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import prefetchCoursesAvailability from "../../utils/prefetchCoursesAvailability";
 import prefetchBoardsAndStates from "../../utils/prefetchBoardsAndStates";
 
 const HomePage = () => {
+    const location = useLocation();
+
+    // Handle hash navigation (e.g., /#courses from learning hub)
+    useEffect(() => {
+        if (location.hash === '#courses') {
+            setTimeout(() => {
+                const coursesSection = document.getElementById('courses');
+                if (coursesSection) {
+                    coursesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 300);
+        }
+    }, [location.hash]);
+
     useEffect(() => {
         // Kick off background prefetch for /courses availability without blocking paint
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -23,9 +38,9 @@ const HomePage = () => {
             : setTimeout(run, 0);
 
         return () => {
-            if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch {}
+            if (typeof cancelIdleCallback !== 'undefined') try { cancelIdleCallback(handle); } catch { }
             else clearTimeout(handle);
-            try { controller?.abort(); } catch {}
+            try { controller?.abort(); } catch { }
         };
     }, []);
     return (

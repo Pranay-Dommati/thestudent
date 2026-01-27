@@ -193,7 +193,7 @@ const Courses = () => {
             <div className="bg-gray-50 pt-7">
                 <div className="container mx-auto px-4 py-12">
                     {!selectedLevel ? (
-                        <div className="max-w-7xl mx-auto">
+                        <div id="courses" className="max-w-7xl mx-auto">
                             {/* Header & Toggle */}
                             <div className="flex flex-col items-center mb-12 mt-8">
                                 <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 tracking-tight">

@@ -58,7 +58,7 @@ const HeroSection = ({ user }) => {
                             </span>
                         </Link>
                         <Link
-                            to="/courses"
+                            to="/#courses"
                             className="group relative px-6 py-3 bg-indigo-500 bg-opacity-30 text-white font-medium rounded-lg border border-white/30 transition-all duration-300 hover:bg-opacity-40 hover:border-white/50 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white/50"
                             style={{
                                 pointerEvents: 'auto',
