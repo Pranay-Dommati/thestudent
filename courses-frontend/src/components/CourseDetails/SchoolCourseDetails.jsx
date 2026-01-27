@@ -26,7 +26,7 @@ const SchoolCourseDetails = () => {
     const [showAllTopics, setShowAllTopics] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
-    const { boardId, stateId, subjectId } = useParams();
+    const { boardId, stateId, subjectId, sourceType } = useParams(); // sourceType = 'originals' or 'curated'
     const { isLoggedIn, validateAuth } = useAuth(); // Get authentication state and validator
 
     // Define subject icons mapping
@@ -118,6 +118,20 @@ const SchoolCourseDetails = () => {
 
                     const courseData = await getSchoolCourseById(selectedCourseId);
 
+                    // Validate source_type matches URL if sourceType param is present
+                    if (sourceType) {
+                        const expectedSourceType = sourceType === 'originals' ? 'original' : 'youtube';
+                        const courseSourceType = courseData.source_type || 'youtube';
+                        if (courseSourceType !== expectedSourceType && courseSourceType !== (sourceType === 'originals' ? 'original' : courseSourceType)) {
+                            logger.warn('Course source_type mismatch:', {
+                                url: sourceType,
+                                expected: expectedSourceType,
+                                actual: courseSourceType
+                            });
+                            // Continue loading anyway - courseId is the primary identifier
+                        }
+                    }
+
                     // Build absolute thumbnail URL when backend returns a relative media path
                     const absoluteThumb = toAbsoluteMedia(courseData.thumbnail);
 
@@ -141,7 +155,8 @@ const SchoolCourseDetails = () => {
                         chapters: Array.isArray(courseData.chapters) ? courseData.chapters.length : 0,
                         sources: courseData.sources || 'YouTube',
                         thumbnail: absoluteThumb || courseData.thumbnail,
-                        icon: SUBJECT_ICONS[courseData.subject] || '📚'
+                        icon: SUBJECT_ICONS[courseData.subject] || '📚',
+                        source_type: courseData.source_type || 'youtube' // Store for learning page reference
                     };
 
                     setCourse(formattedCourse);

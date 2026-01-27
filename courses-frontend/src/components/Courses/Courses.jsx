@@ -262,9 +262,9 @@ const Courses = () => {
                                                                     const board = boardPart.toLowerCase();
                                                                     let path;
                                                                     if (board === 'state') {
-                                                                        path = `/${classLevel}/state/ts/${subject}?courseId=${course.id}`;
+                                                                        path = `/${classLevel}/state/ts/originals/${subject}?courseId=${course.id}`;
                                                                     } else {
-                                                                        path = `/${classLevel}/${board}/${subject}?courseId=${course.id}`;
+                                                                        path = `/${classLevel}/${board}/originals/${subject}?courseId=${course.id}`;
                                                                     }
                                                                     navigate(path);
                                                                     return;
@@ -345,9 +345,9 @@ const Courses = () => {
                                                                     const board = boardPart.toLowerCase();
                                                                     let path;
                                                                     if (board === 'state') {
-                                                                        path = `/${classLevel}/state/ts/${subject}?courseId=${course.id}`;
+                                                                        path = `/${classLevel}/state/ts/curated/${subject}?courseId=${course.id}`;
                                                                     } else {
-                                                                        path = `/${classLevel}/${board}/${subject}?courseId=${course.id}`;
+                                                                        path = `/${classLevel}/${board}/curated/${subject}?courseId=${course.id}`;
                                                                     }
                                                                     navigate(path);
                                                                     return;

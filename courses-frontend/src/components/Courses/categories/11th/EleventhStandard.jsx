@@ -319,9 +319,10 @@ const EleventhStandard = () => {
                             <SegregatedCourseSections
                                 courses={courses}
                                 getLinkTo={(course) => {
+                                    const sourceType = course.source_type === 'original' ? 'originals' : 'curated';
                                     const basePath = selectedBoard.includes('state')
-                                        ? `/11th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}`
-                                        : `/11th/${selectedBoard}/${course.subject.toLowerCase()}`;
+                                        ? `/11th/state/${stateId || selectedBoard.replace('state-', '')}/${sourceType}/${course.subject.toLowerCase()}`
+                                        : `/11th/${selectedBoard}/${sourceType}/${course.subject.toLowerCase()}`;
                                     return `${basePath}?courseId=${encodeURIComponent(course.id)}`;
                                 }}
                                 getBoardDisplay={() => selectedBoard.includes('state')

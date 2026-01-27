@@ -219,9 +219,13 @@ const TenthStandard = () => {
                         ) : courses.length > 0 ? (
                             <SegregatedCourseSections
                                 courses={courses}
-                                getLinkTo={(course) => `${(selectedBoard.includes('state')
-                                    ? `/10th/state/${stateId || selectedBoard.replace('state-', '')}/${course.subject.toLowerCase()}`
-                                    : `/10th/${selectedBoard}/${course.subject.toLowerCase()}`)}?courseId=${encodeURIComponent(course.id)}`}
+                                getLinkTo={(course) => {
+                                    const sourceType = course.source_type === 'original' ? 'originals' : 'curated';
+                                    const basePath = selectedBoard.includes('state')
+                                        ? `/10th/state/${stateId || selectedBoard.replace('state-', '')}/${sourceType}/${course.subject.toLowerCase()}`
+                                        : `/10th/${selectedBoard}/${sourceType}/${course.subject.toLowerCase()}`;
+                                    return `${basePath}?courseId=${encodeURIComponent(course.id)}`;
+                                }}
                                 getBoardDisplay={() => selectedBoard.includes('state')
                                     ? `State · ${stateBoards.find(s => selectedBoard.includes(s.id))?.name || 'TS'}`
                                     : boards.find(b => b.id === selectedBoard)?.name || 'CBSE'}
