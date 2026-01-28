@@ -72,7 +72,8 @@ const Layout = ({ children, excludePaths = [] }) => {
 
     // Special cases: pages that should not show global navbars
     const isCertificatePage = /^\/courses\/[^/]+\/certificate(\/|$)?/.test(location.pathname);
-    const isLearningPage = /^\/courses\/.+\/learning(\/|$)?/.test(location.pathname);
+    // Match ANY learning page: school routes (/11th/state/ts/math/learning), engineering (/engineering/id/learning), or generic (/:courseId/learning)
+    const isLearningPage = /\/learning(\/|$|\?)/.test(location.pathname);
 
     // Check if the current route is in the excludePaths array or should be excluded
     const isExcluded = excludePaths.some(path => location.pathname.startsWith(path)) ||
