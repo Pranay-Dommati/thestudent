@@ -1,12 +1,14 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { FaUserCircle } from 'react-icons/fa';
+import { FaUserCircle, FaBook } from 'react-icons/fa';
+import { HiSparkles } from 'react-icons/hi2';
 
 import CodeEditor from './CodeEditor';
 import InputModal from './InputModal';
 import ImmersiveVisualizer from './ImmersiveVisualizer';
 import { ConstraintAwareGenerator } from './engine/InputGenerator';
+import { DSASheetsPanel } from '../DSASheets';
 import './CodeVisualizer.css';
 
 // API Base URL - uses Django backend visualizer API
@@ -40,6 +42,9 @@ function CodeVisualizerPage() {
 
     // Banner state
     const [showBetaBanner, setShowBetaBanner] = useState(true);
+
+    // DSA Sheets panel state
+    const [showDSAPanel, setShowDSAPanel] = useState(false);
 
     // Input generator instance (memoized)
     const inputGenerator = useMemo(() => new ConstraintAwareGenerator(), []);
@@ -470,9 +475,19 @@ function CodeVisualizerPage() {
                     </div>
 
                     {/* Hero Section */}
-                    <div className="relative text-center px-6 pb-6 pt-2">
+                    <div className="relative text-center px-6 pb-4 pt-2">
                         <p className="text-white/90 text-base font-medium">See your Python code come alive</p>
                         <p className="text-white/60 text-sm mt-1">Step-by-step execution visualization</p>
+
+                        {/* Mobile DSA Sheets Button */}
+                        <button
+                            onClick={() => setShowDSAPanel(true)}
+                            className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur-sm border border-white/20 rounded-xl text-white text-sm font-medium transition-all duration-300 group"
+                        >
+                            <HiSparkles className="text-amber-300 group-hover:animate-pulse" />
+                            <span>DSA Practice Sheets</span>
+                            <FaBook className="text-white/60 text-xs" />
+                        </button>
                     </div>
 
                     {/* Mobile Beta Banner */}
@@ -625,6 +640,22 @@ function CodeVisualizerPage() {
                         />
                     </div>
                 </main>
+
+                {/* Desktop DSA Sheets Floating Button */}
+                <div className="fixed bottom-8 right-8 z-50 animate-float">
+                    <button
+                        onClick={() => setShowDSAPanel(true)}
+                        className="group flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white font-semibold rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 dsa-button-glow"
+                    >
+                        <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <HiSparkles className="text-amber-300 text-lg" />
+                        </div>
+                        <div className="text-left">
+                            <p className="text-sm font-bold">DSA Sheets</p>
+                            <p className="text-[10px] text-white/70">Practice problems</p>
+                        </div>
+                    </button>
+                </div>
             </div >
 
             {/* Input Modal */}
@@ -651,6 +682,12 @@ function CodeVisualizerPage() {
                 loadingPhase={loadingPhase}
                 isGenerating={isRunning}
                 executionId={executionId}
+            />
+
+            {/* DSA Sheets Panel */}
+            <DSASheetsPanel
+                isOpen={showDSAPanel}
+                onClose={() => setShowDSAPanel(false)}
             />
         </div >
     );

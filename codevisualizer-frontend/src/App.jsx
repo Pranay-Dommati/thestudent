@@ -22,6 +22,9 @@ const Feedback = React.lazy(() => import('./components/Feedback/FeedbackPage'));
 const TermsAndConditions = React.lazy(() => import('./components/Legal/TermsAndConditions'));
 const PrivacyPolicy = React.lazy(() => import('./components/Legal/PrivacyPolicy'));
 
+// DSA Sheet
+const DSAProblemPage = React.lazy(() => import('./pages/DSAProblemPage'));
+
 const Layout = ({ children }) => {
     const location = useLocation();
 
@@ -33,7 +36,7 @@ const Layout = ({ children }) => {
     // Minimal navbar logic - show on everything except pure auth pages if desired, 
     // or maybe specific layout requirements. 
     // For now, keeping a simple check to hide nav on specific full-screen views if needed.
-    const hideNav = location.pathname.startsWith('/auth');
+    const hideNav = location.pathname.startsWith('/auth') || location.pathname.startsWith('/dsa-sheet');
 
     // Use transparent navbar on homepage and code-visualizer, light on others
     const isHomePage = location.pathname === '/' || location.pathname === '/code-visualizer';
@@ -92,6 +95,9 @@ const App = () => {
                                 <Route path="/feedback" element={<Feedback />} />
                                 <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
                                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+
+                                {/* DSA Sheet Routes */}
+                                <Route path="/dsa-sheet/:problemName" element={<DSAProblemPage />} />
 
                                 {/* Dev Tools */}
                                 <Route path="/dev-sandbox" element={

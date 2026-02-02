@@ -803,3 +803,58 @@ body {
     overflow-wrap: break-word;
     hyphens: auto;
   }
+
+/* DSA Sheets Panel Animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slideOutRight {
+  animation: slideOutRight 0.25s ease-in;
+}
+
+/* DSA Floating Button Animation */
+@keyframes floatBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-float {
+  animation: floatBounce 3s ease-in-out infinite;
+}
+
+/* DSA Button Glow Effect */
+.dsa-button-glow {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+  transition: box-shadow 0.3s ease;
+}
+
+.dsa-button-glow:hover {
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.6), 0 0 60px rgba(99, 102, 241, 0.3);
+}
