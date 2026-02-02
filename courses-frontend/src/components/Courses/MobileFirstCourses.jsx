@@ -325,14 +325,40 @@ const MobileFirstCourses = () => {
 
     // Derived filtered courses for discovery mode
     const getDiscoveryCourses = () => {
-        if (!searchQuery.trim()) return allCourses;
+        const baseList = allCourses;
+        if (!searchQuery.trim()) return baseList;
         const lowerQ = searchQuery.toLowerCase();
-        return allCourses.filter(c =>
+        return baseList.filter(c =>
             c.title?.toLowerCase().includes(lowerQ) ||
             c.subject?.toLowerCase().includes(lowerQ)
         );
     };
-    const discoveryList = getDiscoveryCourses();
+    
+    const filteredDiscovery = getDiscoveryCourses();
+    const originals = filteredDiscovery.filter(c => c.source_type === 'original');
+    const curated = filteredDiscovery.filter(c => c.source_type !== 'original');
+
+    const navigateToCourse = (course) => {
+        if (course.course_type === 'school' && course.class && course.category) {
+            const classString = course.class || '';
+            const [classLevel, boardPart] = classString.split(' - ').map(s => s?.trim());
+            const subject = (course.category || '').toLowerCase();
+            const sourceType = course.source_type === 'original' ? 'originals' : 'curated';
+
+            if (classLevel && boardPart && subject) {
+                const board = boardPart.toLowerCase();
+                let path;
+                if (board === 'state') {
+                    path = `/${classLevel}/state/ts/${sourceType}/${subject}?courseId=${course.id}`;
+                } else {
+                    path = `/${classLevel}/${board}/${sourceType}/${subject}?courseId=${course.id}`;
+                }
+                navigate(path);
+                return;
+            }
+        }
+        navigate(`/${course.id}`);
+    };
 
     if (selectedLevel) {
         return (
@@ -367,100 +393,165 @@ const MobileFirstCourses = () => {
             <div className="bg-gray-50 min-h-screen pb-6">
                 <div className="container mx-auto px-4 py-6">
                     {viewMode === 'discovery' ? (
-                        // Discovery View
-                        loadingCourses ? (
-                            // Skeleton Cards for loading
-                            <div className="space-y-4">
-                                {[...Array(4)].map((_, i) => (
-                                    <div key={i} className="bg-white rounded-xl shadow-sm p-3 flex gap-3 border border-gray-100 animate-pulse">
-                                        <div className="w-24 h-24 flex-shrink-0 bg-gray-200 rounded-xl" />
-                                        <div className="flex-1 flex flex-col justify-center space-y-2">
-                                            <div className="h-3 bg-gray-200 rounded w-1/4" />
-                                            <div className="h-4 bg-gray-200 rounded w-3/4" />
-                                            <div className="h-3 bg-gray-200 rounded w-1/2" />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : discoveryList.length > 0 ? (
-                            <div className="space-y-4">
-                                {discoveryList.map((course) => (
-                                    <div
-                                        key={course.id}
-                                        onClick={() => {
-                                            // Navigate based on course_type from API
-                                            // API returns: class: "10th - state", category: "Mathematics", course_type: "school"
-                                            if (course.course_type === 'school' && course.class && course.category) {
-                                                const classString = course.class || '';
-                                                const [classLevel, boardPart] = classString.split(' - ').map(s => s?.trim());
-                                                const subject = (course.category || '').toLowerCase();
-
-                                                if (classLevel && boardPart && subject) {
-                                                    const board = boardPart.toLowerCase();
-                                                    let path;
-                                                    if (board === 'state') {
-                                                        path = `/${classLevel}/state/ts/${subject}?courseId=${course.id}`;
-                                                    } else {
-                                                        path = `/${classLevel}/${board}/${subject}?courseId=${course.id}`;
-                                                    }
-                                                    navigate(path);
-                                                    return;
-                                                }
-                                            }
-                                            // Fallback
-                                            navigate(`/${course.id}`);
-                                        }}
-                                        className="bg-white rounded-xl shadow-sm hover:shadow p-3 flex gap-3 border border-gray-100 active:scale-[0.99] transition-transform"
-                                    >
-                                        <div className="w-24 h-24 flex-shrink-0 relative">
-                                            <img
-                                                src={course.thumbnail || `https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80&text=${encodeURIComponent(course.subject || 'Course')}`}
-                                                alt={course.title}
-                                                className="w-full h-full object-cover rounded-xl"
-                                            />
-                                        </div>
-                                        <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                            {course.class && course.class !== 'Engineering' && (
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                                                        {course.class}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            <h3 className="text-sm font-bold text-gray-900 leading-tight mb-1 line-clamp-2">
-                                                {course.title}
-                                            </h3>
-                                            <p className="text-xs text-gray-500">{course.category}</p>
-                                        </div>
-                                    </div>
-                                ))}
-
-                                {/* Side-by-Side CTA Section (Mobile - Stacked) */}
-                                <div className="mt-12 mb-8 pt-8 border-t border-gray-100">
-                                    <div className="text-center">
-                                        <h3 className="text-lg font-bold text-gray-900 mb-1">
-                                            Not sure where to start?
+                        // Discovery View with Two Sections
+                        <div className="space-y-10">
+                            {/* Section 1: EasyLearnova Originals */}
+                            <section>
+                                <div className="mb-5">
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <div className="w-1 h-5 bg-indigo-500 rounded-full"></div>
+                                        <h3 className="text-lg font-bold text-gray-900">
+                                            EasyLearnova Originals
                                         </h3>
-                                        <p className="text-gray-500 text-sm mb-5">
-                                            We'll create a clear learning path for you — step by step.
-                                        </p>
-                                        <button
-                                            onClick={() => navigate('/learning-path')}
-                                            className="bg-slate-900 text-white px-6 py-3 rounded-lg font-semibold active:scale-[0.98] transition-all shadow-sm"
-                                        >
-                                            Get My Learning Path
-                                        </button>
+                                        {originals.length === 0 && (
+                                            <span className="bg-indigo-50 text-indigo-600 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                                Coming Soon
+                                            </span>
+                                        )}
                                     </div>
+                                    <p className="text-xs text-gray-400 ml-4">Expert-crafted courses by our educators</p>
+                                </div>
+
+                                {loadingCourses ? (
+                                    <div className="space-y-4">
+                                        {[...Array(2)].map((_, i) => (
+                                            <div key={i} className="bg-white rounded-xl shadow-sm p-3 flex gap-3 border border-gray-100 animate-pulse">
+                                                <div className="w-24 h-24 flex-shrink-0 bg-gray-200 rounded-xl" />
+                                                <div className="flex-1 flex flex-col justify-center space-y-2">
+                                                    <div className="h-3 bg-gray-200 rounded w-1/4" />
+                                                    <div className="h-4 bg-gray-200 rounded w-3/4" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : originals.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {originals.map((course) => (
+                                            <div
+                                                key={course.id}
+                                                onClick={() => navigateToCourse(course)}
+                                                className="bg-white rounded-xl shadow-sm hover:shadow p-3 flex gap-3 border border-indigo-100 active:scale-[0.99] transition-transform"
+                                            >
+                                                <div className="w-24 h-24 flex-shrink-0 relative">
+                                                    <img
+                                                        src={course.thumbnail}
+                                                        alt={course.title}
+                                                        className="w-full h-full object-cover rounded-xl"
+                                                    />
+                                                    <div className="absolute top-1 right-1 bg-indigo-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-sm">
+                                                        ORIGINAL
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                    {course.class && (
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                                                                {course.class}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <h3 className="text-sm font-bold text-gray-900 leading-tight mb-1 line-clamp-2">
+                                                        {course.title}
+                                                    </h3>
+                                                    <p className="text-xs text-gray-500">{course.category}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="bg-gradient-to-br from-indigo-50/50 to-white rounded-xl border border-indigo-100/50 py-8 px-4 text-center">
+                                        <p className="text-xs text-gray-500 leading-relaxed">
+                                            Original courses created by EasyLearnova, with structured lessons and clear explanations.
+                                        </p>
+                                    </div>
+                                )}
+                            </section>
+
+                            {/* Section 2: YouTube Curated */}
+                            <section>
+                                <div className="mb-5">
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <div className="w-1 h-5 bg-gray-400 rounded-full"></div>
+                                        <h3 className="text-lg font-bold text-gray-900">
+                                            YouTube Curated
+                                        </h3>
+                                    </div>
+                                    <p className="text-xs text-gray-400 ml-4">Playlists from top educators across YouTube</p>
+                                </div>
+
+                                {loadingCourses ? (
+                                    <div className="space-y-4">
+                                        {[...Array(3)].map((_, i) => (
+                                            <div key={i} className="bg-white rounded-xl shadow-sm p-3 flex gap-3 border border-gray-100 animate-pulse">
+                                                <div className="w-24 h-24 flex-shrink-0 bg-gray-200 rounded-xl" />
+                                                <div className="flex-1 flex flex-col justify-center space-y-2">
+                                                    <div className="h-3 bg-gray-200 rounded w-1/4" />
+                                                    <div className="h-4 bg-gray-200 rounded w-3/4" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : curated.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {curated.map((course) => (
+                                            <div
+                                                key={course.id}
+                                                onClick={() => navigateToCourse(course)}
+                                                className="bg-white rounded-xl shadow-sm hover:shadow p-3 flex gap-3 border border-gray-100 active:scale-[0.99] transition-transform"
+                                            >
+                                                <div className="w-24 h-24 flex-shrink-0 relative">
+                                                    <img
+                                                        src={course.thumbnail || `https://images.unsplash.com/photo-1635070041078-e363dbe005cb?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80&text=${encodeURIComponent(course.subject || 'Course')}`}
+                                                        alt={course.title}
+                                                        className="w-full h-full object-cover rounded-xl opacity-90"
+                                                    />
+                                                    <div className="absolute top-1 right-1 bg-gray-900/80 text-white text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                                                        <span>▶</span> <span>CURATED</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                    {course.class && (
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
+                                                                {course.class}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <h3 className="text-sm font-bold text-gray-900 leading-tight mb-1 line-clamp-2">
+                                                        {course.title}
+                                                    </h3>
+                                                    <p className="text-xs text-gray-500">{course.category}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-200">
+                                        <div className="text-gray-300 text-4xl mb-3">🔍</div>
+                                        <h3 className="text-sm font-semibold text-gray-900 mb-1">No courses found</h3>
+                                        <p className="text-xs text-gray-500 px-6">Check back later for new content or try a different search.</p>
+                                    </div>
+                                )}
+                            </section>
+
+                            {/* Side-by-Side CTA Section (Mobile - Stacked) */}
+                            <div className="mt-12 mb-8 pt-8 border-t border-gray-100">
+                                <div className="text-center">
+                                    <h3 className="text-lg font-bold text-gray-900 mb-1">
+                                        Not sure where to start?
+                                    </h3>
+                                    <p className="text-gray-500 text-sm mb-5">
+                                        We'll create a clear learning path for you — step by step.
+                                    </p>
+                                    <button
+                                        onClick={() => navigate('/learning-path')}
+                                        className="bg-slate-900 text-white px-6 py-3 rounded-lg font-semibold active:scale-[0.98] transition-all shadow-sm"
+                                    >
+                                        Get My Learning Path
+                                    </button>
                                 </div>
                             </div>
-                        ) : (
-                            <div className="text-center py-12">
-                                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                                    <FaSearch className="w-6 h-6 text-gray-400" />
-                                </div>
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">No courses found</h3>
-                            </div>
-                        )
+                        </div>
                     ) : (
                         // By Class View (Existing Mobile Logic)
                         loading ? (
