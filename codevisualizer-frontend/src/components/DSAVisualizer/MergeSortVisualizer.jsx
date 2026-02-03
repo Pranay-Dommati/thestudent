@@ -395,14 +395,6 @@ const MergeSortVisualizer = ({
 
     return (
         <div className="flex flex-col h-full bg-slate-900 text-white">
-            {/* Step Info Header */}
-            <div className="px-6 py-4 border-b border-slate-700 bg-slate-800/50">
-                <StepInfoPanel
-                    step={currentStep}
-                    stepIndex={currentStepIndex}
-                    totalSteps={steps.length}
-                />
-            </div>
 
             {/* Main Visualization Canvas */}
             <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-auto">
@@ -575,8 +567,559 @@ const MergeSortVisualizer = ({
                             </motion.div>
                         )}
 
-                        {/* Main Array Display (for non-call_function steps) */}
-                        {stepType !== 'call_function' && mainArray.length > 0 && (
+                        {/* Special Animation for Base Case Check */}
+                        {stepType === 'check_base' && (
+                            <motion.div
+                                className="flex flex-col items-center gap-6"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                {/* Step-by-step expression evaluation */}
+                                <div className="flex flex-col items-center gap-4 font-mono text-lg">
+                                    {/* Original expression */}
+                                    <motion.div
+                                        className="flex items-center gap-2"
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.2 }}
+                                    >
+                                        <span className="text-purple-400 font-bold">if</span>
+                                        <span className="text-amber-400">len</span>
+                                        <span className="text-slate-400">(</span>
+                                        <span className="text-blue-400">arr</span>
+                                        <span className="text-slate-400">)</span>
+                                        <span className="text-slate-500">&lt;=</span>
+                                        <span className="text-emerald-400">1</span>
+                                        <span className="text-slate-400">:</span>
+                                    </motion.div>
+
+                                    {/* Arrow 1 */}
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 0.6 }}
+                                        className="text-slate-500"
+                                    >
+                                        ↓
+                                    </motion.div>
+
+                                    {/* Expanded len with array */}
+                                    <motion.div
+                                        className="flex items-center gap-2"
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 0.8 }}
+                                    >
+                                        <span className="text-purple-400 font-bold">if</span>
+                                        <span className="text-amber-400">len</span>
+                                        <span className="text-slate-400">(</span>
+                                        <motion.span
+                                            className="text-emerald-400 text-sm px-2 py-1 bg-emerald-500/10 rounded"
+                                            animate={{
+                                                boxShadow: ['0 0 0px #10b981', '0 0 15px #10b981', '0 0 0px #10b981']
+                                            }}
+                                            transition={{ duration: 1.5, repeat: Infinity }}
+                                        >
+                                            [{mainArray.join(', ')}]
+                                        </motion.span>
+                                        <span className="text-slate-400">)</span>
+                                        <span className="text-slate-500">&lt;=</span>
+                                        <span className="text-emerald-400">1</span>
+                                    </motion.div>
+
+                                    {/* Arrow 2 */}
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 1.4 }}
+                                        className="text-slate-500"
+                                    >
+                                        ↓
+                                    </motion.div>
+
+                                    {/* Length computed */}
+                                    <motion.div
+                                        className="flex items-center gap-2"
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 1.6 }}
+                                    >
+                                        <span className="text-purple-400 font-bold">if</span>
+                                        <motion.span
+                                            className="text-xl font-bold text-cyan-400 px-3 py-1 bg-cyan-500/10 rounded-lg"
+                                            animate={{
+                                                scale: [1, 1.1, 1],
+                                                boxShadow: ['0 0 0px #22d3ee', '0 0 20px #22d3ee', '0 0 0px #22d3ee']
+                                            }}
+                                            transition={{ duration: 0.5, delay: 1.8 }}
+                                        >
+                                            {mainArray.length}
+                                        </motion.span>
+                                        <span className="text-slate-500">&lt;=</span>
+                                        <span className="text-emerald-400">1</span>
+                                    </motion.div>
+
+                                    {/* Arrow 3 */}
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 2.2 }}
+                                        className="text-slate-500"
+                                    >
+                                        ↓
+                                    </motion.div>
+
+                                    {/* Final result */}
+                                    <motion.div
+                                        className="flex items-center gap-3"
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 2.4, type: "spring", stiffness: 200 }}
+                                    >
+                                        <span className="text-slate-400">{mainArray.length} &lt;= 1</span>
+                                        <span className="text-slate-500">=</span>
+                                        <motion.span
+                                            className={`text-xl font-bold px-4 py-2 rounded-xl ${mainArray.length <= 1
+                                                ? 'text-emerald-400 bg-emerald-500/20 border border-emerald-500/30'
+                                                : 'text-red-400 bg-red-500/20 border border-red-500/30'
+                                                }`}
+                                            animate={{
+                                                scale: [1, 1.15, 1]
+                                            }}
+                                            transition={{ delay: 2.6, duration: 0.3 }}
+                                        >
+                                            {mainArray.length <= 1 ? '✓ True' : '✗ False'}
+                                        </motion.span>
+                                    </motion.div>
+
+                                    {/* Explanation */}
+                                    <motion.div
+                                        className="mt-4 text-sm text-slate-400 text-center max-w-md"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 3 }}
+                                    >
+                                        {mainArray.length <= 1
+                                            ? '✅ Base case reached! Array has 0 or 1 elements, so it\'s already sorted.'
+                                            : '❌ Not a base case. Array has more than 1 element, continue dividing...'
+                                        }
+                                    </motion.div>
+                                </div>
+
+                                {/* The array below */}
+                                <motion.div
+                                    className="mt-4"
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.5 }}
+                                >
+                                    <div className="flex flex-col items-center gap-2">
+                                        <span className="text-xs text-slate-500 uppercase">Current Array (arr)</span>
+                                        <ArrayRow
+                                            id="base-check-array"
+                                            data={mainArray}
+                                            state="active"
+                                            highlightIndices={[]}
+                                        />
+                                        <span className="text-xs text-cyan-400">length = {mainArray.length}</span>
+                                    </div>
+                                </motion.div>
+                            </motion.div>
+                        )}
+
+                        {/* Special Animation for Split Left: left = arr[:mid] */}
+                        {stepType === 'split_left' && mid !== undefined && (
+                            <motion.div
+                                className="flex flex-col items-center gap-6"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                {/* Code expression evaluation */}
+                                <div className="flex flex-col items-center gap-3 font-mono">
+                                    {/* Original expression */}
+                                    <motion.div
+                                        className="flex items-center gap-2 text-lg"
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.2 }}
+                                    >
+                                        <span className="text-blue-400 font-bold">left</span>
+                                        <span className="text-slate-500">=</span>
+                                        <span className="text-amber-400">arr</span>
+                                        <span className="text-slate-400">[</span>
+                                        <span className="text-slate-400">:</span>
+                                        <span className="text-purple-400">mid</span>
+                                        <span className="text-slate-400">]</span>
+                                    </motion.div>
+
+                                    {/* Arrow */}
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 0.5 }}
+                                        className="text-slate-500"
+                                    >
+                                        ↓
+                                    </motion.div>
+
+                                    {/* Expanded with mid value */}
+                                    <motion.div
+                                        className="flex items-center gap-2 text-lg"
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 0.7 }}
+                                    >
+                                        <span className="text-blue-400 font-bold">left</span>
+                                        <span className="text-slate-500">=</span>
+                                        <span className="text-amber-400">arr</span>
+                                        <span className="text-slate-400">[</span>
+                                        <span className="text-emerald-400">0</span>
+                                        <span className="text-slate-400">:</span>
+                                        <motion.span
+                                            className="text-purple-400 font-bold px-2 py-0.5 bg-purple-500/20 rounded"
+                                            animate={{
+                                                boxShadow: ['0 0 0px #a855f7', '0 0 15px #a855f7', '0 0 0px #a855f7']
+                                            }}
+                                            transition={{ duration: 1.5, repeat: Infinity }}
+                                        >
+                                            {mid}
+                                        </motion.span>
+                                        <span className="text-slate-400">]</span>
+                                    </motion.div>
+                                </div>
+
+                                {/* Main array with extraction animation */}
+                                <motion.div
+                                    className="flex flex-col items-center gap-4 mt-4"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 0.4 }}
+                                >
+                                    <span className="text-xs text-slate-500 uppercase">Original Array (arr)</span>
+
+                                    {/* Array with highlighted left portion */}
+                                    <div className="flex items-center gap-1">
+                                        {mainArray.map((val, idx) => (
+                                            <motion.div
+                                                key={`main-${idx}`}
+                                                className={`w-12 h-12 flex items-center justify-center rounded-lg font-bold text-lg border-2 ${idx < mid
+                                                    ? 'bg-blue-600 border-blue-400 text-white'
+                                                    : 'bg-slate-700 border-slate-600 text-slate-400'
+                                                    }`}
+                                                initial={{ scale: 1 }}
+                                                animate={idx < mid ? {
+                                                    scale: [1, 1.1, 1],
+                                                    boxShadow: ['0 0 0px #3b82f6', '0 0 20px #3b82f6', '0 0 0px #3b82f6']
+                                                } : {}}
+                                                transition={{ delay: 1 + idx * 0.1, duration: 0.4 }}
+                                            >
+                                                {val}
+                                            </motion.div>
+                                        ))}
+                                    </div>
+
+                                    {/* Index markers */}
+                                    <div className="flex items-center gap-1">
+                                        {mainArray.map((_, idx) => (
+                                            <div
+                                                key={`idx-${idx}`}
+                                                className={`w-12 text-center text-xs ${idx < mid ? 'text-blue-400' : 'text-slate-600'
+                                                    }`}
+                                            >
+                                                [{idx}]
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Slice indicator */}
+                                    <motion.div
+                                        className="flex items-center gap-2 text-sm"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 0.9 }}
+                                    >
+                                        <span className="text-blue-400">← indices 0 to {mid - 1}</span>
+                                        <span className="text-slate-600">|</span>
+                                        <span className="text-slate-500">indices {mid} to {mainArray.length - 1} →</span>
+                                    </motion.div>
+                                </motion.div>
+
+                                {/* Animated extraction arrow */}
+                                <motion.div
+                                    className="flex flex-col items-center"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 1.5 }}
+                                >
+                                    <motion.div
+                                        animate={{ y: [0, 8, 0] }}
+                                        transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                                        className="text-blue-400 text-2xl"
+                                    >
+                                        ↓
+                                    </motion.div>
+                                    <motion.span
+                                        className="text-xs text-blue-300"
+                                        animate={{ opacity: [0.5, 1, 0.5] }}
+                                        transition={{ duration: 1.5, repeat: Infinity }}
+                                    >
+                                        extracting left half
+                                    </motion.span>
+                                </motion.div>
+
+                                {/* Resulting left array */}
+                                <motion.div
+                                    className="flex flex-col items-center gap-2"
+                                    initial={{ opacity: 0, y: 30 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 1.8, type: "spring", stiffness: 150 }}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <motion.span
+                                            className="text-blue-400 font-bold font-mono"
+                                            animate={{
+                                                textShadow: ['0 0 0px #60a5fa', '0 0 10px #60a5fa', '0 0 0px #60a5fa']
+                                            }}
+                                            transition={{ duration: 2, repeat: Infinity }}
+                                        >
+                                            left
+                                        </motion.span>
+                                        <span className="text-slate-500">=</span>
+                                    </div>
+
+                                    {/* Animated elements moving in */}
+                                    <div className="flex items-center gap-1">
+                                        {mainArray.slice(0, mid).map((val, idx) => (
+                                            <motion.div
+                                                key={`left-${idx}`}
+                                                className="w-12 h-12 flex items-center justify-center rounded-lg font-bold text-lg bg-blue-600 border-2 border-blue-400 text-white"
+                                                initial={{ opacity: 0, y: -30, scale: 0.5 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                transition={{
+                                                    delay: 2 + idx * 0.15,
+                                                    type: "spring",
+                                                    stiffness: 200
+                                                }}
+                                            >
+                                                {val}
+                                            </motion.div>
+                                        ))}
+                                    </div>
+
+                                    {/* Result code */}
+                                    <motion.div
+                                        className="mt-2 font-mono text-sm px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 2.5 }}
+                                    >
+                                        <span className="text-blue-400">left</span>
+                                        <span className="text-slate-500"> = </span>
+                                        <span className="text-emerald-400">[{mainArray.slice(0, mid).join(', ')}]</span>
+                                    </motion.div>
+                                </motion.div>
+                            </motion.div>
+                        )}
+
+                        {/* Special Animation for Split Right: right = arr[mid:] */}
+                        {stepType === 'split_right' && mid !== undefined && (
+                            <motion.div
+                                className="flex flex-col items-center gap-6"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                {/* Code expression evaluation */}
+                                <div className="flex flex-col items-center gap-3 font-mono">
+                                    {/* Original expression */}
+                                    <motion.div
+                                        className="flex items-center gap-2 text-lg"
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.2 }}
+                                    >
+                                        <span className="text-orange-400 font-bold">right</span>
+                                        <span className="text-slate-500">=</span>
+                                        <span className="text-amber-400">arr</span>
+                                        <span className="text-slate-400">[</span>
+                                        <span className="text-purple-400">mid</span>
+                                        <span className="text-slate-400">:</span>
+                                        <span className="text-slate-400">]</span>
+                                    </motion.div>
+
+                                    {/* Arrow */}
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 0.5 }}
+                                        className="text-slate-500"
+                                    >
+                                        ↓
+                                    </motion.div>
+
+                                    {/* Expanded with mid value */}
+                                    <motion.div
+                                        className="flex items-center gap-2 text-lg"
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 0.7 }}
+                                    >
+                                        <span className="text-orange-400 font-bold">right</span>
+                                        <span className="text-slate-500">=</span>
+                                        <span className="text-amber-400">arr</span>
+                                        <span className="text-slate-400">[</span>
+                                        <motion.span
+                                            className="text-purple-400 font-bold px-2 py-0.5 bg-purple-500/20 rounded"
+                                            animate={{
+                                                boxShadow: ['0 0 0px #a855f7', '0 0 15px #a855f7', '0 0 0px #a855f7']
+                                            }}
+                                            transition={{ duration: 1.5, repeat: Infinity }}
+                                        >
+                                            {mid}
+                                        </motion.span>
+                                        <span className="text-slate-400">:</span>
+                                        <span className="text-emerald-400">{mainArray.length}</span>
+                                        <span className="text-slate-400">]</span>
+                                    </motion.div>
+                                </div>
+
+                                {/* Main array with extraction animation */}
+                                <motion.div
+                                    className="flex flex-col items-center gap-4 mt-4"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 0.4 }}
+                                >
+                                    <span className="text-xs text-slate-500 uppercase">Original Array (arr)</span>
+
+                                    {/* Array with highlighted right portion */}
+                                    <div className="flex items-center gap-1">
+                                        {mainArray.map((val, idx) => (
+                                            <motion.div
+                                                key={`main-${idx}`}
+                                                className={`w-12 h-12 flex items-center justify-center rounded-lg font-bold text-lg border-2 ${idx >= mid
+                                                    ? 'bg-orange-600 border-orange-400 text-white'
+                                                    : 'bg-slate-700 border-slate-600 text-slate-400'
+                                                    }`}
+                                                initial={{ scale: 1 }}
+                                                animate={idx >= mid ? {
+                                                    scale: [1, 1.1, 1],
+                                                    boxShadow: ['0 0 0px #ea580c', '0 0 20px #ea580c', '0 0 0px #ea580c']
+                                                } : {}}
+                                                transition={{ delay: 1 + (idx - mid) * 0.1, duration: 0.4 }}
+                                            >
+                                                {val}
+                                            </motion.div>
+                                        ))}
+                                    </div>
+
+                                    {/* Index markers */}
+                                    <div className="flex items-center gap-1">
+                                        {mainArray.map((_, idx) => (
+                                            <div
+                                                key={`idx-${idx}`}
+                                                className={`w-12 text-center text-xs ${idx >= mid ? 'text-orange-400' : 'text-slate-600'
+                                                    }`}
+                                            >
+                                                [{idx}]
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Slice indicator */}
+                                    <motion.div
+                                        className="flex items-center gap-2 text-sm"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 0.9 }}
+                                    >
+                                        <span className="text-slate-500">← indices 0 to {mid - 1}</span>
+                                        <span className="text-slate-600">|</span>
+                                        <span className="text-orange-400">indices {mid} to {mainArray.length - 1} →</span>
+                                    </motion.div>
+                                </motion.div>
+
+                                {/* Animated extraction arrow */}
+                                <motion.div
+                                    className="flex flex-col items-center"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 1.5 }}
+                                >
+                                    <motion.div
+                                        animate={{ y: [0, 8, 0] }}
+                                        transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                                        className="text-orange-400 text-2xl"
+                                    >
+                                        ↓
+                                    </motion.div>
+                                    <motion.span
+                                        className="text-xs text-orange-300"
+                                        animate={{ opacity: [0.5, 1, 0.5] }}
+                                        transition={{ duration: 1.5, repeat: Infinity }}
+                                    >
+                                        extracting right half
+                                    </motion.span>
+                                </motion.div>
+
+                                {/* Resulting right array */}
+                                <motion.div
+                                    className="flex flex-col items-center gap-2"
+                                    initial={{ opacity: 0, y: 30 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 1.8, type: "spring", stiffness: 150 }}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <motion.span
+                                            className="text-orange-400 font-bold font-mono"
+                                            animate={{
+                                                textShadow: ['0 0 0px #fb923c', '0 0 10px #fb923c', '0 0 0px #fb923c']
+                                            }}
+                                            transition={{ duration: 2, repeat: Infinity }}
+                                        >
+                                            right
+                                        </motion.span>
+                                        <span className="text-slate-500">=</span>
+                                    </div>
+
+                                    {/* Animated elements moving in */}
+                                    <div className="flex items-center gap-1">
+                                        {mainArray.slice(mid).map((val, idx) => (
+                                            <motion.div
+                                                key={`right-${idx}`}
+                                                className="w-12 h-12 flex items-center justify-center rounded-lg font-bold text-lg bg-orange-600 border-2 border-orange-400 text-white"
+                                                initial={{ opacity: 0, y: -30, scale: 0.5 }}
+                                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                transition={{
+                                                    delay: 2 + idx * 0.15,
+                                                    type: "spring",
+                                                    stiffness: 200
+                                                }}
+                                            >
+                                                {val}
+                                            </motion.div>
+                                        ))}
+                                    </div>
+
+                                    {/* Result code */}
+                                    <motion.div
+                                        className="mt-2 font-mono text-sm px-4 py-2 bg-orange-500/10 border border-orange-500/30 rounded-lg"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 2.5 }}
+                                    >
+                                        <span className="text-orange-400">right</span>
+                                        <span className="text-slate-500"> = </span>
+                                        <span className="text-emerald-400">[{mainArray.slice(mid).join(', ')}]</span>
+                                    </motion.div>
+                                </motion.div>
+                            </motion.div>
+                        )}
+
+                        {/* Main Array Display (for standard steps) */}
+                        {stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && mainArray.length > 0 && (
                             <div className="flex flex-col items-center gap-2">
                                 <span className="text-xs text-slate-500 uppercase">Current Array (arr)</span>
                                 <ArrayRow
@@ -597,8 +1140,8 @@ const MergeSortVisualizer = ({
                             </div>
                         )}
 
-                        {/* Split View: Left and Right Arrays */}
-                        {(leftArray || rightArray) && (
+                        {/* Split View: Left and Right Arrays (hide during split animations) */}
+                        {stepType !== 'split_left' && stepType !== 'split_right' && (leftArray || rightArray) && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
