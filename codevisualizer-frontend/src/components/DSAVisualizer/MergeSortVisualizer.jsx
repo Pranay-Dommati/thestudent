@@ -288,7 +288,12 @@ const MergeSortVisualizer = ({
 
     // Analyze the code line to determine what type of action this is
     const getStepType = () => {
+        // Check if the step already has a stepType property (e.g., synthetic init step)
+        if (currentStep?.stepType) return currentStep.stepType;
+
         if (!code) return 'initial';
+        // Check for array initialization line first
+        if (code.includes('arr = [') && code.includes(']')) return 'init_array';
         if (code.includes('if len(arr)') || code.includes('len(arr) <= 1')) return 'check_base';
         if (code.includes('return arr') && !code.includes('merge')) return 'return_base';
         if (code.includes('mid =') || code.includes('len(arr) //')) return 'compute_mid';
@@ -329,12 +334,57 @@ const MergeSortVisualizer = ({
         return null;
     };
 
-    // Get display arrays based on what's available
+    // PREDICTIVE ANIMATION: Extract values from explanation or next step
+    // The backend captures state BEFORE line execution, so we need to "look ahead"
+    const explanation = currentStep?.explanation || '';
+    const nextStep = steps[currentStepIndex + 1];
+    const nextVars = nextStep?.variables || nextStep?.locals || {};
+
+    // Parse explanation to extract computed values
+    // Example: "... mid = 7 // 2 → mid = 3" → extract mid = 3
+    const parseResultFromExplanation = (name) => {
+        // Look for patterns like "→ name = value" or "name = value"
+        const regex = new RegExp(`→\\s*${name}\\s*=\\s*([\\d\\-]+|\\[[^\\]]*\\])`, 'i');
+        const match = explanation.match(regex);
+        if (match) {
+            const val = match[1];
+            if (val.startsWith('[')) {
+                // It's an array - parse it
+                try {
+                    return JSON.parse(val.replace(/'/g, '"'));
+                } catch { return null; }
+            }
+            return parseInt(val, 10);
+        }
+        return undefined;
+    };
+
+    // Get the "predicted" value - either from explanation or next step's variables
+    const getPredictedValue = (name) => {
+        // First try to parse from explanation
+        const fromExplanation = parseResultFromExplanation(name);
+        if (fromExplanation !== undefined) return fromExplanation;
+        // Fall back to next step's variables (which has the result after current line runs)
+        return getValue(nextVars[name]);
+    };
+
+    const getPredictedArray = (name) => {
+        // First try to parse from explanation
+        const fromExplanation = parseResultFromExplanation(name);
+        if (Array.isArray(fromExplanation)) return fromExplanation;
+        // Fall back to next step's variables
+        return getArray(nextVars[name]);
+    };
+
+    // Get display arrays - use CURRENT vars for existing data, PREDICTED for new data
     let mainArray = getArray(currentVars.arr) || [];
     if (mainArray.length === 0 && steps.length > 0) mainArray = [38, 27, 43, 3, 9, 82, 10]; // Default
 
-    const leftArray = getArray(currentVars.left);
-    const rightArray = getArray(currentVars.right);
+    // For mid, left, right - use PREDICTED values based on step type
+    // This shows the RESULT of the current line immediately
+    const mid = stepType === 'compute_mid' ? getPredictedValue('mid') : getValue(currentVars.mid);
+    const leftArray = stepType === 'split_left' ? getPredictedArray('left') : getArray(currentVars.left);
+    const rightArray = stepType === 'split_right' ? getPredictedArray('right') : getArray(currentVars.right);
     const resultArray = getArray(currentVars.result);
     const leftSorted = getArray(currentVars.left_sorted);
     const rightSorted = getArray(currentVars.right_sorted);
@@ -342,7 +392,6 @@ const MergeSortVisualizer = ({
     // Get pointers for comparison highlighting (extract raw values)
     const iPtr = getValue(currentVars.i);
     const jPtr = getValue(currentVars.j);
-    const mid = getValue(currentVars.mid);
 
     return (
         <div className="flex flex-col h-full bg-slate-900 text-white">
@@ -373,13 +422,16 @@ const MergeSortVisualizer = ({
                                 backgroundColor: stepType.includes('compare') ? '#f59e0b22' :
                                     stepType.includes('split') || stepType.includes('left') || stepType.includes('right') ? '#3b82f622' :
                                         stepType.includes('merge') || stepType.includes('result') || stepType.includes('append') ? '#10b98122' :
-                                            stepType.includes('return') ? '#8b5cf622' : '#64748b22',
+                                            stepType.includes('return') ? '#8b5cf622' :
+                                                stepType === 'init_array' ? '#22c55e22' : '#64748b22',
                                 color: stepType.includes('compare') ? '#fbbf24' :
                                     stepType.includes('split') || stepType.includes('left') || stepType.includes('right') ? '#60a5fa' :
                                         stepType.includes('merge') || stepType.includes('result') || stepType.includes('append') ? '#34d399' :
-                                            stepType.includes('return') ? '#a78bfa' : '#94a3b8'
+                                            stepType.includes('return') ? '#a78bfa' :
+                                                stepType === 'init_array' ? '#4ade80' : '#94a3b8'
                             }}
                         >
+                            {stepType === 'init_array' && '📊 Creating Initial Array'}
                             {stepType === 'check_base' && '🔍 Checking Base Case'}
                             {stepType === 'return_base' && '↩️ Base Case: Already Sorted'}
                             {stepType === 'compute_mid' && '📐 Computing Midpoint'}

@@ -8,7 +8,7 @@
  * Uses same layout as ImmersiveVisualizer but with custom visualization
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
 import MergeSortVisualizer from './MergeSortVisualizer';
@@ -152,8 +152,27 @@ const DSAImmersiveVisualizer = ({
     const [executedLines, setExecutedLines] = useState([]);
     const [isPlaying, setIsPlaying] = useState(false);
 
-    // Get current step
-    const currentStep = steps[currentStepIndex];
+    // Create initialization step for array creation
+    // This shows before the actual trace begins
+    const initStep = {
+        lineNumber: 40, // Line number where arr = [...] is in the code
+        line_no: 40,
+        code: 'arr = [38, 27, 43, 3, 9, 82, 10]',
+        explanation: 'Creating the initial unsorted array that we will sort using merge sort.',
+        variables: {
+            arr: [38, 27, 43, 3, 9, 82, 10]
+        },
+        stepType: 'init_array'
+    };
+
+    // Prepend the initialization step to the steps array
+    const allSteps = useMemo(() => {
+        if (steps.length === 0) return [];
+        return [initStep, ...steps];
+    }, [steps]);
+
+    // Get current step from allSteps (includes init step)
+    const currentStep = allSteps[currentStepIndex];
     const currentLineNumber = currentStep?.lineNumber || currentStep?.line_no || 0;
 
     // Track executed lines
@@ -180,25 +199,25 @@ const DSAImmersiveVisualizer = ({
 
     // Handle step change
     const handleStepChange = useCallback((newIndex) => {
-        if (newIndex >= 0 && newIndex < steps.length) {
+        if (newIndex >= 0 && newIndex < allSteps.length) {
             setCurrentStepIndex(newIndex);
             // Rebuild executed lines for the new index
-            const newExecutedLines = steps.slice(0, newIndex + 1).map(s => s.lineNumber || s.line_no).filter(Boolean);
+            const newExecutedLines = allSteps.slice(0, newIndex + 1).map(s => s.lineNumber || s.line_no).filter(Boolean);
             setExecutedLines([...new Set(newExecutedLines)]);
         }
-    }, [steps]);
+    }, [allSteps]);
 
     // Auto-play
     useEffect(() => {
-        if (isPlaying && currentStepIndex < steps.length - 1) {
+        if (isPlaying && currentStepIndex < allSteps.length - 1) {
             const timer = setTimeout(() => {
                 handleStepChange(currentStepIndex + 1);
             }, 1500);
             return () => clearTimeout(timer);
-        } else if (isPlaying && currentStepIndex >= steps.length - 1) {
+        } else if (isPlaying && currentStepIndex >= allSteps.length - 1) {
             setIsPlaying(false);
         }
-    }, [isPlaying, currentStepIndex, steps.length, handleStepChange]);
+    }, [isPlaying, currentStepIndex, allSteps.length, handleStepChange]);
 
     // Keyboard controls
     useEffect(() => {
@@ -279,7 +298,7 @@ const DSAImmersiveVisualizer = ({
                         </div>
                     ) : (
                         <MergeSortVisualizer
-                            steps={steps}
+                            steps={allSteps}
                             currentStepIndex={currentStepIndex}
                             onStepChange={handleStepChange}
                             isPlaying={isPlaying}
