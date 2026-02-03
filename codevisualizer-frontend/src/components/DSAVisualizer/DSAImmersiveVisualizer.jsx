@@ -145,31 +145,89 @@ const DSAImmersiveVisualizer = ({
     code = '',
     isLoading = false,
     loadingPhase = 0,
-    algorithmType = 'merge-sort'
+    algorithmType = 'merge-sort',
+    customArray = '[38, 27, 43, 3, 9, 82, 10]',
+    onRerun = null // Callback to rerun with new array: (arrayString) => void
 }) => {
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [showCodePanel, setShowCodePanel] = useState(true);
     const [executedLines, setExecutedLines] = useState([]);
     const [isPlaying, setIsPlaying] = useState(false);
 
-    // Create initialization step for array creation
-    // This shows before the actual trace begins
-    const initStep = {
-        lineNumber: 40, // Line number where arr = [...] is in the code
-        line_no: 40,
-        code: 'arr = [38, 27, 43, 3, 9, 82, 10]',
-        explanation: 'Creating the initial unsorted array that we will sort using merge sort.',
-        variables: {
-            arr: [38, 27, 43, 3, 9, 82, 10]
-        },
-        stepType: 'init_array'
+    // Local array input state for inline editing
+    const [localArrayInput, setLocalArrayInput] = useState(customArray);
+    const [inputError, setInputError] = useState('');
+    const [showInputPanel, setShowInputPanel] = useState(false);
+
+    // Update local input when prop changes
+    useEffect(() => {
+        setLocalArrayInput(customArray);
+    }, [customArray]);
+
+    // Validate array input
+    const validateInput = (input) => {
+        const trimmed = input.trim();
+        if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) return 'Invalid format';
+        const inner = trimmed.slice(1, -1).trim();
+        if (!inner) return 'Empty array';
+        const parts = inner.split(',').map(p => p.trim());
+        for (const part of parts) {
+            if (!/^-?\d+$/.test(part)) return `Invalid: ${part}`;
+        }
+        if (parts.length > 15) return 'Max 15 elements';
+        return '';
     };
 
-    // Prepend the initialization step to the steps array
+    const handleInputChange = (e) => {
+        const value = e.target.value;
+        setLocalArrayInput(value);
+        setInputError(validateInput(value));
+    };
+
+    const handleRerun = () => {
+        if (!inputError && onRerun) {
+            setShowInputPanel(false);
+            onRerun(localArrayInput);
+        }
+    };
+
+    // Create initialization step for array creation
+    // This shows before the actual trace begins - uses the custom array
+    const parseArrayFromString = (str) => {
+        try {
+            const inner = str.trim().slice(1, -1);
+            return inner.split(',').map(p => parseInt(p.trim(), 10));
+        } catch { return [38, 27, 43, 3, 9, 82, 10]; }
+    };
+
+    const initStep = useMemo(() => ({
+        lineNumber: 39, // Line 39 is where arr = [...] is defined
+        line_no: 39,
+        code: `arr = ${customArray}`,
+        explanation: 'Creating the initial unsorted array that we will sort using merge sort.',
+        variables: {
+            arr: parseArrayFromString(customArray)
+        },
+        stepType: 'init_array'
+    }), [customArray]);
+
+    // Second synthetic step for the function call line (which tracer skips)
+    const callStep = useMemo(() => ({
+        lineNumber: 40, // Line 40 is where result = merge_sort(arr) is called
+        line_no: 40,
+        code: 'result = merge_sort(arr)',
+        explanation: 'Calling the merge_sort function with our array. This will recursively divide and conquer the array.',
+        variables: {
+            arr: parseArrayFromString(customArray)
+        },
+        stepType: 'call_function'
+    }), [customArray]);
+
+    // Prepend the initialization steps to the steps array
     const allSteps = useMemo(() => {
         if (steps.length === 0) return [];
-        return [initStep, ...steps];
-    }, [steps]);
+        return [initStep, callStep, ...steps];
+    }, [steps, initStep, callStep]);
 
     // Get current step from allSteps (includes init step)
     const currentStep = allSteps[currentStepIndex];
@@ -258,6 +316,52 @@ const DSAImmersiveVisualizer = ({
                         <Sparkles className="w-4 h-4 text-amber-400" />
                         Merge Sort Visualizer
                     </h1>
+                </div>
+
+                {/* Center: Array Input */}
+                <div className="flex items-center gap-3">
+                    {showInputPanel ? (
+                        <div className="flex items-center gap-2 bg-slate-700/50 rounded-xl px-3 py-1.5">
+                            <span className="text-slate-400 text-sm">arr =</span>
+                            <input
+                                type="text"
+                                value={localArrayInput}
+                                onChange={handleInputChange}
+                                className={`w-48 px-2 py-1 bg-slate-900 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/50' : 'border-slate-600 focus:border-blue-500'
+                                    }`}
+                                placeholder="[1, 2, 3]"
+                            />
+                            {inputError && (
+                                <span className="text-red-400 text-xs">{inputError}</span>
+                            )}
+                            <button
+                                onClick={handleRerun}
+                                disabled={!!inputError || !onRerun}
+                                className={`px-3 py-1 text-sm font-medium rounded-lg transition-all ${inputError || !onRerun
+                                    ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                    }`}
+                            >
+                                ▶ Run
+                            </button>
+                            <button
+                                onClick={() => setShowInputPanel(false)}
+                                className="text-slate-400 hover:text-white text-sm"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    ) : (
+                        onRerun && (
+                            <button
+                                onClick={() => setShowInputPanel(true)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg text-sm font-medium transition-all"
+                            >
+                                <span className="text-amber-400">✎</span>
+                                Change Input
+                            </button>
+                        )
+                    )}
                 </div>
 
                 <div className="flex items-center gap-3">

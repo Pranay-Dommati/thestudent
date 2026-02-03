@@ -423,15 +423,18 @@ const MergeSortVisualizer = ({
                                     stepType.includes('split') || stepType.includes('left') || stepType.includes('right') ? '#3b82f622' :
                                         stepType.includes('merge') || stepType.includes('result') || stepType.includes('append') ? '#10b98122' :
                                             stepType.includes('return') ? '#8b5cf622' :
-                                                stepType === 'init_array' ? '#22c55e22' : '#64748b22',
+                                                stepType === 'init_array' ? '#22c55e22' :
+                                                    stepType === 'call_function' ? '#6366f122' : '#64748b22',
                                 color: stepType.includes('compare') ? '#fbbf24' :
                                     stepType.includes('split') || stepType.includes('left') || stepType.includes('right') ? '#60a5fa' :
                                         stepType.includes('merge') || stepType.includes('result') || stepType.includes('append') ? '#34d399' :
                                             stepType.includes('return') ? '#a78bfa' :
-                                                stepType === 'init_array' ? '#4ade80' : '#94a3b8'
+                                                stepType === 'init_array' ? '#4ade80' :
+                                                    stepType === 'call_function' ? '#a5b4fc' : '#94a3b8'
                             }}
                         >
                             {stepType === 'init_array' && '📊 Creating Initial Array'}
+                            {stepType === 'call_function' && '🚀 Calling merge_sort(arr)'}
                             {stepType === 'check_base' && '🔍 Checking Base Case'}
                             {stepType === 'return_base' && '↩️ Base Case: Already Sorted'}
                             {stepType === 'compute_mid' && '📐 Computing Midpoint'}
@@ -455,8 +458,125 @@ const MergeSortVisualizer = ({
                             {stepType === 'other' && '⚡ Processing...'}
                         </motion.div>
 
-                        {/* Main Array Display */}
-                        {mainArray.length > 0 && (
+                        {/* Special Animation for Function Call */}
+                        {stepType === 'call_function' && (
+                            <motion.div
+                                className="flex flex-col items-center gap-8"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.3 }}
+                            >
+                                {/* The calling line */}
+                                <motion.div
+                                    className="flex items-center gap-3 text-lg font-mono"
+                                    initial={{ opacity: 0, y: -20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.2 }}
+                                >
+                                    <span className="text-slate-400">result</span>
+                                    <span className="text-slate-500">=</span>
+                                    <motion.span
+                                        className="text-indigo-400 font-bold"
+                                        animate={{
+                                            textShadow: ['0 0 0px #818cf8', '0 0 20px #818cf8', '0 0 0px #818cf8']
+                                        }}
+                                        transition={{ duration: 1.5, repeat: Infinity }}
+                                    >
+                                        merge_sort
+                                    </motion.span>
+                                    <span className="text-slate-400">(</span>
+                                    <span className="text-amber-400">arr</span>
+                                    <span className="text-slate-400">)</span>
+                                </motion.div>
+
+                                {/* The Array with animated "entering function" effect */}
+                                <div className="relative flex flex-col items-center gap-4">
+                                    {/* Array */}
+                                    <motion.div
+                                        initial={{ y: 0, scale: 1 }}
+                                        animate={{ y: 40, scale: 0.95 }}
+                                        transition={{ delay: 0.5, duration: 0.8, ease: "easeInOut" }}
+                                    >
+                                        <ArrayRow
+                                            id="function-call-array"
+                                            data={mainArray}
+                                            state="active"
+                                            highlightIndices={[]}
+                                        />
+                                    </motion.div>
+
+                                    {/* Animated Arrow pointing down */}
+                                    <motion.div
+                                        className="flex flex-col items-center gap-1"
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.4 }}
+                                    >
+                                        <motion.div
+                                            animate={{ y: [0, 8, 0] }}
+                                            transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                                            className="text-indigo-400 text-2xl"
+                                        >
+                                            ↓
+                                        </motion.div>
+                                        <motion.span
+                                            className="text-xs text-indigo-300"
+                                            animate={{ opacity: [0.5, 1, 0.5] }}
+                                            transition={{ duration: 1.5, repeat: Infinity }}
+                                        >
+                                            passing as argument
+                                        </motion.span>
+                                    </motion.div>
+
+                                    {/* Function Box */}
+                                    <motion.div
+                                        className="relative mt-4 px-8 py-6 bg-indigo-950/50 border-2 border-indigo-500/50 rounded-2xl"
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 0.6, duration: 0.4 }}
+                                    >
+                                        {/* Glow effect */}
+                                        <motion.div
+                                            className="absolute inset-0 bg-indigo-500/20 rounded-2xl blur-xl"
+                                            animate={{ opacity: [0.3, 0.6, 0.3] }}
+                                            transition={{ duration: 2, repeat: Infinity }}
+                                        />
+
+                                        <div className="relative flex flex-col items-center gap-2">
+                                            <motion.div
+                                                className="text-indigo-300 font-mono text-sm"
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                transition={{ delay: 0.8 }}
+                                            >
+                                                def merge_sort(arr):
+                                            </motion.div>
+                                            <motion.div
+                                                className="flex items-center gap-2 text-xs text-slate-400"
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                transition={{ delay: 1 }}
+                                            >
+                                                <span className="text-amber-400">arr</span>
+                                                <span>=</span>
+                                                <span className="text-emerald-400">[{mainArray.join(', ')}]</span>
+                                            </motion.div>
+                                            <motion.div
+                                                className="mt-2 text-xs text-indigo-400"
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                transition={{ delay: 1.2 }}
+                                            >
+                                                🚀 Entering function...
+                                            </motion.div>
+                                        </div>
+                                    </motion.div>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {/* Main Array Display (for non-call_function steps) */}
+                        {stepType !== 'call_function' && mainArray.length > 0 && (
                             <div className="flex flex-col items-center gap-2">
                                 <span className="text-xs text-slate-500 uppercase">Current Array (arr)</span>
                                 <ArrayRow

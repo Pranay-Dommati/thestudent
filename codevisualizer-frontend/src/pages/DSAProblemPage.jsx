@@ -9,9 +9,9 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
     ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')}/visualizer`
     : 'http://localhost:8000/api/visualizer';
 
-// Pre-defined code for each DSA problem
-const PROBLEM_CODES = {
-    'merge-sort': `def merge_sort(arr):
+// Pre-defined code template for each DSA problem (array is injected dynamically)
+const PROBLEM_CODE_TEMPLATES = {
+    'merge-sort': (arrString) => `def merge_sort(arr):
     # Base case: single element is sorted
     if len(arr) <= 1:
         return arr
@@ -49,9 +49,14 @@ def merge(left, right):
 
 
 # Run the algorithm
-arr = [38, 27, 43, 3, 9, 82, 10]
+arr = ${arrString}
 result = merge_sort(arr)
 print(result)`
+};
+
+// Default array for each problem
+const DEFAULT_ARRAYS = {
+    'merge-sort': '[38, 27, 43, 3, 9, 82, 10]'
 };
 
 // Problem metadata
@@ -76,7 +81,15 @@ const problemsData = {
 const DSAProblemPage = () => {
     const { problemName } = useParams();
     const problem = problemsData[problemName];
-    const code = PROBLEM_CODES[problemName] || '';
+
+    // Custom array input state
+    const [customArrayInput, setCustomArrayInput] = useState(DEFAULT_ARRAYS[problemName] || '[38, 27, 43, 3, 9, 82, 10]');
+    const [arrayError, setArrayError] = useState('');
+
+    // Generate code with custom array
+    const code = PROBLEM_CODE_TEMPLATES[problemName]
+        ? PROBLEM_CODE_TEMPLATES[problemName](customArrayInput)
+        : '';
 
     // Visualizer state (same pattern as CodeVisualizerPage)
     const [showVisualizer, setShowVisualizer] = useState(false);
@@ -85,6 +98,153 @@ const DSAProblemPage = () => {
     const [steps, setSteps] = useState([]);
     const [executionId, setExecutionId] = useState(null);
     const [error, setError] = useState(null);
+
+    // Validate array input
+    const validateArrayInput = (input) => {
+        const trimmed = input.trim();
+        if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
+            return 'Array must start with [ and end with ]';
+        }
+        const inner = trimmed.slice(1, -1).trim();
+        if (!inner) {
+            return 'Array cannot be empty';
+        }
+        const parts = inner.split(',').map(p => p.trim());
+        for (const part of parts) {
+            if (!/^-?\d+$/.test(part)) {
+                return `Invalid number: ${part}`;
+            }
+        }
+        if (parts.length > 15) {
+            return 'Maximum 15 elements allowed for visualization';
+        }
+        return '';
+    };
+
+    const handleArrayInputChange = (e) => {
+        const value = e.target.value;
+        setCustomArrayInput(value);
+        setArrayError(validateArrayInput(value));
+    };
+
+    // Handle rerun with a specific array (called from visualizer)
+    const handleRerunWithArray = useCallback(async (newArrayString) => {
+        setCustomArrayInput(newArrayString);
+        setShowVisualizer(true);
+        setIsLoadingTrace(true);
+        setSteps([]);
+        setExecutionId(null);
+        setError(null);
+
+        // Generate code with the new array directly
+        const newCode = PROBLEM_CODE_TEMPLATES[problemName](newArrayString);
+
+        // Loading phases
+        setLoadingPhase(1);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        setLoadingPhase(2);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        setLoadingPhase(3);
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/trace-stream/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+                body: JSON.stringify({
+                    code: newCode,
+                    inputs: [],
+                    codeType: 'script',
+                    functionName: null,
+                    className: null,
+                    inputTypes: []
+                })
+            });
+
+            const contentType = response.headers.get('content-type');
+
+            if (contentType && contentType.includes('text/event-stream')) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let receivedFirstFrame = false;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+
+                                if (data.type === 'error') {
+                                    setError(data.message);
+                                    setShowVisualizer(false);
+                                    break;
+                                }
+
+                                if (data.type === 'step') {
+                                    if (!receivedFirstFrame) {
+                                        receivedFirstFrame = true;
+                                        setLoadingPhase(4);
+                                    }
+                                    const transformedStep = {
+                                        lineNumber: data.line,
+                                        code: data.code,
+                                        explanation: data.explanation,
+                                        variables: data.locals,
+                                        changedVars: data.changed_vars || [],
+                                        computed_values: data.computed_values,
+                                        event: data.event,
+                                        functionName: data.function_name,
+                                        phase: data.phase
+                                    };
+                                    setSteps(prev => [...prev, transformedStep]);
+                                }
+
+                                if (data.type === 'complete') {
+                                    if (data.execution_id) setExecutionId(data.execution_id);
+                                    setIsLoadingTrace(false);
+                                }
+                            } catch (e) {
+                                // Skip malformed JSON
+                            }
+                        }
+                    }
+                }
+            } else {
+                const data = await response.json();
+                if (data.error) {
+                    setError(data.error);
+                    setShowVisualizer(false);
+                } else if (data.frames) {
+                    const transformedSteps = data.frames.map(frame => ({
+                        lineNumber: frame.line,
+                        code: frame.code,
+                        explanation: frame.explanation,
+                        variables: frame.locals,
+                        changedVars: frame.changed_vars || [],
+                        computed_values: frame.computed_values,
+                        event: frame.event,
+                        functionName: frame.function_name,
+                        phase: frame.phase
+                    }));
+                    setSteps(transformedSteps);
+                    if (data.execution_id) setExecutionId(data.execution_id);
+                }
+                setIsLoadingTrace(false);
+            }
+        } catch (err) {
+            console.error('Trace error:', err);
+            setError('Failed to execute code. Please try again.');
+            setShowVisualizer(false);
+            setIsLoadingTrace(false);
+        }
+    }, [problemName]);
 
     // Run the trace (same logic as CodeVisualizerPage)
     const handleVisualize = useCallback(async () => {
@@ -248,6 +408,8 @@ const DSAProblemPage = () => {
                 isLoading={isLoadingTrace}
                 loadingPhase={loadingPhase}
                 algorithmType="merge-sort"
+                customArray={customArrayInput}
+                onRerun={handleRerunWithArray}
             />
 
             {/* Problem Detail View */}
@@ -349,14 +511,62 @@ const DSAProblemPage = () => {
                         </div>
                     )}
 
+                    {/* Custom Array Input */}
+                    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 mb-8">
+                        <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+                            <HiSparkles className="text-amber-400" />
+                            Try Your Own Array
+                        </h3>
+                        <div className="space-y-3">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={customArrayInput}
+                                    onChange={handleArrayInputChange}
+                                    placeholder="[1, 2, 3, 4, 5]"
+                                    className={`w-full px-4 py-3 bg-slate-800 border rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 transition-all ${arrayError
+                                        ? 'border-red-500/50 focus:ring-red-500/30'
+                                        : 'border-white/20 focus:ring-blue-500/30 focus:border-blue-500/50'
+                                        }`}
+                                />
+                                {customArrayInput !== DEFAULT_ARRAYS[problemName] && (
+                                    <button
+                                        onClick={() => {
+                                            setCustomArrayInput(DEFAULT_ARRAYS[problemName]);
+                                            setArrayError('');
+                                        }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-sm px-2 py-1 bg-slate-700 rounded-lg transition-colors"
+                                    >
+                                        Reset
+                                    </button>
+                                )}
+                            </div>
+                            {arrayError ? (
+                                <p className="text-red-400 text-sm flex items-center gap-1">
+                                    <span>⚠️</span> {arrayError}
+                                </p>
+                            ) : (
+                                <p className="text-slate-500 text-sm">
+                                    Enter comma-separated integers (max 15 elements)
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
                     {/* CTA Button */}
                     <div className="text-center">
                         <button
                             onClick={handleVisualize}
-                            className="group relative inline-flex items-center gap-4 px-10 py-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 text-white font-bold text-xl rounded-2xl shadow-2xl shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all duration-300 hover:scale-105"
+                            disabled={!!arrayError}
+                            className={`group relative inline-flex items-center gap-4 px-10 py-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-bold text-xl rounded-2xl shadow-2xl transition-all duration-300 ${arrayError
+                                ? 'opacity-50 cursor-not-allowed shadow-none'
+                                : 'hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105'
+                                }`}
                         >
                             {/* Glow effect */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl blur-xl opacity-50 group-hover:opacity-70 transition-opacity" />
+                            {!arrayError && (
+                                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl blur-xl opacity-50 group-hover:opacity-70 transition-opacity" />
+                            )}
 
                             <div className="relative flex items-center gap-4">
                                 <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
