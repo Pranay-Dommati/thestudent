@@ -397,8 +397,33 @@ const MergeSortVisualizer = ({
     // if stepType is 'recurse_left', we're at the CALL site, not the RETURN site.
     // We should show return animation only when leftSorted exists AND we're NOT at the call step.
     // Additionally, when we're on 'recurse_right', we should NOT show the left return animation at all.
-    const isLeftReturnPhase = leftSorted && leftSorted.length > 0 && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'return_base';
-    const isRightReturnPhase = rightSorted && rightSorted.length > 0 && stepType !== 'recurse_right' && stepType !== 'recurse_left' && stepType !== 'return_base';
+    // 
+    // IMPORTANT: Detect if current step is specifically about right_sorted assignment
+    // If so, don't show left return animation (even if leftSorted has a value)
+    const codeInvolvesRightSorted = code.includes('right_sorted');
+    const codeInvolvesLeftSorted = code.includes('left_sorted') && !code.includes('right_sorted');
+
+    // isLeftReturnPhase: Only true when:
+    // - leftSorted exists
+    // - We're not at a recursion CALL step
+    // - We're not at base case return
+    // - The current code is NOT about right_sorted (otherwise we'd show both animations)
+    const isLeftReturnPhase = leftSorted && leftSorted.length > 0
+        && stepType !== 'recurse_left'
+        && stepType !== 'recurse_right'
+        && stepType !== 'return_base'
+        && !codeInvolvesRightSorted;
+
+    // isRightReturnPhase: Only true when:
+    // - rightSorted exists  
+    // - We're not at a recursion CALL step
+    // - We're not at base case return
+    // - The current code is NOT specifically about left_sorted only
+    const isRightReturnPhase = rightSorted && rightSorted.length > 0
+        && stepType !== 'recurse_right'
+        && stepType !== 'recurse_left'
+        && stepType !== 'return_base'
+        && !codeInvolvesLeftSorted;
 
     // Explicit Phase: 'CALL' vs 'RETURN'
     // During RETURN phase, we HIDE the parent frame context to focus solely on the value flow
