@@ -1970,7 +1970,8 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Sorted Halves Display - hide during return phases where animation shows it */}
-                        {(leftSorted || rightSorted) && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'return_base' && (
+                        {/* Also hide when any return animation is showing (isLeftReturnPhase or isRightReturnPhase) */}
+                        {(leftSorted || rightSorted) && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'return_base' && !isLeftReturnPhase && !isRightReturnPhase && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
