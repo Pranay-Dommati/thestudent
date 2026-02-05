@@ -389,6 +389,20 @@ const MergeSortVisualizer = ({
     const leftSorted = getArray(currentVars.left_sorted) || getPredictedArray('left_sorted');
     const rightSorted = getArray(currentVars.right_sorted) || getPredictedArray('right_sorted');
 
+    // Flags to distinguish CALL phase from RETURN phase
+    // CALL phase: We're on the line "left_sorted = merge_sort(left)" and CALLING into the function
+    // RETURN phase: We're on the same line but the recursive call has completed and we're RECEIVING the result
+    // 
+    // Key insight: Even if leftSorted has a value (from a previous deeper recursion), 
+    // if stepType is 'recurse_left', we're at the CALL site, not the RETURN site.
+    // We should show return animation only when leftSorted exists AND we're NOT at the call step.
+    const isLeftReturnPhase = leftSorted && leftSorted.length > 0 && stepType !== 'recurse_left';
+    const isRightReturnPhase = rightSorted && rightSorted.length > 0 && stepType !== 'recurse_right';
+
+    // Explicit Phase: 'CALL' vs 'RETURN'
+    // During RETURN phase, we HIDE the parent frame context to focus solely on the value flow
+    const phase = (isLeftReturnPhase || isRightReturnPhase) ? 'RETURN' : 'CALL';
+
     // Get pointers for comparison highlighting (extract raw values)
     const iPtr = getValue(currentVars.i);
     const jPtr = getValue(currentVars.j);
@@ -1119,146 +1133,114 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Special Animation for Recursive Left: left_sorted = merge_sort(left) */}
-                        {stepType === 'recurse_left' && (leftArray || leftSorted) && (
+                        {/* Show when: stepType is recurse_left (CALL phase) OR isLeftReturnPhase is true (RETURN phase) */}
+                        {(stepType === 'recurse_left' || isLeftReturnPhase) && (leftArray || leftSorted) && (
                             <motion.div
                                 className="flex flex-col items-center gap-6"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 transition={{ duration: 0.3 }}
                             >
-                                {/* Code expression */}
-                                <div className="flex flex-col items-center gap-3 font-mono">
-                                    <motion.div
-                                        className="flex items-center gap-2 text-lg"
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.2 }}
-                                    >
-                                        <motion.span
-                                            className="text-cyan-400 font-bold"
-                                            animate={leftSorted ? {
-                                                textShadow: ['0 0 0px #22d3ee', '0 0 20px #22d3ee', '0 0 0px #22d3ee']
-                                            } : {}}
-                                            transition={{ duration: 1.5, repeat: Infinity }}
-                                        >
-                                            left_sorted
-                                        </motion.span>
-                                        <span className="text-slate-500">=</span>
-                                        <motion.span
-                                            className="text-indigo-400 font-bold"
-                                            animate={{
-                                                textShadow: ['0 0 0px #818cf8', '0 0 15px #818cf8', '0 0 0px #818cf8']
-                                            }}
-                                            transition={{ duration: 1.5, repeat: Infinity }}
-                                        >
-                                            merge_sort
-                                        </motion.span>
-                                        <span className="text-slate-400">(</span>
-                                        <span className="text-blue-400">left</span>
-                                        <span className="text-slate-400">)</span>
-                                    </motion.div>
-                                </div>
 
-                                {/* CONDITIONAL: Show return assignment if leftSorted exists, otherwise show diving */}
-                                {leftSorted && leftSorted.length > 0 ? (
-                                    /* Return Assignment Animation - showing value being stored */
+
+                                {/* CONDITIONAL: Show return animation only when left_sorted is ACTUALLY returned (in currentVars) */}
+                                {isLeftReturnPhase && leftSorted && leftSorted.length > 0 ? (
+                                    /* Cinematic Return Animation */
                                     <>
-                                        {/* Returned value coming UP */}
+                                        {/* Container for the variable we are filling */}
                                         <motion.div
-                                            className="flex flex-col items-center gap-4"
-                                            initial={{ opacity: 0, y: 50 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.4, duration: 0.6, type: "spring" }}
-                                        >
-                                            <motion.div
-                                                className="px-4 py-2 bg-emerald-950/50 border-2 border-emerald-500/50 rounded-xl"
-                                                initial={{ scale: 0.8 }}
-                                                animate={{ scale: 1 }}
-                                                transition={{ delay: 0.6 }}
-                                            >
-                                                <span className="text-xs text-emerald-400">✓ Recursion Complete</span>
-                                            </motion.div>
-
-                                            <div className="flex items-center gap-1">
-                                                {leftSorted.map((val, idx) => (
-                                                    <motion.div
-                                                        key={`sorted-${idx}`}
-                                                        className="w-12 h-12 flex items-center justify-center rounded-lg font-bold text-lg bg-emerald-600 border-2 border-emerald-400 text-white"
-                                                        initial={{ opacity: 0, y: 30, scale: 0.5 }}
-                                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                        transition={{
-                                                            delay: 0.8 + idx * 0.1,
-                                                            type: "spring",
-                                                            stiffness: 200
-                                                        }}
-                                                    >
-                                                        {val}
-                                                    </motion.div>
-                                                ))}
-                                            </div>
-                                        </motion.div>
-
-                                        {/* Upward arrow showing return */}
-                                        <motion.div
-                                            className="flex flex-col items-center"
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            transition={{ delay: 1.2 }}
-                                        >
-                                            <motion.div
-                                                animate={{ y: [0, -8, 0] }}
-                                                transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                                                className="text-emerald-400 text-2xl"
-                                            >
-                                                ↑
-                                            </motion.div>
-                                            <motion.span
-                                                className="text-xs text-emerald-300"
-                                                animate={{ opacity: [0.5, 1, 0.5] }}
-                                                transition={{ duration: 1.5, repeat: Infinity }}
-                                            >
-                                                returning sorted array
-                                            </motion.span>
-                                        </motion.div>
-
-                                        {/* Assignment result box */}
-                                        <motion.div
-                                            className="relative px-8 py-6 bg-cyan-950/50 border-2 border-cyan-500/50 rounded-2xl"
+                                            className="flex flex-col items-center gap-2 mb-4"
                                             initial={{ opacity: 0, scale: 0.9 }}
                                             animate={{ opacity: 1, scale: 1 }}
-                                            transition={{ delay: 1.5, duration: 0.4 }}
+                                            transition={{ delay: 0.2 }}
                                         >
+                                            <span className="text-cyan-400 font-mono text-sm font-bold">left_sorted</span>
                                             <motion.div
-                                                className="absolute inset-0 bg-cyan-500/20 rounded-2xl blur-xl"
-                                                animate={{ opacity: [0.3, 0.6, 0.3] }}
+                                                className="px-6 py-4 bg-cyan-950/30 border-2 border-dashed border-cyan-500/30 rounded-xl min-w-[120px] flex justify-center items-center"
+                                                animate={{
+                                                    borderColor: ['rgba(6,182,212,0.3)', 'rgba(6,182,212,0.8)', 'rgba(6,182,212,0.3)'],
+                                                    backgroundColor: ['rgba(8,51,68,0.3)', 'rgba(8,51,68,0.5)', 'rgba(8,51,68,0.3)']
+                                                }}
                                                 transition={{ duration: 2, repeat: Infinity }}
-                                            />
-                                            <div className="relative flex flex-col items-center gap-2">
+                                            >
+                                                {/* The final resting place for the array */}
+                                                <div className="flex items-center gap-1">
+                                                    {leftSorted.map((val, idx) => (
+                                                        <motion.div
+                                                            key={`final-left-${idx}`}
+                                                            className="w-10 h-10 flex items-center justify-center rounded-lg font-bold text-base bg-cyan-600 border-2 border-cyan-400 text-white shadow-[0_0_15px_rgba(34,211,238,0.5)]"
+                                                            initial={{ opacity: 0, scale: 0, y: 20 }}
+                                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                            transition={{ delay: 1.5 + idx * 0.1, type: "spring" }}
+                                                        >
+                                                            {val}
+                                                        </motion.div>
+                                                    ))}
+                                                </div>
+                                            </motion.div>
+                                        </motion.div>
+
+                                        {/* Upward Flow Animation */}
+                                        <div className="relative flex flex-col items-center h-32 justify-end">
+                                            {/* Rising values from recursion */}
+                                            <motion.div
+                                                className="absolute bottom-0 flex items-center gap-1"
+                                                initial={{ y: 60, opacity: 0 }}
+                                                animate={{ y: -60, opacity: [0, 1, 1, 0] }} // Move UP into the box
+                                                transition={{ duration: 1.5, times: [0, 0.2, 0.8, 1], ease: "easeInOut" }}
+                                            >
+                                                {leftSorted.map((val, idx) => (
+                                                    <div key={`rising-${idx}`} className="w-10 h-10 flex items-center justify-center rounded-lg font-bold text-base bg-emerald-600 border-2 border-emerald-400 text-white opacity-60 filter blur-[1px]">
+                                                        {val}
+                                                    </div>
+                                                ))}
+                                            </motion.div>
+
+                                            {/* Up Arrow Effect */}
+                                            <motion.div
+                                                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                transition={{ delay: 0.5 }}
+                                            >
                                                 <motion.div
-                                                    className="font-mono text-base"
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    transition={{ delay: 1.7 }}
-                                                >
-                                                    <span className="text-cyan-400 font-bold">left_sorted</span>
-                                                    <span className="text-slate-500"> = </span>
-                                                    <span className="text-emerald-400">[{leftSorted.join(', ')}]</span>
-                                                </motion.div>
+                                                    className="w-0.5 h-full bg-gradient-to-t from-emerald-500/0 via-cyan-500/50 to-cyan-500/0"
+                                                />
                                                 <motion.div
-                                                    className="flex items-center gap-2 mt-2 text-sm text-cyan-400"
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    transition={{ delay: 1.9 }}
+                                                    className="absolute top-0 text-cyan-400 text-2xl"
+                                                    animate={{ y: [-10, 0, -10], opacity: [0.5, 1, 0.5] }}
+                                                    transition={{ duration: 1.5, repeat: Infinity }}
                                                 >
-                                                    <span>✅</span>
-                                                    <span>Stored sorted left half!</span>
+                                                    ▲
                                                 </motion.div>
-                                            </div>
+                                            </motion.div>
+                                        </div>
+
+                                        <motion.div
+                                            className="mt-2 text-xs text-emerald-400/80 font-mono"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ delay: 1 }}
+                                        >
+                                            Returning sorted sub-array...
                                         </motion.div>
                                     </>
                                 ) : leftArray && leftArray.length > 0 ? (
                                     /* Diving In Animation - original behavior */
                                     <>
+                                        {/* Code expression header ONLY for diving phase */}
+                                        <div className="flex flex-col items-center gap-2 mb-4 font-mono">
+                                            <motion.div
+                                                className="flex items-center gap-2 text-lg"
+                                                initial={{ opacity: 0, y: -10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: 0.2 }}
+                                            >
+                                                <span className="text-cyan-400 font-bold">left_sorted</span>
+                                                <span className="text-slate-500">=</span>
+                                                <span className="text-indigo-400 font-bold">merge_sort(left)</span>
+                                            </motion.div>
+                                        </div>
                                         {/* The left array being passed */}
                                         <motion.div
                                             className="flex flex-col items-center gap-4"
@@ -1365,146 +1347,114 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Special Animation for Recursive Right: right_sorted = merge_sort(right) */}
-                        {stepType === 'recurse_right' && (rightArray || rightSorted) && (
+                        {/* Show when: stepType is recurse_right (CALL phase) OR isRightReturnPhase is true (RETURN phase) */}
+                        {(stepType === 'recurse_right' || isRightReturnPhase) && (rightArray || rightSorted) && (
                             <motion.div
                                 className="flex flex-col items-center gap-6"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 transition={{ duration: 0.3 }}
                             >
-                                {/* Code expression */}
-                                <div className="flex flex-col items-center gap-3 font-mono">
-                                    <motion.div
-                                        className="flex items-center gap-2 text-lg"
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.2 }}
-                                    >
-                                        <motion.span
-                                            className="text-amber-400 font-bold"
-                                            animate={rightSorted ? {
-                                                textShadow: ['0 0 0px #fbbf24', '0 0 20px #fbbf24', '0 0 0px #fbbf24']
-                                            } : {}}
-                                            transition={{ duration: 1.5, repeat: Infinity }}
-                                        >
-                                            right_sorted
-                                        </motion.span>
-                                        <span className="text-slate-500">=</span>
-                                        <motion.span
-                                            className="text-indigo-400 font-bold"
-                                            animate={{
-                                                textShadow: ['0 0 0px #818cf8', '0 0 15px #818cf8', '0 0 0px #818cf8']
-                                            }}
-                                            transition={{ duration: 1.5, repeat: Infinity }}
-                                        >
-                                            merge_sort
-                                        </motion.span>
-                                        <span className="text-slate-400">(</span>
-                                        <span className="text-orange-400">right</span>
-                                        <span className="text-slate-400">)</span>
-                                    </motion.div>
-                                </div>
 
-                                {/* CONDITIONAL: Show return assignment if rightSorted exists, otherwise show diving */}
-                                {rightSorted && rightSorted.length > 0 ? (
-                                    /* Return Assignment Animation - showing value being stored */
+
+                                {/* CONDITIONAL: Show return animation only when right_sorted is ACTUALLY returned (in currentVars) */}
+                                {isRightReturnPhase && rightSorted && rightSorted.length > 0 ? (
+                                    /* Cinematic Return Animation */
                                     <>
-                                        {/* Returned value coming UP */}
+                                        {/* Container for the variable we are filling */}
                                         <motion.div
-                                            className="flex flex-col items-center gap-4"
-                                            initial={{ opacity: 0, y: 50 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.4, duration: 0.6, type: "spring" }}
-                                        >
-                                            <motion.div
-                                                className="px-4 py-2 bg-emerald-950/50 border-2 border-emerald-500/50 rounded-xl"
-                                                initial={{ scale: 0.8 }}
-                                                animate={{ scale: 1 }}
-                                                transition={{ delay: 0.6 }}
-                                            >
-                                                <span className="text-xs text-emerald-400">✓ Recursion Complete</span>
-                                            </motion.div>
-
-                                            <div className="flex items-center gap-1">
-                                                {rightSorted.map((val, idx) => (
-                                                    <motion.div
-                                                        key={`sorted-${idx}`}
-                                                        className="w-12 h-12 flex items-center justify-center rounded-lg font-bold text-lg bg-emerald-600 border-2 border-emerald-400 text-white"
-                                                        initial={{ opacity: 0, y: 30, scale: 0.5 }}
-                                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                        transition={{
-                                                            delay: 0.8 + idx * 0.1,
-                                                            type: "spring",
-                                                            stiffness: 200
-                                                        }}
-                                                    >
-                                                        {val}
-                                                    </motion.div>
-                                                ))}
-                                            </div>
-                                        </motion.div>
-
-                                        {/* Upward arrow showing return */}
-                                        <motion.div
-                                            className="flex flex-col items-center"
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            transition={{ delay: 1.2 }}
-                                        >
-                                            <motion.div
-                                                animate={{ y: [0, -8, 0] }}
-                                                transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                                                className="text-emerald-400 text-2xl"
-                                            >
-                                                ↑
-                                            </motion.div>
-                                            <motion.span
-                                                className="text-xs text-emerald-300"
-                                                animate={{ opacity: [0.5, 1, 0.5] }}
-                                                transition={{ duration: 1.5, repeat: Infinity }}
-                                            >
-                                                returning sorted array
-                                            </motion.span>
-                                        </motion.div>
-
-                                        {/* Assignment result box */}
-                                        <motion.div
-                                            className="relative px-8 py-6 bg-amber-950/50 border-2 border-amber-500/50 rounded-2xl"
+                                            className="flex flex-col items-center gap-2 mb-4"
                                             initial={{ opacity: 0, scale: 0.9 }}
                                             animate={{ opacity: 1, scale: 1 }}
-                                            transition={{ delay: 1.5, duration: 0.4 }}
+                                            transition={{ delay: 0.2 }}
                                         >
+                                            <span className="text-amber-400 font-mono text-sm font-bold">right_sorted</span>
                                             <motion.div
-                                                className="absolute inset-0 bg-amber-500/20 rounded-2xl blur-xl"
-                                                animate={{ opacity: [0.3, 0.6, 0.3] }}
+                                                className="px-6 py-4 bg-amber-950/30 border-2 border-dashed border-amber-500/30 rounded-xl min-w-[120px] flex justify-center items-center"
+                                                animate={{
+                                                    borderColor: ['rgba(251,191,36,0.3)', 'rgba(251,191,36,0.8)', 'rgba(251,191,36,0.3)'],
+                                                    backgroundColor: ['rgba(69,26,3,0.3)', 'rgba(69,26,3,0.5)', 'rgba(69,26,3,0.3)']
+                                                }}
                                                 transition={{ duration: 2, repeat: Infinity }}
-                                            />
-                                            <div className="relative flex flex-col items-center gap-2">
+                                            >
+                                                {/* The final resting place for the array */}
+                                                <div className="flex items-center gap-1">
+                                                    {rightSorted.map((val, idx) => (
+                                                        <motion.div
+                                                            key={`final-right-${idx}`}
+                                                            className="w-10 h-10 flex items-center justify-center rounded-lg font-bold text-base bg-amber-600 border-2 border-amber-400 text-white shadow-[0_0_15px_rgba(251,191,36,0.5)]"
+                                                            initial={{ opacity: 0, scale: 0, y: 20 }}
+                                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                                            transition={{ delay: 1.5 + idx * 0.1, type: "spring" }}
+                                                        >
+                                                            {val}
+                                                        </motion.div>
+                                                    ))}
+                                                </div>
+                                            </motion.div>
+                                        </motion.div>
+
+                                        {/* Upward Flow Animation */}
+                                        <div className="relative flex flex-col items-center h-32 justify-end">
+                                            {/* Rising values from recursion */}
+                                            <motion.div
+                                                className="absolute bottom-0 flex items-center gap-1"
+                                                initial={{ y: 60, opacity: 0 }}
+                                                animate={{ y: -60, opacity: [0, 1, 1, 0] }} // Move UP into the box
+                                                transition={{ duration: 1.5, times: [0, 0.2, 0.8, 1], ease: "easeInOut" }}
+                                            >
+                                                {rightSorted.map((val, idx) => (
+                                                    <div key={`rising-${idx}`} className="w-10 h-10 flex items-center justify-center rounded-lg font-bold text-base bg-emerald-600 border-2 border-emerald-400 text-white opacity-60 filter blur-[1px]">
+                                                        {val}
+                                                    </div>
+                                                ))}
+                                            </motion.div>
+
+                                            {/* Up Arrow Effect */}
+                                            <motion.div
+                                                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                transition={{ delay: 0.5 }}
+                                            >
                                                 <motion.div
-                                                    className="font-mono text-base"
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    transition={{ delay: 1.7 }}
-                                                >
-                                                    <span className="text-amber-400 font-bold">right_sorted</span>
-                                                    <span className="text-slate-500"> = </span>
-                                                    <span className="text-emerald-400">[{rightSorted.join(', ')}]</span>
-                                                </motion.div>
+                                                    className="w-0.5 h-full bg-gradient-to-t from-emerald-500/0 via-amber-500/50 to-amber-500/0"
+                                                />
                                                 <motion.div
-                                                    className="flex items-center gap-2 mt-2 text-sm text-amber-400"
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    transition={{ delay: 1.9 }}
+                                                    className="absolute top-0 text-amber-400 text-2xl"
+                                                    animate={{ y: [-10, 0, -10], opacity: [0.5, 1, 0.5] }}
+                                                    transition={{ duration: 1.5, repeat: Infinity }}
                                                 >
-                                                    <span>✅</span>
-                                                    <span>Stored sorted right half!</span>
+                                                    ▲
                                                 </motion.div>
-                                            </div>
+                                            </motion.div>
+                                        </div>
+
+                                        <motion.div
+                                            className="mt-2 text-xs text-emerald-400/80 font-mono"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ delay: 1 }}
+                                        >
+                                            Returning sorted sub-array...
                                         </motion.div>
                                     </>
                                 ) : rightArray && rightArray.length > 0 ? (
                                     /* Diving In Animation - original behavior */
                                     <>
+                                        {/* Code expression header ONLY for diving phase */}
+                                        <div className="flex flex-col items-center gap-2 mb-4 font-mono">
+                                            <motion.div
+                                                className="flex items-center gap-2 text-lg"
+                                                initial={{ opacity: 0, y: -10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: 0.2 }}
+                                            >
+                                                <span className="text-amber-400 font-bold">right_sorted</span>
+                                                <span className="text-slate-500">=</span>
+                                                <span className="text-indigo-400 font-bold">merge_sort(right)</span>
+                                            </motion.div>
+                                        </div>
                                         {/* The right array being passed */}
                                         <motion.div
                                             className="flex flex-col items-center gap-4"
@@ -1660,7 +1610,7 @@ const MergeSortVisualizer = ({
                                     >
                                         <span className="text-xs text-cyan-400 uppercase">left_sorted</span>
                                         <div className="flex items-center gap-1">
-                                            {(leftSortedArray || leftArray || []).map((val, idx) => (
+                                            {(leftSorted || leftArray || []).map((val, idx) => (
                                                 <motion.div
                                                     key={`left-sorted-${idx}`}
                                                     className="w-10 h-10 flex items-center justify-center rounded-lg font-bold bg-cyan-600 border-2 border-cyan-400 text-white"
@@ -1694,7 +1644,7 @@ const MergeSortVisualizer = ({
                                     >
                                         <span className="text-xs text-amber-400 uppercase">right_sorted</span>
                                         <div className="flex items-center gap-1">
-                                            {(rightSortedArray || rightArray || []).map((val, idx) => (
+                                            {(rightSorted || rightArray || []).map((val, idx) => (
                                                 <motion.div
                                                     key={`right-sorted-${idx}`}
                                                     className="w-10 h-10 flex items-center justify-center rounded-lg font-bold bg-amber-600 border-2 border-amber-400 text-white"
@@ -1760,9 +1710,9 @@ const MergeSortVisualizer = ({
                                             animate={{ opacity: 1 }}
                                             transition={{ delay: 1.7 }}
                                         >
-                                            <span className="text-cyan-400">[{(leftSortedArray || leftArray || []).join(', ')}]</span>
+                                            <span className="text-cyan-400">[{(leftSorted || leftArray || []).join(', ')}]</span>
                                             <span className="text-slate-500">+</span>
-                                            <span className="text-amber-400">[{(rightSortedArray || rightArray || []).join(', ')}]</span>
+                                            <span className="text-amber-400">[{(rightSorted || rightArray || []).join(', ')}]</span>
                                         </motion.div>
                                         <motion.div
                                             className="flex items-center gap-2 mt-2 text-sm text-emerald-400"
@@ -1783,8 +1733,8 @@ const MergeSortVisualizer = ({
                             </motion.div>
                         )}
 
-                        {/* Main Array Display (for standard steps) */}
-                        {stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && mainArray.length > 0 && (
+                        {/* Main Array Display (for standard steps) - ONLY VISIBLE IN CALL PHASE */}
+                        {phase === 'CALL' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && mainArray.length > 0 && (
                             <div className="flex flex-col items-center gap-2">
                                 <span className="text-xs text-slate-500 uppercase">Current Array (arr)</span>
                                 <ArrayRow
@@ -1805,8 +1755,8 @@ const MergeSortVisualizer = ({
                             </div>
                         )}
 
-                        {/* Split View: Left and Right Arrays (hide during special animations) */}
-                        {stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && (leftArray || rightArray) && (
+                        {/* Split View: Left and Right Arrays (hide during special animations and return phases) - ONLY VISIBLE IN CALL PHASE */}
+                        {phase === 'CALL' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && (leftArray || rightArray) && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -1842,8 +1792,8 @@ const MergeSortVisualizer = ({
                             </motion.div>
                         )}
 
-                        {/* Sorted Halves Display */}
-                        {(leftSorted || rightSorted) && (
+                        {/* Sorted Halves Display - hide during return phases where animation shows it */}
+                        {(leftSorted || rightSorted) && stepType !== 'recurse_left' && stepType !== 'recurse_right' && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
