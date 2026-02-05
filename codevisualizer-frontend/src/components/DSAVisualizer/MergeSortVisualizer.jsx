@@ -396,8 +396,9 @@ const MergeSortVisualizer = ({
     // Key insight: Even if leftSorted has a value (from a previous deeper recursion), 
     // if stepType is 'recurse_left', we're at the CALL site, not the RETURN site.
     // We should show return animation only when leftSorted exists AND we're NOT at the call step.
-    const isLeftReturnPhase = leftSorted && leftSorted.length > 0 && stepType !== 'recurse_left';
-    const isRightReturnPhase = rightSorted && rightSorted.length > 0 && stepType !== 'recurse_right';
+    // Additionally, when we're on 'recurse_right', we should NOT show the left return animation at all.
+    const isLeftReturnPhase = leftSorted && leftSorted.length > 0 && stepType !== 'recurse_left' && stepType !== 'recurse_right';
+    const isRightReturnPhase = rightSorted && rightSorted.length > 0 && stepType !== 'recurse_right' && stepType !== 'recurse_left';
 
     // Explicit Phase: 'CALL' vs 'RETURN'
     // During RETURN phase, we HIDE the parent frame context to focus solely on the value flow
