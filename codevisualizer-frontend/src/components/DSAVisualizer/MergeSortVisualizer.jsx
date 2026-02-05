@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { InitResultAnimation, InitPointersAnimation } from './MergeSort/animations';
 
 // ============ ARRAY BOX COMPONENT ============
 const ArrayBox = ({ value, state = 'default', delay = 0, isComparing = false, isActive = false }) => {
@@ -1914,8 +1915,24 @@ const MergeSortVisualizer = ({
                             </motion.div>
                         )}
 
+                        {/* Init Result Animation: result = [] */}
+                        {stepType === 'init_result' && (
+                            <InitResultAnimation
+                                leftArray={leftArray || leftSorted}
+                                rightArray={rightArray || rightSorted}
+                            />
+                        )}
+
+                        {/* Init Pointers Animation: i = j = 0 */}
+                        {stepType === 'init_pointers' && (
+                            <InitPointersAnimation
+                                leftArray={leftArray || leftSorted}
+                                rightArray={rightArray || rightSorted}
+                            />
+                        )}
+
                         {/* Main Array Display (for standard steps) - ONLY VISIBLE IN CALL PHASE */}
-                        {phase === 'CALL' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && mainArray.length > 0 && (
+                        {phase === 'CALL' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && mainArray.length > 0 && (
                             <div className="flex flex-col items-center gap-2">
                                 <span className="text-xs text-slate-500 uppercase">Current Array (arr)</span>
                                 <ArrayRow
@@ -1937,7 +1954,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Split View: Left and Right Arrays (hide during special animations and return phases) - ONLY VISIBLE IN CALL PHASE */}
-                        {phase === 'CALL' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && (leftArray || rightArray) && (
+                        {phase === 'CALL' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && (leftArray || rightArray) && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -2011,7 +2028,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Result Array - Being Built */}
-                        {resultArray && (
+                        {resultArray && stepType !== 'init_result' && stepType !== 'init_pointers' && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
