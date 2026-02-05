@@ -407,22 +407,26 @@ const MergeSortVisualizer = ({
     // - leftSorted exists
     // - We're not at a recursion CALL step
     // - We're not at base case return
+    // - We're not at the merge call (which has its own animation)
     // - The current code is NOT about right_sorted (otherwise we'd show both animations)
     const isLeftReturnPhase = leftSorted && leftSorted.length > 0
         && stepType !== 'recurse_left'
         && stepType !== 'recurse_right'
         && stepType !== 'return_base'
+        && stepType !== 'call_merge'
         && !codeInvolvesRightSorted;
 
     // isRightReturnPhase: Only true when:
     // - rightSorted exists  
     // - We're not at a recursion CALL step
     // - We're not at base case return
+    // - We're not at the merge call (which has its own animation)
     // - The current code is NOT specifically about left_sorted only
     const isRightReturnPhase = rightSorted && rightSorted.length > 0
         && stepType !== 'recurse_right'
         && stepType !== 'recurse_left'
         && stepType !== 'return_base'
+        && stepType !== 'call_merge'
         && !codeInvolvesLeftSorted;
 
     // Explicit Phase: 'CALL' vs 'RETURN'
