@@ -333,12 +333,20 @@ const MobileFirstCourses = () => {
             c.subject?.toLowerCase().includes(lowerQ)
         );
     };
-    
+
     const filteredDiscovery = getDiscoveryCourses();
     const originals = filteredDiscovery.filter(c => c.source_type === 'original');
-    const curated = filteredDiscovery.filter(c => c.source_type !== 'original');
+    const examReady = filteredDiscovery.filter(c => c.source_type === 'exam_ready');
+    const curated = filteredDiscovery.filter(c => c.source_type !== 'original' && c.source_type !== 'exam_ready');
 
     const navigateToCourse = (course) => {
+        // Handle exam_ready courses with their special route
+        if (course.source_type === 'exam_ready') {
+            const slug = course.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+            navigate(`/exam-ready-series/${slug}/${course.id}`);
+            return;
+        }
+
         if (course.course_type === 'school' && course.class && course.category) {
             const classString = course.class || '';
             const [classLevel, boardPart] = classString.split(' - ').map(s => s?.trim());
@@ -393,8 +401,59 @@ const MobileFirstCourses = () => {
             <div className="bg-gray-50 min-h-screen pb-6">
                 <div className="container mx-auto px-4 py-6">
                     {viewMode === 'discovery' ? (
-                        // Discovery View with Two Sections
+                        // Discovery View with Three Sections
                         <div className="space-y-10">
+                            {/* Section 0: Exam Ready Series */}
+                            <section>
+                                <div className="mb-5">
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <div className="w-1 h-5 bg-orange-500 rounded-full"></div>
+                                        <h3 className="text-lg font-bold text-gray-900">
+                                            Exam Ready Series
+                                        </h3>
+                                        {examReady.length === 0 && (
+                                            <span className="bg-orange-50 text-orange-600 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                                Coming Soon
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-gray-400 ml-4">Intensive exam preparation courses</p>
+                                </div>
+
+                                {examReady.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {examReady.map((course) => (
+                                            <div
+                                                key={course.id}
+                                                onClick={() => navigateToCourse(course)}
+                                                className="bg-white rounded-xl shadow-sm p-3 flex gap-3 border border-orange-100 cursor-pointer active:bg-orange-50 transition-colors"
+                                            >
+                                                <div className="w-24 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 relative">
+                                                    <img
+                                                        src={course.thumbnail}
+                                                        alt={course.title}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                    <div className="absolute top-1 right-1 bg-white/90 text-orange-500 text-[8px] font-bold px-1 py-0.5 rounded">
+                                                        🎯
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-semibold text-gray-900 text-sm line-clamp-2 mb-1">{course.title}</h4>
+                                                    <p className="text-xs text-gray-500">{course.category}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="bg-gradient-to-br from-orange-50/50 to-amber-50/50 rounded-xl border border-orange-100/50 py-8 px-4 text-center">
+                                        <p className="text-xs text-gray-500 leading-relaxed">
+                                            Focused exam preparation with practice tests, revision notes, and targeted problem-solving strategies.
+                                        </p>
+                                    </div>
+                                )}
+                            </section>
+
                             {/* Section 1: EasyLearnova Originals */}
                             <section>
                                 <div className="mb-5">

@@ -228,8 +228,66 @@ const Courses = () => {
 
                             {/* View Content */}
                             {viewMode === 'discovery' ? (
-                                // Discovery View with Two Sections
+                                // Discovery View with Three Sections
                                 <div className="space-y-14">
+                                    {/* Section 0: Exam Ready Series */}
+                                    <section>
+                                        <div className="mb-6">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <div className="w-1 h-6 bg-orange-500 rounded-full"></div>
+                                                <h3 className="text-xl font-semibold text-gray-900">
+                                                    Exam Ready Series
+                                                </h3>
+                                                {allCourses.filter(c => c.source_type === 'exam_ready').length === 0 && (
+                                                    <span className="bg-orange-50 text-orange-600 text-xs font-medium px-2.5 py-1 rounded-full">
+                                                        Coming Soon
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-gray-400 ml-4">Intensive exam preparation courses designed for success</p>
+                                        </div>
+
+                                        {allCourses.filter(c => c.source_type === 'exam_ready').length > 0 ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                                {allCourses.filter(c => c.source_type === 'exam_ready').map((course) => (
+                                                    <div
+                                                        key={course.id}
+                                                        onClick={() => {
+                                                            const slug = course.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                                                            navigate(`/exam-ready-series/${slug}/${course.id}`);
+                                                        }}
+                                                        className="bg-white rounded-xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden cursor-pointer border border-orange-100 group transform"
+                                                    >
+                                                        <div className="aspect-video relative overflow-hidden bg-gray-100">
+                                                            <img
+                                                                src={course.thumbnail}
+                                                                alt={course.title}
+                                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                                            />
+                                                            <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md border border-orange-100 text-orange-600 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider shadow-sm z-20 flex items-center gap-1.5">
+                                                                <span className="text-orange-500 text-xs">🎯</span> <span>Exam Ready</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="p-5">
+                                                            <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-orange-600 transition-colors">
+                                                                {course.title}
+                                                            </h3>
+                                                            <div className="flex items-center text-sm text-gray-500 mb-3">
+                                                                <span>{course.category}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl border border-orange-100/50 py-12 px-6 text-center">
+                                                <p className="text-gray-500">
+                                                    Focused exam preparation courses with practice tests, revision notes, and targeted problem-solving strategies.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </section>
+
                                     {/* Section 1: EasyLearnova Originals */}
                                     <section>
                                         <div className="mb-6">

@@ -19,6 +19,7 @@ class BaseCourse(models.Model):
     SOURCE_TYPE_CHOICES = (
         ('youtube', 'YouTube Curated'),
         ('original', 'EasyLearnova Original'),
+        ('exam_ready', 'Exam Ready Series'),
     )
     source_type = models.CharField(max_length=20, choices=SOURCE_TYPE_CHOICES, default='youtube')
     
