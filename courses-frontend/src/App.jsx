@@ -314,6 +314,12 @@ const App = () => {
                                 <Route path="/pro-learning" element={<Navigate to="/learning-path" replace />} />
                                 <Route path="/learning-path/:courseId" element={<ProLearningPage />} />
                                 <Route path="/learning-path/share/:shareId" element={<SharedProLearningPage />} />
+
+                                {/* Exam Ready Series Routes */}
+                                <Route path="/exam-ready-series/:courseTitle/:courseId" element={<Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div></div>}><SchoolCourseDetails /></Suspense>} />
+                                <Route path="/exam-ready-series/:courseTitle/learning/:courseId" element={<ResponsiveCourseLearningPage />} />
+                                <Route path="/exam-ready-series/:courseTitle/learning/:courseId/quiz" element={<StandaloneQuizPage />} />
+
                                 <Route path="/:courseId" element={<CourseDetailsWrapper />} />
                                 <Route path="/:courseId/learning" element={<ResponsiveCourseLearningPage />} />
                                 {/* Canonical ID-based quiz route */}

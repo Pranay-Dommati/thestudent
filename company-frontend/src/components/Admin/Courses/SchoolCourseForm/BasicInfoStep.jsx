@@ -189,7 +189,7 @@ const BasicInfoStep = ({
                 <label className="block text-gray-700 font-medium">
                     Course Type <span className="text-red-500">*</span>
                 </label>
-                <div className="flex space-x-6 mt-2">
+                <div className="flex flex-wrap gap-4 mt-2">
                     <label className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-all ${courseInfo.source_type === 'youtube' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
                         <input
                             type="radio"
@@ -217,6 +217,21 @@ const BasicInfoStep = ({
                         <div className="flex flex-col">
                             <span className="font-medium text-gray-900">EasyLearnova Originals</span>
                             <span className="text-xs text-gray-500">Premium original content</span>
+                        </div>
+                    </label>
+
+                    <label className={`flex items-center space-x-3 p-3 border rounded-lg cursor-pointer transition-all ${courseInfo.source_type === 'exam_ready' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                        <input
+                            type="radio"
+                            name="source_type"
+                            value="exam_ready"
+                            checked={courseInfo.source_type === 'exam_ready'}
+                            onChange={handleCourseInfoChange}
+                            className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                        />
+                        <div className="flex flex-col">
+                            <span className="font-medium text-gray-900">Exam Ready</span>
+                            <span className="text-xs text-gray-500">Intensive exam preparation</span>
                         </div>
                     </label>
                 </div>

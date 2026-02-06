@@ -26,7 +26,7 @@ const SchoolCourseDetails = () => {
     const [showAllTopics, setShowAllTopics] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
-    const { boardId, stateId, subjectId, sourceType } = useParams(); // sourceType = 'originals' or 'curated'
+    const { boardId, stateId, subjectId, sourceType, courseId: urlCourseId, courseTitle } = useParams(); // sourceType = 'originals' or 'curated', courseId/courseTitle for exam-ready-series
     const { isLoggedIn, validateAuth } = useAuth(); // Get authentication state and validator
 
     // Define subject icons mapping
@@ -75,15 +75,18 @@ const SchoolCourseDetails = () => {
         }
     };
 
+    // Check if this is an exam-ready-series route
+    const isExamReadyRoute = location.pathname.includes('/exam-ready-series/');
+
     useEffect(() => {
         const fetchCourseData = async () => {
             setLoading(true);
             try {
-                // If a specific courseId is provided in the query string, prefer fetching by ID.
+                // Get courseId from URL params (exam-ready-series) or query string
                 const searchParams = new URLSearchParams(location.search || '');
-                const selectedCourseId = searchParams.get('courseId');
+                const selectedCourseId = urlCourseId || searchParams.get('courseId');
                 if (selectedCourseId) {
-                    logger.log('Fetching school course by ID from query param:', selectedCourseId);
+                    logger.log('Fetching school course by ID:', selectedCourseId);
 
                     const cacheKey = schoolCourseKey({ courseId: selectedCourseId });
                     // Serve from cache immediately if available
@@ -384,8 +387,26 @@ const SchoolCourseDetails = () => {
 
     const handleStartLearning = async () => {
         if (isStarting) return; // guard against rapid clicks
+
+        // Helper to generate exam-ready learning URL
+        const getExamReadyLearningUrl = () => {
+            if (course?.id && course?.title) {
+                const slug = course.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                return `/exam-ready-series/${slug}/learning/${course.id}`;
+            }
+            return null;
+        };
+
         // Guests preview the course without enrollment
         if (!isLoggedIn) {
+            // For exam-ready routes, use the special URL pattern
+            if (isExamReadyRoute && course?.id) {
+                const learningUrl = getExamReadyLearningUrl();
+                if (learningUrl) {
+                    navigate(learningUrl);
+                    return;
+                }
+            }
             // Ensure courseId is always in the query params for cache consistency
             const params = new URLSearchParams(location.search || '');
             if (course?.id && !params.get('courseId')) {
@@ -406,6 +427,14 @@ const SchoolCourseDetails = () => {
             if (isEnrolled) {
                 logger.log('User already enrolled, navigating directly to learning page');
                 universalToast.success('Welcome back! Continuing your learning journey.', { id: 'start-learning' });
+                // For exam-ready courses, use the special URL pattern
+                if (isExamReadyRoute && course?.id) {
+                    const learningUrl = getExamReadyLearningUrl();
+                    if (learningUrl) {
+                        navigate(learningUrl);
+                        return;
+                    }
+                }
                 // ID-BASED NAVIGATION: Always use canonical /courses/:courseId/learning route
                 // Include courseId as query param to avoid late URL rewrite and improve cache hits
                 if (course?.id) {
@@ -449,6 +478,14 @@ const SchoolCourseDetails = () => {
                     universalToast.success('Welcome back! Continuing your learning journey.', { id: 'start-learning' });
                 }
 
+                // For exam-ready courses, use the special URL pattern
+                if (isExamReadyRoute && course?.id) {
+                    const learningUrl = getExamReadyLearningUrl();
+                    if (learningUrl) {
+                        navigate(learningUrl);
+                        return;
+                    }
+                }
                 // ID-BASED NAVIGATION after enrollment
                 // Include courseId as query param to avoid late URL rewrite and improve cache hits
                 if (course?.id) {
