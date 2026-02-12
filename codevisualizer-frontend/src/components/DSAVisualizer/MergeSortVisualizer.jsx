@@ -12,6 +12,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { InitResultAnimation, InitPointersAnimation } from './MergeSort/animations';
+import LoopConditionAnimation from './MergeSort/animations/LoopConditionAnimation';
+import CompareAnimation from './MergeSort/animations/CompareAnimation';
 
 // ============ ARRAY BOX COMPONENT ============
 const ArrayBox = ({ value, state = 'default', delay = 0, isComparing = false, isActive = false }) => {
@@ -1931,8 +1933,28 @@ const MergeSortVisualizer = ({
                             />
                         )}
 
+                        {/* Improved Cinematic Loop Condition Animation */
+                            stepType === 'compare_loop' && (
+                                <LoopConditionAnimation
+                                    i={iPtr}
+                                    j={jPtr}
+                                    leftLen={leftArray?.length || 0}
+                                    rightLen={rightArray?.length || 0}
+                                />
+                            )}
+
+                        {/* Cinematic Comparison Animation */}
+                        {stepType === 'compare' && (
+                            <CompareAnimation
+                                leftVal={leftArray ? leftArray[iPtr] : 0}
+                                rightVal={rightArray ? rightArray[jPtr] : 0}
+                                i={iPtr}
+                                j={jPtr}
+                            />
+                        )}
+
                         {/* Main Array Display (for standard steps) - ONLY VISIBLE IN CALL PHASE */}
-                        {phase === 'CALL' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && mainArray.length > 0 && (
+                        {phase === 'CALL' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && mainArray.length > 0 && (
                             <div className="flex flex-col items-center gap-2">
                                 <span className="text-xs text-slate-500 uppercase">Current Array (arr)</span>
                                 <ArrayRow
@@ -1954,7 +1976,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Split View: Left and Right Arrays (hide during special animations and return phases) - ONLY VISIBLE IN CALL PHASE */}
-                        {phase === 'CALL' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && (leftArray || rightArray) && (
+                        {phase === 'CALL' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && (leftArray || rightArray) && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -1992,7 +2014,7 @@ const MergeSortVisualizer = ({
 
                         {/* Sorted Halves Display - hide during return phases where animation shows it */}
                         {/* Also hide when any return animation is showing (isLeftReturnPhase or isRightReturnPhase) */}
-                        {(leftSorted || rightSorted) && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'return_base' && !isLeftReturnPhase && !isRightReturnPhase && (
+                        {(leftSorted || rightSorted) && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'return_base' && !isLeftReturnPhase && !isRightReturnPhase && stepType !== 'compare' && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -2028,7 +2050,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Result Array - Being Built */}
-                        {resultArray && stepType !== 'init_result' && stepType !== 'init_pointers' && (
+                        {resultArray && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -2045,7 +2067,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Pointer Display */}
-                        {(iPtr !== undefined || jPtr !== undefined) && (
+                        {(iPtr !== undefined || jPtr !== undefined) && stepType !== 'compare_loop' && stepType !== 'compare' && (
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
