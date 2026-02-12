@@ -184,6 +184,7 @@ INSTALLED_APPS = [
     'newsletter',  # Add newsletter app
     'rest_framework',
     'social_django',  # Add social-auth-app-django
+    'api.apps.ApiConfig',  # Self-ping logic
     'tracking',  # Custom analytics/tracking app
 ]
 
