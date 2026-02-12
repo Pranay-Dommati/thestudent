@@ -15,6 +15,7 @@ import { InitResultAnimation, InitPointersAnimation } from './MergeSort/animatio
 import LoopConditionAnimation from './MergeSort/animations/LoopConditionAnimation';
 import CompareAnimation from './MergeSort/animations/CompareAnimation';
 import AppendAnimation from './MergeSort/animations/AppendAnimation';
+import IncrementPointerAnimation from './MergeSort/animations/IncrementPointerAnimation';
 
 // ============ ARRAY BOX COMPONENT ============
 const ArrayBox = ({ value, state = 'default', delay = 0, isComparing = false, isActive = false }) => {
@@ -1963,8 +1964,16 @@ const MergeSortVisualizer = ({
                             />
                         )}
 
+                        {/* Increment Pointer Animation */}
+                        {(stepType === 'inc_i' || stepType === 'inc_j') && (
+                            <IncrementPointerAnimation
+                                pointerName={stepType === 'inc_i' ? 'i' : 'j'}
+                                newValue={stepType === 'inc_i' ? iPtr : jPtr}
+                            />
+                        )}
+
                         {/* Main Array Display (for standard steps) - ONLY VISIBLE IN CALL PHASE */}
-                        {phase === 'CALL' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && mainArray.length > 0 && (
+                        {phase === 'CALL' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && mainArray.length > 0 && (
                             <div className="flex flex-col items-center gap-2">
                                 <span className="text-xs text-slate-500 uppercase">Current Array (arr)</span>
                                 <ArrayRow
@@ -1986,7 +1995,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Split View: Left and Right Arrays (hide during special animations and return phases) - ONLY VISIBLE IN CALL PHASE */}
-                        {phase === 'CALL' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && (leftArray || rightArray) && (
+                        {phase === 'CALL' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && (leftArray || rightArray) && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -2024,7 +2033,7 @@ const MergeSortVisualizer = ({
 
                         {/* Sorted Halves Display - hide during return phases where animation shows it */}
                         {/* Also hide when any return animation is showing (isLeftReturnPhase or isRightReturnPhase) */}
-                        {(leftSorted || rightSorted) && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'return_base' && !isLeftReturnPhase && !isRightReturnPhase && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && (
+                        {(leftSorted || rightSorted) && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'return_base' && !isLeftReturnPhase && !isRightReturnPhase && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -2060,7 +2069,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Result Array - Being Built */}
-                        {resultArray && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && (
+                        {resultArray && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -2077,7 +2086,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Pointer Display */}
-                        {(iPtr !== undefined || jPtr !== undefined) && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && (
+                        {(iPtr !== undefined || jPtr !== undefined) && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && (
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
