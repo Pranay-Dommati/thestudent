@@ -1,0 +1,296 @@
+/* Code Visualizer specific styles */
+
+/* Scope styles to code-visualizer-container to avoid global conflicts */
+.code-visualizer-container {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Code font override */
+.code-visualizer-container code, 
+.code-visualizer-container pre, 
+.code-visualizer-container textarea, 
+.code-visualizer-container .font-mono {
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace !important;
+}
+
+/* Scrollbar Styles - Light theme with indigo accents */
+.code-visualizer-container ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.code-visualizer-container ::-webkit-scrollbar-track {
+  background: rgba(99, 102, 241, 0.05);
+  border-radius: 3px;
+}
+
+.code-visualizer-container ::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 3px;
+}
+
+.code-visualizer-container ::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5);
+}
+
+/* Textarea scrollbar - dark theme for code area */
+.code-visualizer-container textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.code-visualizer-container textarea::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+}
+
+.code-visualizer-container textarea::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.4);
+  border-radius: 3px;
+}
+
+.code-visualizer-container textarea::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.6);
+}
+
+/* Resizable panel styles */
+.code-visualizer-container .resizable-panel {
+  transition: none;
+}
+
+.code-visualizer-container .resizable-panel.not-dragging {
+  transition: width 0.15s ease-out;
+}
+
+/* Prevent selection during resize */
+.code-visualizer-container .resize-dragging {
+  cursor: col-resize !important;
+}
+
+.code-visualizer-container .resize-dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  pointer-events: none !important;
+}
+
+.code-visualizer-container .resize-dragging .resize-handle {
+  pointer-events: auto !important;
+}
+
+/* Subtle glow effects */
+.code-visualizer-container .glow-indigo {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.15),
+              0 0 40px rgba(99, 102, 241, 0.1);
+}
+
+/* ============================================
+   CINEMATIC ANIMATIONS
+   ============================================ */
+
+/* Fade in animation */
+@keyframes cv-fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade in up animation */
+@keyframes cv-fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Typing cursor animation */
+@keyframes cv-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Glow pulse animation */
+@keyframes cv-glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(20, 184, 166, 0.3),
+                0 0 10px rgba(20, 184, 166, 0.2),
+                0 0 20px rgba(20, 184, 166, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(20, 184, 166, 0.5),
+                0 0 20px rgba(20, 184, 166, 0.3),
+                0 0 40px rgba(20, 184, 166, 0.2);
+  }
+}
+
+/* Line highlight glow */
+@keyframes cv-lineGlow {
+  0%, 100% {
+    background: rgba(20, 184, 166, 0.1);
+    border-left-color: rgba(20, 184, 166, 0.5);
+  }
+  50% {
+    background: rgba(20, 184, 166, 0.15);
+    border-left-color: rgba(20, 184, 166, 0.8);
+  }
+}
+
+/* Scale in animation */
+@keyframes cv-scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Slide in from right */
+@keyframes cv-slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Typewriter effect */
+@keyframes cv-typewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+/* Variable update flash */
+@keyframes cv-varFlash {
+  0% {
+    background: rgba(20, 184, 166, 0.3);
+    transform: scale(1.02);
+  }
+  100% {
+    background: rgba(20, 184, 166, 0.1);
+    transform: scale(1);
+  }
+}
+
+/* Utility classes for animations */
+.code-visualizer-container .animate-fade-in {
+  animation: cv-fadeIn 0.5s ease-out forwards;
+}
+
+.code-visualizer-container .animate-fade-in-up {
+  animation: cv-fadeInUp 0.6s ease-out forwards;
+}
+
+.code-visualizer-container .animate-scale-in {
+  animation: cv-scaleIn 0.4s ease-out forwards;
+}
+
+.code-visualizer-container .animate-slide-in-right {
+  animation: cv-slideInRight 0.5s ease-out forwards;
+}
+
+.code-visualizer-container .animate-glow-pulse {
+  animation: cv-glowPulse 2s ease-in-out infinite;
+}
+
+.code-visualizer-container .animate-line-glow {
+  animation: cv-lineGlow 1.5s ease-in-out infinite;
+}
+
+.code-visualizer-container .animate-var-flash {
+  animation: cv-varFlash 0.5s ease-out forwards;
+}
+
+/* Blur effect for non-active lines */
+.code-visualizer-container .line-blur {
+  filter: blur(1px);
+  opacity: 0.5;
+  transition: all 0.3s ease;
+}
+
+.code-visualizer-container .line-focus {
+  filter: blur(0);
+  opacity: 1;
+  transition: all 0.3s ease;
+}
+
+/* Active line cinematic highlight */
+.code-visualizer-container .active-line-highlight {
+  position: relative;
+  background: linear-gradient(90deg, 
+    rgba(20, 184, 166, 0.15) 0%, 
+    rgba(59, 130, 246, 0.1) 50%,
+    transparent 100%
+  );
+  border-left: 3px solid #14b8a6;
+  animation: cv-lineGlow 1.5s ease-in-out infinite;
+}
+
+.code-visualizer-container .active-line-highlight::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #14b8a6, #3b82f6);
+  box-shadow: 0 0 10px rgba(20, 184, 166, 0.5);
+}
+
+/* Storyline overlay styles */
+.code-visualizer-container .storyline-overlay {
+  background: radial-gradient(ellipse at center, 
+    rgba(15, 23, 42, 0.95) 0%, 
+    rgba(15, 23, 42, 0.98) 100%
+  );
+  backdrop-filter: blur(8px);
+}
+
+/* Typing animation container */
+.code-visualizer-container .typing-text {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid #14b8a6;
+  animation: cv-typewriter 2s steps(40) forwards, cv-blink 0.7s step-end infinite;
+}
+
+/* Progress dots animation */
+.code-visualizer-container .progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #14b8a6;
+  animation: cv-bounce 1s ease-in-out infinite;
+}
+
+.code-visualizer-container .progress-dot:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.code-visualizer-container .progress-dot:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+@keyframes cv-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Smooth scroll for code editor */
+.code-visualizer-container .smooth-scroll {
+  scroll-behavior: smooth;
+}

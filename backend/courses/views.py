@@ -169,6 +169,7 @@ def create_course(request):
                 'state': _first(['state', 'State']),
                 'subject': _first(['subject', 'Subject', 'courseSubject']),
                 'sources': _first(['sources']),
+                'source_type': _first(['source_type', 'sourceType'], 'youtube'),
                 'duration': _first(['duration']),
                 'is_published': True,
             }
@@ -325,6 +326,7 @@ def create_course(request):
                 'description': data.get('description', ''),
                 'duration': data.get('duration', ''),
                 'sources': data.get('sources', ''),
+                'source_type': _first(['source_type', 'sourceType'], 'youtube'),
                 'proficiency': data.get('proficiency', 'beginner'),
                 'certificate_given': data.get('certificateGiven') in ['true', True, 'True'],
                 'project_based': data.get('projectBased') in ['true', True, 'True'],
@@ -565,6 +567,7 @@ def list_engineering_courses(request):
                 'description': course.description,
                 'duration': course.duration,
                 'sources': course.sources,
+                'source_type': course.source_type,
                 'proficiency': course.proficiency,
                 'certificate_given': course.certificate_given,
                 'project_based': course.project_based,
@@ -755,9 +758,21 @@ def get_school_course_by_id(request, course_id):
 @permission_classes([AllowAny])
 @authentication_classes([])
 def list_all_courses(request):
+    from django.core.cache import cache
+    
     try:
         category = request.query_params.get('category', 'all')
-        print(f"Requested category: {category}")
+        
+        # Check cache first (5 minute TTL)
+        cache_key = f'courses_all_{category}'
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            if settings.DEBUG:
+                print(f"[CACHE HIT] Returning cached courses for category: {category}")
+            return Response(cached_data)
+        
+        if settings.DEBUG:
+            print(f"[CACHE MISS] Fetching courses for category: {category}")
         
         # Process engineering courses (only published for public listing)
         eng_queryset = EngineeringCourse.objects.filter(is_published=True)
@@ -780,6 +795,7 @@ def list_all_courses(request):
                 'thumbnail': _build_thumbnail_url(course, request),
                 'short_description': course.short_description,
                 'course_type': 'engineering',
+                'source_type': course.source_type,
                 'category': course.category or 'Engineering',
                 'class': 'Engineering',
                 'last_updated': course.last_updated,
@@ -795,6 +811,7 @@ def list_all_courses(request):
                 'thumbnail': _build_thumbnail_url(course, request),
                 'short_description': course.short_description,
                 'course_type': 'school',
+                'source_type': course.source_type,
                 'category': course.subject,
                 'class': f"{course.class_level} - {course.board}",
                 'last_updated': course.last_updated,
@@ -802,8 +819,11 @@ def list_all_courses(request):
             }
             courses_data.append(course_data)
 
+        # Cache the result for 5 minutes
+        cache.set(cache_key, courses_data, timeout=300)
+        
         if settings.DEBUG:
-            print(f"Successfully processed {len(courses_data)} courses")
+            print(f"[CACHE SET] Cached {len(courses_data)} courses for category: {category}")
         return Response(courses_data)
         
     except Exception as e:
@@ -1022,6 +1042,7 @@ def list_school_courses(request):
                 'state': course.state,
                 'duration': course.duration,
                 'sources': course.sources,
+                'source_type': course.source_type,
                 'key_topics': course.key_topics,
                 'learning_points': course.learning_points,
                 'last_updated': course.last_updated,

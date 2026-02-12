@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,14 +19,60 @@ import axios from '../../utils/axios';
 import { getLearningStats as fetchLearningStats } from '../../services/activityTracker';
 // logger removed for production cleanliness
 
-// API base is provided via axios instance or fetch with relative paths
+// Session cache for hub stats - instant display
+const HUB_STATS_CACHE_KEY = 'learning_hub_stats_v1';
+const HUB_STATS_TTL = 60 * 1000; // 1 minute
+
+const readHubStatsCache = () => {
+  try {
+    const raw = sessionStorage.getItem(HUB_STATS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.ts) return null;
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+};
+
+const writeHubStatsCache = (stats, count) => {
+  try {
+    sessionStorage.setItem(HUB_STATS_CACHE_KEY, JSON.stringify({ 
+      ts: Date.now(), 
+      stats, 
+      count 
+    }));
+  } catch (_) {}
+};
+
+// Get initial state from cache for instant display
+const getInitialHubState = () => {
+  const cached = readHubStatsCache();
+  if (cached) {
+    return { 
+      stats: cached.stats || null, 
+      count: cached.count || 0,
+      hasCachedData: true
+    };
+  }
+  return { stats: null, count: 0, hasCachedData: false };
+};
 
 const MobileLearningHubPage = () => {
   const { user: authUser, isLoggedIn } = useAuth();
   const location = useLocation();
-  const [learningStats, setLearningStats] = useState(null);
-  const [enrolledCoursesCount, setEnrolledCoursesCount] = useState(0);
+  
+  // Initialize from cache for instant display
+  const initialHubState = getInitialHubState();
+  const [learningStats, setLearningStats] = useState(initialHubState.stats);
+  const [enrolledCoursesCount, setEnrolledCoursesCount] = useState(initialHubState.count);
   const [activeTab, setActiveTab] = useState('enrolled'); // Tab state
+  
+  // Refs to prevent duplicate API calls (matching desktop optimization)
+  const lastRefreshTimeRef = useRef(0);
+  const isRefreshingRef = useRef(false);
+  const hasCachedDataRef = useRef(initialHubState.hasCachedData);
+  const REFRESH_COOLDOWN = 30000; // 30 seconds cooldown between refreshes
 
   // Handle hash navigation to switch to AI courses tab
   useEffect(() => {
@@ -35,45 +81,78 @@ const MobileLearningHubPage = () => {
     }
   }, [location.hash]);
 
-  useEffect(() => {
-    const refresh = async () => {
-      if (!isLoggedIn) return;
-      try {
-        const token = localStorage.getItem('accessToken');
-        if (!token) return;
-        const [coursesResponse, stats] = await Promise.all([
-          axios.get('/courses/enrolled/'),
-          fetchLearningStats(),
-        ]);
-        if (coursesResponse.data?.success) {
-          setEnrolledCoursesCount(coursesResponse.data.courses.length);
-        }
-        if (stats) {
-          setLearningStats(stats);
-        }
-      } catch (_) {}
-    };
-    refresh();
-  }, [isLoggedIn]);
+  // Optimized refresh function with cooldown (matching desktop version)
+  const refreshHubData = useCallback(async (force = false) => {
+    if (!isLoggedIn) return;
+    
+    const now = Date.now();
+    
+    // Check cache freshness
+    if (!force && hasCachedDataRef.current) {
+      const cached = readHubStatsCache();
+      if (cached && (now - cached.ts) < HUB_STATS_TTL) {
+        return; // Cache is fresh
+      }
+    }
+    
+    // Prevent duplicate calls within cooldown period
+    if (!force && (isRefreshingRef.current || (now - lastRefreshTimeRef.current < REFRESH_COOLDOWN))) {
+      return;
+    }
+    
+    isRefreshingRef.current = true;
+    lastRefreshTimeRef.current = now;
+    
+    try {
+      // Parallel fetch for better performance
+      const [coursesResponse, stats] = await Promise.all([
+        axios.get('/courses/enrolled/'),
+        fetchLearningStats(),
+      ]);
+      
+      let newCount = 0;
+      let newStats = null;
+      
+      if (coursesResponse.data?.success) {
+        newCount = coursesResponse.data.courses.length;
+        setEnrolledCoursesCount(newCount);
+      }
+      if (stats) {
+        newStats = stats;
+        setLearningStats(stats);
+      }
+      
+      // Update cache
+      writeHubStatsCache(newStats, newCount);
+      hasCachedDataRef.current = true;
+    } catch (_) {
+      // silent in production
+    } finally {
+      isRefreshingRef.current = false;
+    }
+  }, [isLoggedIn]); // Only depend on isLoggedIn - state values captured fresh each call
 
-  // Listen for global enrollment changes and refresh-on-focus for mobile
+  useEffect(() => {
+    // Background fetch - don't force if we have cache
+    refreshHubData(!hasCachedDataRef.current);
+  }, [refreshHubData]);
+
+  // Lightweight realtime: listen for activity updates (matching desktop optimization)
   useEffect(() => {
     const onEnrollmentChanged = (e) => {
+      // Prefer delta updates to avoid extra network call; fallback to full refresh
       const detail = e?.detail || {};
       if (typeof detail.count === 'number') {
         setEnrolledCoursesCount(Math.max(0, detail.count));
       } else if (typeof detail.delta === 'number') {
         setEnrolledCoursesCount((prev) => Math.max(0, prev + detail.delta));
       } else {
-        // Fallback: refetch count once
-        axios.get('/courses/enrolled/').then((res) => {
-          if (res.data?.success) {
-            setEnrolledCoursesCount(res.data.courses.length);
-          }
-        }).catch(() => {});
+        refreshHubData(); // Cooldown will prevent excessive calls
       }
     };
+    
     const onActivity = (e) => {
+      // Optimistically update time-based stats without immediate network call
       const minutes = e?.detail?.minutes;
       if (typeof minutes === 'number' && minutes > 0) {
         let shouldRefreshForStreak = false;
@@ -82,7 +161,11 @@ const MobileLearningHubPage = () => {
           const prevWeek = Number(prev?.weekly_hours || 0);
           const prevTodayHours = Number(prev?.today?.hours || 0);
           const addHours = minutes / 60;
+          
+          // If this is the first activity chunk today, schedule a stats refresh
           if (prevTodayHours === 0) shouldRefreshForStreak = true;
+          
+          // Update weekly breakdown marking today as active
           const wb = Array.isArray(prev?.weekly_breakdown) ? [...prev.weekly_breakdown] : [];
           try {
             const todayISO = new Date().toISOString().slice(0, 10);
@@ -97,6 +180,7 @@ const MobileLearningHubPage = () => {
               wb[idx] = { ...item, has_activity: true, hours: itemHours, minutes: itemMinutes };
             }
           } catch {}
+          
           return {
             ...prev,
             weekly_hours: prevWeek + addHours,
@@ -104,54 +188,46 @@ const MobileLearningHubPage = () => {
             weekly_breakdown: wb,
           };
         });
+        
+        // Fetch authoritative streak data once when today transitions from 0 -> active
         if (shouldRefreshForStreak) {
-          fetchLearningStats().then((stats) => stats && setLearningStats(stats)).catch(() => {});
+          refreshHubData();
         }
       } else {
-        fetchLearningStats().then((stats) => stats && setLearningStats(stats)).catch(() => {});
+        // For events without minutes detail, fallback to a refresh
+        refreshHubData();
       }
     };
+    
     const onStorage = (e) => {
+      // If proLearning course saved markers changed, refresh
       if (e && typeof e.key === 'string' && (e.key.startsWith('proLearning_') || e.key === 'coursesSavedToHub')) {
-        fetchLearningStats().then((stats) => stats && setLearningStats(stats)).catch(() => {});
+        refreshHubData();
       }
     };
-    const onProLearningSaved = () => {
-      fetchLearningStats().then((stats) => stats && setLearningStats(stats)).catch(() => {});
-    }
+    
+    // Only use visibilitychange (not focus) to avoid double-firing on Alt+Tab
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        axios.get('/courses/enrolled/').then((res) => {
-          if (res.data?.success) {
-            setEnrolledCoursesCount(res.data.courses.length);
-          }
-        }).catch(() => {});
-        fetchLearningStats().then((stats) => stats && setLearningStats(stats)).catch(() => {});
+        refreshHubData(); // Cooldown will prevent excessive calls
       }
     };
-    const onFocus = () => {
-      axios.get('/courses/enrolled/').then((res) => {
-        if (res.data?.success) {
-          setEnrolledCoursesCount(res.data.courses.length);
-        }
-      }).catch(() => {});
-      fetchLearningStats().then((stats) => stats && setLearningStats(stats)).catch(() => {});
-    };
+    
     window.addEventListener('enrollment-changed', onEnrollmentChanged);
     window.addEventListener('learning:activity-updated', onActivity);
-    window.addEventListener('prolearning:course-saved', onProLearningSaved);
+    window.addEventListener('prolearning:course-saved', onActivity);
     window.addEventListener('storage', onStorage);
     document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('focus', onFocus);
+    // Removed focus listener - visibilitychange is sufficient and prevents double-firing
+    
     return () => {
       window.removeEventListener('enrollment-changed', onEnrollmentChanged);
       window.removeEventListener('learning:activity-updated', onActivity);
-      window.removeEventListener('prolearning:course-saved', onProLearningSaved);
+      window.removeEventListener('prolearning:course-saved', onActivity);
       window.removeEventListener('storage', onStorage);
       document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('focus', onFocus);
     };
-  }, []);
+  }, [refreshHubData]);
 
   // Create enhanced user object with updated stats
   const user = {

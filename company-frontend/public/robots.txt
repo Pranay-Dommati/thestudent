@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /chat
+Disallow: /learning-hub
+Disallow: /pro-learning
+Disallow: /api
+
+Sitemap: https://easylearnova.com/sitemap.xml

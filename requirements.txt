@@ -25,3 +25,9 @@ boto3>=1.40.0
 cloudinary>=1.39.1
 django-cloudinary-storage>=0.3.0
 
+# Code Visualizer AI narration
+google-genai>=1.0.0
+
+# Redis cache for DRF throttling (production)
+django-redis>=5.4.0
+

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FaUserCircle, FaSignOutAlt, FaUserPlus, FaSignInAlt, FaChevronRight, FaHome } from 'react-icons/fa';
+import { HiOutlineCode, HiOutlineSparkles } from 'react-icons/hi';
+import { IoClose } from 'react-icons/io5';
 import { useAuth } from '../../context/AuthContext';
 import LogoutConfirmModal from '../common/LogoutConfirmModal';
 
@@ -12,6 +15,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthMenuOpen, setIsAuthMenuOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
 
   // Generate breadcrumbs from current path
@@ -31,6 +35,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
       if (segment === 'chat') name = 'Course Creator';
       if (segment === 'courses') name = 'Courses';
       if (segment === 'pro-learning') name = 'Pro Learning';
+      if (segment === 'code-visualizer') name = 'Code Visualizer';
       if (segment === 'auth') name = 'Authentication';
       if (segment.includes('th') || segment === 'engineering') {
         name = segment.charAt(0).toUpperCase() + segment.slice(1);
@@ -77,13 +82,30 @@ const Navbar = ({ initialStyle = "transparent" }) => {
       if (event.key === 'Escape' && (isMobileMenuOpen || isAuthMenuOpen)) {
         closeAllMenus();
       }
+      if (event.key === 'Escape' && showComingSoon) {
+        setShowComingSoon(false);
+      }
     };
 
-    if (isMobileMenuOpen || isAuthMenuOpen) {
+    if (isMobileMenuOpen || isAuthMenuOpen || showComingSoon) {
       document.addEventListener('keydown', handleKeyDown);
       return () => document.removeEventListener('keydown', handleKeyDown);
     }
-  }, [isMobileMenuOpen, isAuthMenuOpen]);  useEffect(() => {
+  }, [isMobileMenuOpen, isAuthMenuOpen, showComingSoon]);
+
+  // Prevent body scroll when Coming Soon modal is open
+  useEffect(() => {
+    if (showComingSoon) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showComingSoon]);
+
+  useEffect(() => {
     window.scrollTo(0, 0);
     setIsScrolled(window.scrollY > 10);
   }, []);
@@ -182,6 +204,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
   };
 
   return (
+    <>
     <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${backgroundClass} ${isScrolled ? 'py-2' : 'py-4'}`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center">
@@ -239,7 +262,7 @@ const Navbar = ({ initialStyle = "transparent" }) => {
             </div>
           ) : (
             // Full navigation for desktop
-            <div className="flex items-center justify-center flex-1 max-w-[600px]">
+            <div className="flex items-center justify-center flex-1 max-w-[700px]">
               <div className="flex items-center space-x-8">
                 <Link to="/" className={`font-medium transition-colors ${textColor}`}>Home</Link>
                 <Link 
@@ -262,6 +285,18 @@ const Navbar = ({ initialStyle = "transparent" }) => {
                 >
                   Course Creator
                 </Link>
+                <button 
+                  onClick={() => {
+                    if (import.meta.env.DEV) {
+                      navigate('/code-visualizer');
+                    } else {
+                      setShowComingSoon(true);
+                    }
+                  }}
+                  className={`font-medium transition-colors ${textColor} hover:opacity-80`}
+                >
+                  Code Visualizer
+                </button>
               </div>
             </div>
           )}
@@ -515,7 +550,81 @@ const Navbar = ({ initialStyle = "transparent" }) => {
         onConfirm={confirmLogout}
         onCancel={cancelLogout}
       />
+
     </nav>
+    
+    {/* Code Visualizer Coming Soon Modal - Rendered via Portal to body */}
+    {showComingSoon && ReactDOM.createPortal(
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+        {/* Backdrop */}
+        <div 
+          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowComingSoon(false)}
+        />
+        
+        {/* Modal - White background to match site's other modals */}
+        <div className="relative bg-white rounded-2xl p-8 max-w-md mx-4 shadow-2xl border border-gray-100">
+          {/* Close button */}
+          <button
+            onClick={() => setShowComingSoon(false)}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <IoClose className="w-6 h-6" />
+          </button>
+
+          {/* Icon - Purple gradient like other icons on site */}
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <HiOutlineCode className="w-8 h-8 text-white" />
+              </div>
+              <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center">
+                <HiOutlineSparkles className="w-3 h-3 text-white" />
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <h2 className="text-xl font-bold text-gray-900 text-center mb-3">
+            Code Visualizer
+          </h2>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <span className="px-3 py-1 bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold rounded-full">
+              Coming Soon
+            </span>
+          </div>
+          <p className="text-gray-600 text-center mb-6 leading-relaxed">
+            We're building something amazing! Our AI-powered Code Visualizer will help you understand code execution step-by-step with interactive visualizations and voice explanations.
+          </p>
+
+          {/* Features preview */}
+          <div className="space-y-3 mb-6">
+            <div className="flex items-center gap-3 text-gray-600">
+              <div className="w-2 h-2 bg-violet-500 rounded-full"></div>
+              <span className="text-sm">Step-by-step code execution</span>
+            </div>
+            <div className="flex items-center gap-3 text-gray-600">
+              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              <span className="text-sm">AI voice explanations</span>
+            </div>
+            <div className="flex items-center gap-3 text-gray-600">
+              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+              <span className="text-sm">Interactive visualizations</span>
+            </div>
+          </div>
+
+          {/* Button */}
+          <button
+            onClick={() => setShowComingSoon(false)}
+            className="w-full py-3 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-semibold rounded-xl transition-all"
+          >
+            Got it!
+          </button>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 };
 

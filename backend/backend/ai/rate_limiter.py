@@ -32,12 +32,42 @@ ENFORCE_DAILY_LIMIT = bool(getattr(settings, 'ENFORCE_DAILY_LIMIT', False))
 # Security constants
 MAX_CACHE_KEY_LENGTH = 250  # Memcached limit
 MAX_TOPIC_NAME_LENGTH = 200
-# Allow common safe punctuation in topic names
-# Added support for characters used frequently in course topics: &, comma, colon, slash, and apostrophes
-ALLOWED_TOPIC_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9\s\-\+\#\.\(\)\&,:\/'’]+$")
+# Allow common safe punctuation in topic names for educational content
+# Includes: alphanumerics, spaces, common punctuation for questions/exclamations,
+# mathematical symbols, quotation marks, and other educational content characters
+ALLOWED_TOPIC_NAME_PATTERN = re.compile(
+    r"^[a-zA-Z0-9\s\-+#.()\&,:/?!@;=%*_~\[\]{}<>^|'\"]+$"
+)
+
+# Pattern for blocked dangerous content (XSS, script injection)
+BLOCKED_CHARS_PATTERN = re.compile(r'<script|javascript:|data:|vbscript:|onclick=|onerror=', re.IGNORECASE)
+
+def sanitize_topic_name(name):
+    """
+    Sanitize topic name by removing potentially dangerous patterns while preserving 
+    legitimate educational characters like ?, !, ", etc.
+    """
+    if not name:
+        return ''
+    
+    # Convert to string and strip whitespace
+    name = str(name).strip()
+    
+    # Remove null bytes and other control characters (keep printable chars only)
+    name = ''.join(char for char in name if ord(char) >= 32)
+    
+    # Remove dangerous script-like patterns
+    name = re.sub(r'<[^>]*script[^>]*>', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'javascript\s*:', '', name, flags=re.IGNORECASE)
+    name = re.sub(r'on\w+\s*=', '', name, flags=re.IGNORECASE)
+    
+    # Normalize multiple spaces to single space
+    name = re.sub(r'\s+', ' ', name).strip()
+    
+    return name
 
 def validate_topic_input(topics):
-    """Validate topic input for security"""
+    """Validate topic input for security while allowing common educational characters"""
     if not isinstance(topics, list):
         raise ValueError("Topics must be a list")
     
@@ -52,11 +82,25 @@ def validate_topic_input(topics):
         else:
             raise ValueError("Invalid topic format")
         
-        if not name or len(name) > MAX_TOPIC_NAME_LENGTH:
+        # Sanitize the name first
+        name = sanitize_topic_name(name)
+        
+        if not name:
+            raise ValueError("Topic name cannot be empty")
+        
+        if len(name) > MAX_TOPIC_NAME_LENGTH:
             raise ValueError(f"Topic name must be 1-{MAX_TOPIC_NAME_LENGTH} characters")
         
+        # Check for blocked dangerous patterns
+        if BLOCKED_CHARS_PATTERN.search(name):
+            raise ValueError("Topic name contains potentially unsafe content")
+        
+        # Validate against allowed pattern (permissive for educational content)
         if not ALLOWED_TOPIC_NAME_PATTERN.match(name):
-            raise ValueError("Topic name contains invalid characters")
+            # Log the invalid character for debugging
+            invalid_chars = set(c for c in name if not re.match(r"[a-zA-Z0-9\s\-+#.()\&,:/?!@;=%*_~\[\]{}<>^|'\"]", c))
+            logger.warning(f"Topic name contains invalid characters: {invalid_chars} in '{name[:50]}'")
+            raise ValueError(f"Topic name contains invalid characters: {''.join(invalid_chars)}")
     
     return True
 
@@ -290,7 +334,7 @@ class TopicRateLimiter:
                 )
             usage_data['count'] = new_count
         
-        # Sanitize topic names for storage with strict validation
+        # Sanitize topic names for storage with validation
         sanitized_topics = []
         for topic in topics_created:
             if isinstance(topic, dict):
@@ -298,12 +342,13 @@ class TopicRateLimiter:
             else:
                 name = str(topic)
             
-            # Strict validation of topic names
+            # Validation of topic names (now allows educational punctuation)
             if not name or len(name) > MAX_TOPIC_NAME_LENGTH:
                 name = name[:MAX_TOPIC_NAME_LENGTH] if name else 'Unknown'
             if not ALLOWED_TOPIC_NAME_PATTERN.match(name):
                 # Remove disallowed characters but keep common safe punctuation used in topic names
-                name = re.sub(r"[^\w\s\-\+\#\.\(\)\&,:\/'’]", '', name) or 'Invalid_Name'
+                # This handles any edge cases that slip through
+                name = re.sub(r"[^\w\s\-+#.()\&,:/?!@;=%*_~\[\]{}<>^|'\"]", '', name) or 'Invalid_Name'
             sanitized_topics.append(name)
         
         # Record request with precise timestamp

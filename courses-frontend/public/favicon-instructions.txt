@@ -1,0 +1,7 @@
+To fix the favicon.ico 404 error:
+
+1. Place your favicon.ico file in this folder
+2. The file should be named exactly "favicon.ico"
+3. The favicon.ico file should be a valid ICO file (you can convert one at https://favicon.io)
+
+Common favicon sizes are 16x16, 32x32, or 48x48 pixels.

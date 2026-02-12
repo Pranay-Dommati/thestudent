@@ -1,0 +1,1043 @@
+import React, { useRef, useState, useEffect } from 'react';
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import {
+  FaBookOpen,
+  FaBrain,
+  FaBolt,
+  FaLightbulb,
+  FaCheck,
+  FaVideo,
+  FaYoutube
+} from "react-icons/fa";
+import {
+  IoPlayCircle,
+  IoCheckmarkCircle,
+  IoEye,
+  IoBookmark,
+  IoShare
+} from "react-icons/io5";
+import { BiTime } from "react-icons/bi";
+import {
+  formatDuration,
+  formatViewCount
+} from '../services/index.js';
+import { QuizRenderer } from '../utils/QuizUtils.jsx';
+import { ResourcesRenderer } from '../utils/ResourcesUtils.jsx';
+import { getResourceIconName } from '../utils/ResourcesUtils.jsx';
+import {
+  preSanitizeMarkdown,
+  flattenReactChildren,
+  looksLikeAsciiDiagram,
+  shouldRenderAsInlineCode,
+  shouldRenderAsPlainText
+} from '../utils/ReadingUtils.js';
+import TextSelectionPopup from '../TutorChat/TextSelectionPopup.jsx';
+
+// Hook for smooth text streaming animation
+const useSmoothStreaming = (targetText, isComplete, isProgressive) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const targetRef = useRef(targetText || '');
+  const currentLengthRef = useRef(0);
+  const [cursorVisible, setCursorVisible] = useState(true);
+  
+  // Update refs when props change
+  useEffect(() => {
+    targetRef.current = targetText || '';
+    
+    // If not progressive (e.g. reload), or already complete on mount (and we haven't started animating), show immediately
+    // We check currentLengthRef.current === 0 to ensure we only skip animation on initial load, not mid-stream
+    if ((!isProgressive || isComplete) && currentLengthRef.current === 0) {
+        currentLengthRef.current = (targetText || '').length;
+        setDisplayedText(targetText || '');
+    }
+  }, [targetText, isComplete, isProgressive]);
+
+  useEffect(() => {
+    let animationFrameId;
+    
+    const animate = () => {
+      const targetLen = targetRef.current.length;
+      const currentLen = currentLengthRef.current;
+      
+      if (currentLen < targetLen) {
+        // Calculate step size
+        const diff = targetLen - currentLen;
+        
+        // Adaptive speed:
+        // - Small diff: slow, smooth typing (2-3 chars/frame)
+        // - Medium diff: faster (5-10 chars/frame)
+        // - Huge diff: catch up quickly but still animated (15-20 chars/frame)
+        let step = 2; 
+        if (diff > 50) step = 5;
+        if (diff > 200) step = 10; // Reduced from 15
+        if (diff > 1000) step = 20; // Reduced from 50 to prevent "instant" appearance
+        
+        const nextLen = Math.min(targetLen, currentLen + step);
+        currentLengthRef.current = nextLen;
+        setDisplayedText(targetRef.current.slice(0, nextLen));
+        
+        animationFrameId = requestAnimationFrame(animate);
+      } else if (currentLen > targetLen) {
+        // Text shrank (reset), update immediately
+        currentLengthRef.current = targetLen;
+        setDisplayedText(targetRef.current);
+        animationFrameId = requestAnimationFrame(animate);
+      } else {
+        // Idle, check again next frame (or could stop and restart on prop change)
+        // Keeping loop running is simpler for now
+        animationFrameId = requestAnimationFrame(animate);
+      }
+    };
+    
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []); // Run continuously
+
+  // Blinking cursor effect
+  useEffect(() => {
+    if (!isProgressive || isComplete) return;
+    
+    const interval = setInterval(() => {
+      setCursorVisible(v => !v);
+    }, 500);
+    
+    return () => clearInterval(interval);
+  }, [isProgressive, isComplete]);
+
+  // If complete, just return text
+  if (!isProgressive || isComplete) {
+      return displayedText;
+  }
+
+  // Append cursor token if generating
+  return displayedText + (cursorVisible ? ' |CURSOR|' : '');
+};
+
+// Helper to render children with cursor replacement
+const renderChildrenWithCursor = (children) => {
+  return React.Children.map(children, child => {
+    if (typeof child === 'string') {
+      if (child.includes('|CURSOR|')) {
+        const parts = child.split('|CURSOR|');
+        return (
+          <>
+            {parts[0]}
+            <span className="inline-block w-2.5 h-2.5 bg-blue-600 rounded-full ml-1 animate-pulse align-baseline" style={{ animationDuration: '1s' }} />
+            {parts[1]}
+          </>
+        );
+      }
+      return child;
+    }
+    if (React.isValidElement(child) && child.props.children) {
+      return React.cloneElement(child, {
+        children: renderChildrenWithCursor(child.props.children)
+      });
+    }
+    return child;
+  });
+};
+
+/**
+ * TabContentRenderer - Renders all tab content for ProLearningPage
+ * 
+ * This component handles rendering for:
+ * - Reading tab with ReactMarkdown and syntax highlighting
+ * - Summary tab with ReactMarkdown
+ * - Videos tab with video grid and modal
+ * - Quiz tab using QuizRenderer
+ * - Resources tab using ResourcesRenderer
+ */
+const TabContentRenderer = ({
+  activeTab,
+  content,
+  currentTopicName,
+  isTopicBlocked,
+  LoadingComponent,
+  selectedTopic,
+  getCurrentTopicFromParam,
+  topicParam,
+  sanitizedReading,
+  sanitizedReadingTopicName,
+  contentTopicName,
+  copySuccessMap,
+  handleCopyCode,
+  openVideoModal,
+  quizSubmitted,
+  setQuizSubmitted,
+  setContent,
+  loadScenario,
+  getCurrentTopic,
+  setActiveTab,
+  onTextSelection, // New prop for handling text selection
+  isProgressiveGenerating // New prop for animation control
+}) => {
+  // Create ref for reading content container
+  const readingContentRef = useRef(null);
+  const [selectionPopup, setSelectionPopup] = React.useState(null);
+  const [selectedText, setSelectedText] = React.useState('');
+
+  // Handle text selection in reading material
+  React.useEffect(() => {
+    const handleSelection = (e) => {
+      // Small delay to let selection stabilize
+      setTimeout(() => {
+        const selection = window.getSelection();
+        const text = selection?.toString().trim();
+        
+        if (text && text.length > 0 && readingContentRef.current?.contains(selection.anchorNode)) {
+          const range = selection.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          
+          setSelectedText(text);
+          setSelectionPopup({
+            x: rect.left + rect.width / 2,
+            y: rect.top - 10, // Position above selection
+          });
+        } else {
+          setSelectionPopup(null);
+          setSelectedText('');
+        }
+      }, 10);
+    };
+
+    // Only use mouseup to avoid interfering with text selection
+    document.addEventListener('mouseup', handleSelection);
+    
+    return () => {
+      document.removeEventListener('mouseup', handleSelection);
+    };
+  }, []);
+
+  const handleAskSia = () => {
+    if (selectedText && onTextSelection) {
+      onTextSelection(selectedText);
+      setSelectionPopup(null);
+      setSelectedText('');
+      // Don't clear the browser selection - let it persist
+    }
+  };
+
+  // Calculate reading content for animation hook (must be top-level to adhere to Rules of Hooks)
+  const effectiveTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
+  
+  // Prefer sanitized reading if it belongs to current topic
+  const useSanitized = (sanitizedReadingTopicName === effectiveTopicName) && (typeof sanitizedReading === 'string') && sanitizedReading.trim().length > 0;
+  
+  // Else fallback to raw content reading if content belongs to current topic
+  const useRaw = (!useSanitized) && (contentTopicName === effectiveTopicName) && (typeof content?.reading === 'string') && content.reading.trim().length > 0;
+  
+  const rawReading = useSanitized ? sanitizedReading : (useRaw ? content.reading : '');
+  
+  // Check if reading is marked as complete in metadata
+  const isReadingComplete = !!content?.metadata?.readingComplete || !!content?.metadata?.readingGenerated;
+  
+  // Apply smooth streaming - called unconditionally at top level
+  const displayReading = useSmoothStreaming(rawReading, isReadingComplete, isProgressiveGenerating);
+
+  switch (activeTab) {
+    case "reading":
+      // BLOCK CHECK: If topic is blocked, don't show empty content panels
+      if (currentTopicName && isTopicBlocked(currentTopicName)) {
+        return <LoadingComponent />;
+      }
+      
+      // Additional fallback: if content exists but reading is empty, try to show other content
+      const hasAnyContent = content && (content.reading || content.summary || content.videos?.length || content.quiz?.length || content.resources?.length);
+      
+      return (
+        <div className="max-w-none pt-6">
+          {/* Text Selection Popup */}
+          <TextSelectionPopup position={selectionPopup} onAskSia={handleAskSia} />
+          
+          {/* Compact Reading Header */}
+          <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-xl p-4 mb-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-lg flex items-center justify-center shadow-lg mr-3">
+                  <FaBookOpen className="text-sm" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Reading Material</h2>
+                  <p className="text-sm text-gray-600">Comprehensive study content</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Enhanced Content with better typography, all content together */}
+          <div className="prose prose-lg max-w-none px-0 sm:px-4">
+            <style>{`
+              @media (max-width: 640px) {
+                .prose ul,
+                .prose ol {
+                  padding-left: 1rem !important;
+                  margin-left: 0 !important;
+                }
+                .prose li {
+                  margin-left: 0 !important;
+                  padding-left: 0 !important;
+                }
+                .prose blockquote {
+                  margin-left: 0 !important;
+                  padding-left: 1rem !important;
+                }
+                .prose pre {
+                  margin-left: 0 !important;
+                }
+              }
+            `}</style>
+            {(() => {
+              if (!displayReading || displayReading.trim().length === 0) {
+                return (
+                  <div className="text-gray-500">Content not available</div>
+                );
+              }
+              return (
+              <div ref={readingContentRef}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+                components={{
+                  h1: ({children}) => (
+                    <h1 className="text-3xl font-bold mb-6 pb-4 border-b-2 border-blue-200 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                      {renderChildrenWithCursor(children)}
+                    </h1>
+                  ),
+                  h2: ({children}) => (
+                    <h2 className="text-2xl font-semibold text-gray-800 mb-4 mt-8 flex items-center">
+                      <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full mr-3"></div>
+                      {renderChildrenWithCursor(children)}
+                    </h2>
+                  ),
+                  h3: ({children}) => (
+                    <h3 className="text-xl font-medium text-gray-700 mb-3 mt-6 flex items-center">
+                      <FaLightbulb className="text-yellow-500 mr-2" />
+                      {renderChildrenWithCursor(children)}
+                    </h3>
+                  ),
+                  p: ({children}) => {
+                    // Check if children contains code blocks or SyntaxHighlighter components
+                    const hasCodeBlock = React.Children.toArray(children).some(child => {
+                      if (React.isValidElement(child)) {
+                        // Check for pre elements, code elements with language classes, or SyntaxHighlighter
+                        return child.type === 'pre' || 
+                               (child.props && child.props.className && child.props.className.includes('language-')) ||
+                               (child.type && child.type.displayName === 'SyntaxHighlighter');
+                      }
+                      return false;
+                    });
+                    
+                    // Use div for paragraphs containing code blocks to avoid nesting issues
+                    if (hasCodeBlock) {
+                      return (
+                        <div className="text-gray-700 leading-relaxed mb-4 text-base">
+                          {renderChildrenWithCursor(children)}
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <p className="text-gray-700 leading-relaxed mb-4 text-base">
+                        {renderChildrenWithCursor(children)}
+                      </p>
+                    );
+                  },
+                  pre: ({children}) => {
+                    // Ensure pre elements are not wrapped in paragraphs
+                    return (
+                      <div className="my-4">
+                        {children}
+                      </div>
+                    );
+                  },
+                  code({node, inline, className, children, ...props}) {
+                    const match = /language-(\w+)/.exec(className || "");
+                    const lang = match ? match[1] : "";
+                    if (inline) {
+                      return (
+                        <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border" {...props}>{children}</code>
+                      );
+                    }
+                    // Flatten children to a clean text string to avoid [object Object]
+                    const codeString = flattenReactChildren(children).replace(/\n$/, "");
+                    
+                    // If it's a single short token that doesn't look like programming, render as inline code (not a block)
+                    if (shouldRenderAsInlineCode(codeString, lang)) {
+                      return (
+                        <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border inline-block" {...props}>{codeString}</code>
+                      );
+                    }
+                    
+                    // If current topic is math-related and this doesn't look like programming, render as plain text block
+                    const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
+                    if (shouldRenderAsPlainText(currentTopicName, codeString)) {
+                      return (
+                        <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-base leading-7 whitespace-pre text-gray-800">
+                          {codeString}
+                        </pre>
+                      );
+                    }
+                    
+                    // Detect ASCII diagram blocks (triangles, boxes, etc.) and render as plain <pre>
+                    if (looksLikeAsciiDiagram(codeString)) {
+                      return (
+                        <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-sm leading-6 whitespace-pre font-mono text-gray-800">
+                          {codeString}
+                        </pre>
+                      );
+                    }
+                    
+                    const blockId = codeString;
+                    return (
+                      <div className="relative my-6 w-full max-w-full">
+                        <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border border-gray-200 border-b-0 rounded-t-xl w-full">
+                          <span className="text-xs text-gray-600 font-medium">{lang || "code"}</span>
+                          <button
+                            className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 bg-white ml-2 flex items-center gap-1 cursor-pointer hover:bg-gray-50 transition-colors"
+                            onClick={() => handleCopyCode(codeString, blockId)}
+                            type="button"
+                          >
+                            {copySuccessMap[blockId] ? (
+                              <>
+                                <FaCheck className="inline-block text-green-600" /> Copied!
+                              </>
+                            ) : (
+                              <>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                Copy code
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <SyntaxHighlighter
+                          style={{
+                            'code[class*="language-"]': {
+                              color: '#24292e',
+                              background: 'none',
+                              fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
+                              fontSize: '0.875rem',
+                              lineHeight: '1.5',
+                              whiteSpace: 'pre',
+                              wordSpacing: 'normal',
+                              wordBreak: 'normal',
+                              wordWrap: 'normal',
+                              tabSize: 4,
+                              hyphens: 'none'
+                            },
+                            'pre[class*="language-"]': {
+                              color: '#24292e',
+                              background: '#f8f9fa',
+                              overflow: 'auto'
+                            },
+                            comment: { color: '#6a737d', fontStyle: 'italic' },
+                            prolog: { color: '#6a737d' },
+                            doctype: { color: '#6a737d' },
+                            cdata: { color: '#6a737d' },
+                            punctuation: { color: '#24292e' },
+                            property: { color: '#22863a' },
+                            tag: { color: '#22863a' },
+                            constant: { color: '#005cc5' },
+                            symbol: { color: '#e36209' },
+                            deleted: { color: '#b31d28' },
+                            boolean: { color: '#005cc5' },
+                            number: { color: '#005cc5' },
+                            selector: { color: '#22863a' },
+                            'attr-name': { color: '#6f42c1' },
+                            string: { color: '#032f62' },
+                            char: { color: '#032f62' },
+                            builtin: { color: '#005cc5' },
+                            inserted: { color: '#22863a' },
+                            operator: { color: '#d73a49' },
+                            entity: { color: '#24292e', cursor: 'help' },
+                            url: { color: '#24292e' },
+                            variable: { color: '#e36209' },
+                            atrule: { color: '#d73a49' },
+                            'attr-value': { color: '#032f62' },
+                            function: { color: '#6f42c1' },
+                            'class-name': { color: '#6f42c1' },
+                            keyword: { color: '#d73a49' },
+                            regex: { color: '#032f62' },
+                            important: { color: '#d73a49', fontWeight: 'bold' }
+                          }}
+                          language={lang}
+                          customStyle={{
+                            borderRadius: "0 0 0.75rem 0.75rem",
+                            fontSize: "0.875rem",
+                            margin: 0,
+                            padding: "1rem",
+                            background: "#f8f9fa",
+                            border: "1px solid #e5e7eb",
+                            borderTop: "none",
+                            color: "#24292e",
+                            lineHeight: "1.5",
+                            display: 'block',
+                            width: '100%',
+                            overflowX: 'auto'
+                          }}
+                          codeTagProps={{
+                            style: { 
+                              fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
+                              color: '#24292e'
+                            },
+                            className: 'custom-syntax-highlight'
+                          }}
+                          showLineNumbers={false}
+                        >
+                          {codeString}
+                        </SyntaxHighlighter>
+                      </div>
+                    );
+                  },
+                  ul: ({children}) => <ul className="space-y-2 mb-6 ml-6">{children}</ul>,
+                  li: ({children}) => (
+                    <li className="flex items-start text-gray-700">
+                      <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mt-2.5 mr-3 flex-shrink-0"></div>
+                      <span>{renderChildrenWithCursor(children)}</span>
+                    </li>
+                  ),
+                  blockquote: ({children}) => (
+                    <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-6 py-4 my-6 rounded-r-lg">
+                      <div className="flex items-start">
+                        <FaLightbulb className="text-blue-500 mt-1 mr-3 flex-shrink-0" />
+                        <div className="text-blue-800 italic">{renderChildrenWithCursor(children)}</div>
+                      </div>
+                    </blockquote>
+                  )
+                }}
+              >
+                {displayReading}
+              </ReactMarkdown>
+              </div>
+              );
+            })()}
+          </div>
+        </div>
+      );
+
+    case "summary":
+      // BLOCK CHECK: If topic is blocked, don't show empty content panels
+      if (currentTopicName && isTopicBlocked(currentTopicName)) {
+        return <LoadingComponent />;
+      }
+      
+      return (
+        <div className="max-w-none pt-6">
+          {/* Compact Summary Header */}
+          <div className="bg-gradient-to-br from-purple-50 via-pink-50 to-indigo-50 border border-purple-200 rounded-xl p-4 mb-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-lg flex items-center justify-center shadow-lg mr-3">
+                  <FaBrain className="text-sm" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Quick Summary</h2>
+                  <p className="text-sm text-gray-600">Key points and concepts</p>
+                </div>
+              </div>
+              <div className="hidden md:flex items-center space-x-3 text-xs">
+                <div className="bg-white px-2 py-1 rounded-full shadow-sm">
+                  <span className="text-purple-600 font-medium">Quick Review</span>
+                </div>
+                <div className="flex items-center text-gray-600">
+                  <FaBolt className="text-yellow-500 mr-1" />
+                  <span>5-min read</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Enhanced Summary Content */}
+          <div className="prose prose-lg max-w-none px-0 sm:px-4">
+            <style>{`
+              @media (max-width: 640px) {
+                .prose ul,
+                .prose ol {
+                  padding-left: 1rem !important;
+                  margin-left: 0 !important;
+                }
+                .prose li {
+                  margin-left: 0 !important;
+                  padding-left: 0 !important;
+                }
+                .prose blockquote {
+                  margin-left: 0 !important;
+                  padding-left: 1rem !important;
+                }
+                .prose pre {
+                  margin-left: 0 !important;
+                }
+              }
+            `}</style>
+            <ReactMarkdown 
+              remarkPlugins={[remarkGfm, remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+              components={{
+                h1: ({children}) => (
+                  <h1 className="text-3xl font-bold mb-6 pb-4 border-b-2 border-purple-200 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    {children}
+                  </h1>
+                ),
+                h2: ({children}) => (
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-4 mt-8 flex items-center">
+                    <div className="w-1 h-6 bg-gradient-to-b from-purple-500 to-pink-600 rounded-full mr-3"></div>
+                    {children}
+                  </h2>
+                ),
+                h3: ({children}) => (
+                  <h3 className="text-xl font-medium text-gray-700 mb-3 mt-6">
+                    {children}
+                  </h3>
+                ),
+                p: ({children}) => {
+                  // Check if children contains code blocks or SyntaxHighlighter components
+                  const hasCodeBlock = React.Children.toArray(children).some(child => {
+                    if (React.isValidElement(child)) {
+                      // Check for pre elements, code elements with language classes, or SyntaxHighlighter
+                      return child.type === 'pre' || 
+                             (child.props && child.props.className && child.props.className.includes('language-')) ||
+                             (child.type && child.type.displayName === 'SyntaxHighlighter');
+                    }
+                    return false;
+                  });
+                  
+                  // Use div for paragraphs containing code blocks to avoid nesting issues
+                  if (hasCodeBlock) {
+                    return (
+                      <div className="text-gray-700 leading-relaxed mb-4">
+                        {children}
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <p className="text-gray-700 leading-relaxed mb-4">
+                      {children}
+                    </p>
+                  );
+                },
+                pre: ({children}) => {
+                  // Ensure pre elements are not wrapped in paragraphs
+                  return (
+                    <div className="my-4">
+                      {children}
+                    </div>
+                  );
+                },
+                ul: ({children}) => <ul className="space-y-3 mb-6 ml-6">{children}</ul>,
+                li: ({children}) => (
+                  <li className="flex items-start text-gray-700">
+                    <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-600 rounded-full mt-2.5 mr-3 flex-shrink-0"></div>
+                    <span className="leading-relaxed">{children}</span>
+                  </li>
+                ),
+                table: ({children}) => (
+                  <div className="overflow-x-auto my-6">
+                    <table className="min-w-full bg-white border border-gray-200 rounded-xl shadow-sm">
+                      {children}
+                    </table>
+                  </div>
+                ),
+                th: ({children}) => (
+                  <th className="px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 text-left text-sm font-semibold text-gray-700 border-b border-gray-200">
+                    {children}
+                  </th>
+                ),
+                td: ({children}) => (
+                  <td className="px-4 py-3 text-sm text-gray-600 border-b border-gray-100">
+                    {children}
+                  </td>
+                ),
+                code: ({node, inline, className, children, ...props}) => {
+                  const match = /language-(\w+)/.exec(className || "");
+                  const lang = match ? match[1] : "";
+                  if (inline) {
+                    return (
+                      <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border" {...props}>{children}</code>
+                    );
+                  }
+                  const codeString = flattenReactChildren(children).replace(/\n$/, "");
+                  
+                  // Convert single short non-programming, language-less blocks to inline code
+                  if (shouldRenderAsInlineCode(codeString, lang)) {
+                    return (
+                      <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono border inline-block" {...props}>{codeString}</code>
+                    );
+                  }
+                  
+                  // If current topic is math-related and this doesn't look like programming, render as plain text block
+                  const currentTopicName = selectedTopic?.name || getCurrentTopicFromParam(topicParam) || '';
+                  if (shouldRenderAsPlainText(currentTopicName, codeString)) {
+                    return (
+                      <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-base leading-7 whitespace-pre text-gray-800">
+                        {codeString}
+                      </pre>
+                    );
+                  }
+                  
+                  if (looksLikeAsciiDiagram(codeString)) {
+                    return (
+                      <pre className="my-4 p-4 rounded-lg bg-gray-50 border border-gray-200 overflow-auto text-sm leading-6 whitespace-pre font-mono text-gray-800">
+                        {codeString}
+                      </pre>
+                    );
+                  }
+                  
+                  // Nice styled code block with header and copy button (matching Sia chat style)
+                  const blockId = `summary-${codeString.slice(0, 50)}`;
+                  return (
+                    <div className="relative my-6 w-full max-w-full">
+                      <div className="flex items-center justify-between px-4 py-2 bg-gray-100 border border-gray-200 border-b-0 rounded-t-xl w-full">
+                        <span className="text-xs text-gray-600 font-medium">{lang || "code"}</span>
+                        <button
+                          className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded border border-gray-200 bg-white ml-2 flex items-center gap-1 cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={() => handleCopyCode(codeString, blockId)}
+                          type="button"
+                        >
+                          {copySuccessMap[blockId] ? (
+                            <>
+                              <FaCheck className="inline-block text-green-600" /> Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                              Copy code
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <SyntaxHighlighter
+                        language={lang || 'text'}
+                        style={{
+                          'code[class*="language-"]': {
+                            color: '#24292e',
+                            background: 'none',
+                            fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
+                            fontSize: '0.875rem',
+                            lineHeight: '1.5',
+                            whiteSpace: 'pre',
+                            wordSpacing: 'normal',
+                            wordBreak: 'normal',
+                            wordWrap: 'normal',
+                            tabSize: 4,
+                            hyphens: 'none'
+                          },
+                          'pre[class*="language-"]': {
+                            color: '#24292e',
+                            background: '#f8f9fa',
+                            overflow: 'auto'
+                          },
+                          comment: { color: '#6a737d', fontStyle: 'italic' },
+                          prolog: { color: '#6a737d' },
+                          doctype: { color: '#6a737d' },
+                          cdata: { color: '#6a737d' },
+                          punctuation: { color: '#24292e' },
+                          property: { color: '#22863a' },
+                          tag: { color: '#22863a' },
+                          constant: { color: '#005cc5' },
+                          symbol: { color: '#e36209' },
+                          deleted: { color: '#b31d28' },
+                          boolean: { color: '#005cc5' },
+                          number: { color: '#005cc5' },
+                          selector: { color: '#22863a' },
+                          'attr-name': { color: '#6f42c1' },
+                          string: { color: '#032f62' },
+                          char: { color: '#032f62' },
+                          builtin: { color: '#005cc5' },
+                          inserted: { color: '#22863a' },
+                          operator: { color: '#d73a49' },
+                          entity: { color: '#24292e', cursor: 'help' },
+                          url: { color: '#24292e' },
+                          variable: { color: '#e36209' },
+                          atrule: { color: '#d73a49' },
+                          'attr-value': { color: '#032f62' },
+                          function: { color: '#6f42c1' },
+                          'class-name': { color: '#6f42c1' },
+                          keyword: { color: '#d73a49' },
+                          regex: { color: '#032f62' },
+                          important: { color: '#d73a49', fontWeight: 'bold' }
+                        }}
+                        customStyle={{
+                          borderRadius: "0 0 0.75rem 0.75rem",
+                          fontSize: "0.875rem",
+                          margin: 0,
+                          padding: "1rem",
+                          background: "#f8f9fa",
+                          border: "1px solid #e5e7eb",
+                          borderTop: "none",
+                          color: "#24292e",
+                          lineHeight: "1.5",
+                          display: 'block',
+                          width: '100%',
+                          overflowX: 'auto'
+                        }}
+                        codeTagProps={{
+                          style: { 
+                            fontFamily: 'Fira Mono, Menlo, Monaco, Consolas, monospace',
+                            color: '#24292e'
+                          },
+                          className: 'custom-syntax-highlight'
+                        }}
+                        showLineNumbers={false}
+                      >
+                        {codeString}
+                      </SyntaxHighlighter>
+                    </div>
+                  );
+                }
+              }}
+            >
+              {preSanitizeMarkdown(content.summary || '')}
+            </ReactMarkdown>
+          </div>
+        </div>
+      );
+
+    case "videos":
+      // BLOCK CHECK: If topic is blocked, don't show empty content panels
+      if (currentTopicName && isTopicBlocked(currentTopicName)) {
+        return <LoadingComponent />;
+      }
+      
+      return (
+        <div className="pt-6">
+          {/* Compact Videos Header */}
+          <div className="bg-gradient-to-br from-red-50 via-pink-50 to-orange-50 border border-red-200 rounded-xl p-4 mb-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-pink-600 text-white rounded-lg flex items-center justify-center shadow-lg mr-3">
+                  <FaVideo className="text-sm" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Video Learning</h2>
+                  <p className="text-sm text-gray-600">
+                    {content.videosMetadata?.source === 'youtube_api' ? 'Live YouTube Data' : 'Curated educational content'}
+                  </p>
+                </div>
+              </div>
+              <div className="hidden md:flex items-center space-x-3 text-xs">
+                <div className="bg-white px-2 py-1 rounded-full shadow-sm">
+                  <span className="text-red-600 font-medium">{content.videos.length} videos</span>
+                </div>
+                {content.videosMetadata?.avgViewCount && (
+                  <div className="bg-white px-2 py-1 rounded-full shadow-sm">
+                    <span className="text-gray-600">
+                      Avg: {formatViewCount(content.videosMetadata.avgViewCount)}
+                    </span>
+                  </div>
+                )}
+                <div className="bg-white px-2 py-1 rounded-full shadow-sm">
+                  <span className="text-gray-600">HD Quality</span>
+                </div>
+                <div className="flex items-center text-gray-600">
+                  <FaYoutube className="text-red-500 mr-1" />
+                  <span>
+                    {content.videosMetadata?.source === 'youtube_api' ? 'Real YouTube Data' : 'YouTube Curated'}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Video Stats Summary */}
+            {content.videosMetadata?.source === 'youtube_api' && content.videos.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-red-200">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-red-600">
+                      {content.videos.reduce((sum, v) => sum + (v.viewCount || 0), 0).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-gray-600">Total Views</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-purple-600">
+                      {content.videos.reduce((sum, v) => sum + (v.subscriberCount || 0), 0).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-gray-600">Total Subscribers</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-green-600">
+                      {content.videosMetadata.totalDuration || 0} min
+                    </div>
+                    <div className="text-xs text-gray-600">Total Duration</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-blue-600">
+                      {content.videos.filter(v => v.isEducationalChannel).length}
+                    </div>
+                    <div className="text-xs text-gray-600">Verified Channels</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Enhanced Video Grid */}
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {content.videos
+              .sort((a, b) => {
+                // Sort by view count in descending order (highest views first)
+                const viewsA = a.viewCount || parseInt(a.formattedViewCount?.replace(/[^0-9]/g, '') || '0') || 0;
+                const viewsB = b.viewCount || parseInt(b.formattedViewCount?.replace(/[^0-9]/g, '') || '0') || 0;
+                return viewsB - viewsA;
+              })
+              .slice(0, 6) // Limit to maximum 6 videos
+              .map((video, index) => (
+              <div key={video.id} className="group bg-white border border-gray-200 rounded-2xl hover:shadow-xl transition-all duration-300 overflow-hidden transform hover:-translate-y-1">
+                <div className="flex flex-col">
+                  {/* Video Thumbnail */}
+                  <div className="relative h-48 overflow-hidden cursor-pointer" onClick={() => openVideoModal(video)}>
+                    <img 
+                      src={video.thumbnail} 
+                      alt={video.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    {/* Play overlay */}
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
+                        <IoPlayCircle className="text-red-500 text-2xl ml-1" />
+                      </div>
+                    </div>
+                    {/* Duration badge */}
+                    <div className="absolute bottom-3 right-3 bg-black/80 text-white px-2 py-1 rounded-lg text-sm font-medium">
+                      {video.formattedDuration || formatDuration(video.duration) || video.duration + ' min'}
+                    </div>
+                    {/* Quality badge */}
+                    <div className="absolute top-3 left-3 bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-bold">
+                      HD
+                    </div>
+                  </div>
+                  
+                  {/* Video Info */}
+                  <div className="flex-1 p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className="font-bold text-gray-900 text-lg line-clamp-1 group-hover:text-red-600 transition-colors">
+                        {video.title}
+                      </h3>
+                      <div className="ml-2 flex-shrink-0">
+                        {video.difficulty && (
+                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            video.difficulty === 'Beginner' ? 'bg-green-100 text-green-700' :
+                            video.difficulty === 'Intermediate' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {video.difficulty}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center text-gray-600 mb-4">
+                      <FaYoutube className="text-red-500 mr-2" />
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm">{video.channel}</span>
+                        {video.formattedSubscriberCount && (
+                          <span className="text-xs text-gray-500">{video.formattedSubscriberCount}</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-4 text-sm text-gray-500">
+                        <div className="flex items-center">
+                          <IoEye className="mr-1" />
+                          <span>{video.formattedViewCount || (video.viewCount ? formatViewCount(video.viewCount) : video.views + ' views')}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <BiTime className="mr-1" />
+                          <span>{video.formattedDuration || formatDuration(video.duration) || video.duration + ' min'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Action buttons */}
+                    <div className="flex items-center">
+                      <button 
+                        onClick={() => openVideoModal(video)}
+                        className="w-full flex items-center justify-center px-3 py-2 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg text-sm"
+                      >
+                        <IoPlayCircle className="mr-1" />
+                        Watch
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Video learning tips */}
+          <div className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-6">
+            <div className="flex items-center mb-4">
+              <FaLightbulb className="text-yellow-500 mr-3 text-xl" />
+              <h3 className="text-lg font-semibold text-gray-900">Video Learning Tips</h3>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-700">
+              <div className="flex items-start">
+                <FaCheck className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                <span>Take notes while watching</span>
+              </div>
+              <div className="flex items-start">
+                <FaCheck className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                <span>Practice along with examples</span>
+              </div>
+              <div className="flex items-start">
+                <FaCheck className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                <span>Pause and replay difficult sections</span>
+              </div>
+              <div className="flex items-start">
+                <FaCheck className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                <span>Apply concepts immediately</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+
+    case "quiz":
+      // BLOCK CHECK: If topic is blocked, don't show empty content panels
+      if (currentTopicName && isTopicBlocked(currentTopicName)) {
+        return <LoadingComponent />;
+      }
+      
+      return (
+        <QuizRenderer 
+          content={content}
+          quizSubmitted={quizSubmitted}
+          setQuizSubmitted={setQuizSubmitted}
+          setContent={setContent}
+        />
+      );
+
+    case 'resources':
+      return (
+        <ResourcesRenderer 
+          content={content}
+          loadScenario={loadScenario}
+          isDbCourse={(() => {
+            try {
+              const cid = typeof window !== 'undefined' ? (window.location.pathname.split('/')[2] || '') : '';
+              return !!cid && !cid.startsWith('course_');
+            } catch {
+              return false;
+            }
+          })()}
+          getCurrentTopic={getCurrentTopic}
+          getResourceIcon={getResourceIconName}
+          setActiveTab={setActiveTab}
+          LoadingComponent={LoadingComponent}
+        />
+      );
+
+    default:
+      // BLOCK CHECK: If topic is blocked, don't show any content
+      if (currentTopicName && isTopicBlocked(currentTopicName)) {
+        return <LoadingComponent />;
+      }
+      return null;
+  }
+};
+
+export default TabContentRenderer;

@@ -10,9 +10,42 @@ import { FaTrash } from 'react-icons/fa';
 // Use shared axios instance with baseURL
 const COURSES_PER_PAGE = 4; // Show 4 courses initially
 
+// Session cache for faster initial load (stale-while-revalidate pattern)
+const CACHE_KEY = 'enrolled_courses_cache_v1';
+const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
+const readCache = () => {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.ts || !Array.isArray(parsed.data)) return null;
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+};
+
+const writeCache = (data) => {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+  } catch (_) {}
+};
+
+// Read cache synchronously for initial state
+const getInitialState = () => {
+  const cached = readCache();
+  if (cached && Array.isArray(cached.data) && cached.data.length > 0) {
+    return { courses: cached.data, loading: false, hasCachedData: true };
+  }
+  return { courses: [], loading: true, hasCachedData: false };
+};
+
 const ActiveCourses = ({ onEnrollmentChanged }) => {
-  const [enrolledCourses, setEnrolledCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Initialize from cache immediately for instant display
+  const initialState = getInitialState();
+  const [enrolledCourses, setEnrolledCourses] = useState(initialState.courses);
+  const [loading, setLoading] = useState(initialState.loading);
   const [sortBy, setSortBy] = useState('recent');
   const [showAll, setShowAll] = useState(false);
   const [removingCourseId, setRemovingCourseId] = useState(null);
@@ -22,6 +55,7 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
   // Refs to prevent duplicate API calls
   const lastFetchTimeRef = useRef(0);
   const isFetchingRef = useRef(false);
+  const hasCachedDataRef = useRef(initialState.hasCachedData);
   const FETCH_COOLDOWN = 2000; // 2 seconds cooldown
 
   const fetchEnrolledCourses = useCallback(async (force = false) => {
@@ -31,6 +65,15 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
     }
     
     const now = Date.now();
+    
+    // Check cache freshness - if we already have cached data displayed, skip loading
+    if (!force && hasCachedDataRef.current) {
+      const cached = readCache();
+      if (cached && (now - cached.ts) < CACHE_TTL) {
+        return; // Cache is fresh, no need to fetch
+      }
+    }
+    
     // Prevent duplicate calls within cooldown period
     if (!force && (isFetchingRef.current || (now - lastFetchTimeRef.current < FETCH_COOLDOWN))) {
       return;
@@ -38,6 +81,9 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
     
     isFetchingRef.current = true;
     lastFetchTimeRef.current = now;
+    
+    // Only show loading spinner if no cached data is displayed
+    if (!hasCachedDataRef.current) setLoading(true);
 
     try {
       const response = await axios.get(`/courses/enrolled/`);
@@ -103,6 +149,8 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
           });
 
           setEnrolledCourses(formattedCourses);
+          writeCache(formattedCourses); // Cache for faster subsequent loads
+          hasCachedDataRef.current = true; // Mark that we have data
         }
       } catch (error) {
   // silently handle in production
@@ -116,22 +164,19 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
   }, [isLoggedIn]);
 
   useEffect(() => {
-    fetchEnrolledCourses(true); // Force on initial mount
-
+    // Background fetch - don't force if we have cache (will show stale data first)
+    fetchEnrolledCourses(!hasCachedDataRef.current);
   }, [fetchEnrolledCourses]);
 
-  // Listen only for explicit learning activity events (not focus/visibility - parent handles that)
+  // Listen only for explicit progress events (not activity updates - reduces API calls for mobile)
   useEffect(() => {
-    // When learning activity (time-on-task) is sent, progress may have changed server-side
-    const onLearningActivity = () => fetchEnrolledCourses();
     // Generic progress event if emitted elsewhere in app
     const onProgressEvent = () => fetchEnrolledCourses();
 
-    window.addEventListener('learning:activity-updated', onLearningActivity);
     window.addEventListener('learning:progress-updated', onProgressEvent);
+    // Removed learning:activity-updated listener - too frequent for mobile performance
 
     return () => {
-      window.removeEventListener('learning:activity-updated', onLearningActivity);
       window.removeEventListener('learning:progress-updated', onProgressEvent);
     };
   }, [fetchEnrolledCourses]);
@@ -160,8 +205,11 @@ const ActiveCourses = ({ onEnrollmentChanged }) => {
       // Compute new count synchronously from current state
       const nextCount = Math.max(0, (enrolledCourses?.length || 1) - 1);
 
-      // Remove the course from the local state
-      setEnrolledCourses(prev => prev.filter(course => course.enrollmentId !== enrollmentId));
+      // Remove the course from the local state and update cache
+      const updatedCourses = enrolledCourses.filter(course => course.enrollmentId !== enrollmentId);
+      setEnrolledCourses(updatedCourses);
+      writeCache(updatedCourses); // Update cache to reflect removal
+      
   universalToast.success(`Successfully removed "${courseTitle}" from your courses`);
       // Notify parent (prefer exact count) and emit a custom event so other parts can react
       try {

@@ -116,7 +116,7 @@ class CourseWithChaptersSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'class_level', 'board', 'state', 'subject',
             'short_description', 'description', 'thumbnail', 'duration',
-            'sources', 'last_updated', 'key_topics', 'learning_points',
+            'sources', 'source_type', 'last_updated', 'key_topics', 'learning_points',
             'is_published', 'chapters'
         ]
 
@@ -134,7 +134,7 @@ class EngineeringCourseWithSectionsSerializer(serializers.ModelSerializer):
         model = EngineeringCourse
         fields = [
             'id', 'title', 'short_description', 'description',
-            'thumbnail', 'duration', 'sources', 'proficiency', 
+            'thumbnail', 'duration', 'sources', 'source_type', 'proficiency', 
             'certificate_given', 'project_based', 'learning_points', 
             'requirements', 'category', 'last_updated', 'is_published', 
             'sections'
@@ -631,7 +631,7 @@ class CourseStructureSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'class_level', 'board', 'state', 'subject',
             'short_description', 'description', 'thumbnail', 'duration',
-            'sources', 'last_updated', 'key_topics', 'learning_points',
+            'sources', 'source_type', 'last_updated', 'key_topics', 'learning_points',
             'is_published', 'chapters'
         ]
 
@@ -652,7 +652,7 @@ class EngineeringCourseStructureSerializer(serializers.ModelSerializer):
         model = EngineeringCourse
         fields = [
             'id', 'title', 'short_description', 'description',
-            'thumbnail', 'duration', 'sources', 'proficiency', 
+            'thumbnail', 'duration', 'sources', 'source_type', 'proficiency', 
             'certificate_given', 'project_based', 'learning_points', 
             'requirements', 'category', 'last_updated', 'is_published', 
             'sections'

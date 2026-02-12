@@ -24,8 +24,8 @@ def call_gemini_api(prompt, max_retries=5):
         raise Exception("Gemini API key not configured")
 
     model_urls = [
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
     ]
 
     # Ensure prompt is a clean string
@@ -105,8 +105,8 @@ def call_gemini_flash_api(prompt, max_retries=3):
         raise Exception("Gemini API key not configured")
 
     model_urls = [
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
     ]
 
     # Ensure prompt is a clean string
@@ -347,8 +347,8 @@ def call_intent_classifier(user_query: str, max_retries: int = 3):
 
     # Use Flash family for intent classification
     models_to_try = [
-        ('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', "2.0-flash"),
         ('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', "2.5-flash"),
+        ('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', "2.0-flash"),
     ]
 
     for model_url, model_name in models_to_try:
@@ -429,8 +429,8 @@ def call_gemini_api_stream(prompt):
         raise Exception("Gemini API key not configured")
 
     model_urls = [
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse',
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse',
     ]
     
     # Ensure prompt is a clean string
