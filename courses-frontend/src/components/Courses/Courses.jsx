@@ -238,7 +238,7 @@ const Courses = () => {
                                                 <h3 className="text-xl font-semibold text-gray-900">
                                                     Exam Ready Series
                                                 </h3>
-                                                {allCourses.filter(c => c.source_type === 'exam_ready').length === 0 && (
+                                                {!loadingCourses && allCourses.filter(c => c.source_type === 'exam_ready').length === 0 && (
                                                     <span className="bg-orange-50 text-orange-600 text-xs font-medium px-2.5 py-1 rounded-full">
                                                         Coming Soon
                                                     </span>
@@ -308,7 +308,7 @@ const Courses = () => {
                                                 <h3 className="text-xl font-semibold text-gray-900">
                                                     EasyLearnova Originals
                                                 </h3>
-                                                {allCourses.filter(c => c.source_type === 'original').length === 0 && (
+                                                {!loadingCourses && allCourses.filter(c => c.source_type === 'original').length === 0 && (
                                                     <span className="bg-indigo-50 text-indigo-600 text-xs font-medium px-2.5 py-1 rounded-full">
                                                         Coming Soon
                                                     </span>
