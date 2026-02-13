@@ -213,9 +213,12 @@ const TenthStandard = () => {
                         />
 
                         {loading ? (
-                            <div className="flex justify-center my-12">
-                                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500"></div>
-                            </div>
+                            <SegregatedCourseSections
+                                courses={[]}
+                                loading={true}
+                                getLinkTo={() => ''}
+                                getBoardDisplay={() => ''}
+                            />
                         ) : courses.length > 0 ? (
                             <SegregatedCourseSections
                                 courses={courses}
@@ -232,6 +235,7 @@ const TenthStandard = () => {
                                 onPrefetch={(course) => { try { getSchoolCourseById(course.id); } catch { } }}
                             />
                         ) : (
+
                             <div className="text-center py-12">
                                 <p className="text-gray-500">No courses found for this selection.</p>
                                 <p className="text-sm text-gray-400 mt-2">Check back later or try a different board.</p>

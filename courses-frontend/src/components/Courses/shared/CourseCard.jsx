@@ -81,6 +81,32 @@ const CourseCard = ({ course, linkTo, boardDisplay, onPrefetch }) => {
 };
 
 /**
+ * Skeleton loader for course cards
+ */
+export const CourseSkeleton = () => {
+    return (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-pulse h-full">
+            <div className="aspect-video bg-gray-200" />
+            <div className="p-4 sm:p-4 lg:p-5 space-y-4">
+                <div className="space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-3/4" />
+                    <div className="h-4 bg-gray-200 rounded w-1/2" />
+                </div>
+                <div className="h-3 bg-gray-200 rounded w-1/4" />
+                <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-full bg-gray-200" />
+                        <div className="h-3 bg-gray-200 rounded w-16" />
+                    </div>
+                    <div className="h-6 bg-gray-200 rounded-full w-12" />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+/**
  * Section component for displaying courses grouped by source type
  */
 export const CourseSection = ({
@@ -91,18 +117,26 @@ export const CourseSection = ({
     getBoardDisplay,
     onPrefetch,
     emptyMessage = "No courses available yet.",
-    isOriginal = false
+    isOriginal = false,
+    sectionType = 'curated',
+    loading = false
 }) => {
-    if (!courses || courses.length === 0) {
+    if (!loading && (!courses || courses.length === 0)) {
         return null;
     }
+
+    const getIndicatorColor = () => {
+        if (isOriginal) return 'bg-indigo-500';
+        if (sectionType === 'exam_ready') return 'bg-orange-500';
+        return 'bg-gray-400';
+    };
 
     return (
         <section className="mb-12">
             {/* Section Header - matching homepage style */}
             <div className="mb-6">
                 <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-1 h-6 rounded-full ${isOriginal ? 'bg-indigo-500' : 'bg-gray-400'}`}></div>
+                    <div className={`w-1 h-6 rounded-full ${getIndicatorColor()}`}></div>
                     <h3 className="text-xl font-semibold text-gray-900">
                         {title}
                     </h3>
@@ -114,15 +148,19 @@ export const CourseSection = ({
 
             {/* Course Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {courses.map((course) => (
-                    <CourseCard
-                        key={course.id}
-                        course={course}
-                        linkTo={getLinkTo(course)}
-                        boardDisplay={getBoardDisplay(course)}
-                        onPrefetch={() => onPrefetch && onPrefetch(course)}
-                    />
-                ))}
+                {loading ? (
+                    [...Array(4)].map((_, i) => <CourseSkeleton key={i} />)
+                ) : (
+                    courses.map((course) => (
+                        <CourseCard
+                            key={course.id}
+                            course={course}
+                            linkTo={getLinkTo(course)}
+                            boardDisplay={getBoardDisplay(course)}
+                            onPrefetch={() => onPrefetch && onPrefetch(course)}
+                        />
+                    ))
+                )}
             </div>
         </section>
     );
@@ -135,12 +173,14 @@ export const SegregatedCourseSections = ({
     courses,
     getLinkTo,
     getBoardDisplay,
-    onPrefetch
+    onPrefetch,
+    loading = false
 }) => {
     const originalCourses = courses.filter(c => c.source_type === 'original');
-    const curatedCourses = courses.filter(c => c.source_type !== 'original');
+    const examReadyCourses = courses.filter(c => c.source_type === 'exam_ready');
+    const curatedCourses = courses.filter(c => c.source_type !== 'original' && c.source_type !== 'exam_ready');
 
-    if (courses.length === 0) {
+    if (!loading && courses.length === 0) {
         return (
             <div className="text-center py-12">
                 <p className="text-gray-500">No courses found for this selection.</p>
@@ -152,7 +192,7 @@ export const SegregatedCourseSections = ({
     return (
         <div className="px-4 sm:px-0 space-y-14">
             {/* Originals Section */}
-            {originalCourses.length > 0 && (
+            {(loading || originalCourses.length > 0) && (
                 <CourseSection
                     title="EasyLearnova Originals"
                     subtitle="Expert-crafted courses designed by our educators"
@@ -161,11 +201,26 @@ export const SegregatedCourseSections = ({
                     getBoardDisplay={getBoardDisplay}
                     onPrefetch={onPrefetch}
                     isOriginal={true}
+                    loading={loading}
+                />
+            )}
+
+            {/* Exam Ready Series Section */}
+            {(loading || examReadyCourses.length > 0) && (
+                <CourseSection
+                    title="Exam Ready Series"
+                    subtitle="Master your board exams with our intensive 30-day preparation series."
+                    courses={examReadyCourses}
+                    getLinkTo={getLinkTo}
+                    getBoardDisplay={getBoardDisplay}
+                    onPrefetch={onPrefetch}
+                    sectionType="exam_ready"
+                    loading={loading}
                 />
             )}
 
             {/* Curated Section */}
-            {curatedCourses.length > 0 && (
+            {(loading || curatedCourses.length > 0) && (
                 <CourseSection
                     title="YouTube Curated"
                     subtitle="This course uses publicly available YouTube videos. All rights belong to respective creators."
@@ -173,7 +228,8 @@ export const SegregatedCourseSections = ({
                     getLinkTo={getLinkTo}
                     getBoardDisplay={getBoardDisplay}
                     onPrefetch={onPrefetch}
-                    isOriginal={false}
+                    sectionType="curated"
+                    loading={loading}
                 />
             )}
         </div>

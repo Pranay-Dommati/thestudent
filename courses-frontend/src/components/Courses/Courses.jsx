@@ -247,7 +247,19 @@ const Courses = () => {
                                             <p className="text-sm text-gray-400 ml-4">Intensive exam preparation courses designed for success</p>
                                         </div>
 
-                                        {allCourses.filter(c => c.source_type === 'exam_ready').length > 0 ? (
+                                        {loadingCourses ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                                {[...Array(4)].map((_, i) => (
+                                                    <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-pulse">
+                                                        <div className="aspect-video bg-gray-200" />
+                                                        <div className="p-4 space-y-3">
+                                                            <div className="h-4 bg-gray-200 rounded w-3/4" />
+                                                            <div className="h-4 bg-gray-200 rounded w-1/2" />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : allCourses.filter(c => c.source_type === 'exam_ready').length > 0 ? (
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                                 {allCourses.filter(c => c.source_type === 'exam_ready').map((course) => (
                                                     <div
@@ -305,7 +317,19 @@ const Courses = () => {
                                             <p className="text-sm text-gray-400 ml-4">Expert-crafted courses designed by our educators</p>
                                         </div>
 
-                                        {allCourses.filter(c => c.source_type === 'original').length > 0 ? (
+                                        {loadingCourses ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                                {[...Array(4)].map((_, i) => (
+                                                    <div key={i} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-pulse">
+                                                        <div className="aspect-video bg-gray-200" />
+                                                        <div className="p-4 space-y-3">
+                                                            <div className="h-4 bg-gray-200 rounded w-3/4" />
+                                                            <div className="h-4 bg-gray-200 rounded w-1/2" />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : allCourses.filter(c => c.source_type === 'original').length > 0 ? (
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                                 {allCourses.filter(c => c.source_type === 'original').map((course) => (
                                                     <div
