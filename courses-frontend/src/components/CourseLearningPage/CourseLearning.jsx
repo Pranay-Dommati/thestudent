@@ -507,7 +507,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
     const markLessonComplete = async () => {
         if (!course) return;
         if (!isLoggedIn) {
-            universalToast.error('Please log in to track your progress');
+            universalToast.error('Please login to track progress');
             return;
         }
 
@@ -1114,8 +1114,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                                     <button
                                         onClick={() => setActiveTab('about')}
                                         className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'about'
-                                                ? 'border-indigo-500 text-indigo-600'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                            ? 'border-indigo-500 text-indigo-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                             }`}
                                     >
                                         About
@@ -1123,8 +1123,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                                     <button
                                         onClick={() => setActiveTab('resources')}
                                         className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'resources'
-                                                ? 'border-indigo-500 text-indigo-600'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                            ? 'border-indigo-500 text-indigo-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                             }`}
                                     >
                                         Resources
@@ -1244,8 +1244,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
                             <div className="flex justify-between items-center">
                                 <button
                                     className={`px-6 py-3 rounded-lg border font-medium flex items-center ${activeChapter === 0 && activeLesson === 0
-                                            ? 'border-gray-200 text-gray-400 cursor-not-allowed'
-                                            : 'border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors'
+                                        ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                                        : 'border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors'
                                         }`}
                                     onClick={goToPrevLesson}
                                     disabled={activeChapter === 0 && activeLesson === 0}
@@ -1258,7 +1258,7 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
 
                                 <button
                                     className={`px-6 py-3 rounded-lg font-medium flex items-center ${savingProgress ? 'bg-gray-400 cursor-not-allowed' :
-                                            'bg-indigo-600 hover:bg-indigo-700 transition-colors'
+                                        'bg-indigo-600 hover:bg-indigo-700 transition-colors'
                                         } text-white`}
                                     onClick={goToNextLesson}
                                     disabled={savingProgress}
@@ -1316,8 +1316,8 @@ const CourseLearning = ({ courseId, pathname, onSidebarToggle }) => {
             <button
                 onClick={() => setSidebarVisible(!sidebarVisible)}
                 className={`fixed top-32 z-40 h-12 w-8 shadow-md rounded-l-lg flex items-center justify-center border border-r-0 transition-all duration-300 ease-in-out ${sidebarVisible
-                        ? 'right-[400px] bg-white border-gray-200 hover:bg-gray-50'
-                        : 'right-0 bg-indigo-600 border-indigo-600 hover:bg-indigo-700'
+                    ? 'right-[400px] bg-white border-gray-200 hover:bg-gray-50'
+                    : 'right-0 bg-indigo-600 border-indigo-600 hover:bg-indigo-700'
                     }`}
                 aria-label={sidebarVisible ? "Close sidebar" : "Open sidebar"}
             >
