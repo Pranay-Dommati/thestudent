@@ -388,9 +388,9 @@ const Courses = () => {
                                                     </div>
                                                 ))}
                                             </div>
-                                        ) : allCourses.filter(c => c.source_type !== 'original').length > 0 ? (
+                                        ) : allCourses.filter(c => c.source_type !== 'original' && c.source_type !== 'exam_ready').length > 0 ? (
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                                                {allCourses.filter(c => c.source_type !== 'original').map((course) => (
+                                                {allCourses.filter(c => c.source_type !== 'original' && c.source_type !== 'exam_ready').map((course) => (
                                                     <div
                                                         key={course.id}
                                                         onClick={() => {
