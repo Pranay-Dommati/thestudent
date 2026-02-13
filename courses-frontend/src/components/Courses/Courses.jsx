@@ -19,7 +19,7 @@ const Courses = () => {
     // New State for View Mode: 'discovery' (default) or 'by_class'
     const [viewMode, setViewMode] = useState('discovery');
     const [allCourses, setAllCourses] = useState([]);
-    const [loadingCourses, setLoadingCourses] = useState(false);
+    const [loadingCourses, setLoadingCourses] = useState(true);
 
     const allEducationLevels = [
         {
