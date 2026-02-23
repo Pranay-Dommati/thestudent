@@ -745,160 +745,111 @@ const MergeSortVisualizer = ({
                         {/* Special Animation for Base Case Check */}
                         {stepType === 'check_base' && (
                             <motion.div
-                                className="flex flex-col items-center gap-6"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
+                                className="flex flex-col items-center gap-5"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.3 }}
                             >
-                                {/* Step-by-step expression evaluation */}
-                                <div className="flex flex-col items-center gap-4 font-mono text-lg">
-                                    {/* Original expression */}
+                                {/* Condition header */}
+                                <motion.div
+                                    className="font-mono text-base flex items-center gap-1.5"
+                                    initial={{ opacity: 0, y: -8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.15, duration: 0.3 }}
+                                >
+                                    <span className="text-purple-400 font-bold">if</span>
+                                    <span className="text-amber-400">len</span>
+                                    <span className="text-slate-500">(</span>
+                                    <span className="text-blue-400">arr</span>
+                                    <span className="text-slate-500">)</span>
+                                    <span className="text-slate-500 mx-1">&lt;=</span>
+                                    <span className="text-emerald-400">1</span>
+                                    <span className="text-slate-500">:</span>
+                                </motion.div>
+
+                                {/* Evaluation card */}
+                                <motion.div
+                                    className="px-6 py-5 bg-slate-800/70 border border-slate-700/60 rounded-2xl backdrop-blur-sm shadow-2xl flex flex-col gap-4"
+                                    initial={{ opacity: 0, scale: 0.93 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: 0.3, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                                    style={{ minWidth: 320 }}
+                                >
+                                    {/* Row 1: arr = [...chips...] */}
                                     <motion.div
-                                        className="flex items-center gap-2"
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.2 }}
+                                        className="flex items-center gap-2 flex-wrap"
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: 0.45, duration: 0.3 }}
                                     >
-                                        <span className="text-purple-400 font-bold">if</span>
+                                        <span className="text-blue-400 font-mono text-sm font-semibold">arr</span>
+                                        <span className="text-slate-500 font-mono text-sm">=</span>
+                                        <div className="flex flex-wrap gap-1">
+                                            {mainArray.map((val, idx) => (
+                                                <motion.span
+                                                    key={idx}
+                                                    className="px-1.5 py-0.5 bg-slate-700 border border-slate-600 rounded text-slate-200 text-xs font-mono"
+                                                    initial={{ opacity: 0, scale: 0.6 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    transition={{ delay: 0.5 + idx * 0.04, duration: 0.18, ease: 'backOut' }}
+                                                >
+                                                    {val}
+                                                </motion.span>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+
+                                    {/* Divider */}
+                                    <motion.div
+                                        className="h-px bg-slate-700/60"
+                                        initial={{ scaleX: 0 }}
+                                        animate={{ scaleX: 1 }}
+                                        transition={{ delay: 0.85, duration: 0.3, ease: 'easeOut' }}
+                                        style={{ transformOrigin: 'left' }}
+                                    />
+
+                                    {/* Row 2: len(arr) = N */}
+                                    <motion.div
+                                        className="flex items-center gap-2 font-mono text-sm"
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: 0.95, duration: 0.28 }}
+                                    >
                                         <span className="text-amber-400">len</span>
-                                        <span className="text-slate-400">(</span>
-                                        <span className="text-blue-400">arr</span>
-                                        <span className="text-slate-400">)</span>
-                                        <span className="text-slate-500">&lt;=</span>
-                                        <span className="text-emerald-400">1</span>
-                                        <span className="text-slate-400">:</span>
-                                    </motion.div>
-
-                                    {/* Arrow 1 */}
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        transition={{ delay: 0.6 }}
-                                        className="text-slate-500"
-                                    >
-                                        ↓
-                                    </motion.div>
-
-                                    {/* Expanded len with array */}
-                                    <motion.div
-                                        className="flex items-center gap-2"
-                                        initial={{ opacity: 0, scale: 0.9 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        transition={{ delay: 0.8 }}
-                                    >
-                                        <span className="text-purple-400 font-bold">if</span>
-                                        <span className="text-amber-400">len</span>
-                                        <span className="text-slate-400">(</span>
+                                        <span className="text-slate-500">(arr)</span>
+                                        <span className="text-slate-500">=</span>
                                         <motion.span
-                                            className="text-emerald-400 text-sm px-2 py-1 bg-emerald-500/10 rounded"
-                                            animate={{
-                                                boxShadow: ['0 0 0px #10b981', '0 0 15px #10b981', '0 0 0px #10b981']
-                                            }}
-                                            transition={{ duration: 1.5, repeat: Infinity }}
-                                        >
-                                            [{mainArray.join(', ')}]
-                                        </motion.span>
-                                        <span className="text-slate-400">)</span>
-                                        <span className="text-slate-500">&lt;=</span>
-                                        <span className="text-emerald-400">1</span>
-                                    </motion.div>
-
-                                    {/* Arrow 2 */}
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        transition={{ delay: 1.4 }}
-                                        className="text-slate-500"
-                                    >
-                                        ↓
-                                    </motion.div>
-
-                                    {/* Length computed */}
-                                    <motion.div
-                                        className="flex items-center gap-2"
-                                        initial={{ opacity: 0, scale: 0.9 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        transition={{ delay: 1.6 }}
-                                    >
-                                        <span className="text-purple-400 font-bold">if</span>
-                                        <motion.span
-                                            className="text-xl font-bold text-cyan-400 px-3 py-1 bg-cyan-500/10 rounded-lg"
-                                            animate={{
-                                                scale: [1, 1.1, 1],
-                                                boxShadow: ['0 0 0px #22d3ee', '0 0 20px #22d3ee', '0 0 0px #22d3ee']
-                                            }}
-                                            transition={{ duration: 0.5, delay: 1.8 }}
+                                            className="text-cyan-400 font-bold text-base px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/25 rounded-lg"
+                                            animate={{ boxShadow: ['0 0 0px #22d3ee', '0 0 12px #22d3ee55', '0 0 0px #22d3ee'] }}
+                                            transition={{ delay: 1.2, duration: 1.6, repeat: Infinity }}
                                         >
                                             {mainArray.length}
                                         </motion.span>
-                                        <span className="text-slate-500">&lt;=</span>
-                                        <span className="text-emerald-400">1</span>
                                     </motion.div>
 
-                                    {/* Arrow 3 */}
+                                    {/* Row 3: N <= 1 = verdict */}
                                     <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        transition={{ delay: 2.2 }}
-                                        className="text-slate-500"
+                                        className="flex items-center gap-2 font-mono text-sm"
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: 1.25, duration: 0.28 }}
                                     >
-                                        ↓
-                                    </motion.div>
-
-                                    {/* Final result */}
-                                    <motion.div
-                                        className="flex items-center gap-3"
-                                        initial={{ opacity: 0, scale: 0.8 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        transition={{ delay: 2.4, type: "spring", stiffness: 200 }}
-                                    >
-                                        <span className="text-slate-400">{mainArray.length} &lt;= 1</span>
+                                        <span className="text-cyan-400 font-bold">{mainArray.length}</span>
+                                        <span className="text-slate-500">&lt;= 1</span>
                                         <span className="text-slate-500">=</span>
                                         <motion.span
-                                            className={`text-xl font-bold px-4 py-2 rounded-xl ${mainArray.length <= 1
-                                                ? 'text-emerald-400 bg-emerald-500/20 border border-emerald-500/30'
-                                                : 'text-red-400 bg-red-500/20 border border-red-500/30'
-                                                }`}
-                                            animate={{
-                                                scale: [1, 1.15, 1]
-                                            }}
-                                            transition={{ delay: 2.6, duration: 0.3 }}
+                                            className={`font-bold text-sm px-3 py-1 rounded-lg border ${
+                                                mainArray.length <= 1
+                                                    ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30'
+                                                    : 'text-red-400 bg-red-500/15 border-red-500/30'
+                                            }`}
+                                            initial={{ opacity: 0, scale: 0.7 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            transition={{ delay: 1.5, type: 'spring', stiffness: 260, damping: 18 }}
                                         >
                                             {mainArray.length <= 1 ? '✓ True' : '✗ False'}
                                         </motion.span>
                                     </motion.div>
-
-                                    {/* Explanation */}
-                                    <motion.div
-                                        className="mt-4 text-sm text-slate-400 text-center max-w-md"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        transition={{ delay: 3 }}
-                                    >
-                                        {mainArray.length <= 1
-                                            ? '✅ Base case reached! Array has 0 or 1 elements, so it\'s already sorted.'
-                                            : '❌ Not a base case. Array has more than 1 element, continue dividing...'
-                                        }
-                                    </motion.div>
-                                </div>
-
-                                {/* The array below */}
-                                <motion.div
-                                    className="mt-4"
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.5 }}
-                                >
-                                    <div className="flex flex-col items-center gap-2">
-                                        <span className="text-xs text-slate-500 uppercase">Current Array (arr)</span>
-                                        <ArrayRow
-                                            id="base-check-array"
-                                            data={mainArray}
-                                            state="active"
-                                            highlightIndices={[]}
-                                        />
-                                        <span className="text-xs text-cyan-400">length = {mainArray.length}</span>
-                                    </div>
                                 </motion.div>
                             </motion.div>
                         )}
@@ -2051,8 +2002,71 @@ const MergeSortVisualizer = ({
                             />
                         )}
 
+                        {/* Fast Animation for Compute Mid */}
+                        {stepType === 'compute_mid' && (
+                            <motion.div
+                                className="flex flex-col items-center gap-4"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.22 }}
+                            >
+                                {/* Array with index labels */}
+                                <div className="flex flex-col items-center gap-1">
+                                    <div className="flex gap-1">
+                                        {mainArray.map((val, idx) => (
+                                            <motion.div
+                                                key={`mid-arr-${idx}`}
+                                                className={`w-12 h-12 flex items-center justify-center font-mono font-bold text-lg rounded-xl border-2 ${
+                                                    idx === mid
+                                                        ? 'bg-emerald-500 border-emerald-300 text-white shadow-lg shadow-emerald-500/40 ring-2 ring-emerald-300'
+                                                        : 'bg-indigo-500 border-indigo-300 text-white'
+                                                }`}
+                                                initial={{ opacity: 0, y: -10, scale: 0.8 }}
+                                                animate={{ opacity: 1, y: 0, scale: idx === mid ? 1.1 : 1 }}
+                                                transition={{ duration: 0.18, delay: idx * 0.03, ease: 'easeOut' }}
+                                            >
+                                                {val}
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                    {/* Index numbers */}
+                                    <div className="flex gap-1">
+                                        {mainArray.map((_, idx) => (
+                                            <motion.div
+                                                key={`mid-idx-${idx}`}
+                                                className={`w-12 text-center font-mono text-xs ${idx === mid ? 'text-emerald-400 font-bold' : 'text-slate-500'}`}
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                transition={{ duration: 0.15, delay: 0.2 + idx * 0.03 }}
+                                            >
+                                                {idx}
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* mid = N */}
+                                <motion.div
+                                    className="flex items-center gap-2 font-mono text-sm"
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.3, duration: 0.2 }}
+                                >
+                                    <span className="text-blue-400 font-semibold">mid</span>
+                                    <span className="text-slate-500">=</span>
+                                    <motion.span
+                                        className="text-cyan-400 font-bold text-base px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/25 rounded-lg"
+                                        initial={{ scale: 0.7, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        transition={{ delay: 0.38, type: 'spring', stiffness: 280, damping: 18 }}
+                                    >
+                                        {mid}
+                                    </motion.span>
+                                </motion.div>
+                            </motion.div>
+                        )}
+
                         {/* Main Array Display (for standard steps) - ONLY VISIBLE IN CALL PHASE */}
-                        {phase === 'CALL' && stepType !== 'init_array' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && mainArray.length > 0 && (
+                        {phase === 'CALL' && stepType !== 'init_array' && stepType !== 'compute_mid' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && mainArray.length > 0 && (
                             <div className="flex flex-col items-center gap-2">
                                 <span className="text-xs text-slate-500 uppercase">Current Array (arr)</span>
                                 <ArrayRow
