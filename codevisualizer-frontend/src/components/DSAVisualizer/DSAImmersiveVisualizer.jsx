@@ -8,7 +8,7 @@
  * Uses same layout as ImmersiveVisualizer but with custom visualization
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
 import MergeSortVisualizer from './MergeSortVisualizer';
@@ -16,11 +16,22 @@ import MergeSortVisualizer from './MergeSortVisualizer';
 // ============ CODE PANEL WITH LINE HIGHLIGHTING ============
 const CodePanel = ({ code, currentLineNumber, executedLines = [], width = 400 }) => {
     const lines = code.split('\n');
+    const scrollContainerRef = useRef(null);
+    const lineRefs = useRef({});
+
+    useEffect(() => {
+        if (currentLineNumber && lineRefs.current[currentLineNumber]) {
+            lineRefs.current[currentLineNumber].scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+        }
+    }, [currentLineNumber]);
 
     return (
         <div
             style={{ width: `${width}px` }}
-            className="flex-shrink-0 bg-slate-900 border-l border-slate-700 flex flex-col overflow-hidden"
+            className="h-full flex-shrink-0 bg-slate-900 border-l border-slate-700 flex flex-col overflow-hidden"
         >
             {/* Header */}
             <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2 bg-slate-800">
@@ -33,7 +44,10 @@ const CodePanel = ({ code, currentLineNumber, executedLines = [], width = 400 })
             </div>
 
             {/* Code Content */}
-            <div className="flex-1 overflow-y-auto py-2 font-mono text-[13px] leading-[1.7]">
+            <div
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto py-2 font-mono text-[13px] leading-[1.7]"
+            >
                 {lines.map((line, idx) => {
                     const lineNum = idx + 1;
                     const isCurrentLine = lineNum === currentLineNumber;
@@ -42,6 +56,7 @@ const CodePanel = ({ code, currentLineNumber, executedLines = [], width = 400 })
                     return (
                         <div
                             key={idx}
+                            ref={el => lineRefs.current[lineNum] = el}
                             className={`flex transition-all duration-300 ${isCurrentLine
                                 ? 'bg-blue-500/20 border-l-2 border-blue-400'
                                 : wasExecuted
@@ -153,7 +168,7 @@ const DSAImmersiveVisualizer = ({
     const [showCodePanel, setShowCodePanel] = useState(true);
     const [executedLines, setExecutedLines] = useState([]);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [playbackSpeed, setPlaybackSpeed] = useState(1500); // ms per step
+    const [playbackSpeed, setPlaybackSpeed] = useState(4500); // ms per step (~0.85× default)
 
     // Local array input state for inline editing
     const [localArrayInput, setLocalArrayInput] = useState(customArray);
@@ -422,7 +437,7 @@ const DSAImmersiveVisualizer = ({
                             animate={{ width: 400, opacity: 1 }}
                             exit={{ width: 0, opacity: 0 }}
                             transition={{ duration: 0.2 }}
-                            className="flex-shrink-0 overflow-hidden"
+                            className="h-full flex-shrink-0 overflow-hidden"
                         >
                             <CodePanel
                                 code={code}

@@ -2167,8 +2167,8 @@ const MergeSortVisualizer = ({
                         onClick={onPlayPause}
                         disabled={isAtEnd}
                         className={`p-2.5 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed ${isPlaying
-                                ? 'bg-amber-500 hover:bg-amber-400 text-white shadow-lg shadow-amber-500/30'
-                                : 'bg-slate-700 hover:bg-indigo-600 text-slate-300 hover:text-white'
+                            ? 'bg-amber-500 hover:bg-amber-400 text-white shadow-lg shadow-amber-500/30'
+                            : 'bg-slate-700 hover:bg-indigo-600 text-slate-300 hover:text-white'
                             }`}
                         title={isPlaying ? 'Pause auto-play (Space)' : 'Auto-play all steps (Space)'}
                     >
@@ -2239,27 +2239,28 @@ const MergeSortVisualizer = ({
                     <span className="text-xs text-slate-400">🐢</span>
                     <input
                         type="range"
-                        min={200}
-                        max={3000}
-                        step={50}
-                        value={3200 - playbackSpeed} // invert: high value = fast
-                        onChange={e => onSpeedChange?.(3200 - Number(e.target.value))}
-                        className="w-32 h-1.5 appearance-none rounded-full cursor-pointer"
+                        min={800}
+                        max={8000}
+                        step={100}
+                        value={8800 - playbackSpeed}  // invert so right = faster
+                        onChange={e => onSpeedChange?.(8800 - Number(e.target.value))}
+                        className="w-36 h-1.5 appearance-none rounded-full cursor-pointer"
                         style={{
-                            background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((3200 - playbackSpeed - 200) / 2800) * 100
-                                }%, #334155 ${((3200 - playbackSpeed - 200) / 2800) * 100
+                            background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((8800 - playbackSpeed - 800) / 7200) * 100
+                                }%, #334155 ${((8800 - playbackSpeed - 800) / 7200) * 100
                                 }%, #334155 100%)`
                         }}
                         title="Drag to change playback speed"
                     />
                     <span className="text-xs text-slate-400">🐇</span>
-                    <span className="text-xs font-mono text-indigo-400 w-10 text-center">
-                        {playbackSpeed <= 250 ? '5×'
-                            : playbackSpeed <= 600 ? '2×'
-                                : playbackSpeed <= 1100 ? '1×'
-                                    : playbackSpeed <= 1700 ? '0.7×'
-                                        : playbackSpeed <= 2200 ? '0.5×'
-                                            : '0.3×'}
+                    <span className="text-xs font-mono text-indigo-400 w-12 text-center">
+                        {playbackSpeed <= 900 ? '4×'
+                            : playbackSpeed <= 1400 ? '2×'
+                                : playbackSpeed <= 2000 ? '1.5×'
+                                    : playbackSpeed <= 3500 ? '1×'
+                                        : playbackSpeed <= 5000 ? '0.7×'
+                                            : playbackSpeed <= 6500 ? '0.5×'
+                                                : '0.3×'}
                     </span>
                 </div>
             </div>
