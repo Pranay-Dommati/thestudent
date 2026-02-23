@@ -571,120 +571,174 @@ const MergeSortVisualizer = ({
                             {stepType === 'other' && '⚡ Processing...'}
                         </motion.div>
 
+                        {/* Fast Animation for Init Array */}
+                        {stepType === 'init_array' && (
+                            <motion.div
+                                className="flex flex-col items-center gap-3"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                <span className="text-xs text-slate-500 font-mono uppercase tracking-widest">Current Array (arr)</span>
+                                <div className="flex gap-1">
+                                    {mainArray.map((val, idx) => (
+                                        <motion.div
+                                            key={`init-${idx}`}
+                                            className="w-12 h-12 flex items-center justify-center font-mono font-bold text-lg rounded-xl border-2 bg-indigo-500 border-indigo-300 text-white shadow-lg shadow-indigo-500/30"
+                                            initial={{ opacity: 0, y: -12, scale: 0.8 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            transition={{ duration: 0.18, delay: idx * 0.03, ease: 'easeOut' }}
+                                        >
+                                            {val}
+                                        </motion.div>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        )}
+
                         {/* Special Animation for Function Call */}
                         {stepType === 'call_function' && (
                             <motion.div
-                                className="flex flex-col items-center gap-8"
+                                className="relative w-full flex flex-col items-center gap-5"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
-                                transition={{ duration: 0.3 }}
+                                transition={{ duration: 0.45 }}
                             >
-                                {/* The calling line */}
-                                <motion.div
-                                    className="flex items-center gap-3 text-lg font-mono"
-                                    initial={{ opacity: 0, y: -20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.2 }}
-                                >
-                                    <span className="text-slate-400">result</span>
-                                    <span className="text-slate-500">=</span>
-                                    <motion.span
-                                        className="text-indigo-400 font-bold"
-                                        animate={{
-                                            textShadow: ['0 0 0px #818cf8', '0 0 20px #818cf8', '0 0 0px #818cf8']
-                                        }}
-                                        transition={{ duration: 1.5, repeat: Infinity }}
-                                    >
-                                        merge_sort
-                                    </motion.span>
-                                    <span className="text-slate-400">(</span>
-                                    <span className="text-amber-400">arr</span>
-                                    <span className="text-slate-400">)</span>
-                                </motion.div>
+                                {/* ── Row: [Caller] ──arrow──► [Definition] ── */}
+                                <div className="flex items-center justify-center gap-0">
 
-                                {/* The Array with animated "entering function" effect */}
-                                <div className="relative flex flex-col items-center gap-4">
-                                    {/* Array */}
+                                    {/* ── Caller block ── */}
                                     <motion.div
-                                        initial={{ y: 0, scale: 1 }}
-                                        animate={{ y: 40, scale: 0.95 }}
-                                        transition={{ delay: 0.5, duration: 0.8, ease: "easeInOut" }}
+                                        className="relative z-10 flex-shrink-0"
+                                        initial={{ opacity: 0, x: -24 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
                                     >
-                                        <ArrayRow
-                                            id="function-call-array"
-                                            data={mainArray}
-                                            state="active"
-                                            highlightIndices={[]}
-                                        />
+                                        <div className="px-5 py-4 bg-slate-800/75 border border-slate-600/50 rounded-xl backdrop-blur-sm shadow-2xl" style={{ minWidth: 200 }}>
+                                            <div className="text-[10px] text-slate-500 mb-2 font-mono uppercase tracking-widest">caller</div>
+                                            <div className="flex items-center gap-1.5 font-mono text-sm flex-wrap">
+                                                <span className="text-slate-300">result</span>
+                                                <span className="text-slate-500">=</span>
+                                                <motion.span
+                                                    className="text-indigo-400 font-bold"
+                                                    animate={{ textShadow: ['0 0 3px #818cf8', '0 0 16px #818cf8', '0 0 3px #818cf8'] }}
+                                                    transition={{ duration: 1.8, repeat: Infinity }}
+                                                >merge_sort</motion.span>
+                                                <span className="text-slate-400">(</span>
+                                                <span className="text-amber-400 font-semibold">arr</span>
+                                                <span className="text-slate-400">)</span>
+                                            </div>
+                                        </div>
                                     </motion.div>
 
-                                    {/* Animated Arrow pointing down */}
-                                    <motion.div
-                                        className="flex flex-col items-center gap-1"
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.4 }}
-                                    >
-                                        <motion.div
-                                            animate={{ y: [0, 8, 0] }}
-                                            transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                                            className="text-indigo-400 text-2xl"
-                                        >
-                                            ↓
-                                        </motion.div>
-                                        <motion.span
-                                            className="text-xs text-indigo-300"
-                                            animate={{ opacity: [0.5, 1, 0.5] }}
-                                            transition={{ duration: 1.5, repeat: Infinity }}
-                                        >
-                                            passing as argument
-                                        </motion.span>
-                                    </motion.div>
+                                    {/* ── Straight arrow only ── */}
+                                    <div className="flex-shrink-0" style={{ width: 100 }}>
+                                        <svg width="100" height="24" viewBox="0 0 100 24" fill="none">
+                                            <defs>
+                                                <linearGradient id="arrowGradH" x1="0" y1="0" x2="1" y2="0">
+                                                    <stop offset="0%" stopColor="#6366f1" />
+                                                    <stop offset="100%" stopColor="#a5b4fc" />
+                                                </linearGradient>
+                                            </defs>
+                                            {/* Glow */}
+                                            <motion.line x1="4" y1="12" x2="88" y2="12"
+                                                stroke="#818cf8" strokeWidth="6" strokeLinecap="round" opacity={0.13}
+                                                initial={{ pathLength: 0 }} animate={{ pathLength: 1 }}
+                                                transition={{ delay: 0.5, duration: 0.45, ease: "easeInOut" }}
+                                            />
+                                            {/* Line */}
+                                            <motion.line x1="4" y1="12" x2="88" y2="12"
+                                                stroke="url(#arrowGradH)" strokeWidth="2" strokeLinecap="round"
+                                                initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }}
+                                                transition={{ delay: 0.5, duration: 0.45, ease: "easeInOut" }}
+                                            />
+                                            {/* Arrowhead */}
+                                            <motion.path d="M 88 12 L 78 6 M 88 12 L 78 18"
+                                                stroke="#a5b4fc" strokeWidth="2" strokeLinecap="round"
+                                                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                                transition={{ delay: 0.93, duration: 0.18 }}
+                                            />
+                                        </svg>
+                                    </div>
 
-                                    {/* Function Box */}
+                                    {/* ── Definition box ── */}
                                     <motion.div
-                                        className="relative mt-4 px-8 py-6 bg-indigo-950/50 border-2 border-indigo-500/50 rounded-2xl"
-                                        initial={{ opacity: 0, scale: 0.9 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        transition={{ delay: 0.6, duration: 0.4 }}
+                                        className="relative z-10 flex-shrink-0"
+                                        initial={{ opacity: 0, x: 24 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: 0.82, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
                                     >
-                                        {/* Glow effect */}
                                         <motion.div
-                                            className="absolute inset-0 bg-indigo-500/20 rounded-2xl blur-xl"
-                                            animate={{ opacity: [0.3, 0.6, 0.3] }}
-                                            transition={{ duration: 2, repeat: Infinity }}
+                                            className="absolute -inset-4 bg-indigo-500/10 rounded-2xl blur-2xl pointer-events-none"
+                                            animate={{ opacity: [0.35, 0.75, 0.35] }}
+                                            transition={{ duration: 3, repeat: Infinity }}
                                         />
+                                        <div className="relative px-5 py-4 bg-indigo-950/65 border border-indigo-500/40 rounded-xl backdrop-blur-sm shadow-2xl" style={{ minWidth: 210 }}>
+                                            <div className="text-[10px] text-indigo-400/60 mb-2 font-mono uppercase tracking-widest">definition</div>
 
-                                        <div className="relative flex flex-col items-center gap-2">
-                                            <motion.div
-                                                className="text-indigo-300 font-mono text-sm"
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                transition={{ delay: 0.8 }}
+                                            {/* def merge_sort(arr): */}
+                                            <motion.div className="font-mono text-sm"
+                                                initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: 1.0, duration: 0.35 }}
                                             >
-                                                def merge_sort(arr):
-                                            </motion.div>
-                                            <motion.div
-                                                className="flex items-center gap-2 text-xs text-slate-400"
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                transition={{ delay: 1 }}
-                                            >
+                                                <span className="text-purple-400 font-bold">def </span>
+                                                <span className="text-indigo-300 font-bold">merge_sort</span>
+                                                <span className="text-slate-400">(</span>
                                                 <span className="text-amber-400">arr</span>
-                                                <span>=</span>
-                                                <span className="text-emerald-400">[{mainArray.join(', ')}]</span>
+                                                <span className="text-slate-400">):</span>
                                             </motion.div>
-                                            <motion.div
-                                                className="mt-2 text-xs text-indigo-400"
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                                transition={{ delay: 1.2 }}
+
+                                            {/* ... line 1 */}
+                                            <motion.div className="font-mono text-sm mt-2 pl-5"
+                                                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                                transition={{ delay: 1.18, duration: 0.3 }}
                                             >
-                                                🚀 Entering function...
+                                                <motion.span className="text-slate-500"
+                                                    animate={{ opacity: [0.3, 0.85, 0.3] }}
+                                                    transition={{ duration: 1.8, repeat: Infinity }}
+                                                >...</motion.span>
+                                            </motion.div>
+
+                                            {/* ... line 2 */}
+                                            <motion.div className="font-mono text-sm mt-1 pl-5"
+                                                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                                transition={{ delay: 1.32, duration: 0.3 }}
+                                            >
+                                                <motion.span className="text-slate-500"
+                                                    animate={{ opacity: [0.3, 0.85, 0.3] }}
+                                                    transition={{ duration: 1.8, repeat: Infinity, delay: 0.6 }}
+                                                >...</motion.span>
                                             </motion.div>
                                         </div>
                                     </motion.div>
                                 </div>
+
+                                {/* ── Label + chips — centered below the row ── */}
+                                <motion.div
+                                    className="flex flex-col items-center gap-2"
+                                    initial={{ opacity: 0, y: 6 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.88, duration: 0.38 }}
+                                >
+                                    <span className="text-[11px] text-indigo-300/75 font-mono">
+                                        calling <span className="text-indigo-400 font-semibold">merge_sort</span> by passing
+                                    </span>
+                                    <div className="flex items-center flex-wrap justify-center gap-1.5">
+                                        <span className="text-[11px] text-amber-400 font-mono font-semibold">arr =</span>
+                                        {mainArray.map((val, idx) => (
+                                            <motion.span
+                                                key={idx}
+                                                className="px-2 py-0.5 bg-amber-500/15 border border-amber-500/35 rounded text-amber-300 text-xs font-mono"
+                                                initial={{ opacity: 0, scale: 0.5 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                transition={{ delay: 0.92 + idx * 0.06, duration: 0.22, ease: "backOut" }}
+                                            >
+                                                {val}
+                                            </motion.span>
+                                        ))}
+                                    </div>
+                                </motion.div>
+
                             </motion.div>
                         )}
 
@@ -1998,7 +2052,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Main Array Display (for standard steps) - ONLY VISIBLE IN CALL PHASE */}
-                        {phase === 'CALL' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && mainArray.length > 0 && (
+                        {phase === 'CALL' && stepType !== 'init_array' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && mainArray.length > 0 && (
                             <div className="flex flex-col items-center gap-2">
                                 <span className="text-xs text-slate-500 uppercase">Current Array (arr)</span>
                                 <ArrayRow
