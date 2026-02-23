@@ -259,7 +259,9 @@ const MergeSortVisualizer = ({
     currentStepIndex = 0,
     onStepChange,
     isPlaying = false,
-    onPlayPause
+    onPlayPause,
+    playbackSpeed = 1500,
+    onSpeedChange
 }) => {
     const [visualState, setVisualState] = useState({ nodes: [], comparisons: [], phase: 'initial' });
 
@@ -2132,15 +2134,16 @@ const MergeSortVisualizer = ({
             </div>
 
             {/* Controls Bar */}
-            <div className="px-6 py-4 bg-slate-800 border-t border-slate-700">
-                <div className="flex items-center justify-center gap-4">
+            <div className="px-6 py-3 bg-slate-800 border-t border-slate-700">
+                {/* Top row: main playback controls + progress */}
+                <div className="flex items-center justify-center gap-3">
                     {/* Restart */}
                     <button
                         onClick={handleRestart}
-                        className="p-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
+                        className="p-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors"
                         title="Restart"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M1 4v6h6" />
                             <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
                         </svg>
@@ -2150,15 +2153,38 @@ const MergeSortVisualizer = ({
                     <button
                         onClick={handlePrev}
                         disabled={isAtStart}
-                        className="p-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        className="p-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Previous step"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                             <polygon points="19,20 9,12 19,4" />
                             <line x1="5" y1="4" x2="5" y2="20" stroke="currentColor" strokeWidth="2" />
                         </svg>
                     </button>
 
-                    {/* Play/Next */}
+                    {/* ▶/⏸ Auto-play toggle (addon icon button) */}
+                    <button
+                        onClick={onPlayPause}
+                        disabled={isAtEnd}
+                        className={`p-2.5 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed ${isPlaying
+                                ? 'bg-amber-500 hover:bg-amber-400 text-white shadow-lg shadow-amber-500/30'
+                                : 'bg-slate-700 hover:bg-indigo-600 text-slate-300 hover:text-white'
+                            }`}
+                        title={isPlaying ? 'Pause auto-play (Space)' : 'Auto-play all steps (Space)'}
+                    >
+                        {isPlaying ? (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <rect x="6" y="4" width="4" height="16" />
+                                <rect x="14" y="4" width="4" height="16" />
+                            </svg>
+                        ) : (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                        )}
+                    </button>
+
+                    {/* Next (original big button — unchanged) */}
                     <button
                         onClick={handleNext}
                         disabled={isAtEnd}
@@ -2192,19 +2218,49 @@ const MergeSortVisualizer = ({
                         )}
                     </button>
 
-                    {/* Progress Bar */}
-                    <div className="flex-1 max-w-xs flex items-center gap-3 ml-4">
-                        <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                    {/* Progress */}
+                    <div className="flex-1 max-w-xs flex items-center gap-3 ml-2">
+                        <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
                             <motion.div
                                 className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
                                 animate={{ width: `${((currentStepIndex + 1) / steps.length) * 100}%` }}
                                 transition={{ duration: 0.3 }}
                             />
                         </div>
-                        <span className="text-sm text-slate-400 font-mono">
+                        <span className="text-sm text-slate-400 font-mono whitespace-nowrap">
                             {currentStepIndex + 1}/{steps.length}
                         </span>
                     </div>
+                </div>
+
+                {/* Bottom row: Speed control */}
+                <div className="flex items-center justify-center gap-3 mt-2.5">
+                    <span className="text-xs text-slate-500 font-medium">Speed</span>
+                    <span className="text-xs text-slate-400">🐢</span>
+                    <input
+                        type="range"
+                        min={200}
+                        max={3000}
+                        step={50}
+                        value={3200 - playbackSpeed} // invert: high value = fast
+                        onChange={e => onSpeedChange?.(3200 - Number(e.target.value))}
+                        className="w-32 h-1.5 appearance-none rounded-full cursor-pointer"
+                        style={{
+                            background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((3200 - playbackSpeed - 200) / 2800) * 100
+                                }%, #334155 ${((3200 - playbackSpeed - 200) / 2800) * 100
+                                }%, #334155 100%)`
+                        }}
+                        title="Drag to change playback speed"
+                    />
+                    <span className="text-xs text-slate-400">🐇</span>
+                    <span className="text-xs font-mono text-indigo-400 w-10 text-center">
+                        {playbackSpeed <= 250 ? '5×'
+                            : playbackSpeed <= 600 ? '2×'
+                                : playbackSpeed <= 1100 ? '1×'
+                                    : playbackSpeed <= 1700 ? '0.7×'
+                                        : playbackSpeed <= 2200 ? '0.5×'
+                                            : '0.3×'}
+                    </span>
                 </div>
             </div>
         </div >

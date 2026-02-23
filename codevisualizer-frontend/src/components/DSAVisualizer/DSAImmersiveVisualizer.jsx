@@ -153,6 +153,7 @@ const DSAImmersiveVisualizer = ({
     const [showCodePanel, setShowCodePanel] = useState(true);
     const [executedLines, setExecutedLines] = useState([]);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [playbackSpeed, setPlaybackSpeed] = useState(1500); // ms per step
 
     // Local array input state for inline editing
     const [localArrayInput, setLocalArrayInput] = useState(customArray);
@@ -270,12 +271,12 @@ const DSAImmersiveVisualizer = ({
         if (isPlaying && currentStepIndex < allSteps.length - 1) {
             const timer = setTimeout(() => {
                 handleStepChange(currentStepIndex + 1);
-            }, 1500);
+            }, playbackSpeed);
             return () => clearTimeout(timer);
         } else if (isPlaying && currentStepIndex >= allSteps.length - 1) {
             setIsPlaying(false);
         }
-    }, [isPlaying, currentStepIndex, allSteps.length, handleStepChange]);
+    }, [isPlaying, currentStepIndex, allSteps.length, handleStepChange, playbackSpeed]);
 
     // Keyboard controls
     useEffect(() => {
@@ -407,6 +408,8 @@ const DSAImmersiveVisualizer = ({
                             onStepChange={handleStepChange}
                             isPlaying={isPlaying}
                             onPlayPause={() => setIsPlaying(p => !p)}
+                            playbackSpeed={playbackSpeed}
+                            onSpeedChange={setPlaybackSpeed}
                         />
                     )}
                 </div>
