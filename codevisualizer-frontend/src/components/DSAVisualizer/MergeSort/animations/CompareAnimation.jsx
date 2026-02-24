@@ -41,7 +41,7 @@ const CompareAnimation = ({ leftVal, rightVal, i, j }) => {
                         className="text-4xl font-bold text-slate-400"
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
-                        transition={{ delay: 0.5, type: "spring" }}
+                        transition={{ delay: 0.2, type: "spring" }}
                     >
                         &le;
                     </motion.div>
@@ -49,7 +49,7 @@ const CompareAnimation = ({ leftVal, rightVal, i, j }) => {
                         className={`px-3 py-1 rounded text-sm font-bold ${isLeftSmaller ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 1 }}
+                        transition={{ delay: 0.4 }}
                     >
                         {isLeftSmaller ? "TRUE" : "FALSE"}
                     </motion.div>
@@ -77,7 +77,7 @@ const CompareAnimation = ({ leftVal, rightVal, i, j }) => {
                 className="flex flex-col items-center gap-2 mt-4"
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.5 }}
+                transition={{ delay: 0.6 }}
             >
                 <div className="text-slate-300 text-lg text-center max-w-md">
                     Since <span className="font-bold text-white">{leftVal}</span> is {isLeftSmaller ? 'less than or equal to' : 'greater than'} <span className="font-bold text-white">{rightVal}</span>...

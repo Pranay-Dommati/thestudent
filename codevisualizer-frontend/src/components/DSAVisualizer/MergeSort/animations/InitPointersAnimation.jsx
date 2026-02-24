@@ -27,68 +27,6 @@ const InitPointersAnimation = ({ leftArray, rightArray }) => {
                 <span className="text-emerald-400 font-bold">0</span>
             </motion.div>
 
-            {/* Pointer visualization */}
-            <motion.div
-                className="flex items-center gap-8"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-            >
-                {/* i pointer */}
-                <motion.div
-                    className="flex flex-col items-center gap-2"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.5, type: "spring" }}
-                >
-                    <div className="flex items-center gap-2">
-                        <motion.div
-                            className="w-10 h-10 rounded-full bg-cyan-600 border-2 border-cyan-400 flex items-center justify-center font-bold text-white"
-                            animate={{
-                                boxShadow: ['0 0 0px rgba(34,211,238,0)', '0 0 15px rgba(34,211,238,0.5)', '0 0 0px rgba(34,211,238,0)']
-                            }}
-                            transition={{ duration: 1.5, repeat: Infinity }}
-                        >
-                            i
-                        </motion.div>
-                        <span className="text-slate-400">=</span>
-                        <motion.div
-                            className="w-10 h-10 rounded-lg bg-cyan-900/50 border border-cyan-500/50 flex items-center justify-center font-bold text-cyan-300"
-                        >
-                            0
-                        </motion.div>
-                    </div>
-                    <span className="text-xs text-cyan-400">Points to left[0]</span>
-                </motion.div>
-
-                {/* j pointer */}
-                <motion.div
-                    className="flex flex-col items-center gap-2"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.7, type: "spring" }}
-                >
-                    <div className="flex items-center gap-2">
-                        <motion.div
-                            className="w-10 h-10 rounded-full bg-amber-600 border-2 border-amber-400 flex items-center justify-center font-bold text-white"
-                            animate={{
-                                boxShadow: ['0 0 0px rgba(251,191,36,0)', '0 0 15px rgba(251,191,36,0.5)', '0 0 0px rgba(251,191,36,0)']
-                            }}
-                            transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
-                        >
-                            j
-                        </motion.div>
-                        <span className="text-slate-400">=</span>
-                        <motion.div
-                            className="w-10 h-10 rounded-lg bg-amber-900/50 border border-amber-500/50 flex items-center justify-center font-bold text-amber-300"
-                        >
-                            0
-                        </motion.div>
-                    </div>
-                    <span className="text-xs text-amber-400">Points to right[0]</span>
-                </motion.div>
-            </motion.div>
-
             {/* Arrays with pointer indicators */}
             {(leftArray || rightArray) && (
                 <motion.div

@@ -26,7 +26,7 @@ const LoopConditionAnimation = ({ i, j, leftLen, rightLen }) => {
                         className="flex items-center gap-2 font-mono text-xl"
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.2 }}
+                        transition={{ delay: 0.05 }}
                     >
                         <span className="text-cyan-400 font-bold">i</span>
                         <span className="text-slate-500">&lt;</span>
@@ -39,7 +39,7 @@ const LoopConditionAnimation = ({ i, j, leftLen, rightLen }) => {
                         className="flex items-center gap-2 text-lg bg-slate-800/50 px-3 py-1 rounded-lg border border-slate-700"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        transition={{ delay: 0.6 }}
+                        transition={{ delay: 0.1 }}
                     >
                         <span className="text-cyan-300">{i}</span>
                         <span className="text-slate-500">&lt;</span>
@@ -49,7 +49,7 @@ const LoopConditionAnimation = ({ i, j, leftLen, rightLen }) => {
                     <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
-                        transition={{ delay: 1, type: "spring" }}
+                        transition={{ delay: 0.2, type: "spring" }}
                         className={`text-2xl font-bold ${isLeftValid ? 'text-green-500' : 'text-red-500'}`}
                     >
                         {isLeftValid ? 'TRUE' : 'FALSE'}
@@ -61,7 +61,7 @@ const LoopConditionAnimation = ({ i, j, leftLen, rightLen }) => {
                     className="text-slate-500 font-bold text-2xl"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: 1.2 }}
+                    transition={{ delay: 0.25 }}
                 >
                     AND
                 </motion.div>
@@ -72,7 +72,7 @@ const LoopConditionAnimation = ({ i, j, leftLen, rightLen }) => {
                         className="flex items-center gap-2 font-mono text-xl"
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 1.4 }}
+                        transition={{ delay: 0.3 }}
                     >
                         <span className="text-amber-400 font-bold">j</span>
                         <span className="text-slate-500">&lt;</span>
@@ -85,7 +85,7 @@ const LoopConditionAnimation = ({ i, j, leftLen, rightLen }) => {
                         className="flex items-center gap-2 text-lg bg-slate-800/50 px-3 py-1 rounded-lg border border-slate-700"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        transition={{ delay: 1.8 }}
+                        transition={{ delay: 0.4 }}
                     >
                         <span className="text-amber-300">{j}</span>
                         <span className="text-slate-500">&lt;</span>
@@ -96,7 +96,7 @@ const LoopConditionAnimation = ({ i, j, leftLen, rightLen }) => {
                     <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
-                        transition={{ delay: 2.2, type: "spring" }}
+                        transition={{ delay: 0.5, type: "spring" }}
                         className={`text-2xl font-bold ${isRightValid ? 'text-green-500' : 'text-red-500'}`}
                     >
                         {isRightValid ? 'TRUE' : 'FALSE'}
@@ -112,7 +112,7 @@ const LoopConditionAnimation = ({ i, j, leftLen, rightLen }) => {
                     }`}
                 initial={{ opacity: 0, scale: 0.8, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ delay: 2.6, type: "spring" }}
+                transition={{ delay: 0.6, type: "spring" }}
             >
                 {isLoopValid ? 'LOOP CONTINUES' : 'LOOP TERMINATES'}
             </motion.div>
