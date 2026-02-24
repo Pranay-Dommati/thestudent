@@ -9,7 +9,7 @@
  * - Returns: Show result moving up the tree
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { InitResultAnimation, InitPointersAnimation } from './MergeSort/animations';
 import LoopConditionAnimation from './MergeSort/animations/LoopConditionAnimation';
@@ -412,6 +412,98 @@ const FunctionCallAnimation = ({
     </motion.div>
 );
 
+// ============ STEP DATA COMPUTATION (pure function) ============
+const computeStepData = (steps, idx) => {
+    if (!steps || steps.length === 0 || idx < 0 || idx >= steps.length) {
+        return { stepType: 'initial', mainArray: [38, 27, 43, 3, 9, 82, 10], mid: undefined, leftArray: null, rightArray: null, resultArray: null, leftSorted: null, rightSorted: null, iPtr: undefined, jPtr: undefined, isLeftReturnPhase: false, isRightReturnPhase: false, phase: 'CALL', stepIndex: idx };
+    }
+    const step = steps[idx];
+    const currentVars = step?.variables || step?.locals || {};
+    const code = step?.code?.trim() || '';
+    const explanation = step?.explanation || '';
+    const nextStep = steps[idx + 1];
+    const nextVars = nextStep?.variables || nextStep?.locals || {};
+
+    const getValue = (v) => {
+        if (v === null || v === undefined) return undefined;
+        if (typeof v === 'object' && 'value' in v) return v.value;
+        return v;
+    };
+    const getArray = (v) => {
+        if (!v) return null;
+        if (Array.isArray(v)) return v;
+        if (typeof v === 'object' && 'value' in v && Array.isArray(v.value)) return v.value;
+        return null;
+    };
+    const parseResultFromExplanation = (name) => {
+        const regex = new RegExp(`→\\s*${name}\\s*=\\s*([\\d\\-]+|\\[[^\\]]*\\])`, 'i');
+        const match = explanation.match(regex);
+        if (match) {
+            const val = match[1];
+            if (val.startsWith('[')) { try { return JSON.parse(val.replace(/'/g, '"')); } catch { return null; } }
+            return parseInt(val, 10);
+        }
+        return undefined;
+    };
+    const getPredictedValue = (name) => {
+        const fromExplanation = parseResultFromExplanation(name);
+        if (fromExplanation !== undefined) return fromExplanation;
+        return getValue(nextVars[name]);
+    };
+    const getPredictedArray = (name) => {
+        const fromExplanation = parseResultFromExplanation(name);
+        if (Array.isArray(fromExplanation)) return fromExplanation;
+        return getArray(nextVars[name]);
+    };
+
+    let stepType = 'other';
+    if (step?.stepType) { stepType = step.stepType; }
+    else if (!code) { stepType = 'initial'; }
+    else if (code.includes('arr = [') && code.includes(']')) { stepType = 'init_array'; }
+    else if (code.includes('if len(arr)') || code.includes('len(arr) <= 1')) { stepType = 'check_base'; }
+    else if (code.includes('return arr') && !code.includes('merge')) { stepType = 'return_base'; }
+    else if (code.includes('mid =') || code.includes('len(arr) //')) { stepType = 'compute_mid'; }
+    else if (code.includes('left = arr[:mid]')) { stepType = 'split_left'; }
+    else if (code.includes('right = arr[mid:]')) { stepType = 'split_right'; }
+    else if (code.includes('left_sorted') && code.includes('merge_sort')) { stepType = 'recurse_left'; }
+    else if (code.includes('right_sorted') && code.includes('merge_sort')) { stepType = 'recurse_right'; }
+    else if (code.includes('merge') && code.includes('left_sorted') && code.includes('right_sorted')) { stepType = 'call_merge'; }
+    else if (code.includes('result = []')) { stepType = 'init_result'; }
+    else if (code.includes('i = j = 0')) { stepType = 'init_pointers'; }
+    else if (code.includes('while i < len(left)')) { stepType = 'compare_loop'; }
+    else if (code.includes('left[i]') && code.includes('right[j]')) { stepType = 'compare'; }
+    else if (code.includes('result.append(left[i])')) { stepType = 'append_left'; }
+    else if (code.includes('result.append(right[j])')) { stepType = 'append_right'; }
+    else if (code.includes('i += 1')) { stepType = 'inc_i'; }
+    else if (code.includes('j += 1')) { stepType = 'inc_j'; }
+    else if (code.includes('result.extend(left')) { stepType = 'extend_left'; }
+    else if (code.includes('result.extend(right')) { stepType = 'extend_right'; }
+    else if (code.includes('return result')) { stepType = 'return_merged'; }
+
+    let mainArray = getArray(currentVars.arr) || [];
+    if (mainArray.length === 0 && steps.length > 0) mainArray = [38, 27, 43, 3, 9, 82, 10];
+    const mid = stepType === 'compute_mid' ? getPredictedValue('mid') : getValue(currentVars.mid);
+    const leftArray = stepType === 'split_left' ? getPredictedArray('left') : getArray(currentVars.left);
+    const rightArray = stepType === 'split_right' ? getPredictedArray('right') : getArray(currentVars.right);
+    const resultArray = getArray(currentVars.result);
+    const leftSorted = getArray(currentVars.left_sorted) || getPredictedArray('left_sorted');
+    const rightSorted = getArray(currentVars.right_sorted) || getPredictedArray('right_sorted');
+    const codeInvolvesRightSorted = code.includes('right_sorted');
+    const codeInvolvesLeftSorted = code.includes('left_sorted') && !code.includes('right_sorted');
+    const isLeftReturnPhase = !!(leftSorted && leftSorted.length > 0
+        && stepType !== 'recurse_left' && stepType !== 'recurse_right'
+        && stepType !== 'return_base' && stepType !== 'call_merge'
+        && stepType !== 'return_merged' && !codeInvolvesRightSorted);
+    const isRightReturnPhase = !!(rightSorted && rightSorted.length > 0
+        && stepType !== 'recurse_right' && stepType !== 'recurse_left'
+        && stepType !== 'return_base' && stepType !== 'call_merge'
+        && stepType !== 'return_merged' && !codeInvolvesLeftSorted);
+    const phase = (isLeftReturnPhase || isRightReturnPhase) ? 'RETURN' : 'CALL';
+    const iPtr = getValue(currentVars.i);
+    const jPtr = getValue(currentVars.j);
+    return { stepType, mainArray, mid, leftArray, rightArray, resultArray, leftSorted, rightSorted, iPtr, jPtr, isLeftReturnPhase, isRightReturnPhase, phase, stepIndex: idx };
+};
+
 // ============ MAIN VISUALIZER COMPONENT ============
 const MergeSortVisualizer = ({
     steps = [],
@@ -422,17 +514,35 @@ const MergeSortVisualizer = ({
     playbackSpeed = 1500,
     onSpeedChange
 }) => {
-    const [visualState, setVisualState] = useState({ nodes: [], comparisons: [], phase: 'initial' });
-
-    // Build visualization state whenever step changes
-    useEffect(() => {
-        const newState = buildVisualizationState(steps, currentStepIndex);
-        setVisualState(newState);
-    }, [steps, currentStepIndex]);
+    const [slideElements, setSlideElements] = useState([]);
+    const scrollContainerRef = useRef(null);
 
     const currentStep = steps[currentStepIndex];
     const isAtEnd = currentStepIndex >= steps.length - 1;
     const isAtStart = currentStepIndex <= 0;
+
+    // Sync slideElements whenever currentStepIndex changes (handles manual nav + autoplay)
+    useEffect(() => {
+        setSlideElements(prev => {
+            const targetLen = currentStepIndex + 1;
+            if (prev.length === targetLen) return prev;
+            if (prev.length < targetLen) {
+                const newSlides = [...prev];
+                for (let i = prev.length; i < targetLen; i++) {
+                    newSlides.push(computeStepData(steps, i));
+                }
+                return newSlides;
+            }
+            return prev.slice(0, targetLen);
+        });
+    }, [currentStepIndex, steps]);
+
+    // Auto-scroll to the rightmost (newest) slide
+    useEffect(() => {
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTo({ left: scrollContainerRef.current.scrollWidth, behavior: 'smooth' });
+        }
+    }, [slideElements.length]);
 
     const handleNext = useCallback(() => {
         if (currentStepIndex < steps.length - 1) {
@@ -450,243 +560,56 @@ const MergeSortVisualizer = ({
         onStepChange?.(0);
     }, [onStepChange]);
 
-    // Get current variables for display - check multiple possible locations
-    const currentVars = currentStep?.variables || currentStep?.locals || {};
-    const code = currentStep?.code?.trim() || '';
 
-    // Analyze the code line to determine what type of action this is
-    const getStepType = () => {
-        // Check if the step already has a stepType property (e.g., synthetic init step)
-        if (currentStep?.stepType) return currentStep.stepType;
-
-        if (!code) return 'initial';
-        // Check for array initialization line first
-        if (code.includes('arr = [') && code.includes(']')) return 'init_array';
-        if (code.includes('if len(arr)') || code.includes('len(arr) <= 1')) return 'check_base';
-        if (code.includes('return arr') && !code.includes('merge')) return 'return_base';
-        if (code.includes('mid =') || code.includes('len(arr) //')) return 'compute_mid';
-        if (code.includes('left = arr[:mid]')) return 'split_left';
-        if (code.includes('right = arr[mid:]')) return 'split_right';
-        if (code.includes('left_sorted') && code.includes('merge_sort')) return 'recurse_left';
-        if (code.includes('right_sorted') && code.includes('merge_sort')) return 'recurse_right';
-        if (code.includes('merge') && code.includes('left_sorted') && code.includes('right_sorted')) return 'call_merge';
-        if (code.includes('result = []')) return 'init_result';
-        if (code.includes('i = j = 0')) return 'init_pointers';
-        if (code.includes('while i < len(left)')) return 'compare_loop';
-        if (code.includes('left[i]') && code.includes('right[j]')) return 'compare';
-        if (code.includes('result.append(left[i])')) return 'append_left';
-        if (code.includes('result.append(right[j])')) return 'append_right';
-        if (code.includes('i += 1')) return 'inc_i';
-        if (code.includes('j += 1')) return 'inc_j';
-        if (code.includes('result.extend(left')) return 'extend_left';
-        if (code.includes('result.extend(right')) return 'extend_right';
-        if (code.includes('return result')) return 'return_merged';
-        return 'other';
-    };
-
-    const stepType = getStepType();
-
-    // Helper to extract actual value from backend variable format
-    // Backend may return {value: 5, type: 'int'} or just 5
-    const getValue = (v) => {
-        if (v === null || v === undefined) return undefined;
-        if (typeof v === 'object' && 'value' in v) return v.value;
-        return v;
-    };
-
-    // Helper to extract array from variable
-    const getArray = (v) => {
-        if (!v) return null;
-        if (Array.isArray(v)) return v;
-        if (typeof v === 'object' && 'value' in v && Array.isArray(v.value)) return v.value;
-        return null;
-    };
-
-    // PREDICTIVE ANIMATION: Extract values from explanation or next step
-    // The backend captures state BEFORE line execution, so we need to "look ahead"
-    const explanation = currentStep?.explanation || '';
-    const nextStep = steps[currentStepIndex + 1];
-    const nextVars = nextStep?.variables || nextStep?.locals || {};
-
-    // Parse explanation to extract computed values
-    // Example: "... mid = 7 // 2 → mid = 3" → extract mid = 3
-    const parseResultFromExplanation = (name) => {
-        // Look for patterns like "→ name = value" or "name = value"
-        const regex = new RegExp(`→\\s*${name}\\s*=\\s*([\\d\\-]+|\\[[^\\]]*\\])`, 'i');
-        const match = explanation.match(regex);
-        if (match) {
-            const val = match[1];
-            if (val.startsWith('[')) {
-                // It's an array - parse it
-                try {
-                    return JSON.parse(val.replace(/'/g, '"'));
-                } catch { return null; }
-            }
-            return parseInt(val, 10);
-        }
-        return undefined;
-    };
-
-    // Get the "predicted" value - either from explanation or next step's variables
-    const getPredictedValue = (name) => {
-        // First try to parse from explanation
-        const fromExplanation = parseResultFromExplanation(name);
-        if (fromExplanation !== undefined) return fromExplanation;
-        // Fall back to next step's variables (which has the result after current line runs)
-        return getValue(nextVars[name]);
-    };
-
-    const getPredictedArray = (name) => {
-        // First try to parse from explanation
-        const fromExplanation = parseResultFromExplanation(name);
-        if (Array.isArray(fromExplanation)) return fromExplanation;
-        // Fall back to next step's variables
-        return getArray(nextVars[name]);
-    };
-
-    // Get display arrays - use CURRENT vars for existing data, PREDICTED for new data
-    let mainArray = getArray(currentVars.arr) || [];
-    if (mainArray.length === 0 && steps.length > 0) mainArray = [38, 27, 43, 3, 9, 82, 10]; // Default
-
-    // For mid, left, right - use PREDICTED values based on step type
-    // This shows the RESULT of the current line immediately
-    const mid = stepType === 'compute_mid' ? getPredictedValue('mid') : getValue(currentVars.mid);
-    const leftArray = stepType === 'split_left' ? getPredictedArray('left') : getArray(currentVars.left);
-    const rightArray = stepType === 'split_right' ? getPredictedArray('right') : getArray(currentVars.right);
-    const resultArray = getArray(currentVars.result);
-    const leftSorted = getArray(currentVars.left_sorted) || getPredictedArray('left_sorted');
-    const rightSorted = getArray(currentVars.right_sorted) || getPredictedArray('right_sorted');
-
-    // Flags to distinguish CALL phase from RETURN phase
-    // CALL phase: We're on the line "left_sorted = merge_sort(left)" and CALLING into the function
-    // RETURN phase: We're on the same line but the recursive call has completed and we're RECEIVING the result
-    // 
-    // Key insight: Even if leftSorted has a value (from a previous deeper recursion), 
-    // if stepType is 'recurse_left', we're at the CALL site, not the RETURN site.
-    // We should show return animation only when leftSorted exists AND we're NOT at the call step.
-    // Additionally, when we're on 'recurse_right', we should NOT show the left return animation at all.
-    // 
-    // IMPORTANT: Detect if current step is specifically about right_sorted assignment
-    // If so, don't show left return animation (even if leftSorted has a value)
-    const codeInvolvesRightSorted = code.includes('right_sorted');
-    const codeInvolvesLeftSorted = code.includes('left_sorted') && !code.includes('right_sorted');
-
-    // isLeftReturnPhase: Only true when:
-    // - leftSorted exists
-    // - We're not at a recursion CALL step
-    // - We're not at base case return
-    // - We're not at the merge call (which has its own animation)
-    // - The current code is NOT about right_sorted (otherwise we'd show both animations)
-    const isLeftReturnPhase = leftSorted && leftSorted.length > 0
-        && stepType !== 'recurse_left'
-        && stepType !== 'recurse_right'
-        && stepType !== 'return_base'
-        && stepType !== 'call_merge'
-        && stepType !== 'return_merged'
-        && !codeInvolvesRightSorted;
-
-    // isRightReturnPhase: Only true when:
-    // - rightSorted exists  
-    // - We're not at a recursion CALL step
-    // - We're not at base case return
-    // - We're not at the merge call (which has its own animation)
-    // - The current code is NOT specifically about left_sorted only
-    const isRightReturnPhase = rightSorted && rightSorted.length > 0
-        && stepType !== 'recurse_right'
-        && stepType !== 'recurse_left'
-        && stepType !== 'return_base'
-        && stepType !== 'call_merge'
-        && stepType !== 'return_merged'
-        && !codeInvolvesLeftSorted;
-
-    // Explicit Phase: 'CALL' vs 'RETURN'
-    // During RETURN phase, we HIDE the parent frame context to focus solely on the value flow
-    const phase = (isLeftReturnPhase || isRightReturnPhase) ? 'RETURN' : 'CALL';
-
-    // Get pointers for comparison highlighting (extract raw values)
-    const iPtr = getValue(currentVars.i);
-    const jPtr = getValue(currentVars.j);
 
     return (
         <div className="flex flex-col h-full bg-slate-900 text-white">
 
-            {/* Main Visualization Canvas */}
-            <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-auto relative">
-
-
-                {/* Context Panel - Shows current scope's assigned variables at top-left */}
-                {/* Hide during return_base since those values are from a parent scope */}
-                {stepType !== 'return_base' && ((leftSorted && leftSorted.length > 0) || (rightSorted && rightSorted.length > 0)) ? (
-                    <motion.div
-                        className="absolute top-4 left-4 bg-slate-800/90 backdrop-blur-sm border border-slate-600/50 rounded-xl p-3 shadow-lg z-10"
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.3 }}
-                    >
-                        <div className="text-xs text-slate-400 uppercase mb-2 font-medium">Current Scope</div>
-                        <div className="flex flex-col gap-2">
-                            {/* Show left_sorted if available */}
-                            {leftSorted && leftSorted.length > 0 && (
-                                <motion.div
-                                    className="flex items-center gap-2"
-                                    initial={{ opacity: 0, y: -5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.1 }}
-                                >
-                                    <span className="text-cyan-400 font-mono text-sm font-bold">left_sorted</span>
-                                    <span className="text-slate-500">=</span>
-                                    <div className="flex items-center gap-0.5">
-                                        {leftSorted.map((val, idx) => (
-                                            <motion.div
-                                                key={`ctx-left-${idx}`}
-                                                className="w-8 h-8 flex items-center justify-center rounded-md font-bold text-sm bg-cyan-600/80 border border-cyan-400/50 text-white"
-                                                initial={{ scale: 0 }}
-                                                animate={{ scale: 1 }}
-                                                transition={{ delay: 0.15 + idx * 0.05, type: "spring" }}
-                                            >
-                                                {val}
-                                            </motion.div>
-                                        ))}
+            {/* Main Visualization Canvas - Horizontal History Scroll */}
+            <div
+                ref={scrollContainerRef}
+                className="flex-1 flex flex-row overflow-x-auto overflow-y-hidden relative"
+                style={{ scrollbarWidth: 'thin', scrollbarColor: '#1e293b transparent' }}
+            >
+                {slideElements.map((slideData, slideIdx) => {
+                    const {
+                        stepType, mainArray, mid, leftArray, rightArray, resultArray,
+                        leftSorted, rightSorted, iPtr, jPtr, isLeftReturnPhase,
+                        isRightReturnPhase, phase
+                    } = slideData;
+                    return (
+                        <div
+                            key={slideIdx}
+                            className="flex-shrink-0 flex flex-col items-center justify-center p-8 relative"
+                            style={{ minWidth: '100%', height: '100%' }}
+                        >
+                            {/* Context Panel per slide */}
+                            {stepType !== 'return_base' && ((leftSorted && leftSorted.length > 0) || (rightSorted && rightSorted.length > 0)) ? (
+                                <div className="absolute top-4 left-4 bg-slate-800/90 backdrop-blur-sm border border-slate-600/50 rounded-xl p-3 shadow-lg z-10">
+                                    <div className="text-xs text-slate-400 uppercase mb-2 font-medium">Current Scope</div>
+                                    <div className="flex flex-col gap-2">
+                                        {leftSorted && leftSorted.length > 0 && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-cyan-400 font-mono text-sm font-bold">left_sorted</span>
+                                                <span className="text-slate-500">=</span>
+                                                <div className="flex items-center gap-0.5">
+                                                    {leftSorted.map((val, i) => (<div key={`ctx-l-${i}`} className="w-8 h-8 flex items-center justify-center rounded-md font-bold text-sm bg-cyan-600/80 border border-cyan-400/50 text-white">{val}</div>))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {rightSorted && rightSorted.length > 0 && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-amber-400 font-mono text-sm font-bold">right_sorted</span>
+                                                <span className="text-slate-500">=</span>
+                                                <div className="flex items-center gap-0.5">
+                                                    {rightSorted.map((val, i) => (<div key={`ctx-r-${i}`} className="w-8 h-8 flex items-center justify-center rounded-md font-bold text-sm bg-amber-600/80 border border-amber-400/50 text-white">{val}</div>))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                </motion.div>
-                            )}
-                            {/* Show right_sorted if available */}
-                            {rightSorted && rightSorted.length > 0 && (
-                                <motion.div
-                                    className="flex items-center gap-2"
-                                    initial={{ opacity: 0, y: -5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.2 }}
-                                >
-                                    <span className="text-amber-400 font-mono text-sm font-bold">right_sorted</span>
-                                    <span className="text-slate-500">=</span>
-                                    <div className="flex items-center gap-0.5">
-                                        {rightSorted.map((val, idx) => (
-                                            <motion.div
-                                                key={`ctx-right-${idx}`}
-                                                className="w-8 h-8 flex items-center justify-center rounded-md font-bold text-sm bg-amber-600/80 border border-amber-400/50 text-white"
-                                                initial={{ scale: 0 }}
-                                                animate={{ scale: 1 }}
-                                                transition={{ delay: 0.25 + idx * 0.05, type: "spring" }}
-                                            >
-                                                {val}
-                                            </motion.div>
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </div>
-                    </motion.div>
-                ) : null}
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={`step-${currentStepIndex}`}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.3 }}
-                        className="flex flex-col items-center gap-6"
-                    >
+                                </div>
+                            ) : null}
+                            <div className="flex flex-col items-center gap-6" style={{ width: '100%' }}>
                         {/* Step Type Indicator */}
                         <motion.div
                             className="px-4 py-2 rounded-full text-sm font-medium"
@@ -1616,8 +1539,10 @@ const MergeSortVisualizer = ({
                                 )}
                             </motion.div>
                         )}
-                    </motion.div>
-                </AnimatePresence>
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
 
             {/* Controls Bar */}
