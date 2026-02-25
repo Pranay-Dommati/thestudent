@@ -458,85 +458,70 @@ const FunctionCallAnimation = ({
 };
 
 // ============ BASE CASE CHECK ANIMATION ============
-// Phase 0 → 1 → 2, each middle chunk fully unmounts so no dead space remains.
-// Phase 0: if  len( chips ) <= 1  :
-// Phase 1: if  7  <= 1  :
-// Phase 2: if  True/False  :
+// Phase 0: if len( chips ) <= 1 :
+// Phase 1: if 7 <= 1 :            (len(chips) replaced in-place)
+// Phase 2: if False :             (7 <= 1 replaced in-place)
 const CheckBaseAnimation = ({ arr }) => {
     const [phase, setPhase] = React.useState(0);
     const isBase = arr.length <= 1;
 
     React.useEffect(() => {
         setPhase(0);
-        const t1 = setTimeout(() => setPhase(1), 1600);   // chips → number
-        const t2 = setTimeout(() => setPhase(2), 3000);   // number+cmp → badge
+        const t1 = setTimeout(() => setPhase(1), 1600);   // replace len(chips) → number
+        const t2 = setTimeout(() => setPhase(2), 3000);   // replace num<=1 → boolean
         return () => { clearTimeout(t1); clearTimeout(t2); };
     }, [arr]);
 
-    const fadeSlide = {
-        initial: { opacity: 0, y: 8, scale: 0.85 },
-        animate: { opacity: 1, y: 0,  scale: 1 },
-        exit:    { opacity: 0, y: -8, scale: 0.85 },
-        transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
-    };
+    const fade = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.25 } };
 
     return (
-        <motion.div
-            className="font-mono text-lg flex items-center gap-2 flex-wrap justify-center"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-        >
-            {/* "if" — always visible */}
+        <div className="font-mono text-lg flex items-center justify-center gap-1.5">
             <span className="text-purple-400 font-bold">if</span>
 
-            {/* Middle section — swaps between phases */}
+            {/* len(chips) ← swaps to number in phase 1, gone in phase 2 */}
             <AnimatePresence mode="wait">
-                {phase === 0 && (
-                    <motion.span key="p0" className="flex items-center gap-1.5" {...fadeSlide}>
+                {phase === 0 ? (
+                    <motion.span key="lenchips" className="inline-flex items-center gap-1.5" {...fade}>
                         <span className="text-amber-400 font-semibold">len</span>
                         <span className="text-slate-400">(</span>
                         {arr.map((val, idx) => (
-                            <motion.span
-                                key={idx}
-                                className="px-2 py-0.5 bg-slate-700/80 border border-slate-600 rounded text-slate-200 text-sm font-mono"
-                                initial={{ opacity: 0, scale: 0.4 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: 0.08 + idx * 0.055, duration: 0.2, ease: 'backOut' }}
-                            >{val}</motion.span>
+                            <span key={idx} className="px-2 py-0.5 bg-slate-700/80 border border-slate-600 rounded text-slate-200 text-sm font-mono">
+                                {val}
+                            </span>
                         ))}
                         <span className="text-slate-400">)</span>
-                        <span className="text-slate-400 ml-1">&lt;=</span>
-                        <span className="text-emerald-400 font-bold">1</span>
                     </motion.span>
-                )}
-
-                {phase === 1 && (
-                    <motion.span key="p1" className="flex items-center gap-2" {...fadeSlide}>
+                ) : phase === 1 ? (
+                    <motion.span key="lenval" {...fade}>
                         <span className="text-cyan-300 font-black px-3 py-0.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-xl">
                             {arr.length}
                         </span>
+                    </motion.span>
+                ) : null}
+            </AnimatePresence>
+
+            {/* <= 1  ← swaps to boolean in phase 2 */}
+            <AnimatePresence mode="wait">
+                {phase < 2 ? (
+                    <motion.span key="cmp" className="inline-flex items-center gap-1.5" {...fade}>
                         <span className="text-slate-400">&lt;=</span>
                         <span className="text-emerald-400 font-bold">1</span>
                     </motion.span>
-                )}
-
-                {phase === 2 && (
+                ) : (
                     <motion.span
-                        key="p2"
-                        className={`font-bold px-5 py-1 rounded-xl border text-lg ${
+                        key="bool"
+                        className={`font-bold px-4 py-0.5 rounded-xl border text-lg ${
                             isBase
                                 ? 'text-emerald-300 bg-emerald-500/15 border-emerald-500/40 shadow-[0_0_14px_#10b98166]'
                                 : 'text-red-400 bg-red-500/15 border-red-500/40 shadow-[0_0_14px_#ef444466]'
                         }`}
-                        {...fadeSlide}
+                        {...fade}
                     >{isBase ? 'True' : 'False'}</motion.span>
                 )}
             </AnimatePresence>
 
-            {/* `:` — always visible */}
             <span className="text-slate-400">:</span>
-        </motion.div>
+        </div>
     );
 };
 
