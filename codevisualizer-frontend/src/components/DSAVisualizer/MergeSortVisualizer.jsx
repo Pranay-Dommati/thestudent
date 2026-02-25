@@ -328,12 +328,12 @@ const FunctionCallAnimation = ({
             </motion.div>
 
             {/* Curvy arrow from call parenthesis down to def box, with box on the right */}
-            <div className="relative w-full flex justify-end pr-4" style={{ minHeight: 160 }}>
+            <div className="relative w-full flex justify-end pr-4" style={{ minHeight: 200 }}>
 
                 {/* SVG arrow — starts from center-top (under the parenthesis), curves right-down to the box */}
                 <svg
                     className="absolute left-0 top-0 w-full h-full pointer-events-none"
-                    viewBox="0 0 600 160"
+                    viewBox="0 0 600 200"
                     preserveAspectRatio="none"
                     fill="none"
                 >
@@ -453,6 +453,34 @@ const FunctionCallAnimation = ({
                     </div>
                 </motion.div>
             </div>
+
+            {/* Arg bindings — centered below the arrow, one row per param */}
+            <motion.div
+                className="font-mono text-base flex flex-col items-center gap-2 mt-1"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.6, duration: 0.3 }}
+            >
+                {args.map(({ name, nameClass, array, chipClass }, idx) => (
+                    <motion.div
+                        key={idx}
+                        className="flex items-center gap-2 flex-wrap justify-center"
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 1.65 + idx * 0.15, duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                        <span className={`${nameClass} font-semibold text-lg`}>{name}</span>
+                        <span className="text-slate-400 text-lg">=</span>
+                        {Array.isArray(array) ? (
+                            <span className="text-white text-lg font-semibold">
+                                [{array.join(', ')}]
+                            </span>
+                        ) : (
+                            <span className="text-white text-lg font-semibold">{String(array)}</span>
+                        )}
+                    </motion.div>
+                ))}
+            </motion.div>
         </motion.div>
     );
 };
