@@ -14,22 +14,6 @@ const IncrementPointerAnimation = ({ pointerName, oldValue, newValue }) => {
 
     return (
         <div className="flex flex-col items-center gap-16 py-12 w-full max-w-2xl select-none">
-            {/* Title Badge - More premium, avoids generic assignment look */}
-            <motion.div
-                className={`flex items-center gap-3 px-8 py-4 rounded-2xl border-2 shadow-2xl font-mono font-bold text-xl ${colorClass}`}
-                initial={{ opacity: 0, scale: 0.8, y: -30 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ type: "spring", damping: 15 }}
-            >
-                <motion.span
-                    animate={{ x: [0, 5, 0] }}
-                    transition={{ repeat: Infinity, duration: 1.5 }}
-                >
-                    👉
-                </motion.span>
-                <span>Incrementing {isI ? "Left" : "Right"} Index ({pointerName}++)</span>
-            </motion.div>
-
             {/* Visual Action Area */}
             <div className="flex items-center justify-center gap-10">
 

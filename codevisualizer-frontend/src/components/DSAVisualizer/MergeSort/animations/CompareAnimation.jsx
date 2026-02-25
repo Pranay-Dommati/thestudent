@@ -7,16 +7,6 @@ const CompareAnimation = ({ leftVal, rightVal, i, j }) => {
 
     return (
         <div className="flex flex-col items-center gap-8 py-8">
-            {/* Main Title/Status */}
-            <motion.div
-                className="text-lg font-mono font-bold text-amber-300 bg-slate-800/80 px-6 py-2 rounded-xl border border-amber-500/30 shadow-lg"
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-            >
-                Comparing Elements
-            </motion.div>
-
             {/* Comparison Area */}
             <div className="flex items-center gap-12">
                 {/* Left Element */}

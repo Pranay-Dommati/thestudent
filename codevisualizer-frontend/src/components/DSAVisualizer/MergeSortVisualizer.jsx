@@ -509,6 +509,7 @@ const MergeSortVisualizer = ({
     steps = [],
     currentStepIndex = 0,
     onStepChange,
+    onScrub,
     isPlaying = false,
     onPlayPause,
     playbackSpeed = 1500,
@@ -568,8 +569,8 @@ const MergeSortVisualizer = ({
             {/* Main Visualization Canvas - Horizontal History Scroll */}
             <div
                 ref={scrollContainerRef}
-                className="flex-1 flex flex-row overflow-x-auto overflow-y-hidden relative"
-                style={{ scrollbarWidth: 'thin', scrollbarColor: '#1e293b transparent' }}
+                className="flex-1 flex flex-row overflow-x-auto overflow-y-hidden relative dsa-viz-scroll"
+                style={{ scrollbarWidth: 'thin', scrollbarColor: '#6366f1 #1e293b' }}
             >
                 {slideElements.map((slideData, slideIdx) => {
                     const {
@@ -610,48 +611,6 @@ const MergeSortVisualizer = ({
                                 </div>
                             ) : null}
                             <div className="flex flex-col items-center gap-6" style={{ width: '100%' }}>
-                        {/* Step Type Indicator */}
-                        <motion.div
-                            className="px-4 py-2 rounded-full text-sm font-medium"
-                            style={{
-                                backgroundColor: stepType.includes('compare') ? '#f59e0b22' :
-                                    stepType.includes('split') || stepType.includes('left') || stepType.includes('right') ? '#3b82f622' :
-                                        stepType.includes('merge') || stepType.includes('result') || stepType.includes('append') ? '#10b98122' :
-                                            stepType.includes('return') ? '#8b5cf622' :
-                                                stepType === 'init_array' ? '#22c55e22' :
-                                                    stepType === 'call_function' ? '#6366f122' : '#64748b22',
-                                color: stepType.includes('compare') ? '#fbbf24' :
-                                    stepType.includes('split') || stepType.includes('left') || stepType.includes('right') ? '#60a5fa' :
-                                        stepType.includes('merge') || stepType.includes('result') || stepType.includes('append') ? '#34d399' :
-                                            stepType.includes('return') ? '#a78bfa' :
-                                                stepType === 'init_array' ? '#4ade80' :
-                                                    stepType === 'call_function' ? '#a5b4fc' : '#94a3b8'
-                            }}
-                        >
-                            {stepType === 'init_array' && '📊 Creating Initial Array'}
-                            {stepType === 'call_function' && '🚀 Calling merge_sort(arr)'}
-                            {stepType === 'check_base' && '🔍 Checking Base Case'}
-                            {stepType === 'return_base' && '↩️ Base Case: Already Sorted'}
-                            {stepType === 'compute_mid' && '📐 Computing Midpoint'}
-                            {stepType === 'split_left' && '✂️ Creating Left Half'}
-                            {stepType === 'split_right' && '✂️ Creating Right Half'}
-                            {stepType === 'recurse_left' && '🔄 Recursively Sorting Left'}
-                            {stepType === 'recurse_right' && '🔄 Recursively Sorting Right'}
-                            {stepType === 'call_merge' && '🔗 Calling Merge'}
-                            {stepType === 'init_result' && '📦 Initializing Result Array'}
-                            {stepType === 'init_pointers' && '👆 Setting Up Pointers i=0, j=0'}
-                            {stepType === 'compare_loop' && '🔄 Comparison Loop'}
-                            {stepType === 'compare' && `⚖️ Comparing left[${iPtr}] vs right[${jPtr}]`}
-                            {stepType === 'append_left' && `➕ Adding left[${iPtr}] to result`}
-                            {stepType === 'append_right' && `➕ Adding right[${jPtr}] to result`}
-                            {stepType === 'inc_i' && '👆 Moving left pointer (i++)'}
-                            {stepType === 'inc_j' && '👆 Moving right pointer (j++)'}
-                            {stepType === 'extend_left' && '📤 Adding remaining left elements'}
-                            {stepType === 'extend_right' && '📤 Adding remaining right elements'}
-                            {stepType === 'return_merged' && '✅ Returning Merged Result'}
-                            {stepType === 'initial' && '🚀 Ready to Start'}
-                            {stepType === 'other' && '⚡ Processing...'}
-                        </motion.div>
 
                         {/* Fast Animation for Init Array */}
                         {stepType === 'init_array' && (
@@ -1630,16 +1589,24 @@ const MergeSortVisualizer = ({
                         )}
                     </button>
 
-                    {/* Progress */}
-                    <div className="flex-1 max-w-xs flex items-center gap-3 ml-2">
-                        <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                            <motion.div
-                                className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
-                                animate={{ width: `${((currentStepIndex + 1) / steps.length) * 100}%` }}
-                                transition={{ duration: 0.3 }}
-                            />
-                        </div>
-                        <span className="text-sm text-slate-400 font-mono whitespace-nowrap">
+                    {/* Progress scrubber */}
+                    <div className="flex-1 max-w-sm flex items-center gap-3 ml-2">
+                        <input
+                            type="range"
+                            min={0}
+                            max={Math.max(0, steps.length - 1)}
+                            step={1}
+                            value={currentStepIndex}
+                            onChange={e => onScrub?.(Number(e.target.value))}
+                            className="dsa-scrubber flex-1"
+                            style={{
+                                background: steps.length > 1
+                                    ? `linear-gradient(to right, #818cf8 0%, #818cf8 ${(currentStepIndex / (steps.length - 1)) * 100}%, #475569 ${(currentStepIndex / (steps.length - 1)) * 100}%, #475569 100%)`
+                                    : '#475569'
+                            }}
+                            title={`Step ${currentStepIndex + 1} of ${steps.length} — drag to jump`}
+                        />
+                        <span className="text-sm text-slate-200 font-mono whitespace-nowrap bg-slate-700 border border-slate-600 px-2.5 py-0.5 rounded-lg">
                             {currentStepIndex + 1}/{steps.length}
                         </span>
                     </div>
@@ -1656,11 +1623,9 @@ const MergeSortVisualizer = ({
                         step={100}
                         value={8800 - playbackSpeed}  // invert so right = faster
                         onChange={e => onSpeedChange?.(8800 - Number(e.target.value))}
-                        className="w-36 h-1.5 appearance-none rounded-full cursor-pointer"
+                        className="dsa-speed w-36"
                         style={{
-                            background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((8800 - playbackSpeed - 800) / 7200) * 100
-                                }%, #334155 ${((8800 - playbackSpeed - 800) / 7200) * 100
-                                }%, #334155 100%)`
+                            background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((8800 - playbackSpeed - 800) / 7200) * 100}%, #475569 ${((8800 - playbackSpeed - 800) / 7200) * 100}%, #475569 100%)`
                         }}
                         title="Drag to change playback speed"
                     />

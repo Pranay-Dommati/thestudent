@@ -421,6 +421,7 @@ const DSAImmersiveVisualizer = ({
                             steps={allSteps}
                             currentStepIndex={currentStepIndex}
                             onStepChange={handleStepChange}
+                            onScrub={handleStepChange}
                             isPlaying={isPlaying}
                             onPlayPause={() => setIsPlaying(p => !p)}
                             playbackSpeed={playbackSpeed}

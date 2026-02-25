@@ -4,21 +4,6 @@ import { motion } from 'framer-motion';
 const ReturnMergedAnimation = ({ result }) => {
     return (
         <div className="flex flex-col items-center gap-12 py-8 w-full max-w-4xl select-none">
-            {/* Celebration Badge */}
-            <motion.div
-                className="flex items-center gap-3 px-8 py-4 rounded-2xl border-2 border-emerald-500/50 bg-emerald-900/40 text-emerald-300 shadow-2xl shadow-emerald-500/20 font-mono font-bold text-xl"
-                initial={{ opacity: 0, scale: 0.8, y: -30 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ type: "spring", damping: 15 }}
-            >
-                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                        <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                </div>
-                <span>Merge Complete: Returning Result</span>
-            </motion.div>
-
             {/* Visual Action Area */}
             <div className="flex flex-col items-center gap-8">
 

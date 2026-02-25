@@ -9,16 +9,6 @@ const LoopConditionAnimation = ({ i, j, leftLen, rightLen }) => {
 
     return (
         <div className="flex flex-col items-center gap-6">
-            {/* Main Title/Status */}
-            <motion.div
-                className="text-lg font-mono font-bold text-indigo-300 bg-slate-800/80 px-4 py-2 rounded-xl border border-indigo-500/30 shadow-lg"
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-            >
-                Checking Loop Condition
-            </motion.div>
-
             <div className="flex items-center gap-8">
                 {/* Condition 1: i < len(left) */}
                 <div className="flex flex-col items-center gap-2">

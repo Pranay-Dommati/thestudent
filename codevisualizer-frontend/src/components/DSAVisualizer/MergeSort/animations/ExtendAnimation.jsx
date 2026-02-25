@@ -13,16 +13,6 @@ const ExtendAnimation = ({ values, source, currentResult }) => {
 
     return (
         <div className="flex flex-col items-center gap-8 py-4 w-full max-w-4xl">
-            {/* Header Message */}
-            <motion.div
-                className={`text-lg font-mono font-bold px-6 py-2 rounded-xl border shadow-lg ${textColor} ${bgColor} ${borderColor}`}
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-            >
-                Appending remaining {source} values
-            </motion.div>
-
             {/* The Animation Area */}
             <div className="relative flex flex-col items-center justify-center min-h-[200px] w-full">
 

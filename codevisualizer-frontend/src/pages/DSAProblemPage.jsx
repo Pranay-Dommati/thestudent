@@ -166,7 +166,7 @@ const DSAProblemPage = () => {
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
-                let receivedFirstFrame = false;
+                const collectedSteps = [];
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -184,15 +184,13 @@ const DSAProblemPage = () => {
                                 if (data.type === 'error') {
                                     setError(data.message);
                                     setShowVisualizer(false);
+                                    setIsLoadingTrace(false);
                                     break;
                                 }
 
                                 if (data.type === 'step') {
-                                    if (!receivedFirstFrame) {
-                                        receivedFirstFrame = true;
-                                        setLoadingPhase(4);
-                                    }
-                                    const transformedStep = {
+                                    setLoadingPhase(4);
+                                    collectedSteps.push({
                                         lineNumber: data.line,
                                         code: data.code,
                                         explanation: data.explanation,
@@ -202,12 +200,28 @@ const DSAProblemPage = () => {
                                         event: data.event,
                                         functionName: data.function_name,
                                         phase: data.phase
-                                    };
-                                    setSteps(prev => [...prev, transformedStep]);
+                                    });
+                                }
+
+                                if (data.type === 'frame') {
+                                    setLoadingPhase(4);
+                                    const frame = data.frame;
+                                    collectedSteps.push({
+                                        lineNumber: frame.line,
+                                        code: frame.code,
+                                        explanation: frame.explanation,
+                                        variables: frame.locals,
+                                        changedVars: frame.changed_vars || [],
+                                        computed_values: frame.computed_values,
+                                        event: frame.event,
+                                        functionName: frame.function_name,
+                                        phase: frame.phase
+                                    });
                                 }
 
                                 if (data.type === 'complete') {
                                     if (data.execution_id) setExecutionId(data.execution_id);
+                                    setSteps(collectedSteps);
                                     setIsLoadingTrace(false);
                                 }
                             } catch (e) {
@@ -281,7 +295,7 @@ const DSAProblemPage = () => {
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
-                let receivedFirstFrame = false;
+                const collectedSteps = [];
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -312,13 +326,8 @@ const DSAProblemPage = () => {
                                 }
 
                                 if (data.type === 'frame') {
-                                    if (!receivedFirstFrame) {
-                                        receivedFirstFrame = true;
-                                        setIsLoadingTrace(false);
-                                    }
-
                                     const frame = data.frame;
-                                    const transformedStep = {
+                                    collectedSteps.push({
                                         lineNumber: frame.line,
                                         code: frame.code,
                                         explanation: frame.explanation,
@@ -331,11 +340,11 @@ const DSAProblemPage = () => {
                                         state_before: frame.state_before,
                                         state_after: frame.state_after,
                                         var_transitions: frame.var_transitions
-                                    };
-                                    setSteps(prev => [...prev, transformedStep]);
+                                    });
                                 }
 
                                 if (data.type === 'complete') {
+                                    setSteps(collectedSteps);
                                     setIsLoadingTrace(false);
                                 }
                             } catch (e) {
@@ -343,6 +352,11 @@ const DSAProblemPage = () => {
                             }
                         }
                     }
+                }
+                // Fallback: if stream ended without a complete event
+                if (collectedSteps.length > 0) {
+                    setSteps(prev => prev.length === 0 ? collectedSteps : prev);
+                    setIsLoadingTrace(false);
                 }
             } else {
                 // Non-streaming fallback
