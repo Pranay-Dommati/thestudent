@@ -80,15 +80,7 @@ const IncrementPointerAnimation = ({ pointerName, oldValue, newValue }) => {
                 </div>
             </div>
 
-            {/* Status Text */}
-            <motion.div
-                className="text-slate-500 text-sm font-mono tracking-widest uppercase opacity-60"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1 }}
-            >
-                Pointing to next element...
-            </motion.div>
+
         </div>
     );
 };

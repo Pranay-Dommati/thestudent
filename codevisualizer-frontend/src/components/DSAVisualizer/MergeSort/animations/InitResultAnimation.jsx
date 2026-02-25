@@ -32,7 +32,7 @@ const InitResultAnimation = ({ leftArray, rightArray }) => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
             >
-                <span className="text-xs text-purple-400 uppercase">Empty Result Array</span>
+
                 <motion.div
                     className="px-8 py-4 bg-purple-950/40 border-2 border-dashed border-purple-500/50 rounded-xl min-w-[120px] flex justify-center items-center"
                     animate={{
@@ -58,7 +58,7 @@ const InitResultAnimation = ({ leftArray, rightArray }) => {
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.8 }}
                 >
-                    <span className="text-xs text-slate-400">Will merge:</span>
+
                     <div className="flex items-center gap-4">
                         {leftArray && (
                             <div className="flex flex-col items-center gap-1">
@@ -101,15 +101,7 @@ const InitResultAnimation = ({ leftArray, rightArray }) => {
                 </motion.div>
             )}
 
-            {/* Explanation */}
-            <motion.div
-                className="text-sm text-slate-400 text-center max-w-md"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.2 }}
-            >
-                📦 Creating empty result array to store merged elements
-            </motion.div>
+
         </motion.div>
     );
 };

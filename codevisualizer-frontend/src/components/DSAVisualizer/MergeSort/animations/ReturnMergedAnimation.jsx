@@ -55,20 +55,11 @@ const ReturnMergedAnimation = ({ result }) => {
                         >
                             ▲
                         </motion.div>
-                        <span className="text-xs text-slate-500 font-mono tracking-widest uppercase">Returning to Sort Frame</span>
                     </div>
                 </div>
             </div>
 
-            {/* Context Message */}
-            <motion.div
-                className="text-slate-400 text-center max-w-md italic"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.5 }}
-            >
-                This sorted subarray will now be used by the higher-level recursion...
-            </motion.div>
+
         </div>
     );
 };

@@ -59,15 +59,7 @@ const ExtendAnimation = ({ values, source, currentResult }) => {
                 </div>
             </div>
 
-            {/* Context/Explanation */}
-            <motion.div
-                className="mt-4 text-slate-400 text-sm font-mono"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-            >
-                result.extend({source}[...])
-            </motion.div>
+
         </div>
     );
 };

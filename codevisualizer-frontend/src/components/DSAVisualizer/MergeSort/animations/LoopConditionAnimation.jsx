@@ -94,18 +94,7 @@ const LoopConditionAnimation = ({ i, j, leftLen, rightLen }) => {
                 </div>
             </div>
 
-            {/* Overall Result */}
-            <motion.div
-                className={`mt-4 px-6 py-3 rounded-xl text-xl font-bold border-2 ${isLoopValid
-                    ? 'bg-green-500/20 border-green-500/50 text-green-400'
-                    : 'bg-red-500/20 border-red-500/50 text-red-400'
-                    }`}
-                initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ delay: 0.6, type: "spring" }}
-            >
-                {isLoopValid ? 'LOOP CONTINUES' : 'LOOP TERMINATES'}
-            </motion.div>
+
         </div>
     );
 };

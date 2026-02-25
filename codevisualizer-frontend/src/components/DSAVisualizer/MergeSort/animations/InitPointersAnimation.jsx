@@ -117,15 +117,7 @@ const InitPointersAnimation = ({ leftArray, rightArray }) => {
                 </motion.div>
             )}
 
-            {/* Explanation */}
-            <motion.div
-                className="text-sm text-slate-400 text-center max-w-md mt-2"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.5 }}
-            >
-                👆 Initializing pointers to track positions in both arrays during merge
-            </motion.div>
+
         </motion.div>
     );
 };

@@ -62,37 +62,7 @@ const CompareAnimation = ({ leftVal, rightVal, i, j }) => {
                 </div>
             </div>
 
-            {/* Explanation/Outcome */}
-            <motion.div
-                className="flex flex-col items-center gap-2 mt-4"
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-            >
-                <div className="text-slate-300 text-lg text-center max-w-md">
-                    Since <span className="font-bold text-white">{leftVal}</span> is {isLeftSmaller ? 'less than or equal to' : 'greater than'} <span className="font-bold text-white">{rightVal}</span>...
-                </div>
 
-                <motion.div
-                    className={`px-6 py-3 rounded-lg font-mono font-bold text-lg flex items-center gap-2 ${isLeftSmaller
-                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50'
-                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/50'}`}
-                    animate={{ scale: [1, 1.05, 1] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                >
-                    {isLeftSmaller ? (
-                        <>
-                            <span>append left[{i}]</span>
-                            <span className="text-2xl">⬇</span>
-                        </>
-                    ) : (
-                        <>
-                            <span>append right[{j}]</span>
-                            <span className="text-2xl">⬇</span>
-                        </>
-                    )}
-                </motion.div>
-            </motion.div>
         </div>
     );
 };
