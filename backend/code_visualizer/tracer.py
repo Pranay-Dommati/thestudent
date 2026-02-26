@@ -357,6 +357,43 @@ class PythonTracer:
                 else:
                     display_value = str(return_value)
                 
+                # PRE-RETURN: Insert a synthetic step showing the return line in the
+                # CURRENT (returning) frame BEFORE transferring control to the caller.
+                # This is most visible when many steps occurred inside a called function
+                # (e.g. merge() ran for 20+ steps before merge_sort returned).
+                # Skip it only when the last recorded step was already this exact line
+                # in this function (avoids duplicating single-line base-case returns).
+                return_line = frame.f_lineno
+                return_code = self._get_code_line(return_line)
+                last_frame = self.frames[-1] if self.frames else None
+                already_shown = (
+                    last_frame is not None
+                    and last_frame.line == return_line
+                    and last_frame.function_name == func_name
+                )
+                if not already_shown:
+                    self.step_count += 1
+                    returning_locals = self._serialize_locals(dict(frame.f_locals))
+                    pre_return_frame = TraceFrame(
+                        step=self.step_count,
+                        line=return_line,
+                        code=return_code,
+                        event='synthetic_return',
+                        locals=returning_locals,
+                        changed_vars=[],
+                        function_name=func_name,
+                        return_value=return_value
+                    )
+                    pre_return_frame.explanation = (
+                        f"Returning {display_value} from {func_name}() back to caller"
+                    )
+                    self.frames.append(pre_return_frame)
+                    if self.on_frame:
+                        try:
+                            self.on_frame(pre_return_frame.to_dict())
+                        except Exception:
+                            pass
+                
                 self.step_count += 1
                 
                 # Create synthetic step showing the assignment

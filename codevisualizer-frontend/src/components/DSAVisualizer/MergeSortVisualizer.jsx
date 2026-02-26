@@ -599,6 +599,9 @@ const computeStepData = (steps, idx) => {
 
     let stepType = 'other';
     if (step?.stepType) { stepType = step.stepType; }
+    // synthetic_return: merge_sort is returning — show return_merged animation with the actual merged result
+    else if (step?.event === 'synthetic_return') { stepType = 'synthetic_return'; }
+    else if (step?.event === 'synthetic_assignment') { stepType = 'synthetic_assignment'; }
     else if (!code) { stepType = 'initial'; }
     else if (code.includes('arr = [') && code.includes(']')) { stepType = 'init_array'; }
     else if (code.includes('if len(arr)') || code.includes('len(arr) <= 1')) { stepType = 'check_base'; }
@@ -621,6 +624,37 @@ const computeStepData = (steps, idx) => {
     else if (code.includes('result.extend(right')) { stepType = 'extend_right'; }
     else if (code.includes('return result')) { stepType = 'return_merged'; }
 
+    // ── Assignment-completion override ────────────────────────────────────
+    // Python re-hits "right_sorted = merge_sort(right)" after the recursive
+    // call returns (to complete the assignment). At that point right_sorted IS
+    // in vars, meaning both sorted halves are ready. We show call_merge
+    // (return merge(left_sorted, right_sorted)) instead of the recurse animation.
+    if (stepType === 'recurse_right' && getArray(currentVars.right_sorted)) {
+        stepType = 'call_merge';
+    }
+
+    // ── synthetic_return result ───────────────────────────────────────────
+    // The return_value field carries the actual merged array returned by merge_sort.
+    // Fall back to merging left_sorted+right_sorted if unavailable.
+    let syntheticReturnResult = null;
+    if (stepType === 'synthetic_return') {
+        if (Array.isArray(step?.return_value)) {
+            syntheticReturnResult = step.return_value;
+        } else if (step?.return_value && typeof step.return_value === 'object' && Array.isArray(step.return_value.value)) {
+            syntheticReturnResult = step.return_value.value;
+        } else {
+            // Parse from explanation: "Returning [27, 43] from merge_sort() back to caller"
+            const retMatch = (step?.explanation || '').match(/Returning\s*(\[[^\]]*\])/);
+            if (retMatch) { try { syntheticReturnResult = JSON.parse(retMatch[1]); } catch {} }
+        }
+        // Last resort: sorted merge of left_sorted + right_sorted
+        if (!syntheticReturnResult) {
+            const ls = getArray(currentVars.left_sorted);
+            const rs = getArray(currentVars.right_sorted);
+            if (ls && rs) syntheticReturnResult = [...ls, ...rs].sort((a, b) => a - b);
+        }
+    }
+
     let mainArray = getArray(currentVars.arr) || [];
     if (mainArray.length === 0 && steps.length > 0) mainArray = [38, 27, 43, 3, 9, 82, 10];
     const mid = stepType === 'compute_mid' ? getPredictedValue('mid') : getValue(currentVars.mid);
@@ -642,7 +676,7 @@ const computeStepData = (steps, idx) => {
     const phase = (isLeftReturnPhase || isRightReturnPhase) ? 'RETURN' : 'CALL';
     const iPtr = getValue(currentVars.i);
     const jPtr = getValue(currentVars.j);
-    return { stepType, mainArray, mid, leftArray, rightArray, resultArray, leftSorted, rightSorted, iPtr, jPtr, isLeftReturnPhase, isRightReturnPhase, phase, stepIndex: idx };
+    return { stepType, code, mainArray, mid, leftArray, rightArray, resultArray: stepType === 'synthetic_return' ? syntheticReturnResult : resultArray, leftSorted, rightSorted, iPtr, jPtr, isLeftReturnPhase, isRightReturnPhase, phase, stepIndex: idx };
 };
 
 // ============ CALL STACK BUILDER ============
@@ -662,6 +696,10 @@ const getValFromVars = (vars, key) => {
 };
 const inferStepType = (step) => {
     if (step?.stepType) return step.stepType;
+    // Detect synthetic events before code-based pattern matching so that
+    // 'return merge(left_sorted, right_sorted)' is not mis-classified as call_merge.
+    if (step?.event === 'synthetic_return') return 'synthetic_return';
+    if (step?.event === 'synthetic_assignment') return 'synthetic_assignment';
     const code = step?.code?.trim() || '';
     if (code.includes('if len(arr)') || code.includes('len(arr) <= 1')) return 'check_base';
     if (code.includes('return arr') && !code.includes('merge')) return 'return_base';
@@ -707,7 +745,15 @@ const buildCallStack = (steps, currentIdx) => {
         const step = steps[i];
         const vars = step?.variables || step?.locals || {};
         const arr = getArrFromVars(vars);
-        const st = inferStepType(step);
+        let st = inferStepType(step);
+
+        // ── Assignment-completion overrides (same as computeStepData) ────
+        // Python re-hits the recurse line to complete the assignment after the
+        // recursive call returns. Detect this by checking if the result var
+        // is already in scope — if so, skip the pendingNewFrame logic.
+        if (st === 'recurse_right' && getArrFromVars(vars, 'right_sorted') !== null) {
+            st = 'right_sorted_done'; // neutral — no frame push, no seal
+        }
 
         // ── PUSH new frame when pending ─────────────────────────────────
         if (pendingNewFrame) {
@@ -736,6 +782,19 @@ const buildCallStack = (steps, currentIdx) => {
             if (top && top.func !== 'merge') top.func = 'merge';
         }
 
+        // ── Pre-blast for synthetic_assignment ─────────────────────────────
+        // Blast the returning child frame BEFORE writing vars so that the
+        // caller's locals (which the synthetic_assignment step carries) are
+        // written to the correct parent frame, not the departing child frame.
+        if (st === 'synthetic_assignment') {
+            for (let fi = frames.length - 1; fi >= 0; fi--) {
+                if (frames[fi].returning && frames[fi].status !== 'returned') {
+                    frames[fi].status = 'returned';
+                    break;
+                }
+            }
+        }
+
         // ── Write vars ONLY to the last ACTIVE frame ─────────────────────
         // 'sealing' and 'returned' frames are frozen — no updates allowed.
         const target = lastActive();
@@ -754,13 +813,19 @@ const buildCallStack = (steps, currentIdx) => {
         }
 
         // ── On call_merge: SEAL current merge_sort frame + schedule merge frame ─
-        // The merge_sort frame is done computing — it's now waiting for merge() to
-        // run and return. Sealing it prevents merge()'s internal vars (result, i, j)
-        // from polluting it. The frame will be blasted when return_merged fires.
+        // BUT: if this frame's merge() has already returned (mergeCompleted flag),
+        // the tracer is re-hitting "return merge(...)" as part of merge_sort's own
+        // return — blast this merge_sort frame instead of scheduling another merge.
         if (st === 'call_merge') {
             const active = lastActive();
-            if (active && active.func === 'merge_sort') active.status = 'sealing';
-            pendingNewFrame = true;
+            if (active && active.func === 'merge_sort' && active.mergeCompleted) {
+                // merge_sort is executing its own "return merge(...)" — blast it
+                active.status = 'returned';
+            } else if (active && active.func === 'merge_sort') {
+                // First time: seal this merge_sort, schedule merge() frame
+                active.status = 'sealing';
+                pendingNewFrame = true;
+            }
         }
 
         // ── On return_base: blast current active merge_sort frame ─────────
@@ -769,14 +834,28 @@ const buildCallStack = (steps, currentIdx) => {
             if (active) active.status = 'returned';
         }
 
-        // ── On return_merged: blast merge() frame + its sealed merge_sort parent ─
+        // ── On return_merged: blast ONLY merge() frame, re-activate sealed merge_sort ─
+        // merge_sort needs to visually resume at its "return merge(...)" line
+        // before being blasted by the subsequent synthetic_return step.
         if (st === 'return_merged') {
-            // Blast the merge() frame (it's the last active one)
             const mergeFrame = lastActive();
-            if (mergeFrame) mergeFrame.status = 'returned';
-            // Also blast the nearest sealing merge_sort frame (it's returning too)
+            if (mergeFrame && mergeFrame.func === 'merge') mergeFrame.status = 'returned';
+            // Re-activate the sealed merge_sort and mark that its merge() completed
             const sealedParent = lastWith('sealing');
-            if (sealedParent) sealedParent.status = 'returned';
+            if (sealedParent) {
+                sealedParent.status = 'active';
+                sealedParent.mergeCompleted = true;
+            }
+        }
+
+        // ── On synthetic_return: keep the frame alive for one extra step ──────
+        // This is the intermediate step between merge() finishing and the parent
+        // receiving the return value. The frame stays visible in the call stack
+        // (and line 16 "return merge(...)" is highlighted in the code panel)
+        // until the next synthetic_assignment step blasts it (see pre-blast above).
+        if (st === 'synthetic_return') {
+            const active = lastActive();
+            if (active) active.returning = true; // keep status='active', just flag it
         }
     }
     return frames;
@@ -795,10 +874,86 @@ const formatCallVal = (v) => {
     return String(v);
 };
 
+// ── Reusable frame card (used for both vertical stack and horizontal pair) ──
+const FrameCard = ({ frame, isTop, pairRole }) => {
+    // pairRole: 'parent' | 'child' | null  (null = normal vertical)
+    const isMerge = frame.func === 'merge';
+    const isSealing = frame.status === 'sealing';
+    const orderedVars = VAR_ORDER.filter(
+        k => frame.vars[k] !== undefined && frame.vars[k] !== null
+    );
+
+    let borderCls, titleCls;
+    if (pairRole === 'parent') {
+        // sealing merge_sort — FULL brightness, indigo, no dimming
+        borderCls = 'border-indigo-500/70 bg-indigo-950/50 shadow-lg shadow-indigo-950/40';
+        titleCls  = 'text-indigo-300';
+    } else if (pairRole === 'child') {
+        // active merge() in pair
+        borderCls = 'border-purple-500/70 bg-purple-950/50 shadow-lg shadow-purple-950/40';
+        titleCls  = 'text-purple-300';
+    } else if (isTop) {
+        borderCls = isMerge
+            ? 'border-purple-500/70 bg-purple-950/50 shadow-lg shadow-purple-950/40'
+            : 'border-indigo-500/70 bg-indigo-950/50 shadow-lg shadow-indigo-950/40';
+        titleCls = isMerge ? 'text-purple-300' : 'text-indigo-300';
+    } else {
+        borderCls = 'border-slate-700/50 bg-slate-800/35';
+        titleCls  = 'text-slate-400';
+    }
+
+    return (
+        <div className={`relative rounded-xl border p-3 h-full ${borderCls}`}>
+            {/* ID badge */}
+            <span className={`absolute top-2 right-2.5 text-[10px] font-mono font-bold ${
+                pairRole ? (pairRole === 'child' ? 'text-purple-500/60' : 'text-indigo-500/60') : isTop ? 'text-indigo-500/60' : 'text-slate-600'
+            }`}>#{frame.frameNumber}</span>
+
+            {/* Title */}
+            <div className="flex items-center gap-2 mb-2.5 pr-8 flex-wrap">
+                <span className={`text-sm font-mono font-bold ${titleCls}`}>{frame.func}(arr)</span>
+                {pairRole === 'child' && (
+                    <motion.span
+                        className="text-[10px] px-1.5 py-0.5 rounded-md font-semibold bg-purple-500/25 text-purple-200"
+                        animate={{ opacity: [1, 0.4, 1] }}
+                        transition={{ duration: 1.4, repeat: Infinity }}
+                    >▶ running</motion.span>
+                )}
+                {pairRole === 'parent' && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md font-semibold bg-indigo-500/15 text-indigo-400/70">
+                        ↩ called merge
+                    </span>
+                )}
+                {!pairRole && isTop && !isSealing && (
+                    <motion.span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${isMerge ? 'bg-purple-500/25 text-purple-200' : 'bg-indigo-500/25 text-indigo-200'}`}
+                        animate={{ opacity: [1, 0.4, 1] }}
+                        transition={{ duration: 1.4, repeat: Infinity }}
+                    >▶ running</motion.span>
+                )}
+            </div>
+
+            {/* Variables */}
+            {orderedVars.length > 0 ? (
+                <div className="flex flex-col gap-1">
+                    {orderedVars.map(k => (
+                        <div key={k} className="flex items-start gap-1.5 font-mono">
+                            <span className={`text-sm font-semibold shrink-0 ${pairRole ? 'w-20' : 'w-24'} ${VAR_COLORS[k] || 'text-slate-300'}`}>{k}</span>
+                            <span className="text-sm text-slate-500 shrink-0">=</span>
+                            <span className="text-sm text-slate-100 break-all leading-snug">{formatCallVal(frame.vars[k])}</span>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <span className="text-xs text-slate-500 font-mono">entering...</span>
+            )}
+        </div>
+    );
+};
+
 const CallStackPanel = ({ frames }) => {
     const scrollRef = React.useRef(null);
 
-    // Active frames = active + sealing (not yet returned), newest first
     const activeFrames = React.useMemo(() => {
         const indexed = frames.map((f, i) => ({ ...f, frameNumber: i + 1 }));
         return indexed.filter(f => f.status !== 'returned').reverse();
@@ -806,15 +961,31 @@ const CallStackPanel = ({ frames }) => {
 
     const totalActive = activeFrames.length;
 
-    // Auto-scroll back to top when a new frame is pushed
+    // Detect merge pair: top frame is merge() + second frame is sealing merge_sort
+    const hasMergePair = totalActive >= 2
+        && activeFrames[0].func === 'merge'
+        && activeFrames[0].status === 'active'
+        && activeFrames[1].status === 'sealing';
+
+    // Panel expands when merge pair is visible
+    const panelWidth = hasMergePair ? 560 : 290;
+
     React.useEffect(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = 0;
     }, [totalActive]);
 
+    // Frames shown in vertical stack: skip the pair when active
+    const stackFrames = hasMergePair ? activeFrames.slice(2) : activeFrames;
+
     return (
-        <div className="flex flex-col bg-slate-950 border-r border-slate-700/60" style={{ width: 290, minWidth: 290 }}>
+        <motion.div
+            className="flex flex-col bg-slate-950 border-r border-slate-700/60 overflow-hidden"
+            animate={{ width: panelWidth, minWidth: panelWidth }}
+            transition={{ type: 'spring', stiffness: 320, damping: 35 }}
+            style={{ width: panelWidth, minWidth: panelWidth }}
+        >
             {/* Header */}
-            <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between bg-slate-950 z-10">
+            <div className="px-4 py-3 border-b border-slate-700/50 flex items-center justify-between bg-slate-950 z-10 shrink-0">
                 <span className="text-xs font-bold tracking-widest uppercase text-slate-400">Call Stack</span>
                 <span className="text-xs font-mono text-slate-600">
                     {totalActive > 0 ? `${totalActive} active` : 'empty'}
@@ -833,105 +1004,74 @@ const CallStackPanel = ({ frames }) => {
                     </div>
                 ) : (
                     <div className="flex flex-col gap-2.5 p-3">
-                        {/*
-                            mode="popLayout": when a frame is removed, Framer Motion
-                            takes it out of the layout immediately (positioned absolutely)
-                            and plays its exit animation while the remaining frames
-                            smoothly slide upward via their layout animations.
-                        */}
-                        <AnimatePresence initial={false} mode="popLayout">
-                            {activeFrames.map((frame, idx) => {
-                                const isTop = idx === 0;
-                                const isMerge = frame.func === 'merge';
-                                const isSealing = frame.status === 'sealing';
-                                const orderedVars = VAR_ORDER.filter(
-                                    k => frame.vars[k] !== undefined && frame.vars[k] !== null
-                                );
-                                // Sealing frames dim more (they're frozen and returning)
-                                const depthOpacity = isSealing ? 0.45 : isTop ? 1 : Math.max(0.35, 1 - idx * 0.18);
 
+                        {/* ── Horizontal merge pair ── */}
+                        <AnimatePresence initial={false} mode="popLayout">
+                            {hasMergePair && (
+                                <motion.div
+                                    key={`merge-pair-${activeFrames[0].id}-${activeFrames[1].id}`}
+                                    layout
+                                    initial={{ opacity: 0, y: -20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{
+                                        y: -100, opacity: 0, scale: 1.1, filter: 'brightness(2.2)',
+                                        transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+                                    }}
+                                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                                    className="flex items-stretch gap-0"
+                                >
+                                    {/* Parent (sealing merge_sort) — full brightness */}
+                                    <div className="flex-1 min-w-0">
+                                        <FrameCard frame={activeFrames[1]} isTop={false} pairRole="parent" />
+                                    </div>
+
+                                    {/* Arrow connector */}
+                                    <div className="flex flex-col items-center justify-center px-1 shrink-0" style={{ width: 36 }}>
+                                        <svg width="36" height="24" viewBox="0 0 36 24" fill="none">
+                                            <motion.line
+                                                x1="0" y1="12" x2="28" y2="12"
+                                                stroke="#6366f1" strokeWidth="1.8" strokeLinecap="round"
+                                                initial={{ pathLength: 0, opacity: 0 }}
+                                                animate={{ pathLength: 1, opacity: 1 }}
+                                                transition={{ duration: 0.35, delay: 0.1 }}
+                                            />
+                                            <motion.polyline
+                                                points="22,5 32,12 22,19"
+                                                stroke="#6366f1" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                transition={{ duration: 0.2, delay: 0.35 }}
+                                            />
+                                        </svg>
+                                        <span className="text-[8px] text-indigo-500/50 font-mono mt-0.5">calls</span>
+                                    </div>
+
+                                    {/* Child (active merge()) */}
+                                    <div className="flex-1 min-w-0">
+                                        <FrameCard frame={activeFrames[0]} isTop={true} pairRole="child" />
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* ── Regular vertical stack ── */}
+                        <AnimatePresence initial={false} mode="popLayout">
+                            {stackFrames.map((frame, idx) => {
+                                const isTop = !hasMergePair && idx === 0;
+                                const depthOpacity = isTop ? 1 : Math.max(0.35, 1 - idx * 0.18);
                                 return (
                                     <motion.div
                                         key={frame.id}
                                         layout
-                                        initial={{ y: -56, opacity: 0, scale: 0.86 }}
-                                        animate={{
-                                            y: 0,
-                                            opacity: depthOpacity,
-                                            scale: isTop && !isSealing ? 1 : 0.97,
-                                        }}
+                                        initial={{ y: -50, opacity: 0, scale: 0.88 }}
+                                        animate={{ y: 0, opacity: depthOpacity, scale: isTop ? 1 : 0.97 }}
                                         exit={{
-                                            y: -120,
-                                            opacity: 0,
-                                            scale: 1.22,
-                                            filter: 'brightness(2.5)',
-                                            transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
+                                            y: -120, opacity: 0, scale: 1.22, filter: 'brightness(2.5)',
+                                            transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
                                         }}
                                         transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                                        className={`relative rounded-xl border p-4 ${
-                                            isSealing
-                                                ? 'border-amber-600/35 bg-amber-950/15'
-                                                : isTop
-                                                    ? isMerge
-                                                        ? 'border-purple-500/70 bg-purple-950/50 shadow-lg shadow-purple-950/40'
-                                                        : 'border-indigo-500/70 bg-indigo-950/50 shadow-lg shadow-indigo-950/40'
-                                                    : 'border-slate-700/50 bg-slate-800/35'
-                                        }`}
                                     >
-                                        {/* Frame ID badge */}
-                                        <span className={`absolute top-2.5 right-3 text-[10px] font-mono font-bold ${
-                                            isSealing ? 'text-amber-700/60'
-                                                : isTop ? (isMerge ? 'text-purple-500/70' : 'text-indigo-500/70')
-                                                : 'text-slate-600'
-                                        }`}>
-                                            #{frame.frameNumber}
-                                        </span>
-
-                                        {/* Title row */}
-                                        <div className="flex items-center gap-2 mb-3 pr-8">
-                                            <span className={`text-sm font-mono font-bold ${
-                                                isSealing ? 'text-amber-500/60'
-                                                    : isTop ? (isMerge ? 'text-purple-300' : 'text-indigo-300')
-                                                    : 'text-slate-400'
-                                            }`}>
-                                                {frame.func}(arr)
-                                            </span>
-                                            {isTop && !isSealing && (
-                                                <motion.span
-                                                    className={`text-[10px] px-2 py-0.5 rounded-md font-semibold tracking-wide ${
-                                                        isMerge ? 'bg-purple-500/25 text-purple-200' : 'bg-indigo-500/25 text-indigo-200'
-                                                    }`}
-                                                    animate={{ opacity: [1, 0.4, 1] }}
-                                                    transition={{ duration: 1.4, repeat: Infinity }}
-                                                >
-                                                    ▶ running
-                                                </motion.span>
-                                            )}
-                                            {isSealing && (
-                                                <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold tracking-wide bg-amber-900/30 text-amber-500/70">
-                                                    ↩ returning
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        {/* Variables */}
-                                        {orderedVars.length > 0 ? (
-                                            <div className="flex flex-col gap-1.5">
-                                                {orderedVars.map(k => (
-                                                    <div key={k} className="flex items-start gap-2 font-mono">
-                                                        <span className={`text-sm font-semibold shrink-0 w-24 ${VAR_COLORS[k] || 'text-slate-300'}`}>
-                                                            {k}
-                                                        </span>
-                                                        <span className="text-sm text-slate-500 shrink-0">=</span>
-                                                        <span className="text-sm text-slate-100 break-all leading-snug">
-                                                            {formatCallVal(frame.vars[k])}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <span className="text-xs text-slate-500 font-mono">entering...</span>
-                                        )}
+                                        <FrameCard frame={frame} isTop={isTop} pairRole={null} />
                                     </motion.div>
                                 );
                             })}
@@ -940,17 +1080,17 @@ const CallStackPanel = ({ frames }) => {
                 )}
             </div>
 
-            {/* Scroll hint when deep stack */}
-            {totalActive > 2 && (
+            {/* Scroll hint */}
+            {totalActive > (hasMergePair ? 3 : 2) && (
                 <motion.div
-                    className="px-4 py-2 border-t border-slate-800 text-[10px] text-slate-600 text-center font-mono tracking-wide"
+                    className="px-4 py-2 border-t border-slate-800 text-[10px] text-slate-600 text-center font-mono tracking-wide shrink-0"
                     animate={{ opacity: [0.4, 1, 0.4] }}
                     transition={{ duration: 2, repeat: Infinity }}
                 >
-                    ↓ {totalActive - 1} older frame{totalActive > 2 ? 's' : ''} below
+                    ↓ {stackFrames.length} older frame{stackFrames.length !== 1 ? 's' : ''} below
                 </motion.div>
             )}
-        </div>
+        </motion.div>
     );
 };
 
@@ -988,11 +1128,45 @@ const MergeSortVisualizer = ({
         });
     }, [currentStepIndex, steps]);
 
-    // Auto-scroll to the rightmost (newest) slide
+    // Auto-scroll to the rightmost (newest) slide.
+    // The CallStackPanel spring-animates its width (e.g. 560px → 290px), which
+    // continuously resizes the scroll container.  Each slide is min-width:100%,
+    // so all slide positions shift during the animation.  A one-shot scrollTo
+    // lands in the wrong place once the width settles.
+    //
+    // Fix: use a ResizeObserver to keep correcting scrollLeft while the container
+    // is resizing, then stop after the spring settles (~400 ms).
+    const shouldAutoScrollRef = useRef(false);
+
+    // 1) When a NEW slide is appended, instantly jump to it and arm the flag.
     useEffect(() => {
-        if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTo({ left: scrollContainerRef.current.scrollWidth, behavior: 'smooth' });
+        if (slideElements.length === 0) return;
+        shouldAutoScrollRef.current = true;
+
+        const container = scrollContainerRef.current;
+        if (container) {
+            const containerWidth = container.clientWidth;
+            container.scrollLeft = (slideElements.length - 1) * containerWidth;
         }
+
+        // Disarm after springs settle so manual back-scroll still works.
+        const timeout = setTimeout(() => { shouldAutoScrollRef.current = false; }, 400);
+        return () => clearTimeout(timeout);
+    }, [slideElements.length]);
+
+    // 2) While the flag is on, every resize event re-pins to the last slide.
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const observer = new ResizeObserver(() => {
+            if (shouldAutoScrollRef.current && slideElements.length > 0) {
+                const containerWidth = container.clientWidth;
+                container.scrollLeft = (slideElements.length - 1) * containerWidth;
+            }
+        });
+        observer.observe(container);
+        return () => observer.disconnect();
     }, [slideElements.length]);
 
     const handleNext = useCallback(() => {
@@ -1031,7 +1205,7 @@ const MergeSortVisualizer = ({
             >
                 {slideElements.map((slideData, slideIdx) => {
                     const {
-                        stepType, mainArray, mid, leftArray, rightArray, resultArray,
+                        stepType, code: slideCode, mainArray, mid, leftArray, rightArray, resultArray,
                         leftSorted, rightSorted, iPtr, jPtr, isLeftReturnPhase,
                         isRightReturnPhase, phase
                     } = slideData;
@@ -1042,7 +1216,7 @@ const MergeSortVisualizer = ({
                             style={{ minWidth: '100%', height: '100%' }}
                         >
                             {/* Context Panel per slide */}
-                            {stepType !== 'return_base' && ((leftSorted && leftSorted.length > 0) || (rightSorted && rightSorted.length > 0)) ? (
+                            {stepType !== 'return_base' && stepType !== 'return_merged' && stepType !== 'synthetic_return' && stepType !== 'synthetic_assignment' && ((leftSorted && leftSorted.length > 0) || (rightSorted && rightSorted.length > 0)) ? (
                                 <div className="absolute top-4 left-4 bg-slate-800/90 backdrop-blur-sm border border-slate-600/50 rounded-xl p-3 shadow-lg z-10">
                                     <div className="text-xs text-slate-400 uppercase mb-2 font-medium">Current Scope</div>
                                     <div className="flex flex-col gap-2">
@@ -1387,7 +1561,7 @@ const MergeSortVisualizer = ({
                             />
                         )}
                         {/* RETURN phase: show sorted result bubbling up */}
-                        {isLeftReturnPhase && leftSorted && leftSorted.length > 0 && (
+                        {isLeftReturnPhase && leftSorted && leftSorted.length > 0 && stepType !== 'synthetic_return' && (
                             <motion.div
                                 className="flex flex-col items-center gap-6"
                                 initial={{ opacity: 0 }}
@@ -1477,7 +1651,7 @@ const MergeSortVisualizer = ({
                             />
                         )}
                         {/* RETURN phase: show sorted result bubbling up */}
-                        {isRightReturnPhase && rightSorted && rightSorted.length > 0 && (
+                        {isRightReturnPhase && rightSorted && rightSorted.length > 0 && stepType !== 'synthetic_return' && (
                             <motion.div
                                 className="flex flex-col items-center gap-6"
                                 initial={{ opacity: 0 }}
@@ -1636,10 +1810,20 @@ const MergeSortVisualizer = ({
                             />
                         )}
 
-                        {/* Return Merged Result Animation */}
-                        {stepType === 'return_merged' && (
+                        {/* Return Merged Result Animation — also used for synthetic_return (merge_sort returning) */}
+                        {(stepType === 'return_merged' || stepType === 'synthetic_return') && (
                             <ReturnMergedAnimation
                                 result={resultArray}
+                                label={stepType === 'synthetic_return'
+                                    ? <span className="flex items-center gap-1 flex-wrap justify-center">
+                                        <span className="text-emerald-400">merge</span>
+                                        <span className="text-slate-400">(</span>
+                                        <span className="text-cyan-300">left_sorted</span>
+                                        <span className="text-slate-500">,</span>
+                                        <span className="text-amber-300">right_sorted</span>
+                                        <span className="text-slate-400">)</span>
+                                      </span>
+                                    : null}
                             />
                         )}
 
@@ -1707,7 +1891,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Main Array Display (for standard steps) - ONLY VISIBLE IN CALL PHASE */}
-                        {phase === 'CALL' && stepType !== 'init_array' && stepType !== 'compute_mid' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'return_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && mainArray.length > 0 && (
+                        {phase === 'CALL' && stepType !== 'init_array' && stepType !== 'compute_mid' && stepType !== 'call_function' && stepType !== 'check_base' && stepType !== 'return_base' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && stepType !== 'synthetic_return' && stepType !== 'synthetic_assignment' && mainArray.length > 0 && (
                             <div className="flex flex-col items-center gap-2">
                                 <span className="text-xs text-slate-500 uppercase">Current Array (arr)</span>
                                 <ArrayRow
@@ -1729,7 +1913,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Split View: Left and Right Arrays (hide during special animations and return phases) - ONLY VISIBLE IN CALL PHASE */}
-                        {phase === 'CALL' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && (leftArray || rightArray) && (
+                        {phase === 'CALL' && stepType !== 'split_left' && stepType !== 'split_right' && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && stepType !== 'synthetic_return' && stepType !== 'synthetic_assignment' && (leftArray || rightArray) && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -1767,7 +1951,7 @@ const MergeSortVisualizer = ({
 
                         {/* Sorted Halves Display - hide during return phases where animation shows it */}
                         {/* Also hide when any return animation is showing (isLeftReturnPhase or isRightReturnPhase) */}
-                        {(leftSorted || rightSorted) && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'return_base' && !isLeftReturnPhase && !isRightReturnPhase && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && (
+                        {(leftSorted || rightSorted) && stepType !== 'recurse_left' && stepType !== 'recurse_right' && stepType !== 'call_merge' && stepType !== 'return_base' && !isLeftReturnPhase && !isRightReturnPhase && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && stepType !== 'synthetic_return' && stepType !== 'synthetic_assignment' && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -1803,7 +1987,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Result Array - Being Built */}
-                        {resultArray && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && (
+                        {resultArray && stepType !== 'init_result' && stepType !== 'init_pointers' && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && stepType !== 'synthetic_return' && stepType !== 'synthetic_assignment' && (
                             <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -1820,7 +2004,7 @@ const MergeSortVisualizer = ({
                         )}
 
                         {/* Pointer Display */}
-                        {(iPtr !== undefined || jPtr !== undefined) && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && (
+                        {(iPtr !== undefined || jPtr !== undefined) && stepType !== 'compare_loop' && stepType !== 'compare' && stepType !== 'append_left' && stepType !== 'append_right' && stepType !== 'inc_i' && stepType !== 'inc_j' && stepType !== 'extend_left' && stepType !== 'extend_right' && stepType !== 'return_merged' && stepType !== 'synthetic_return' && stepType !== 'synthetic_assignment' && (
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}

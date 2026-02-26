@@ -199,7 +199,8 @@ const DSAProblemPage = () => {
                                         computed_values: data.computed_values,
                                         event: data.event,
                                         functionName: data.function_name,
-                                        phase: data.phase
+                                        phase: data.phase,
+                                        return_value: data.return_value
                                     });
                                 }
 
@@ -215,7 +216,8 @@ const DSAProblemPage = () => {
                                         computed_values: frame.computed_values,
                                         event: frame.event,
                                         functionName: frame.function_name,
-                                        phase: frame.phase
+                                        phase: frame.phase,
+                                        return_value: frame.return_value
                                     });
                                 }
 
@@ -245,7 +247,8 @@ const DSAProblemPage = () => {
                         computed_values: frame.computed_values,
                         event: frame.event,
                         functionName: frame.function_name,
-                        phase: frame.phase
+                        phase: frame.phase,
+                        return_value: frame.return_value
                     }));
                     setSteps(transformedSteps);
                     if (data.execution_id) setExecutionId(data.execution_id);
@@ -339,7 +342,8 @@ const DSAProblemPage = () => {
                                         phase: frame.phase,
                                         state_before: frame.state_before,
                                         state_after: frame.state_after,
-                                        var_transitions: frame.var_transitions
+                                        var_transitions: frame.var_transitions,
+                                        return_value: frame.return_value
                                     });
                                 }
 
@@ -374,7 +378,8 @@ const DSAProblemPage = () => {
                         computed_values: frame.computed_values,
                         event: frame.event,
                         functionName: frame.function_name,
-                        phase: frame.phase
+                        phase: frame.phase,
+                        return_value: frame.return_value
                     }));
                     setSteps(transformedSteps);
                     if (data.execution_id) setExecutionId(data.execution_id);

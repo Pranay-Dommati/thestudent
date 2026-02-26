@@ -1,7 +1,10 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-const ReturnMergedAnimation = ({ result }) => {
+const ReturnMergedAnimation = ({ result, label = null }) => {
+    // label: custom JSX or string to show after "return". Defaults to "result".
+    const defaultLabel = <span className="text-slate-300">result</span>;
+    const returnLabel = label ?? defaultLabel;
     return (
         <div className="flex flex-col items-center gap-12 py-8 w-full max-w-4xl select-none">
             {/* Visual Action Area */}
@@ -9,13 +12,13 @@ const ReturnMergedAnimation = ({ result }) => {
 
                 {/* The Code Line */}
                 <motion.div
-                    className="font-mono text-2xl"
+                    className="font-mono text-2xl flex items-center gap-2 flex-wrap justify-center"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.3 }}
                 >
                     <span className="text-purple-400 font-bold">return</span>
-                    <span className="ml-3 text-slate-300">result</span>
+                    {returnLabel}
                 </motion.div>
 
                 {/* The Array being returned */}
