@@ -1776,6 +1776,8 @@ const MergeSortVisualizer = ({
                             <CompareAnimation
                                 leftVal={leftArray ? leftArray[iPtr] : 0}
                                 rightVal={rightArray ? rightArray[jPtr] : 0}
+                                leftArray={leftArray || []}
+                                rightArray={rightArray || []}
                                 i={iPtr}
                                 j={jPtr}
                             />
