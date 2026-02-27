@@ -11,9 +11,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// ─── How many merges get the detailed comparison panel ──────────────────────
-const MAX_DETAIL_MERGES = 3;
-
 // ─── Layout constants ───────────────────────────────────────────────────────
 const CELL_W   = 38;   // px per element cell
 const CELL_H   = 38;
@@ -105,7 +102,6 @@ const generateMergeSteps = (nodeId, left, right, scrollY) => {
  */
 const buildEvents = (node) => {
     const evs = [];
-    let detailCount = 0;
 
     const dfs = (n) => {
         evs.push({ type: 'appear',        nodeId: n.id, scrollY: n.y });
@@ -115,12 +111,9 @@ const buildEvents = (node) => {
             dfs(n.left);
             dfs(n.right);
 
-            if (detailCount < MAX_DETAIL_MERGES) {
-                detailCount++;
-                const panelScrollY = Math.max(0, n.y + LEVEL_H * 0.5);
-                generateMergeSteps(n.id, n.left.merged, n.right.merged, panelScrollY)
-                    .forEach(ev => evs.push(ev));
-            }
+            const panelScrollY = Math.max(0, n.y + LEVEL_H * 0.5);
+            generateMergeSteps(n.id, n.left.merged, n.right.merged, panelScrollY)
+                .forEach(ev => evs.push(ev));
 
             evs.push({ type: 'merge_result', nodeId: n.id, scrollY: Math.max(0, n.y - 60) });
         }
@@ -238,7 +231,7 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <div className="w-2 h-2 rounded-full bg-indigo-500" style={{ animation: 'pulse 1.5s infinite' }} />
                     <span className="text-xs font-bold text-indigo-300 uppercase tracking-widest">
-                        Merge {mergeCount} of {MAX_DETAIL_MERGES}
+                        Merge {mergeCount}
                     </span>
                 </div>
                 <div className="h-px flex-1 bg-slate-700/60" />

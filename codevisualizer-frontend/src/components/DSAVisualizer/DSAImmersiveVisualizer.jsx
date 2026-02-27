@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
 import MergeSortVisualizer from './MergeSortVisualizer';
 import CoreLogicVisualizer from './CoreLogicVisualizer';
+import SyncedCoreLogicVisualizer from './SyncedCoreLogicVisualizer';
 
 // ============ CODE PANEL WITH LINE HIGHLIGHTING ============
 const CodePanel = ({ code, currentLineNumber, executedLines = [], width = 400 }) => {
@@ -170,7 +171,7 @@ const DSAImmersiveVisualizer = ({
     const [executedLines, setExecutedLines] = useState([]);
     const [isPlaying, setIsPlaying] = useState(false);
     const [playbackSpeed, setPlaybackSpeed] = useState(4500); // ms per step (~0.85× default)
-    const [activeTab, setActiveTab] = useState('logic'); // 'logic' | 'execution'
+    const [activeTab, setActiveTab] = useState('logic'); // 'logic' | 'execution' | 'combined'
 
     // Local array input state for inline editing
     const [localArrayInput, setLocalArrayInput] = useState(customArray);
@@ -358,6 +359,16 @@ const DSAImmersiveVisualizer = ({
                     >
                         Code Execution Visualization
                     </button>
+                    <button
+                        onClick={() => { setActiveTab('combined'); setShowCodePanel(true); }}
+                        className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                            activeTab === 'combined'
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
+                                : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                        }`}
+                    >
+                        New Code Exec Vis
+                    </button>
                 </div>
 
                 {/* Right of center: Array Input */}
@@ -432,7 +443,9 @@ const DSAImmersiveVisualizer = ({
             <div className="flex-1 flex overflow-hidden">
                 {/* Visualization Area */}
                 <div className="flex-1 min-w-0">
-                    {activeTab === 'logic' ? (
+                    {activeTab === 'combined' ? (
+                        <SyncedCoreLogicVisualizer customArray={customArray} code={code} />
+                    ) : activeTab === 'logic' ? (
                         <CoreLogicVisualizer customArray={customArray} />
                     ) : isLoading ? (
                         <div className="w-full h-full flex items-center justify-center">
@@ -461,8 +474,9 @@ const DSAImmersiveVisualizer = ({
                     )}
                 </div>
                 <AnimatePresence>
-                    {activeTab === 'execution' && showCodePanel && (
+                    {activeTab === 'execution' && showCodePanel ? (
                         <motion.div
+                            key="exec-code"
                             initial={{ width: 0, opacity: 0 }}
                             animate={{ width: 400, opacity: 1 }}
                             exit={{ width: 0, opacity: 0 }}
@@ -475,7 +489,7 @@ const DSAImmersiveVisualizer = ({
                                 executedLines={executedLines}
                             />
                         </motion.div>
-                    )}
+                    ) : null}
                 </AnimatePresence>
             </div>
         </div>
