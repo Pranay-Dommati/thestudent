@@ -457,27 +457,11 @@ const SyncedCodePanel = ({ code, activeLine, executedLines }) => {
 };
 
 // ─── Annotation badge (shown in top-right of canvas) ─────────────────────────
-const AnnotationBadge = ({ text, type }) => {
-    const colors = {
-        appear:        'border-slate-600 text-slate-300 bg-slate-800/90',
-        call_sort:     'border-indigo-600/60 text-indigo-200 bg-indigo-900/80',
-        check_base:    'border-amber-600/50 text-amber-200 bg-amber-900/60',
-        base_return:   'border-emerald-600/50 text-emerald-200 bg-emerald-900/60',
-        highlight_mid: 'border-amber-500/60 text-amber-100 bg-amber-900/70',
-        split:         'border-indigo-500/60 text-indigo-100 bg-indigo-900/70',
-        split_right:   'border-indigo-500/60 text-indigo-100 bg-indigo-900/70',
-        recurse_left:  'border-purple-500/60 text-purple-100 bg-purple-900/70',
-        recurse_right: 'border-purple-500/60 text-purple-100 bg-purple-900/70',
-        call_merge:    'border-teal-500/60 text-teal-100 bg-teal-900/70',
-        merge_result:  'border-emerald-500/60 text-emerald-100 bg-emerald-900/70',
-        merge_detail:  'border-sky-500/60 text-sky-100 bg-sky-900/70',
-    };
-    const cls = colors[type] ?? 'border-slate-600 text-slate-300 bg-slate-800/90';
-
+const AnnotationBadge = ({ text }) => {
     return (
         <motion.div
             key={text}
-            className={`max-w-sm rounded-xl border px-4 py-2.5 text-sm font-medium leading-snug shadow-xl backdrop-blur ${cls}`}
+            className="max-w-sm rounded-xl border border-amber-600/50 px-4 py-2.5 text-sm font-medium leading-snug shadow-xl backdrop-blur bg-amber-900/60 text-amber-200"
             initial={{ opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 12 }}
@@ -509,7 +493,7 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
     const totalLeaves = useMemo(() => countLeaves(tree),  [tree]);
     const maxDepth    = useMemo(() => Math.max(...allNodes.map(n => n.depth)), [allNodes]);
 
-    const canvasW = totalLeaves * LEAF_W + 80;
+    const canvasW = totalLeaves * LEAF_W + 300; // extra room for annotation badges (they are abs-positioned, not inline)
     const canvasH = (maxDepth + 1) * LEVEL_H + 200;
 
     // ── Animation state ──────────────────────────────────────────────────────
@@ -548,6 +532,19 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
             setEventIdx(-1); setFinished(false);
             setTimeout(() => setPlaying(true), 80);
         } else { setPlaying(true); }
+    };
+
+    const handleBack = () => {
+        setPlaying(false);
+        setFinished(false);
+        setEventIdx(idx => Math.max(-1, idx - 1));
+    };
+
+    const handleNext = () => {
+        setPlaying(false);
+        const nextIdx = eventIdx + 1;
+        if (nextIdx >= events.length) { setFinished(true); return; }
+        setEventIdx(nextIdx);
     };
 
     // ── Derived sets ─────────────────────────────────────────────────────────
@@ -632,6 +629,25 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                             ))}
                         </div>
                     </div>
+                    {/* Back / Next step buttons */}
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={handleBack}
+                            disabled={eventIdx < 0}
+                            className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all"
+                            title="Previous step"
+                        >
+                            ← Back
+                        </button>
+                        <button
+                            onClick={handleNext}
+                            disabled={finished}
+                            className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all"
+                            title="Next step"
+                        >
+                            Next →
+                        </button>
+                    </div>
                     {/* Play / Pause / Resume / Replay */}
                     {!playing && !finished && eventIdx < 0 && (
                         <button onClick={handlePlay}
@@ -670,15 +686,6 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                     {/* Scrollable tree area */}
                     <div ref={scrollRef} className="flex-1 overflow-auto">
                         <div className="relative mx-auto" style={{ width: canvasW, height: canvasH + 80, minHeight: '100%' }}>
-
-                            {/* Annotation badge — sticky top-right of canvas */}
-                            <div className="sticky top-4 z-20 flex justify-end pr-4 pointer-events-none">
-                                <AnimatePresence mode="wait">
-                                    {currentEv?.annotation && !isDetailEvent && (
-                                        <AnnotationBadge key={currentEv.annotation} text={currentEv.annotation} type={currentEv.type} />
-                                    )}
-                                </AnimatePresence>
-                            </div>
 
                             {/* SVG lines */}
                             <svg className="absolute inset-0 pointer-events-none" width={canvasW} height={canvasH + 80} overflow="visible">
@@ -724,6 +731,7 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                                                 transition={{ delay: 0.2 }}>Merged ✓</motion.span>
                                         )}
 
+                                        {/* Array box */}
                                         <motion.div
                                             className={`flex items-center rounded-xl border-2 transition-colors duration-500 ${
                                                 isMerged
@@ -755,6 +763,30 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                                     </motion.div>
                                 );
                             })}
+
+                            {/* Annotation badge — absolutely placed beside the active node's right edge */}
+                            <AnimatePresence mode="wait">
+                                {(() => {
+                                    if (!currentEv?.annotation) return null;
+                                    const activeNode = allNodes.find(n => n.id === currentEv.nodeId && visibleIds.has(n.id));
+                                    if (!activeNode) return null;
+                                    const dArr = mergedIds.has(activeNode.id) ? activeNode.merged : activeNode.arr;
+                                    const bW   = nodeBoxW(dArr);
+                                    const badgeLeft = activeNode.x + bW / 2 + 14;
+                                    const badgeTop  = activeNode.y + 1;
+                                    return (
+                                        <motion.div
+                                            key={currentEv.annotation}
+                                            style={{ position: 'absolute', left: badgeLeft, top: badgeTop, zIndex: 30, maxWidth: 260 }}
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.15 }}>
+                                            <AnnotationBadge text={currentEv.annotation} />
+                                        </motion.div>
+                                    );
+                                })()}
+                            </AnimatePresence>
                         </div>
                     </div>
 
