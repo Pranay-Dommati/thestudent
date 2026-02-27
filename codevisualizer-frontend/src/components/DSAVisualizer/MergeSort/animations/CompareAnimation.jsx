@@ -44,11 +44,11 @@ const CompareAnimation = ({ leftVal, rightVal, leftArray = [], rightArray = [], 
     /* ---- timer chain ---- */
     useEffect(() => {
         const t = [
-            setTimeout(() => setPhase(1), 1400),
-            setTimeout(() => setPhase(2), 2800),
-            setTimeout(() => setHlReady(true), 4400),
-            setTimeout(() => setCollapsing(true), 5400),
-            setTimeout(() => setShowVerdict(true), 6400),
+            setTimeout(() => setPhase(1), 600),
+            setTimeout(() => setPhase(2), 1600),
+            setTimeout(() => setHlReady(true), 3000),
+            setTimeout(() => setCollapsing(true), 4000),
+            setTimeout(() => setShowVerdict(true), 5000),
         ];
         return () => t.forEach(clearTimeout);
     }, []);

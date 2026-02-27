@@ -53,8 +53,9 @@ const ReturnMergedAnimation = ({ result, label = null }) => {
                     <div className="flex flex-col items-center gap-2">
                         <motion.div
                             className="text-emerald-400 text-3xl"
-                            animate={{ y: [-10, 10, -10], opacity: [0.4, 1, 0.4] }}
-                            transition={{ duration: 2, repeat: Infinity }}
+                            initial={{ opacity: 0 }}
+                            animate={{ y: [-10, 10, -10], opacity: [0, 0.4, 1, 0.4] }}
+                            transition={{ duration: 2, repeat: Infinity, delay: 1.2 }}
                         >
                             ▲
                         </motion.div>

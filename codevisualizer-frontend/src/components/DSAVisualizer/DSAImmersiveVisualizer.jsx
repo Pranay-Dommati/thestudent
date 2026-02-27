@@ -12,6 +12,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
 import MergeSortVisualizer from './MergeSortVisualizer';
+import CoreLogicVisualizer from './CoreLogicVisualizer';
 
 // ============ CODE PANEL WITH LINE HIGHLIGHTING ============
 const CodePanel = ({ code, currentLineNumber, executedLines = [], width = 400 }) => {
@@ -169,6 +170,7 @@ const DSAImmersiveVisualizer = ({
     const [executedLines, setExecutedLines] = useState([]);
     const [isPlaying, setIsPlaying] = useState(false);
     const [playbackSpeed, setPlaybackSpeed] = useState(4500); // ms per step (~0.85× default)
+    const [activeTab, setActiveTab] = useState('logic'); // 'logic' | 'execution'
 
     // Local array input state for inline editing
     const [localArrayInput, setLocalArrayInput] = useState(customArray);
@@ -334,7 +336,31 @@ const DSAImmersiveVisualizer = ({
                     </h1>
                 </div>
 
-                {/* Center: Array Input */}
+                {/* Center: View Tabs */}
+                <div className="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-slate-700">
+                    <button
+                        onClick={() => { setActiveTab('logic'); setShowCodePanel(true); }}
+                        className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                            activeTab === 'logic'
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
+                                : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                        }`}
+                    >
+                        Core Logic Visualization
+                    </button>
+                    <button
+                        onClick={() => { setActiveTab('execution'); setShowCodePanel(true); }}
+                        className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                            activeTab === 'execution'
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
+                                : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                        }`}
+                    >
+                        Code Execution Visualization
+                    </button>
+                </div>
+
+                {/* Right of center: Array Input */}
                 <div className="flex items-center gap-3">
                     {showInputPanel ? (
                         <div className="flex items-center gap-2 bg-slate-700/50 rounded-xl px-3 py-1.5">
@@ -381,15 +407,17 @@ const DSAImmersiveVisualizer = ({
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setShowCodePanel(!showCodePanel)}
-                        className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${showCodePanel
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                            }`}
-                    >
-                        {showCodePanel ? 'Hide Code' : 'Show Code'}
-                    </button>
+                    {activeTab === 'execution' && (
+                        <button
+                            onClick={() => setShowCodePanel(!showCodePanel)}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${showCodePanel
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                }`}
+                        >
+                            {showCodePanel ? 'Hide Code' : 'Show Code'}
+                        </button>
+                    )}
 
                     <button
                         onClick={onClose}
@@ -404,7 +432,9 @@ const DSAImmersiveVisualizer = ({
             <div className="flex-1 flex overflow-hidden">
                 {/* Visualization Area */}
                 <div className="flex-1 min-w-0">
-                    {isLoading ? (
+                    {activeTab === 'logic' ? (
+                        <CoreLogicVisualizer customArray={customArray} />
+                    ) : isLoading ? (
                         <div className="w-full h-full flex items-center justify-center">
                             <div className="flex flex-col items-center gap-4">
                                 <div className="w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -426,13 +456,12 @@ const DSAImmersiveVisualizer = ({
                             onPlayPause={() => setIsPlaying(p => !p)}
                             playbackSpeed={playbackSpeed}
                             onSpeedChange={setPlaybackSpeed}
+                            hideCallStack={activeTab === 'logic'}
                         />
                     )}
                 </div>
-
-                {/* Code Panel */}
                 <AnimatePresence>
-                    {showCodePanel && (
+                    {activeTab === 'execution' && showCodePanel && (
                         <motion.div
                             initial={{ width: 0, opacity: 0 }}
                             animate={{ width: 400, opacity: 1 }}

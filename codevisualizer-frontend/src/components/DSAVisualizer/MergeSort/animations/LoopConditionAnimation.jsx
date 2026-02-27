@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
  * Phase 4:  FALSE                                              ← collapse to final
  */
 
-const MORPH = { duration: 0.45, ease: [0.4, 0, 0.2, 1] };
+const MORPH = { duration: 0.28, ease: [0.4, 0, 0.2, 1] };
 
 /* Cross-fade: only the element with a changing `id` key re-renders */
 const Morph = ({ id, children }) => (
@@ -52,11 +52,11 @@ const LoopConditionAnimation = ({ i, j, leftLen, rightLen, leftArray = [], right
     const [phase, setPhase] = useState(0);
     useEffect(() => {
         const timers = [
-            setTimeout(() => setPhase(1), 1200),
-            setTimeout(() => setPhase(2), 2400),
-            setTimeout(() => setPhase(3), 3600),
-            setTimeout(() => setPhase(4), 4800),
-            setTimeout(() => setPhase(5), 6000),
+            setTimeout(() => setPhase(1), 700),
+            setTimeout(() => setPhase(2), 1900),   // extra pause so user reads 1<1 before FALSE
+            setTimeout(() => setPhase(3), 2600),
+            setTimeout(() => setPhase(4), 4000),   // extra pause so user reads 1<2 before TRUE
+            setTimeout(() => setPhase(5), 4700),
         ];
         return () => timers.forEach(clearTimeout);
     }, []);

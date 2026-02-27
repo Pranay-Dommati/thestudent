@@ -1103,7 +1103,8 @@ const MergeSortVisualizer = ({
     isPlaying = false,
     onPlayPause,
     playbackSpeed = 1500,
-    onSpeedChange
+    onSpeedChange,
+    hideCallStack = false
 }) => {
     const [slideElements, setSlideElements] = useState([]);
     const scrollContainerRef = useRef(null);
@@ -1195,7 +1196,7 @@ const MergeSortVisualizer = ({
             <div className="flex-1 flex flex-row overflow-hidden">
 
             {/* Call Stack Panel */}
-            <CallStackPanel frames={callStackFrames} />
+            {!hideCallStack && <CallStackPanel frames={callStackFrames} />}
 
             {/* Main Visualization Canvas - Horizontal History Scroll */}
             <div
