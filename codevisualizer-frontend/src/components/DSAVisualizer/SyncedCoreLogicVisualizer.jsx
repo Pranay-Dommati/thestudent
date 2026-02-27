@@ -173,15 +173,16 @@ const buildSyncedEvents = (node) => {
 
     const fmt = (arr) => `[${arr.join(', ')}]`;
 
-    const dfs = (n, isRoot, parentSide) => {
-        // Which code line caused this node to "appear"?
-        const appearLine = isRoot ? LINE.ARR_INIT
-            : parentSide === 'left' ? LINE.RECURSE_LEFT : LINE.RECURSE_RIGHT;
-        const appearNote = isRoot
-            ? `arr = ${fmt(n.arr)}  — the unsorted input array`
-            : `merge_sort(${fmt(n.arr)})  called recursively`;
-
-        evs.push({ type: 'appear', nodeId: n.id, scrollY: n.y, codeLine: appearLine, annotation: appearNote });
+    // skipAppear: child node was already revealed at split time, don't duplicate
+    const dfs = (n, isRoot, parentSide, skipAppear = false) => {
+        if (!skipAppear) {
+            const appearLine = isRoot ? LINE.ARR_INIT
+                : parentSide === 'left' ? LINE.RECURSE_LEFT : LINE.RECURSE_RIGHT;
+            const appearNote = isRoot
+                ? `arr = ${fmt(n.arr)}  — the unsorted input array`
+                : `merge_sort(${fmt(n.arr)})  called recursively`;
+            evs.push({ type: 'appear', nodeId: n.id, scrollY: n.y, codeLine: appearLine, annotation: appearNote });
+        }
 
         if (n.isLeaf) {
             evs.push({ type: 'check_base', nodeId: n.id, scrollY: n.y, codeLine: LINE.BASE_CHECK,
@@ -203,22 +204,34 @@ const buildSyncedEvents = (node) => {
         evs.push({ type: 'highlight_mid', nodeId: n.id, scrollY: n.y, codeLine: LINE.MID,
             annotation: `mid = ${n.arr.length} // 2 = ${n.mid}  →  split point` });
 
+        // split event draws the connector lines AND reveals the left child node immediately
         evs.push({ type: 'split', nodeId: n.id,
             scrollY: Math.max(0, n.y + LEVEL_H - 80),
             codeLine: LINE.SPLIT_LEFT,
             annotation: `left = arr[:${n.mid}] = ${fmt(n.arr.slice(0, n.mid))}` });
+        // Left child appears right here (same code line, same moment)
+        evs.push({ type: 'appear', nodeId: n.left.id, scrollY: n.left.y,
+            codeLine: LINE.SPLIT_LEFT,
+            annotation: `left = arr[:${n.mid}] = ${fmt(n.arr.slice(0, n.mid))}` });
 
+        // split_right reveals the right child node immediately
         evs.push({ type: 'split_right', nodeId: n.id, scrollY: Math.max(0, n.y + LEVEL_H - 80),
+            codeLine: LINE.SPLIT_RIGHT,
+            annotation: `right = arr[${n.mid}:] = ${fmt(n.arr.slice(n.mid))}` });
+        // Right child appears right here (same code line, same moment)
+        evs.push({ type: 'appear', nodeId: n.right.id, scrollY: n.right.y,
             codeLine: LINE.SPLIT_RIGHT,
             annotation: `right = arr[${n.mid}:] = ${fmt(n.arr.slice(n.mid))}` });
 
         evs.push({ type: 'recurse_left', nodeId: n.id, scrollY: n.left.y, codeLine: LINE.RECURSE_LEFT,
             annotation: `left_sorted = merge_sort(${fmt(n.left.arr)})  — diving into left half` });
-        dfs(n.left, false, 'left');
+        // skipAppear=true: child already shown at split time
+        dfs(n.left, false, 'left', true);
 
         evs.push({ type: 'recurse_right', nodeId: n.id, scrollY: n.right.y, codeLine: LINE.RECURSE_RIGHT,
             annotation: `right_sorted = merge_sort(${fmt(n.right.arr)})  — diving into right half` });
-        dfs(n.right, false, 'right');
+        // skipAppear=true: child already shown at split_right time
+        dfs(n.right, false, 'right', true);
 
         const panelScrollY = Math.max(0, n.y + LEVEL_H * 0.5);
         evs.push({ type: 'call_merge', nodeId: n.id, scrollY: panelScrollY, codeLine: LINE.RETURN_MERGE,
