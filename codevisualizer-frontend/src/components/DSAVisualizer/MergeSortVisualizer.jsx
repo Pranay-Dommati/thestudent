@@ -1768,6 +1768,8 @@ const MergeSortVisualizer = ({
                                     j={jPtr}
                                     leftLen={leftArray?.length || 0}
                                     rightLen={rightArray?.length || 0}
+                                    leftArray={leftArray || []}
+                                    rightArray={rightArray || []}
                                 />
                             )}
 
@@ -1798,6 +1800,10 @@ const MergeSortVisualizer = ({
                                 pointerName={stepType === 'inc_i' ? 'i' : 'j'}
                                 oldValue={stepType === 'inc_i' ? iPtr : jPtr}
                                 newValue={(stepType === 'inc_i' ? iPtr : jPtr) + 1}
+                                iPtr={iPtr}
+                                jPtr={jPtr}
+                                leftArray={leftArray || []}
+                                rightArray={rightArray || []}
                             />
                         )}
 
