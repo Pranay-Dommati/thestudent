@@ -81,25 +81,28 @@ const LINE = {
     RETURN_RESULT: 35,
 };
 
-// ─── Event timing (ms before advancing, at 1× speed) ────────────────────────
+// ─── Event timing — base = 1× comfortable reading pace per code step ─────────
+// At 0.5× every delay doubles (very slow / study mode)
+// At 1×  each code-highlighted line stays ~1.5-2 s (normal)
+// At 2×  fast; at 3× quick review
 const DELAY = {
-    arr_init:      1000,
-    call_sort:     1200,
-    check_base:     700,
-    base_return:    600,
-    highlight_mid:  800,
-    split:          900,
-    split_right:    700,
-    recurse_left:   700,
-    recurse_right:  700,
-    call_merge:     800,
-    merge_result:   900,
-    'md:intro':     900,
-    'md:compare':   950,
-    'md:add_left':  700,
-    'md:add_right': 700,
-    'md:remaining': 1100,
-    'md:done':      500,
+    arr_init:      2000,
+    call_sort:     2000,
+    check_base:    1600,
+    base_return:   1600,
+    highlight_mid: 1800,
+    split:         1800,
+    split_right:   1600,
+    recurse_left:  1600,
+    recurse_right: 1600,
+    call_merge:    1800,
+    merge_result:  1800,
+    'md:intro':     1800,
+    'md:compare':   2000,
+    'md:add_left':  1600,
+    'md:add_right': 1600,
+    'md:remaining': 2000,
+    'md:done':      1200,
 };
 
 const getDelay = (ev, speed) => {
@@ -603,15 +606,18 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
             <div className="flex-shrink-0 flex items-center justify-between px-6 py-2.5 border-b border-slate-800 bg-slate-900">
                 <span className="text-sm text-slate-300 font-medium">{statusLabel}</span>
                 <div className="flex items-center gap-3">
-                    {/* Speed */}
-                    <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
-                        {[0.5, 1, 1.5, 2, 3].map(s => (
-                            <button key={s} onClick={() => setSpeed(s)}
-                                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
-                                    speed === s ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}>
-                                {s}×
-                            </button>
-                        ))}
+                    {/* Speed — labelled as code-step pace */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 whitespace-nowrap">Code speed:</span>
+                        <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
+                            {[0.5, 1, 1.5, 2, 3].map(s => (
+                                <button key={s} onClick={() => setSpeed(s)}
+                                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                                        speed === s ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}>
+                                    {s}×
+                                </button>
+                            ))}
+                        </div>
                     </div>
                     {/* Play / Pause / Resume / Replay */}
                     {!playing && !finished && eventIdx < 0 && (
