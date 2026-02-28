@@ -100,7 +100,8 @@ const DELAY = {
     call_merge:         1800,
     merge_result:  1800,
     'md:intro':     1800,
-    'md:compare':   2000,
+    'md:compare':   1600,
+    'md:check_if':  1600,
     'md:add_left':  1600,
     'md:add_right': 1600,
     'md:remaining': 2000,
@@ -121,6 +122,7 @@ const generateMergeSteps = (nodeId, left, right, scrollY) => {
         const map = {
             intro:     [LINE.MERGE_INIT_R, LINE.MERGE_INIT_IJ],
             compare:   [LINE.MERGE_WHILE, LINE.MERGE_IF],
+            check_if:  [LINE.MERGE_IF],
             add_left:  [LINE.APPEND_LEFT, LINE.INC_I],
             add_right: [LINE.APPEND_RIGHT, LINE.INC_J],
             remaining: [LINE.EXTEND_LEFT, LINE.EXTEND_RIGHT],
@@ -129,11 +131,12 @@ const generateMergeSteps = (nodeId, left, right, scrollY) => {
         return map[phase]?.[0] ?? LINE.MERGE_WHILE;
     };
 
-    const mkAnnotation = (phase, _i, _j, addedVal, remaining) => ({
+const mkAnnotation = (phase, _i, _j, addedVal, remaining) => ({
         intro:     `Entering merge() — initialise result = [], i = 0, j = 0`,
-        compare:   `Compare  left[${_i}] = ${left[_i] ?? '—'}  vs  right[${_j}] = ${right[_j] ?? '—'}`,
-        add_left:  `${addedVal} ≤ right[${_j}] → append ${addedVal} from left, i → ${_i + 1}`,
-        add_right: `${addedVal} < left[${_i}] → append ${addedVal} from right, j → ${_j + 1}`,
+        compare:   `i=${_i} < len(left)=${left.length}  and  j=${_j} < len(right)=${right.length}  →  while loop continues`,
+        check_if:  `if left[${_i}]=${left[_i]} <= right[${_j}]=${right[_j]}  →  ${left[_i] <= right[_j] ? 'True, take from left' : 'False, take from right'}`,
+        add_left:  `left[${_i}]=${left[_i]} ≤ right[${_j}]=${right[_j]}  →  append ${addedVal},  i: ${_i} → ${_i + 1}`,
+        add_right: `right[${_j}]=${right[_j]} < left[${_i}]=${left[_i]}  →  append ${addedVal},  j: ${_j} → ${_j + 1}`,
         remaining: `One pointer exhausted — copy remaining ${remaining?.length ?? 0} element(s) directly`,
         done:      `return result  →  [${[...result].join(', ')}]`,
     }[phase] ?? '');
@@ -144,6 +147,9 @@ const generateMergeSteps = (nodeId, left, right, scrollY) => {
     while (i < left.length && j < right.length) {
         steps.push({ type: 'merge_detail', phase: 'compare', nodeId, left, right, i, j, result: [...result], scrollY,
             codeLine: mkLine('compare'), annotation: mkAnnotation('compare', i, j) });
+        // check_if: highlight the if-statement line before deciding which branch
+        steps.push({ type: 'merge_detail', phase: 'check_if', nodeId, left, right, i, j, result: [...result], scrollY,
+            codeLine: mkLine('check_if'), annotation: mkAnnotation('check_if', i, j) });
         if (left[i] <= right[j]) {
             result = [...result, left[i]];
             steps.push({ type: 'merge_detail', phase: 'add_left', nodeId, left, right, i, j, result: [...result], addedVal: left[i], scrollY,
@@ -206,22 +212,14 @@ const buildSyncedEvents = (node) => {
         evs.push({ type: 'highlight_mid', nodeId: n.id, scrollY: n.y, codeLine: LINE.MID,
             annotation: `mid = ${n.arr.length} // 2 = ${n.mid}  →  split point` });
 
-        // split event draws the connector lines AND reveals the left child node immediately
-        evs.push({ type: 'split', nodeId: n.id,
+        // split event draws the connector lines AND reveals the left child node in one step
+        evs.push({ type: 'split', nodeId: n.id, alsoAppear: n.left.id,
             scrollY: Math.max(0, n.y + LEVEL_H - 80),
             codeLine: LINE.SPLIT_LEFT,
             annotation: `left = arr[:${n.mid}] = ${fmt(n.arr.slice(0, n.mid))}` });
-        // Left child appears right here (same code line, same moment)
-        evs.push({ type: 'appear', nodeId: n.left.id, scrollY: n.left.y,
-            codeLine: LINE.SPLIT_LEFT,
-            annotation: `left = arr[:${n.mid}] = ${fmt(n.arr.slice(0, n.mid))}` });
 
-        // split_right reveals the right child node immediately
-        evs.push({ type: 'split_right', nodeId: n.id, scrollY: Math.max(0, n.y + LEVEL_H - 80),
-            codeLine: LINE.SPLIT_RIGHT,
-            annotation: `right = arr[${n.mid}:] = ${fmt(n.arr.slice(n.mid))}` });
-        // Right child appears right here (same code line, same moment)
-        evs.push({ type: 'appear', nodeId: n.right.id, scrollY: n.right.y,
+        // split_right reveals the right child node in one step
+        evs.push({ type: 'split_right', nodeId: n.id, alsoAppear: n.right.id, scrollY: Math.max(0, n.y + LEVEL_H - 80),
             codeLine: LINE.SPLIT_RIGHT,
             annotation: `right = arr[${n.mid}:] = ${fmt(n.arr.slice(n.mid))}` });
 
@@ -260,7 +258,7 @@ const buildSyncedEvents = (node) => {
 };
 
 // ─── Small shared UI ─────────────────────────────────────────────────────────
-const ArrayCell = ({ val, highlight, sorted, pointer, dim, small }) => {
+const ArrayCell = ({ val, highlight, sorted, pointer, pointerId, pointerLabel, dim, small }) => {
     const size = small ? 28 : CELL_H;
     const font = small ? 'text-xs' : 'text-sm';
     let bg = 'bg-slate-700 border-slate-500 text-slate-200';
@@ -269,10 +267,16 @@ const ArrayCell = ({ val, highlight, sorted, pointer, dim, small }) => {
     if (dim)       bg = 'bg-slate-800 border-slate-700 text-slate-500';
     return (
         <div className="flex flex-col items-center gap-0.5">
-            {pointer && (
-                <motion.div className="text-indigo-400 font-bold text-base leading-none"
+            {pointer ? (
+                <motion.div
+                    layoutId={pointerId}
+                    className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 border border-indigo-400 text-white font-bold text-[11px] leading-none"
                     initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ type: 'spring', stiffness: 300 }}>▼</motion.div>
+                    transition={{ type: 'spring', stiffness: 300, damping: 24 }}>
+                    {pointerLabel}
+                </motion.div>
+            ) : (
+                <div style={{ height: 20 }} />
             )}
             <div className={`flex items-center justify-center rounded-lg border-2 font-bold ${font} ${bg}`}
                 style={{ width: size, height: size, minWidth: size, flexShrink: 0 }}>
@@ -297,10 +301,14 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
     if (!ev) return null;
     const { phase, left, right, i, j, result, remaining, addedVal } = ev;
 
-    const showPointer = phase !== 'remaining' && phase !== 'done';
+    // Advance pointer position for increment phases so it animates forward
+    const ptrI = phase === 'add_left'  ? Math.min(i + 1, left.length  - 1) : i;
+    const ptrJ = phase === 'add_right' ? Math.min(j + 1, right.length - 1) : j;
+    const showLeftPointer  = phase !== 'remaining' && phase !== 'done' && i < left.length;
+    const showRightPointer = phase !== 'remaining' && phase !== 'done' && j < right.length;
 
     const sym = (() => {
-        if (phase === 'compare' && i < left.length && j < right.length) {
+        if ((phase === 'check_if' || phase === 'compare') && i < left.length && j < right.length) {
             if (left[i] < right[j])  return { s: '<', c: 'text-amber-400' };
             if (left[i] > right[j])  return { s: '>', c: 'text-amber-400' };
             return { s: '=', c: 'text-sky-400' };
@@ -328,41 +336,61 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
                 {/* Left */}
                 <div className="flex flex-col items-center bg-slate-800/60 border border-slate-700/80 rounded-2xl px-5 py-3 gap-2">
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Left</span>
-                    <div className="flex gap-2 items-end" style={{ minHeight: CELL_H + 24 }}>
+                    <div className="flex gap-2" style={{ minHeight: CELL_H + 24 }}>
                         {left.map((v, idx) => (
                             <ArrayCell key={idx} val={v}
-                                highlight={phase === 'compare' && idx === i}
-                                pointer={showPointer && idx === i && i < left.length}
-                                dim={idx < i} sorted={false} />
+                                highlight={(phase === 'check_if' && idx === i && i < left.length && j < right.length && left[i] <= right[j]) || (phase === 'add_left' && idx === i)}
+                                pointer={showLeftPointer && idx === ptrI}
+                                pointerId={`lptr-${ev.nodeId}`}
+                                pointerLabel="i"
+                                dim={idx < ptrI} sorted={false} />
                         ))}
                     </div>
-                    <span className="text-[11px] font-mono text-indigo-400">i = {Math.min(i, left.length)}</span>
-                </div>
-                {/* Operator */}
-                <div className="flex flex-col items-center gap-1 self-center pt-2">
-                    <div className="w-px h-4 bg-slate-700" />
-                    <motion.span key={sym.s} className={`text-lg font-black ${sym.c}`}
-                        initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }}
-                        transition={{ type: 'spring', stiffness: 350, damping: 20 }}>
-                        {sym.s}
+                    <motion.span
+                        key={`i-${ptrI}`}
+                        className="flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-indigo-500/50 bg-indigo-900/40 text-xs font-bold font-mono text-indigo-300"
+                        initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 24 }}>
+                        i = {Math.min(ptrI, left.length)}
                     </motion.span>
+                </div>
+                {/* Operator — only shown during if-statement phases */}
+                <div className="flex flex-col items-center gap-1 self-center mt-6">
+                    <div className="w-px h-4 bg-slate-700" />
+                    {(phase === 'check_if' || phase === 'add_left' || phase === 'add_right') ? (
+                        <motion.span key={sym.s} className={`text-lg font-black ${sym.c}`}
+                            initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 350, damping: 20 }}>
+                            {sym.s}
+                        </motion.span>
+                    ) : (
+                        <span className="text-slate-600 text-sm font-mono">|</span>
+                    )}
                     <div className="w-px h-4 bg-slate-700" />
                 </div>
                 {/* Right */}
                 <div className="flex flex-col items-center bg-slate-800/60 border border-slate-700/80 rounded-2xl px-5 py-3 gap-2">
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Right</span>
-                    <div className="flex gap-2 items-end" style={{ minHeight: CELL_H + 24 }}>
+                    <div className="flex gap-2" style={{ minHeight: CELL_H + 24 }}>
                         {right.map((v, idx) => (
                             <ArrayCell key={idx} val={v}
-                                highlight={phase === 'compare' && idx === j}
-                                pointer={showPointer && idx === j && j < right.length}
-                                dim={idx < j} sorted={false} />
+                                highlight={(phase === 'check_if' && idx === j && i < left.length && j < right.length && right[j] < left[i]) || (phase === 'add_right' && idx === j)}
+                                pointer={showRightPointer && idx === ptrJ}
+                                pointerId={`rptr-${ev.nodeId}`}
+                                pointerLabel="j"
+                                dim={idx < ptrJ} sorted={false} />
                         ))}
                     </div>
-                    <span className="text-[11px] font-mono text-indigo-400">j = {Math.min(j, right.length)}</span>
+                    <motion.span
+                        key={`j-${ptrJ}`}
+                        className="flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-indigo-500/50 bg-indigo-900/40 text-xs font-bold font-mono text-indigo-300"
+                        initial={{ opacity: 0, x: 4 }} animate={{ opacity: 1, x: 0 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 24 }}>
+                        j = {Math.min(ptrJ, right.length)}
+                    </motion.span>
                 </div>
                 {/* Arrow */}
-                <div className="self-center pt-2">
+                <div className="self-center mt-6">
                     <svg width="36" height="14" viewBox="0 0 36 14" fill="none">
                         <line x1="0" y1="7" x2="26" y2="7" stroke="#4b5563" strokeWidth="2" strokeLinecap="round" />
                         <polygon points="26,2 36,7 26,12" fill="#4b5563" />
@@ -577,7 +605,14 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
 
     // ── Derived sets ─────────────────────────────────────────────────────────
     const processed     = useMemo(() => events.slice(0, eventIdx + 1), [events, eventIdx]);
-    const visibleIds    = useMemo(() => new Set(processed.filter(e => e.type === 'appear').map(e => e.nodeId)),        [processed]);
+    const visibleIds    = useMemo(() => {
+        const ids = new Set();
+        processed.forEach(e => {
+            if (e.type === 'appear') ids.add(e.nodeId);
+            if (e.alsoAppear) ids.add(e.alsoAppear);
+        });
+        return ids;
+    }, [processed]);
     const highlightMids = useMemo(() => new Set(processed.filter(e => e.type === 'highlight_mid').map(e => e.nodeId)), [processed]);
     const splitIds      = useMemo(() => new Set(processed.filter(e => e.type === 'split').map(e => e.nodeId)),          [processed]);
     const mergedIds     = useMemo(() => new Set(processed.filter(e => e.type === 'merge_result').map(e => e.nodeId)),   [processed]);
