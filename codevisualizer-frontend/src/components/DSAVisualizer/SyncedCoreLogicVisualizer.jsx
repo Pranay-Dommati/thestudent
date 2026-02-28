@@ -98,7 +98,8 @@ const DELAY = {
     store_left_result:  1800,
     store_right_result: 1800,
     call_merge:         1800,
-    merge_result:  1800,
+    merge_result:       1800,
+    return_to_caller:   1600,
     'md:intro':     1800,
     'md:compare':   1600,
     'md:check_if':  1600,
@@ -197,9 +198,7 @@ const mkAnnotation = (phase, _i, _j, addedVal, remaining) => ({
     result = [...result, ...rightRem];
     steps.push({ type: 'merge_detail', phase: 'extend_right', nodeId, left, right, i, j, result: [...result], scrollY,
         codeLine: mkLine('extend_right'), annotation: mkAnnotation('extend_right', i, j) });
-    result = [...result]; // final form
-    steps.push({ type: 'merge_detail', phase: 'done', nodeId, left, right, i: left.length, j: right.length, result: [...result], scrollY,
-        codeLine: mkLine('done'), annotation: mkAnnotation('done') });
+    // No separate 'done' step — merge_result event covers the return result line
     return steps;
 };
 
@@ -279,6 +278,10 @@ const buildSyncedEvents = (node) => {
         evs.push({ type: 'merge_result', nodeId: n.id, scrollY: Math.max(0, n.y - 60),
             codeLine: LINE.RETURN_RESULT,
             annotation: `Merged & sorted: ${fmt(n.merged)}` });
+
+        evs.push({ type: 'return_to_caller', nodeId: n.id, scrollY: Math.max(0, n.y - 60),
+            codeLine: LINE.RETURN_MERGE,
+            annotation: `merge() returned ${fmt(n.merged)} → back to merge_sort return statement` });
     };
 
     dfs(node, true, null);
@@ -332,9 +335,9 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
     if (!ev) return null;
     const { phase, left, right, i, j, result, remaining, addedVal } = ev;
 
-    // Advance pointer position for increment phases so it animates forward
-    const ptrI = phase === 'add_left' ? i + 1 : i;   // can equal left.length (past-end phantom)
-    const ptrJ = phase === 'add_right' ? j + 1 : j;  // can equal right.length
+    // Advance pointer position only during the explicit increment step
+    const ptrI = i;   // can equal left.length (past-end phantom)
+    const ptrJ = j;   // can equal right.length
     const showLeftPointer  = phase !== 'done';
     const showRightPointer = phase !== 'done';
 
@@ -696,6 +699,24 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
     const splitIds      = useMemo(() => new Set(processed.filter(e => e.type === 'split').map(e => e.nodeId)),          [processed]);
     const mergedIds     = useMemo(() => new Set(processed.filter(e => e.type === 'merge_result').map(e => e.nodeId)),   [processed]);
 
+    // Nodes to animate away: all descendants of stored result nodes
+    const dismissedIds  = useMemo(() => {
+        const ids = new Set();
+        processed.forEach(e => {
+            if (e.type !== 'store_left_result' && e.type !== 'store_right_result') return;
+            const storedNode = allNodes.find(n => n.id === e.nodeId);
+            if (!storedNode || storedNode.isLeaf) return;
+            const collectDesc = (n) => {
+                if (!n) return;
+                ids.add(n.id);
+                if (!n.isLeaf) { collectDesc(n.left); collectDesc(n.right); }
+            };
+            collectDesc(storedNode.left);
+            collectDesc(storedNode.right);
+        });
+        return ids;
+    }, [processed, allNodes]);
+
     // Persistent stored-variable labels: collect all store events whose parent hasn't merged yet
     const activeStoredVars = useMemo(() => {
         const result = [];
@@ -734,6 +755,7 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
         const lines = [];
         allNodes.forEach(node => {
             if (node.isLeaf || !splitIds.has(node.id)) return;
+            if (dismissedIds.has(node.left.id) || dismissedIds.has(node.right.id)) return;
             const merging = mergedIds.has(node.id);
             lines.push({ key: node.id + '-L', x1: node.x, y1: node.y + CELL_H + 8, x2: node.left.x,  y2: node.left.y  - 4, merging });
             lines.push({ key: node.id + '-R', x1: node.x, y1: node.y + CELL_H + 8, x2: node.right.x, y2: node.right.y - 4, merging });
@@ -759,7 +781,8 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
             store_right_result: '📥 Storing result in right_sorted',
             call_merge:         '🔀 Calling merge()',
             merge_detail:  '🔍 Stepping through merge()',
-            merge_result:  '✅ Merge complete',
+            merge_result:       '✅ Merge complete',
+            return_to_caller:   '↩️ Returning to merge_sort',
         };
         return map[currentEv.type] ?? '';
     })();
@@ -865,8 +888,9 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                             </svg>
 
                             {/* Nodes */}
+                            <AnimatePresence>
                             {allNodes.map(node => {
-                                if (!visibleIds.has(node.id)) return null;
+                                if (!visibleIds.has(node.id) || dismissedIds.has(node.id)) return null;
                                 const isMerged  = mergedIds.has(node.id);
                                 const isHighMid = highlightMids.has(node.id) && !splitIds.has(node.id);
                                 const displayArr = isMerged ? node.merged : node.arr;
@@ -878,6 +902,7 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                                         style={{ left: node.x - boxW / 2, top: node.y }}
                                         initial={{ opacity: 0, scale: 0.6, y: -12 }}
                                         animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.4, y: 20 }}
                                         transition={{ type: 'spring', stiffness: 220, damping: 20 }}>
 
                                         {isMerged && !node.isLeaf && (
@@ -918,6 +943,7 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                                     </motion.div>
                                 );
                             })}
+                            </AnimatePresence>
 
                             {/* Persistent stored-variable labels — stay above node until parent merges */}
                             <AnimatePresence>
