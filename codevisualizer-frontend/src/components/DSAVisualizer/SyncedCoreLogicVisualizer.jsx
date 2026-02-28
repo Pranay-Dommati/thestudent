@@ -366,23 +366,31 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
 
     return (
         <motion.div
-            className="flex-shrink-0 border-t-2 border-indigo-900/60 bg-slate-900 px-8 py-4"
+            className="flex-shrink-0 border-t-2 border-indigo-900/60 bg-slate-900 px-5 py-2"
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ type: 'spring', stiffness: 280, damping: 28 }}>
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3 mb-2">
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <div className="w-2 h-2 rounded-full bg-indigo-500" style={{ animation: 'pulse 1.5s infinite' }} />
                     <span className="text-xs font-bold text-indigo-300 uppercase tracking-widest">Merge {mergeCount}</span>
                 </div>
                 <div className="h-px flex-1 bg-slate-700/60" />
-                <span className="text-sm font-semibold text-slate-300">{ev.annotation}</span>
             </div>
             <div className="flex items-center justify-center gap-4">
                 {/* Left */}
-                <div className="flex flex-col items-center bg-slate-800/60 border border-slate-700/80 rounded-2xl px-5 py-3 gap-2">
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Left</span>
-                    <div className="flex gap-2" style={{ minHeight: CELL_H + 24 }}>
+                <div className="flex flex-col items-center bg-slate-800/60 border border-slate-700/80 rounded-2xl px-4 py-1.5 gap-1">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Left</span>
+                        <motion.span
+                            key={`i-${ptrI}`}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-indigo-500/50 bg-indigo-900/40 text-[11px] font-bold font-mono text-indigo-300"
+                            initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 24 }}>
+                            i = {Math.min(ptrI, left.length)}
+                        </motion.span>
+                    </div>
+                    <div className="flex gap-2" style={{ minHeight: CELL_H + 12 }}>
                         {left.map((v, idx) => (
                             <ArrayCell key={idx} val={v}
                                 highlight={(phase === 'check_if' && idx === i && i < left.length && j < right.length && left[i] <= right[j]) || (phase === 'add_left' && idx === i)}
@@ -416,13 +424,6 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
                             <div style={{ width: CELL_H, height: CELL_H }} />
                         </div>
                     </div>
-                    <motion.span
-                        key={`i-${ptrI}`}
-                        className="flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-indigo-500/50 bg-indigo-900/40 text-xs font-bold font-mono text-indigo-300"
-                        initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
-                        transition={{ type: 'spring', stiffness: 300, damping: 24 }}>
-                        i = {Math.min(ptrI, left.length)}
-                    </motion.span>
                 </div>
                 {/* Operator — only shown during if-statement phases */}
                 <div className="flex flex-col items-center gap-1 self-center mt-6">
@@ -439,9 +440,18 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
                     <div className="w-px h-4 bg-slate-700" />
                 </div>
                 {/* Right */}
-                <div className="flex flex-col items-center bg-slate-800/60 border border-slate-700/80 rounded-2xl px-5 py-3 gap-2">
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Right</span>
-                    <div className="flex gap-2" style={{ minHeight: CELL_H + 24 }}>
+                <div className="flex flex-col items-center bg-slate-800/60 border border-slate-700/80 rounded-2xl px-4 py-1.5 gap-1">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Right</span>
+                        <motion.span
+                            key={`j-${ptrJ}`}
+                            className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-indigo-500/50 bg-indigo-900/40 text-[11px] font-bold font-mono text-indigo-300"
+                            initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 24 }}>
+                            j = {Math.min(ptrJ, right.length)}
+                        </motion.span>
+                    </div>
+                    <div className="flex gap-2" style={{ minHeight: CELL_H + 12 }}>
                         {right.map((v, idx) => (
                             <ArrayCell key={idx} val={v}
                                 highlight={(phase === 'check_if' && idx === j && i < left.length && j < right.length && right[j] < left[i]) || (phase === 'add_right' && idx === j)}
@@ -475,13 +485,6 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
                             <div style={{ width: CELL_H, height: CELL_H }} />
                         </div>
                     </div>
-                    <motion.span
-                        key={`j-${ptrJ}`}
-                        className="flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-indigo-500/50 bg-indigo-900/40 text-xs font-bold font-mono text-indigo-300"
-                        initial={{ opacity: 0, x: 4 }} animate={{ opacity: 1, x: 0 }}
-                        transition={{ type: 'spring', stiffness: 300, damping: 24 }}>
-                        j = {Math.min(ptrJ, right.length)}
-                    </motion.span>
                 </div>
                 {/* Arrow */}
                 <div className="self-center mt-6">
@@ -491,9 +494,9 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
                     </svg>
                 </div>
                 {/* Result */}
-                <div className="flex flex-col items-center bg-emerald-900/20 border border-emerald-800/40 rounded-2xl px-5 py-3 gap-2">
+                <div className="flex flex-col items-center bg-emerald-900/20 border border-emerald-800/40 rounded-2xl px-4 py-1.5 gap-1">
                     <span className="text-xs font-semibold text-emerald-400 uppercase tracking-widest">Result</span>
-                    <div className="flex gap-2 items-center" style={{ minHeight: CELL_H + 24 }}>
+                    <div className="flex gap-2 items-center" style={{ minHeight: CELL_H + 12 }}>
                         <AnimatePresence mode="popLayout">
                             {result.map((v, idx) => <ResultCell key={`${idx}-${v}`} val={v} />)}
                             {result.length === 0 && (
@@ -891,8 +894,8 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                                                 const isMidEl = !node.isLeaf && !isMerged && isHighMid && i === node.mid;
                                                 return (
                                                     <motion.div key={i}
-                                                        animate={isPrinting ? { y: [0, -6, 0] } : isMidEl ? { scale: [1, 1.3, 1] } : {}}
-                                                        transition={isPrinting ? { duration: 0.5, delay: i * 0.07, repeat: Infinity } : isMidEl ? { duration: 0.6, repeat: 1 } : {}}>
+                                                        animate={isMidEl ? { scale: [1, 1.3, 1] } : {}}
+                                                        transition={isMidEl ? { duration: 0.6, repeat: 1 } : {}}>
                                                         <ArrayCell val={v} highlight={isMidEl} sorted={isMerged} />
                                                     </motion.div>
                                                 );
@@ -900,10 +903,10 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                                         </motion.div>
 
                                         {isPrinting && (
-                                            <motion.span className="text-sm font-bold text-emerald-300 mt-1"
-                                                initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
-                                                transition={{ type: 'spring', stiffness: 300 }}>
-                                                🎉 Sorted!
+                                            <motion.span className="text-[11px] font-semibold text-emerald-400/80 mt-0.5 tracking-wide"
+                                                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                                transition={{ duration: 0.3 }}>
+                                                sorted ✓
                                             </motion.span>
                                         )}
 
@@ -926,10 +929,10 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                                     const isLeft = ev.type === 'store_left_result';
                                     const varName = isLeft ? 'left_sorted' : 'right_sorted';
                                     const bW = nodeBoxW(storeNode.arr);
-                                    // offset left labels slightly left, right labels slightly right (symmetric)
+                                    // offset left labels to the left of node, right labels slightly right of center
                                     const labelX = isLeft
-                                        ? storeNode.x - bW / 2 - 32
-                                        : storeNode.x - bW / 2 + 16;
+                                        ? storeNode.x - bW / 2 - 70
+                                        : storeNode.x - bW / 4;
                                     const labelY = storeNode.y - 44;
                                     return (
                                         <StoredVarLabel
