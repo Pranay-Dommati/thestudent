@@ -79,6 +79,7 @@ const LINE = {
     EXTEND_LEFT:   33,
     EXTEND_RIGHT:  34,
     RETURN_RESULT: 35,
+    PRINT_RESULT:  41,
 };
 
 // ─── Event timing — base = 1× comfortable reading pace per code step ─────────
@@ -100,6 +101,8 @@ const DELAY = {
     call_merge:         1800,
     merge_result:       1800,
     return_to_caller:   1600,
+    final_return:       2000,
+    print_result:       2000,
     'md:intro':     1800,
     'md:compare':   1600,
     'md:check_if':  1600,
@@ -285,6 +288,15 @@ const buildSyncedEvents = (node) => {
     };
 
     dfs(node, true, null);
+
+    // After root finishes: collapse children, highlight result = merge_sort(arr), then print
+    evs.push({ type: 'final_return', nodeId: node.id, scrollY: 0,
+        codeLine: LINE.CALL_SORT,
+        annotation: `merge_sort(arr) returned ${JSON.stringify(node.merged).replace(/,/g, ', ')}  →  stored in result` });
+    evs.push({ type: 'print_result', nodeId: node.id, scrollY: 0,
+        codeLine: LINE.PRINT_RESULT,
+        annotation: `print(result)  →  ${JSON.stringify(node.merged).replace(/,/g, ', ')}` });
+
     return evs;
 };
 
@@ -699,20 +711,34 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
     const splitIds      = useMemo(() => new Set(processed.filter(e => e.type === 'split').map(e => e.nodeId)),          [processed]);
     const mergedIds     = useMemo(() => new Set(processed.filter(e => e.type === 'merge_result').map(e => e.nodeId)),   [processed]);
 
-    // Nodes to animate away: all descendants of stored result nodes
+    // Nodes to animate away: all descendants of stored result nodes + root children on final_return
     const dismissedIds  = useMemo(() => {
         const ids = new Set();
         processed.forEach(e => {
-            if (e.type !== 'store_left_result' && e.type !== 'store_right_result') return;
-            const storedNode = allNodes.find(n => n.id === e.nodeId);
-            if (!storedNode || storedNode.isLeaf) return;
-            const collectDesc = (n) => {
-                if (!n) return;
-                ids.add(n.id);
-                if (!n.isLeaf) { collectDesc(n.left); collectDesc(n.right); }
-            };
-            collectDesc(storedNode.left);
-            collectDesc(storedNode.right);
+            if (e.type === 'store_left_result' || e.type === 'store_right_result') {
+                const storedNode = allNodes.find(n => n.id === e.nodeId);
+                if (!storedNode || storedNode.isLeaf) return;
+                const collectDesc = (n) => {
+                    if (!n) return;
+                    ids.add(n.id);
+                    if (!n.isLeaf) { collectDesc(n.left); collectDesc(n.right); }
+                };
+                collectDesc(storedNode.left);
+                collectDesc(storedNode.right);
+            }
+            if (e.type === 'final_return') {
+                // dismiss all nodes except the root itself
+                const root = allNodes.find(n => n.id === e.nodeId);
+                if (root && !root.isLeaf) {
+                    const collectAll = (n) => {
+                        if (!n) return;
+                        ids.add(n.id);
+                        if (!n.isLeaf) { collectAll(n.left); collectAll(n.right); }
+                    };
+                    collectAll(root.left);
+                    collectAll(root.right);
+                }
+            }
         });
         return ids;
     }, [processed, allNodes]);
@@ -783,6 +809,8 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
             merge_detail:  '🔍 Stepping through merge()',
             merge_result:       '✅ Merge complete',
             return_to_caller:   '↩️ Returning to merge_sort',
+            final_return:       '📦 Storing final result',
+            print_result:       '🖨️ Printing sorted array',
         };
         return map[currentEv.type] ?? '';
     })();
@@ -891,8 +919,10 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                             <AnimatePresence>
                             {allNodes.map(node => {
                                 if (!visibleIds.has(node.id) || dismissedIds.has(node.id)) return null;
-                                const isMerged  = mergedIds.has(node.id);
-                                const isHighMid = highlightMids.has(node.id) && !splitIds.has(node.id);
+                                const isMerged   = mergedIds.has(node.id);
+                                const isHighMid  = highlightMids.has(node.id) && !splitIds.has(node.id);
+                                const isPrinting = currentEv?.type === 'print_result' && node.id === currentEv.nodeId;
+                                const isFinalReturn = currentEv?.type === 'final_return' && node.id === currentEv.nodeId;
                                 const displayArr = isMerged ? node.merged : node.arr;
                                 const boxW       = nodeBoxW(displayArr);
 
@@ -920,19 +950,31 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                                                         ? 'bg-slate-800 border-slate-600'
                                                         : 'bg-slate-800/80 border-indigo-500/50'}`}
                                             style={{ padding: `6px ${NODE_EXTRA_PAD}px`, gap: CELL_GAP }}
-                                            animate={isHighMid ? { boxShadow: ['0 0 0 0 rgba(251,191,36,0)', '0 0 0 8px rgba(251,191,36,0.35)', '0 0 0 0 rgba(251,191,36,0)'] } : {}}
-                                            transition={isHighMid ? { duration: 0.8, repeat: 2 } : {}}>
+                                            animate={
+                                                isPrinting ? { boxShadow: ['0 0 0 0 rgba(52,211,153,0)', '0 0 0 16px rgba(52,211,153,0.6)', '0 0 0 0 rgba(52,211,153,0)'], scale: [1, 1.04, 1] }
+                                                : isFinalReturn ? { boxShadow: ['0 0 0 0 rgba(99,102,241,0)', '0 0 0 12px rgba(99,102,241,0.5)', '0 0 0 0 rgba(99,102,241,0)'] }
+                                                : isHighMid ? { boxShadow: ['0 0 0 0 rgba(251,191,36,0)', '0 0 0 8px rgba(251,191,36,0.35)', '0 0 0 0 rgba(251,191,36,0)'] }
+                                                : {}}
+                                            transition={isPrinting ? { duration: 1, repeat: Infinity, ease: 'easeInOut' } : isFinalReturn ? { duration: 0.9, repeat: 2 } : isHighMid ? { duration: 0.8, repeat: 2 } : {}}>
                                             {displayArr.map((v, i) => {
                                                 const isMidEl = !node.isLeaf && !isMerged && isHighMid && i === node.mid;
                                                 return (
                                                     <motion.div key={i}
-                                                        animate={isMidEl ? { scale: [1, 1.3, 1] } : {}}
-                                                        transition={isMidEl ? { duration: 0.6, repeat: 1 } : {}}>
+                                                        animate={isPrinting ? { y: [0, -6, 0] } : isMidEl ? { scale: [1, 1.3, 1] } : {}}
+                                                        transition={isPrinting ? { duration: 0.5, delay: i * 0.07, repeat: Infinity } : isMidEl ? { duration: 0.6, repeat: 1 } : {}}>
                                                         <ArrayCell val={v} highlight={isMidEl} sorted={isMerged} />
                                                     </motion.div>
                                                 );
                                             })}
                                         </motion.div>
+
+                                        {isPrinting && (
+                                            <motion.span className="text-sm font-bold text-emerald-300 mt-1"
+                                                initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+                                                transition={{ type: 'spring', stiffness: 300 }}>
+                                                🎉 Sorted!
+                                            </motion.span>
+                                        )}
 
                                         {isHighMid && (
                                             <motion.span className="text-xs text-amber-400 font-medium"
