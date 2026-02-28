@@ -102,8 +102,13 @@ const DELAY = {
     'md:intro':     1800,
     'md:compare':   1600,
     'md:check_if':  1600,
-    'md:add_left':  1600,
-    'md:add_right': 1600,
+    'md:add_left':  1400,
+    'md:add_right': 1400,
+    'md:inc_i':     1200,
+    'md:inc_j':     1200,
+    'md:compare_exit': 1600,
+    'md:extend_left':  1600,
+    'md:extend_right': 1600,
     'md:remaining': 2000,
     'md:done':      1200,
 };
@@ -121,23 +126,33 @@ const generateMergeSteps = (nodeId, left, right, scrollY) => {
     const mkLine = (phase) => {
         const map = {
             intro:     [LINE.MERGE_INIT_R, LINE.MERGE_INIT_IJ],
-            compare:   [LINE.MERGE_WHILE, LINE.MERGE_IF],
-            check_if:  [LINE.MERGE_IF],
-            add_left:  [LINE.APPEND_LEFT, LINE.INC_I],
-            add_right: [LINE.APPEND_RIGHT, LINE.INC_J],
-            remaining: [LINE.EXTEND_LEFT, LINE.EXTEND_RIGHT],
-            done:      [LINE.RETURN_RESULT],
+            compare:      [LINE.MERGE_WHILE, LINE.MERGE_IF],
+            compare_exit: [LINE.MERGE_WHILE],
+            check_if:     [LINE.MERGE_IF],
+            add_left:  [LINE.APPEND_LEFT],
+            add_right: [LINE.APPEND_RIGHT],
+            inc_i:     [LINE.INC_I],
+            inc_j:     [LINE.INC_J],
+            remaining:    [LINE.EXTEND_LEFT, LINE.EXTEND_RIGHT],
+            extend_left:  [LINE.EXTEND_LEFT],
+            extend_right: [LINE.EXTEND_RIGHT],
+            done:         [LINE.RETURN_RESULT],
         };
         return map[phase]?.[0] ?? LINE.MERGE_WHILE;
     };
 
 const mkAnnotation = (phase, _i, _j, addedVal, remaining) => ({
         intro:     `Entering merge() — initialise result = [], i = 0, j = 0`,
-        compare:   `i=${_i} < len(left)=${left.length}  and  j=${_j} < len(right)=${right.length}  →  while loop continues`,
+        compare:      `i=${_i} < len(left)=${left.length}  and  j=${_j} < len(right)=${right.length}  →  while loop continues`,
+        compare_exit: `i=${_i} < len(left)=${left.length}  and  j=${_j} < len(right)=${right.length}  →  while condition False, exit loop`,
         check_if:  `if left[${_i}]=${left[_i]} <= right[${_j}]=${right[_j]}  →  ${left[_i] <= right[_j] ? 'True, take from left' : 'False, take from right'}`,
-        add_left:  `left[${_i}]=${left[_i]} ≤ right[${_j}]=${right[_j]}  →  append ${addedVal},  i: ${_i} → ${_i + 1}`,
-        add_right: `right[${_j}]=${right[_j]} < left[${_i}]=${left[_i]}  →  append ${addedVal},  j: ${_j} → ${_j + 1}`,
-        remaining: `One pointer exhausted — copy remaining ${remaining?.length ?? 0} element(s) directly`,
+        add_left:  `result.append(left[${_i}]) = ${addedVal}  →  added to result`,
+        add_right: `result.append(right[${_j}]) = ${addedVal}  →  added to result`,
+        inc_i:     `i += 1  →  i is now ${_i}`,
+        inc_j:     `j += 1  →  j is now ${_j}`,
+        remaining:    `One pointer exhausted — copy remaining element(s) directly`,
+        extend_left:  `result.extend(left[${_i}:]) = [${left.slice(_i).join(', ')}]  →  ${left.slice(_i).length > 0 ? 'appended to result' : 'nothing to add (empty)'}`,
+        extend_right: `result.extend(right[${_j}:]) = [${right.slice(_j).join(', ')}]  →  ${right.slice(_j).length > 0 ? 'appended to result' : 'nothing to add (empty)'}`,
         done:      `return result  →  [${[...result].join(', ')}]`,
     }[phase] ?? '');
 
@@ -155,20 +170,33 @@ const mkAnnotation = (phase, _i, _j, addedVal, remaining) => ({
             steps.push({ type: 'merge_detail', phase: 'add_left', nodeId, left, right, i, j, result: [...result], addedVal: left[i], scrollY,
                 codeLine: mkLine('add_left'), annotation: mkAnnotation('add_left', i, j, left[i]) });
             i++;
+            steps.push({ type: 'merge_detail', phase: 'inc_i', nodeId, left, right, i, j, result: [...result], scrollY,
+                codeLine: mkLine('inc_i'), annotation: mkAnnotation('inc_i', i, j) });
         } else {
             result = [...result, right[j]];
             steps.push({ type: 'merge_detail', phase: 'add_right', nodeId, left, right, i, j, result: [...result], addedVal: right[j], scrollY,
                 codeLine: mkLine('add_right'), annotation: mkAnnotation('add_right', i, j, right[j]) });
             j++;
+            steps.push({ type: 'merge_detail', phase: 'inc_j', nodeId, left, right, i, j, result: [...result], scrollY,
+                codeLine: mkLine('inc_j'), annotation: mkAnnotation('inc_j', i, j) });
         }
     }
 
-    const remaining = [...left.slice(i), ...right.slice(j)];
-    if (remaining.length > 0) {
-        result = [...result, ...remaining];
-        steps.push({ type: 'merge_detail', phase: 'remaining', nodeId, left, right, i, j, result: [...result], remaining, scrollY,
-            codeLine: mkLine('remaining'), annotation: mkAnnotation('remaining', i, j, null, remaining) });
-    }
+    // After the while loop exits, show the while condition failing
+    steps.push({ type: 'merge_detail', phase: 'compare_exit', nodeId, left, right, i, j, result: [...result], scrollY,
+        codeLine: mkLine('compare_exit'), annotation: mkAnnotation('compare_exit', i, j) });
+
+    const leftRem  = left.slice(i);
+    const rightRem = right.slice(j);
+
+    // Always push both extend steps (Python always executes both lines)
+    result = [...result, ...leftRem];
+    steps.push({ type: 'merge_detail', phase: 'extend_left', nodeId, left, right, i, j, result: [...result], scrollY,
+        codeLine: mkLine('extend_left'), annotation: mkAnnotation('extend_left', i, j) });
+
+    result = [...result, ...rightRem];
+    steps.push({ type: 'merge_detail', phase: 'extend_right', nodeId, left, right, i, j, result: [...result], scrollY,
+        codeLine: mkLine('extend_right'), annotation: mkAnnotation('extend_right', i, j) });
     result = [...result]; // final form
     steps.push({ type: 'merge_detail', phase: 'done', nodeId, left, right, i: left.length, j: right.length, result: [...result], scrollY,
         codeLine: mkLine('done'), annotation: mkAnnotation('done') });
@@ -258,19 +286,22 @@ const buildSyncedEvents = (node) => {
 };
 
 // ─── Small shared UI ─────────────────────────────────────────────────────────
-const ArrayCell = ({ val, highlight, sorted, pointer, pointerId, pointerLabel, dim, small }) => {
+const ArrayCell = ({ val, highlight, sorted, pointer, pointerId, pointerLabel, dim, small, pointerHighlight }) => {
     const size = small ? 28 : CELL_H;
     const font = small ? 'text-xs' : 'text-sm';
     let bg = 'bg-slate-700 border-slate-500 text-slate-200';
     if (highlight) bg = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-300';
     if (sorted)    bg = 'bg-emerald-500 border-emerald-300 text-white';
     if (dim)       bg = 'bg-slate-800 border-slate-700 text-slate-500';
+    const ptrCls = pointerHighlight
+        ? 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-300/60'
+        : 'bg-indigo-600 border-indigo-400 text-white';
     return (
         <div className="flex flex-col items-center gap-0.5">
             {pointer ? (
                 <motion.div
                     layoutId={pointerId}
-                    className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 border border-indigo-400 text-white font-bold text-[11px] leading-none"
+                    className={`flex items-center justify-center w-5 h-5 rounded-full font-bold text-[11px] leading-none ${ptrCls}`}
                     initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 24 }}>
                     {pointerLabel}
@@ -302,10 +333,10 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
     const { phase, left, right, i, j, result, remaining, addedVal } = ev;
 
     // Advance pointer position for increment phases so it animates forward
-    const ptrI = phase === 'add_left'  ? Math.min(i + 1, left.length  - 1) : i;
-    const ptrJ = phase === 'add_right' ? Math.min(j + 1, right.length - 1) : j;
-    const showLeftPointer  = phase !== 'remaining' && phase !== 'done' && i < left.length;
-    const showRightPointer = phase !== 'remaining' && phase !== 'done' && j < right.length;
+    const ptrI = phase === 'add_left' ? i + 1 : i;   // can equal left.length (past-end phantom)
+    const ptrJ = phase === 'add_right' ? j + 1 : j;  // can equal right.length
+    const showLeftPointer  = phase !== 'done';
+    const showRightPointer = phase !== 'done';
 
     const sym = (() => {
         if ((phase === 'check_if' || phase === 'compare') && i < left.length && j < right.length) {
@@ -343,8 +374,32 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
                                 pointer={showLeftPointer && idx === ptrI}
                                 pointerId={`lptr-${ev.nodeId}`}
                                 pointerLabel="i"
-                                dim={idx < ptrI} sorted={false} />
-                        ))}
+                                pointerHighlight={phase === 'compare' && idx === ptrI}
+                                dim={idx < ptrI} sorted={false} />)
+                        )}
+                        {/* Phantom past-the-end slot so i badge slides off the right edge */}
+                        <div className="flex flex-col items-center gap-0.5">
+                            {showLeftPointer && ptrI >= left.length ? (
+                                <motion.div
+                                    layoutId={`lptr-${ev.nodeId}`}
+                                    className={`flex items-center justify-center w-5 h-5 rounded-full font-bold text-[11px] leading-none border text-white ${
+                                        phase === 'compare_exit'
+                                            ? 'bg-rose-600 border-rose-400'
+                                            : 'bg-indigo-600 border-indigo-400 opacity-50'
+                                    }`}
+                                    animate={phase === 'compare_exit'
+                                        ? { opacity: [1, 0.2, 1], scale: [1, 1.2, 1] }
+                                        : { opacity: 0.5 }}
+                                    transition={phase === 'compare_exit'
+                                        ? { repeat: Infinity, duration: 0.7, ease: 'easeInOut' }
+                                        : { type: 'spring', stiffness: 300, damping: 24 }}>
+                                    i
+                                </motion.div>
+                            ) : (
+                                <div style={{ height: 20 }} />
+                            )}
+                            <div style={{ width: CELL_H, height: CELL_H }} />
+                        </div>
                     </div>
                     <motion.span
                         key={`i-${ptrI}`}
@@ -378,8 +433,32 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
                                 pointer={showRightPointer && idx === ptrJ}
                                 pointerId={`rptr-${ev.nodeId}`}
                                 pointerLabel="j"
-                                dim={idx < ptrJ} sorted={false} />
-                        ))}
+                                pointerHighlight={phase === 'compare' && idx === ptrJ}
+                                dim={idx < ptrJ} sorted={false} />)
+                        )}
+                        {/* Phantom past-the-end slot so j badge slides off the right edge */}
+                        <div className="flex flex-col items-center gap-0.5">
+                            {showRightPointer && ptrJ >= right.length ? (
+                                <motion.div
+                                    layoutId={`rptr-${ev.nodeId}`}
+                                    className={`flex items-center justify-center w-5 h-5 rounded-full font-bold text-[11px] leading-none border text-white ${
+                                        phase === 'compare_exit'
+                                            ? 'bg-rose-600 border-rose-400'
+                                            : 'bg-indigo-600 border-indigo-400 opacity-50'
+                                    }`}
+                                    animate={phase === 'compare_exit'
+                                        ? { opacity: [1, 0.2, 1], scale: [1, 1.2, 1] }
+                                        : { opacity: 0.5 }}
+                                    transition={phase === 'compare_exit'
+                                        ? { repeat: Infinity, duration: 0.7, ease: 'easeInOut' }
+                                        : { type: 'spring', stiffness: 300, damping: 24 }}>
+                                    j
+                                </motion.div>
+                            ) : (
+                                <div style={{ height: 20 }} />
+                            )}
+                            <div style={{ width: CELL_H, height: CELL_H }} />
+                        </div>
                     </div>
                     <motion.span
                         key={`j-${ptrJ}`}
