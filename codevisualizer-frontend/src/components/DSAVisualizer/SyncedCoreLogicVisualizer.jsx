@@ -87,34 +87,34 @@ const LINE = {
 // At 1×  each code-highlighted line stays ~1.5-2 s (normal)
 // At 2×  fast; at 3× quick review
 const DELAY = {
-    arr_init:      2000,
-    call_sort:     2000,
-    check_base:    1600,
-    base_return:   1600,
-    highlight_mid: 1800,
-    split:         1800,
-    split_right:   1600,
-    recurse_left:       1600,
-    recurse_right:      1600,
-    store_left_result:  1800,
-    store_right_result: 1800,
-    call_merge:         1800,
-    merge_result:       1800,
-    return_to_caller:   1600,
-    final_return:       2000,
-    print_result:       2000,
-    'md:intro':     1800,
-    'md:compare':   1600,
-    'md:check_if':  1600,
-    'md:add_left':  1400,
-    'md:add_right': 1400,
-    'md:inc_i':     1200,
-    'md:inc_j':     1200,
-    'md:compare_exit': 1600,
-    'md:extend_left':  1600,
-    'md:extend_right': 1600,
-    'md:remaining': 2000,
-    'md:done':      1200,
+    arr_init:      4000,
+    call_sort:     4000,
+    check_base:    3200,
+    base_return:   3200,
+    highlight_mid: 3600,
+    split:         3600,
+    split_right:   3200,
+    recurse_left:       3200,
+    recurse_right:      3200,
+    store_left_result:  3600,
+    store_right_result: 3600,
+    call_merge:         3600,
+    merge_result:       3600,
+    return_to_caller:   3200,
+    final_return:       4000,
+    print_result:       4000,
+    'md:intro':     3600,
+    'md:compare':   3200,
+    'md:check_if':  3200,
+    'md:add_left':  2800,
+    'md:add_right': 2800,
+    'md:inc_i':     2400,
+    'md:inc_j':     2400,
+    'md:compare_exit': 3200,
+    'md:extend_left':  3200,
+    'md:extend_right': 3200,
+    'md:remaining': 4000,
+    'md:done':      2400,
 };
 
 const getDelay = (ev, speed) => {
@@ -552,15 +552,6 @@ const SyncedCodePanel = ({ code, activeLine, executedLines, innerOnly }) => {
 
     const inner = (
         <>
-            {/* Header */}
-            <div className="px-3 py-2 border-b border-slate-700 flex items-center gap-2 bg-slate-800 flex-shrink-0">
-                <div className="flex gap-1.5">
-                    <span className="w-3 h-3 rounded-full bg-red-500" />
-                    <span className="w-3 h-3 rounded-full bg-yellow-500" />
-                    <span className="w-3 h-3 rounded-full bg-green-500" />
-                </div>
-                <span className="text-sm text-slate-400 font-mono ml-2">merge_sort.py</span>
-            </div>
             {/* Lines */}
             <div className="flex-1 overflow-y-auto py-2 font-mono text-[13px] leading-[1.7]">
                 {lines.map((line, idx) => {
@@ -639,7 +630,7 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
 
     const tree = useMemo(() => {
         const t = buildTree(inputArr);
-        assignLayout(t, 0);
+        assignLayout(t, 300);
         return t;
     }, [inputArr]);
 
@@ -648,7 +639,7 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
     const totalLeaves = useMemo(() => countLeaves(tree),  [tree]);
     const maxDepth    = useMemo(() => Math.max(...allNodes.map(n => n.depth)), [allNodes]);
 
-    const canvasW = totalLeaves * LEAF_W + 300; // extra room for annotation badges (they are abs-positioned, not inline)
+    const canvasW = totalLeaves * LEAF_W + 600; // 300px padding each side to keep tree centred
     const canvasH = (maxDepth + 1) * LEVEL_H + 200;
 
     // ── Animation state ──────────────────────────────────────────────────────
@@ -952,7 +943,7 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                                 })}
                             </AnimatePresence>
 
-                            {/* Annotation badge — absolutely placed beside the active node's right edge */}
+                            {/* Annotation badge — left of left-child nodes, right of right-child nodes */}
                             <AnimatePresence mode="wait">
                                 {(() => {
                                     if (!currentEv?.annotation) return null;
@@ -960,12 +951,18 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                                     if (!activeNode) return null;
                                     const dArr = mergedIds.has(activeNode.id) ? activeNode.merged : activeNode.arr;
                                     const bW   = nodeBoxW(dArr);
-                                    const badgeLeft = activeNode.x + bW / 2 + 14;
+                                    // Determine if this node is a left or right child
+                                    const parentNode = allNodes.find(n => !n.isLeaf && (n.left?.id === activeNode.id || n.right?.id === activeNode.id));
+                                    const isRightChild = !parentNode || parentNode.right?.id === activeNode.id;
+                                    const badgeLeft = isRightChild
+                                        ? activeNode.x + bW / 2 + 14          // right side
+                                        : activeNode.x - bW / 2 - 14;         // left side
                                     const badgeTop  = activeNode.y + 1;
                                     return (
                                         <motion.div
                                             key={currentEv.annotation}
-                                            style={{ position: 'absolute', left: badgeLeft, top: badgeTop, zIndex: 30, maxWidth: 260 }}
+                                            style={{ position: 'absolute', left: badgeLeft, top: badgeTop, zIndex: 30, maxWidth: 260,
+                                                transform: isRightChild ? 'none' : 'translateX(-100%)' }}
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
                                             exit={{ opacity: 0 }}
