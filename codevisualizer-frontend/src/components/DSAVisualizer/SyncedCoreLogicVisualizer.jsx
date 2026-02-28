@@ -93,9 +93,11 @@ const DELAY = {
     highlight_mid: 1800,
     split:         1800,
     split_right:   1600,
-    recurse_left:  1600,
-    recurse_right: 1600,
-    call_merge:    1800,
+    recurse_left:       1600,
+    recurse_right:      1600,
+    store_left_result:  1800,
+    store_right_result: 1800,
+    call_merge:         1800,
     merge_result:  1800,
     'md:intro':     1800,
     'md:compare':   2000,
@@ -223,19 +225,27 @@ const buildSyncedEvents = (node) => {
             codeLine: LINE.SPLIT_RIGHT,
             annotation: `right = arr[${n.mid}:] = ${fmt(n.arr.slice(n.mid))}` });
 
-        evs.push({ type: 'recurse_left', nodeId: n.id, scrollY: n.left.y, codeLine: LINE.RECURSE_LEFT,
-            annotation: `left_sorted = merge_sort(${fmt(n.left.arr)})  — diving into left half` });
+        evs.push({ type: 'recurse_left', nodeId: n.left.id, scrollY: n.left.y, codeLine: LINE.RECURSE_LEFT,
+            annotation: `calling again merge_sort with this new arr: ${fmt(n.left.arr)}` });
         // skipAppear=true: child already shown at split time
         dfs(n.left, false, 'left', true);
+        // After left subtree finishes, show the assignment back on line 12
+        evs.push({ type: 'store_left_result', nodeId: n.left.id, parentId: n.id,
+            value: n.left.merged, scrollY: n.left.y, codeLine: LINE.RECURSE_LEFT,
+            annotation: `left_sorted = ${fmt(n.left.merged)}  ← value returned, now stored` });
 
-        evs.push({ type: 'recurse_right', nodeId: n.id, scrollY: n.right.y, codeLine: LINE.RECURSE_RIGHT,
-            annotation: `right_sorted = merge_sort(${fmt(n.right.arr)})  — diving into right half` });
+        evs.push({ type: 'recurse_right', nodeId: n.right.id, scrollY: n.right.y, codeLine: LINE.RECURSE_RIGHT,
+            annotation: `calling again merge_sort with this new arr: ${fmt(n.right.arr)}` });
         // skipAppear=true: child already shown at split_right time
         dfs(n.right, false, 'right', true);
+        // After right subtree finishes, show the assignment back on line 13
+        evs.push({ type: 'store_right_result', nodeId: n.right.id, parentId: n.id,
+            value: n.right.merged, scrollY: n.right.y, codeLine: LINE.RECURSE_RIGHT,
+            annotation: `right_sorted = ${fmt(n.right.merged)}  ← value returned, now stored` });
 
         const panelScrollY = Math.max(0, n.y + LEVEL_H * 0.5);
         evs.push({ type: 'call_merge', nodeId: n.id, scrollY: panelScrollY, codeLine: LINE.RETURN_MERGE,
-            annotation: `return merge(${fmt(n.left.merged)}, ${fmt(n.right.merged)})` });
+            annotation: `calling merge() with left_sorted=${fmt(n.left.merged)} and right_sorted=${fmt(n.right.merged)} to sort` });
 
         generateMergeSteps(n.id, n.left.merged, n.right.merged, panelScrollY)
             .forEach(ev => evs.push(ev));
@@ -456,6 +466,24 @@ const SyncedCodePanel = ({ code, activeLine, executedLines }) => {
     );
 };
 
+// ─── Store-result persistent label (above node, lives until parent merges) ───
+const StoredVarLabel = ({ varName, value, x, y }) => (
+    <motion.div
+        style={{ position: 'absolute', left: x, top: y, zIndex: 40, pointerEvents: 'none' }}
+        initial={{ opacity: 0, scale: 0.8, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.8, y: -6 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 24 }}>
+        <div className="flex items-center gap-1.5 rounded-lg border border-teal-500/70 px-2.5 py-1.5 shadow-lg backdrop-blur"
+            style={{ background: 'rgba(13,60,57,0.90)', whiteSpace: 'nowrap' }}>
+            <span className="text-teal-300 font-bold font-mono text-xs">{varName}</span>
+            <span className="text-slate-400 text-xs">=</span>
+            <span className="text-teal-100 font-mono text-xs">[{value.join(', ')}]</span>
+            <span className="ml-1 text-emerald-400 text-xs">✓</span>
+        </div>
+    </motion.div>
+);
+
 // ─── Annotation badge (shown in top-right of canvas) ─────────────────────────
 const AnnotationBadge = ({ text }) => {
     return (
@@ -554,6 +582,17 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
     const splitIds      = useMemo(() => new Set(processed.filter(e => e.type === 'split').map(e => e.nodeId)),          [processed]);
     const mergedIds     = useMemo(() => new Set(processed.filter(e => e.type === 'merge_result').map(e => e.nodeId)),   [processed]);
 
+    // Persistent stored-variable labels: collect all store events whose parent hasn't merged yet
+    const activeStoredVars = useMemo(() => {
+        const result = [];
+        processed.forEach(e => {
+            if (e.type !== 'store_left_result' && e.type !== 'store_right_result') return;
+            if (mergedIds.has(e.parentId)) return; // parent already merged — hide label
+            result.push(e);
+        });
+        return result;
+    }, [processed, mergedIds]);
+
     // ── Current event derived values ─────────────────────────────────────────
     const currentEv     = events[eventIdx];
     const isDetailEvent = currentEv?.type === 'merge_detail' && currentEv?.phase !== 'done';
@@ -600,9 +639,11 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
             highlight_mid: '🎯 Computing mid index',
             split:         '✂️ Splitting left half',
             split_right:   '✂️ Splitting right half',
-            recurse_left:  '🔁 Recursing into left',
-            recurse_right: '🔁 Recursing into right',
-            call_merge:    '🔀 Calling merge()',
+            recurse_left:       '🔁 Recursing into left',
+            recurse_right:      '🔁 Recursing into right',
+            store_left_result:  '📥 Storing result in left_sorted',
+            store_right_result: '📥 Storing result in right_sorted',
+            call_merge:         '🔀 Calling merge()',
             merge_detail:  '🔍 Stepping through merge()',
             merge_result:  '✅ Merge complete',
         };
@@ -763,6 +804,28 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                                     </motion.div>
                                 );
                             })}
+
+                            {/* Persistent stored-variable labels — stay above node until parent merges */}
+                            <AnimatePresence>
+                                {activeStoredVars.map(ev => {
+                                    const storeNode = allNodes.find(n => n.id === ev.nodeId);
+                                    if (!storeNode) return null;
+                                    const varName = ev.type === 'store_left_result' ? 'left_sorted' : 'right_sorted';
+                                    const bW = nodeBoxW(storeNode.arr);
+                                    // centre the label above the node box
+                                    const labelX = storeNode.x - bW / 2;
+                                    const labelY = storeNode.y - 44;
+                                    return (
+                                        <StoredVarLabel
+                                            key={ev.type + '-' + ev.nodeId}
+                                            varName={varName}
+                                            value={ev.value}
+                                            x={labelX}
+                                            y={labelY}
+                                        />
+                                    );
+                                })}
+                            </AnimatePresence>
 
                             {/* Annotation badge — absolutely placed beside the active node's right edge */}
                             <AnimatePresence mode="wait">
