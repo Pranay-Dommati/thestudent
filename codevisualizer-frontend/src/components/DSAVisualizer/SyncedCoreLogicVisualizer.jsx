@@ -540,7 +540,7 @@ const highlightSyntax = (line) => {
 };
 
 // ─── Inline Code Panel ────────────────────────────────────────────────────────
-const SyncedCodePanel = ({ code, activeLine, executedLines }) => {
+const SyncedCodePanel = ({ code, activeLine, executedLines, innerOnly }) => {
     const lines     = code ? code.split('\n') : [];
     const lineRefs  = useRef({});
 
@@ -550,10 +550,10 @@ const SyncedCodePanel = ({ code, activeLine, executedLines }) => {
         }
     }, [activeLine]);
 
-    return (
-        <div className="w-[380px] flex-shrink-0 h-full bg-slate-900 border-l border-slate-700/60 flex flex-col overflow-hidden">
+    const inner = (
+        <>
             {/* Header */}
-            <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2 bg-slate-800 flex-shrink-0">
+            <div className="px-3 py-2 border-b border-slate-700 flex items-center gap-2 bg-slate-800 flex-shrink-0">
                 <div className="flex gap-1.5">
                     <span className="w-3 h-3 rounded-full bg-red-500" />
                     <span className="w-3 h-3 rounded-full bg-yellow-500" />
@@ -584,6 +584,11 @@ const SyncedCodePanel = ({ code, activeLine, executedLines }) => {
                     );
                 })}
             </div>
+        </>
+    );
+    return innerOnly ? inner : (
+        <div className="w-[380px] flex-shrink-0 h-full bg-slate-900 border-l border-slate-700/60 flex flex-col overflow-hidden">
+            {inner}
         </div>
     );
 };
@@ -818,71 +823,6 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
     return (
         <div className="flex flex-col h-full bg-slate-950 text-white select-none overflow-hidden">
 
-            {/* ── Top control bar ─────────────────────────────────────────── */}
-            <div className="flex-shrink-0 flex items-center justify-between px-6 py-2.5 border-b border-slate-800 bg-slate-900">
-                <span className="text-sm text-slate-300 font-medium">{statusLabel}</span>
-                <div className="flex items-center gap-3">
-                    {/* Speed — labelled as code-step pace */}
-                    <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-500 whitespace-nowrap">Code speed:</span>
-                        <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
-                            {[0.5, 1, 1.5, 2, 3].map(s => (
-                                <button key={s} onClick={() => setSpeed(s)}
-                                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
-                                        speed === s ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}>
-                                    {s}×
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    {/* Back / Next step buttons */}
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={handleBack}
-                            disabled={eventIdx < 0}
-                            className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all"
-                            title="Previous step"
-                        >
-                            ← Back
-                        </button>
-                        <button
-                            onClick={handleNext}
-                            disabled={finished}
-                            className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-all"
-                            title="Next step"
-                        >
-                            Next →
-                        </button>
-                    </div>
-                    {/* Play / Pause / Resume / Replay */}
-                    {!playing && !finished && eventIdx < 0 && (
-                        <button onClick={handlePlay}
-                            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-900/40 transition-all">
-                            ▶ Start
-                        </button>
-                    )}
-                    {playing && (
-                        <button onClick={() => setPlaying(false)}
-                            className="px-5 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold rounded-xl transition-all">
-                            ⏸ Pause
-                        </button>
-                    )}
-                    {!playing && eventIdx >= 0 && !finished && (
-                        <button onClick={handlePlay}
-                            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-all">
-                            ▶ Resume
-                        </button>
-                    )}
-                    {finished && (
-                        <button onClick={handlePlay}
-                            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl transition-all">
-                            ↺ Replay
-                        </button>
-                    )}
-                    <span className="text-xs text-slate-500 font-mono">{Math.max(0, eventIdx + 1)}/{events.length}</span>
-                </div>
-            </div>
-
             {/* ── Body: tree canvas + code panel ─────────────────────────── */}
             <div className="flex-1 flex overflow-hidden min-h-0">
 
@@ -1045,17 +985,83 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                         )}
                     </AnimatePresence>
 
-                    {/* Bottom legend */}
-                    <div className="flex-shrink-0 flex items-center justify-center gap-8 py-2.5 border-t border-slate-800 bg-slate-900 text-xs text-slate-500">
-                        <div className="flex items-center gap-2"><div className="w-8 h-0.5 bg-indigo-500" /><span>Divide</span></div>
-                        <div className="flex items-center gap-2"><div className="w-8 h-0.5 bg-emerald-500" /><span>Merge</span></div>
-                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-amber-500/80 border border-amber-400" /><span>Mid element</span></div>
-                        <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-emerald-500/80 border border-emerald-400" /><span>Sorted</span></div>
-                    </div>
+
                 </div>
 
-                {/* Code panel */}
-                <SyncedCodePanel code={code} activeLine={activeLine} executedLines={executedLines} />
+                {/* Code panel + compact controls */}
+                <div className="w-[380px] flex-shrink-0 h-full flex flex-col border-l border-slate-700/60 bg-slate-900 overflow-hidden">
+                    {/* Compact controls bar */}
+                    <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 border-b border-slate-700/60 bg-slate-800/80">
+                        {/* Speed selector */}
+                        <div className="flex items-center gap-0.5 bg-slate-900 rounded-lg p-1">
+                            {[0.5, 1, 1.5, 2, 3].map(s => (
+                                <button key={s} onClick={() => setSpeed(s)}
+                                    className={`px-2 py-1 text-[10px] font-semibold rounded-md transition-all ${
+                                        speed === s ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white hover:bg-slate-700'}`}>
+                                    {s}×
+                                </button>
+                            ))}
+                        </div>
+                        {/* Navigation + playback */}
+                        <div className="flex items-center gap-1">
+                            {/* Previous */}
+                            <button onClick={handleBack} disabled={eventIdx < 0}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed text-slate-300 hover:text-white transition-all"
+                                title="Previous step">
+                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                    <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z"/>
+                                </svg>
+                            </button>
+                            {/* Play / Pause / Resume / Replay */}
+                            {!playing && !finished && eventIdx < 0 && (
+                                <button onClick={handlePlay}
+                                    className="w-9 h-9 flex items-center justify-center rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white shadow shadow-indigo-900/40 transition-all"
+                                    title="Start">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 translate-x-px">
+                                        <path fillRule="evenodd" d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" clipRule="evenodd"/>
+                                    </svg>
+                                </button>
+                            )}
+                            {playing && (
+                                <button onClick={() => setPlaying(false)}
+                                    className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-600 hover:bg-slate-500 active:scale-95 text-white transition-all"
+                                    title="Pause">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                        <path fillRule="evenodd" d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z" clipRule="evenodd"/>
+                                    </svg>
+                                </button>
+                            )}
+                            {!playing && eventIdx >= 0 && !finished && (
+                                <button onClick={handlePlay}
+                                    className="w-9 h-9 flex items-center justify-center rounded-lg bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white transition-all"
+                                    title="Resume">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 translate-x-px">
+                                        <path fillRule="evenodd" d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" clipRule="evenodd"/>
+                                    </svg>
+                                </button>
+                            )}
+                            {finished && (
+                                <button onClick={handlePlay}
+                                    className="w-9 h-9 flex items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white transition-all"
+                                    title="Replay">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                        <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd"/>
+                                    </svg>
+                                </button>
+                            )}
+                            {/* Next */}
+                            <button onClick={handleNext} disabled={finished}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed text-slate-300 hover:text-white transition-all"
+                                title="Next step">
+                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                    <path d="M11.555 5.168A1 1 0 0010 6v2.798L4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    {/* Code content */}
+                    <SyncedCodePanel code={code} activeLine={activeLine} executedLines={executedLines} innerOnly />
+                </div>
             </div>
         </div>
     );
