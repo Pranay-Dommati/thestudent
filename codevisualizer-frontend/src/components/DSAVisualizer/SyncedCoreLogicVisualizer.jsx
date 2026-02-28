@@ -810,10 +810,13 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                                 {activeStoredVars.map(ev => {
                                     const storeNode = allNodes.find(n => n.id === ev.nodeId);
                                     if (!storeNode) return null;
-                                    const varName = ev.type === 'store_left_result' ? 'left_sorted' : 'right_sorted';
+                                    const isLeft = ev.type === 'store_left_result';
+                                    const varName = isLeft ? 'left_sorted' : 'right_sorted';
                                     const bW = nodeBoxW(storeNode.arr);
-                                    // centre the label above the node box
-                                    const labelX = storeNode.x - bW / 2;
+                                    // offset left labels slightly left, right labels slightly right (symmetric)
+                                    const labelX = isLeft
+                                        ? storeNode.x - bW / 2 - 32
+                                        : storeNode.x - bW / 2 + 16;
                                     const labelY = storeNode.y - 44;
                                     return (
                                         <StoredVarLabel
