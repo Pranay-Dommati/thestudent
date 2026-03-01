@@ -6,7 +6,7 @@ import { HiBookOpen } from 'react-icons/hi2';
 // List of DSA Problems
 const dsaProblems = [
     { id: 1, name: "Merge Sort", slug: "merge-sort", difficulty: "Medium", category: "Divide & Conquer", available: true },
-    { id: 2, name: "Quick Sort", slug: "quick-sort", difficulty: "Medium", category: "Divide & Conquer", available: false },
+    { id: 2, name: "Quick Sort", slug: "quick-sort", difficulty: "Medium", category: "Divide & Conquer", available: true },
     { id: 3, name: "Binary Search", slug: "binary-search", difficulty: "Easy", category: "Searching", available: false },
     { id: 4, name: "Two Sum", slug: "two-sum", difficulty: "Easy", category: "Arrays", available: false },
     { id: 5, name: "Linked List Reversal", slug: "linked-list-reversal", difficulty: "Easy", category: "Linked List", available: false },

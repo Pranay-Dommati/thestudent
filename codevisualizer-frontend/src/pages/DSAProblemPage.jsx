@@ -51,12 +51,47 @@ def merge(left, right):
 # Run the algorithm
 arr = ${arrString}
 result = merge_sort(arr)
-print(result)`
+print(result)`,
+
+    'quick-sort': (arrString) => `def quick_sort(nums):
+    def sort(low, high):
+        if low >= high:
+            return
+        
+        # Middle element as pivot
+        pivot = nums[(low + high) // 2]
+        
+        i = low
+        j = high
+        
+        while i <= j:
+            while nums[i] < pivot:
+                i += 1
+            while nums[j] > pivot:
+                j -= 1
+            
+            if i <= j:
+                nums[i], nums[j] = nums[j], nums[i]
+                i += 1
+                j -= 1
+        
+        sort(low, j)
+        sort(i, high)
+    
+    sort(0, len(nums) - 1)
+    return nums
+
+
+# Run the algorithm
+nums = ${arrString}
+result = quick_sort(nums)
+print(result)`,
 };
 
 // Default array for each problem
 const DEFAULT_ARRAYS = {
-    'merge-sort': '[38, 27, 43, 3, 9, 82, 10]'
+    'merge-sort': '[38, 27, 43, 3, 9, 82, 10]',
+    'quick-sort': '[8, 3, 1, 5, 2, 7, 4]',
 };
 
 // Problem metadata
@@ -75,7 +110,22 @@ const problemsData = {
             "Merging Sorted Arrays",
             "Time Complexity Analysis"
         ]
-    }
+    },
+    'quick-sort': {
+        id: 2,
+        name: "Quick Sort",
+        difficulty: "Medium",
+        category: "Divide & Conquer",
+        timeComplexity: "O(n log n) avg",
+        spaceComplexity: "O(log n)",
+        description: "Implement Quick Sort using a middle-element pivot strategy. Quick Sort is an in-place divide-and-conquer algorithm that partitions the array around a pivot, placing elements smaller than the pivot to the left and larger to the right, then recursively sorts both partitions.",
+        concepts: [
+            "In-place Partitioning",
+            "Two-pointer Technique",
+            "Pivot Selection Strategy",
+            "Recursive Divide & Conquer"
+        ]
+    },
 };
 
 const DSAProblemPage = () => {
@@ -426,7 +476,7 @@ const DSAProblemPage = () => {
                 code={code}
                 isLoading={isLoadingTrace}
                 loadingPhase={loadingPhase}
-                algorithmType="merge-sort"
+                algorithmType={problemName}
                 customArray={customArrayInput}
                 onRerun={handleRerunWithArray}
             />

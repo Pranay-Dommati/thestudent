@@ -12,6 +12,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles } from 'lucide-react';
 import CoreLogicVisualizer from './CoreLogicVisualizer';
 import SyncedCoreLogicVisualizer from './SyncedCoreLogicVisualizer';
+import QuickSortCoreLogicVisualizer from './QuickSortCoreLogicVisualizer';
+import QuickSortSyncedVisualizer from './QuickSortSyncedVisualizer';
 
 // ============ MAIN DSA IMMERSIVE VISUALIZER ============
 const DSAImmersiveVisualizer = ({
@@ -128,7 +130,7 @@ const DSAImmersiveVisualizer = ({
 
                     <h1 className="text-base font-semibold text-white flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-amber-400" />
-                        Merge Sort Visualizer
+                        {algorithmType === 'quick-sort' ? 'Quick Sort Visualizer' : 'Merge Sort Visualizer'}
                     </h1>
                 </div>
 
@@ -242,10 +244,18 @@ const DSAImmersiveVisualizer = ({
             <div className="flex-1 flex overflow-hidden">
                 {/* Visualization Area */}
                 <div className="flex-1 min-w-0">
-                    {activeTab === 'combined' ? (
-                        <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                    {algorithmType === 'quick-sort' ? (
+                        activeTab === 'combined' ? (
+                            <QuickSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                        ) : (
+                            <QuickSortCoreLogicVisualizer customArray={customArray} onProgress={setProgress} seekRef={logicSeekRef} />
+                        )
                     ) : (
-                        <CoreLogicVisualizer customArray={customArray} onProgress={setProgress} seekRef={logicSeekRef} />
+                        activeTab === 'combined' ? (
+                            <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                        ) : (
+                            <CoreLogicVisualizer customArray={customArray} onProgress={setProgress} seekRef={logicSeekRef} />
+                        )
                     )}
                 </div>
             </div>
