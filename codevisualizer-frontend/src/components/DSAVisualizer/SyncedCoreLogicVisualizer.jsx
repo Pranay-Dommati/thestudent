@@ -571,7 +571,7 @@ const SyncedCodePanel = ({ code, activeLine, executedLines, innerOnly }) => {
                                 isCur   ? 'text-blue-400 font-bold'
                                 : wasDone ? 'text-emerald-500/70'
                                 : 'text-slate-600'}`}>{num}</span>
-                            <span className={`pr-4 ${isCur ? 'text-blue-100' : wasDone ? 'text-slate-400' : 'text-slate-500'}`}>
+                            <span className={`pr-4 select-text cursor-text ${isCur ? 'text-blue-100' : wasDone ? 'text-slate-400' : 'text-slate-500'}`}>
                                 {highlightSyntax(line) || <span>&nbsp;</span>}
                             </span>
                         </div>
@@ -848,7 +848,7 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
     })();
 
     return (
-        <div className="flex flex-col h-full bg-slate-950 text-white select-none overflow-hidden">
+        <div className="flex flex-col h-full bg-slate-950 text-white overflow-hidden">
 
             {/* ── Body: tree canvas + code panel ─────────────────────────── */}
             <div className="flex-1 flex overflow-hidden min-h-0">

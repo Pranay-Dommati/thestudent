@@ -53,39 +53,34 @@ arr = ${arrString}
 result = merge_sort(arr)
 print(result)`,
 
-    'quick-sort': (arrString) => `def quick_sort(nums):
-    def sort(low, high):
-        if low >= high:
-            return
-        
-        # Middle element as pivot
-        pivot = nums[(low + high) // 2]
-        
-        i = low
-        j = high
-        
-        while i <= j:
-            while nums[i] < pivot:
-                i += 1
-            while nums[j] > pivot:
-                j -= 1
-            
-            if i <= j:
-                nums[i], nums[j] = nums[j], nums[i]
-                i += 1
-                j -= 1
-        
-        sort(low, j)
-        sort(i, high)
+    'quick-sort': (arrString) => `def quick_sort(nums, low, high):
+    if low >= high:
+        return
     
-    sort(0, len(nums) - 1)
-    return nums
+    pivot = nums[(low + high) // 2]
+    
+    i = low
+    j = high
+    
+    while i <= j:
+        while nums[i] < pivot:
+            i += 1
+        while nums[j] > pivot:
+            j -= 1
+        
+        if i <= j:
+            nums[i], nums[j] = nums[j], nums[i]
+            i += 1
+            j -= 1
+    
+    quick_sort(nums, low, j)
+    quick_sort(nums, i, high)
 
 
-# Run the algorithm
+# Run
 nums = ${arrString}
-result = quick_sort(nums)
-print(result)`,
+quick_sort(nums, 0, len(nums) - 1)
+print(nums)`,
 };
 
 // Default array for each problem

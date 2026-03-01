@@ -12,35 +12,36 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
-const CELL_W   = 36;
-const CELL_H   = 36;
+const CELL_W   = 40;
+const CELL_H   = 40;
 const CELL_GAP = 4;
-const ELEM_W   = 54;
-const LEVEL_H  = 170;
-const NODE_PAD = 12;
+const ELEM_W   = 56;
+const LEVEL_H  = 180;
+const NODE_PAD = 16;
 const LEFT_PAD = 340;
 
 // ── Line numbers in the quick sort code ─────────────────────────────────────
 const LINE = {
-    SORT_DEF:       2,
-    BASE_CHECK:     3,
-    BASE_RETURN:    4,
-    PIVOT:          7,
-    INIT_I:         9,
-    INIT_J:        10,
-    WHILE_OUTER:   12,
-    WHILE_I:       13,
-    INC_I:         14,
-    WHILE_J:       15,
-    DEC_J:         16,
-    IF_SWAP:       18,
-    SWAP:          19,
-    POST_I:        20,
-    POST_J:        21,
-    RECURSE_LEFT:  23,
-    RECURSE_RIGHT: 24,
-    CALL_SORT:     26,
-    RETURN_NUMS:   27,
+    SORT_DEF:       1,
+    BASE_CHECK:     2,
+    BASE_RETURN:    3,
+    PIVOT:          5,
+    INIT_I:         7,
+    INIT_J:         8,
+    WHILE_OUTER:   10,
+    WHILE_I:       11,
+    INC_I:         12,
+    WHILE_J:       13,
+    DEC_J:         14,
+    IF_SWAP:       16,
+    SWAP:          17,
+    POST_I:        18,
+    POST_J:        19,
+    RECURSE_LEFT:  21,
+    RECURSE_RIGHT: 22,
+    NUMS_ASSIGN:   26,
+    CALL_SORT:     27,
+    RETURN_NUMS:   28,
 };
 
 // ── Delays per event type ─────────────────────────────────────────────────────
@@ -177,22 +178,28 @@ const buildSyncedEvents = (nodeMap, rootId) => {
     const fmt = arr => `[${arr.join(', ')}]`;
 
     const dfs = (node, isRoot) => {
-        // call
+        // For root: show nums assignment then the initial call site before entering function
+        if (isRoot) {
+            evs.push({
+                type: 'call', nodeId: node.id, scrollY: node.y,
+                codeLine: LINE.NUMS_ASSIGN,
+                annotation: `nums = ${fmt(node.arrAtEntry)}`,
+            });
+            evs.push({
+                type: 'call', nodeId: node.id, scrollY: node.y,
+                codeLine: LINE.CALL_SORT,
+                annotation: `Calling quick_sort(nums, 0, ${node.high})`,
+            });
+        }
+
+        // Enter the function
         evs.push({
             type: 'call', nodeId: node.id, scrollY: node.y,
             codeLine: LINE.SORT_DEF,
             annotation: isRoot
-                ? `sort(0, ${node.high}) — start sorting nums = ${fmt(node.arrAtEntry)}`
-                : `sort(${node.low}, ${node.high}) — subarray: ${fmt(node.arrAtEntry.slice(node.low, node.high + 1))}`,
+                ? `quick_sort(0, ${node.high}) — start sorting nums = ${fmt(node.arrAtEntry)}`
+                : `quick_sort(${node.low}, ${node.high}) — subarray: ${fmt(node.arrAtEntry.slice(node.low, node.high + 1))}`,
         });
-
-        if (isRoot) {
-            evs.push({
-                type: 'call', nodeId: node.id, scrollY: node.y,
-                codeLine: LINE.CALL_SORT,
-                annotation: `Calling sort(0, len(nums)-1 = ${node.high})`,
-            });
-        }
 
         // base check
         const baseResult = node.isBase ? 'True → return' : `False → continue (${node.high - node.low + 1} elements)`;
@@ -420,7 +427,7 @@ const SyncedCodePanel = ({ code, activeLine, executedLines }) => {
                                 isCur    ? 'text-blue-400 font-bold'
                                 : wasDone ? 'text-emerald-500/70'
                                 : 'text-slate-600'}`}>{num}</span>
-                            <span className={`pr-4 ${isCur ? 'text-blue-100' : wasDone ? 'text-slate-400' : 'text-slate-500'}`}>
+                            <span className={`pr-4 select-text cursor-text ${isCur ? 'text-blue-100' : wasDone ? 'text-slate-400' : 'text-slate-500'}`}>
                                 {highlightSyntax(line) || <span>&nbsp;</span>}
                             </span>
                         </div>
@@ -470,6 +477,8 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
 
     const isAllSorted = zones === 'sorted';
     const isBase2 = isBase || (phase === 'base_return' || phase === 'check_base' && node.isBase);
+    const showIJValues = phase === 'init_i' || phase === 'init_j';
+    const showLowHigh  = phase === 'check_base';
 
     if (isBase) {
         const cell = node.low <= node.high ? node.arrAtEntry[node.low] : null;
@@ -525,35 +534,78 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
                 })}
             </div>
             {/* Array box */}
-            <div className={`flex items-center rounded-xl border-2 ${boxBg}`}
-                style={{ padding: `5px ${NODE_PAD}px`, gap: CELL_GAP }}>
-                {arr.map((v, idx) => {
-                    const zone = getZone(idx);
-                    const isPivCell = pivotRelIdx !== null && idx === pivotRelIdx;
-                    const isSorted  = zones === 'sorted';
-                    const isLeft    = zone === 'left';
-                    const isPivZone = zone === 'pivot';
-                    const isSwp     = idx === swapI || idx === swapJ;
+            <div className={`flex flex-col rounded-xl border-2 ${boxBg}`}
+                style={{ padding: `10px ${NODE_PAD}px` }}>
+                <div className="flex items-center" style={{ gap: CELL_GAP }}>
+                    {arr.map((v, idx) => {
+                        const zone = getZone(idx);
+                        const isPivCell = pivotRelIdx !== null && idx === pivotRelIdx;
+                        const isSorted  = zones === 'sorted';
+                        const isLeft    = zone === 'left';
+                        const isPivZone = zone === 'pivot';
+                        const isSwp     = idx === swapI || idx === swapJ;
 
-                    let bg = 'bg-slate-700 border-slate-500 text-slate-200';
-                    if (isSorted)  bg = 'bg-emerald-600 border-emerald-400 text-white';
-                    if (isLeft)    bg = 'bg-indigo-800 border-indigo-500 text-white';
-                    if (isPivZone) bg = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300';
-                    if (zone === 'right') bg = 'bg-slate-600 border-slate-400 text-slate-200';
-                    if (isPivCell) bg = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-300 shadow-md shadow-amber-500/50';
-                    if (isSwp)     bg = 'bg-rose-600 border-rose-400 text-white ring-2 ring-rose-300';
+                        let bg = 'bg-slate-700 border-slate-500 text-slate-200';
+                        if (isSorted)  bg = 'bg-emerald-600 border-emerald-400 text-white';
+                        if (isLeft)    bg = 'bg-indigo-800 border-indigo-500 text-white';
+                        if (isPivZone) bg = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300';
+                        if (zone === 'right') bg = 'bg-slate-600 border-slate-400 text-slate-200';
+                        if (isPivCell) bg = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-300 shadow-md shadow-amber-500/50';
+                        if (isSwp)     bg = 'bg-rose-600 border-rose-400 text-white ring-2 ring-rose-300';
 
-                    return (
-                        <motion.div key={idx}
-                            className={`flex items-center justify-center rounded-lg border-2 text-sm font-bold flex-shrink-0 ${bg}`}
-                            style={{ width: CELL_W, height: CELL_H, minWidth: CELL_W }}
-                            animate={isSwp ? { scale: [1, 1.3, 1] } : {}}
-                            transition={isSwp ? { duration: 0.35 } : {}}>
-                            {v}
-                        </motion.div>
-                    );
-                })}
+                        return (
+                            <motion.div key={idx}
+                                className={`flex items-center justify-center rounded-lg border-2 text-sm font-bold flex-shrink-0 ${bg}`}
+                                style={{ width: CELL_W, height: CELL_H, minWidth: CELL_W }}
+                                animate={isSwp ? { scale: [1, 1.3, 1] } : {}}
+                                transition={isSwp ? { duration: 0.35 } : {}}>
+                                {v}
+                            </motion.div>
+                        );
+                    })}
+                </div>
+                {showIJValues && (
+                    <div className="flex justify-between items-center mt-2 pt-1.5 border-t border-slate-600/40">
+                        <motion.span
+                            className="px-2 py-0.5 rounded-full bg-indigo-900/60 border border-indigo-500/50 text-[11px] font-bold font-mono text-indigo-300"
+                            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
+                            i = {node.low}
+                        </motion.span>
+                        <motion.span
+                            className="px-2 py-0.5 rounded-full bg-pink-900/60 border border-pink-500/50 text-[11px] font-bold font-mono text-pink-300"
+                            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
+                            j = {node.high}
+                        </motion.span>
+                    </div>
+                )}
             </div>
+            {/* low / high labels below box during base-check */}
+            <AnimatePresence>
+            {showLowHigh && (
+                <motion.div
+                    className="flex items-center w-full"
+                    style={{ gap: CELL_GAP, paddingLeft: NODE_PAD, paddingRight: NODE_PAD }}
+                    initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}>
+                    {/* low badge aligned under first cell */}
+                    <div style={{ width: CELL_W }} className="flex justify-center">
+                        <span className="px-1.5 py-0.5 rounded-md bg-sky-900/60 border border-sky-500/50 text-[10px] font-bold font-mono text-sky-300 whitespace-nowrap">
+                            low={node.low}
+                        </span>
+                    </div>
+                    {/* middle: < centered */}
+                    <div className="flex-1 flex items-center justify-center">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-700/60 border border-slate-500/50 text-sm font-bold font-mono text-emerald-300">&lt;</span>
+                    </div>
+                    {/* high badge aligned under last cell */}
+                    <div style={{ width: CELL_W }} className="flex justify-center">
+                        <span className="px-1.5 py-0.5 rounded-md bg-violet-900/60 border border-violet-500/50 text-[10px] font-bold font-mono text-violet-300 whitespace-nowrap">
+                            high={node.high}
+                        </span>
+                    </div>
+                </motion.div>
+            )}
+            </AnimatePresence>
         </div>
     );
 };
@@ -716,7 +768,7 @@ const QuickSortSyncedVisualizer = ({
     })();
 
     return (
-        <div className="flex flex-col h-full bg-slate-950 text-white select-none overflow-hidden">
+        <div className="flex flex-col h-full bg-slate-950 text-white overflow-hidden">
             <div className="flex-1 flex overflow-hidden min-h-0">
                 {/* Tree canvas */}
                 <div className="flex-1 flex flex-col overflow-hidden relative min-w-0">

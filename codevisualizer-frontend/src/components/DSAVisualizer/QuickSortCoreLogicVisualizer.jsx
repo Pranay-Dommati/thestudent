@@ -13,8 +13,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
-const CELL_W       = 38;
-const CELL_H       = 38;
+const CELL_W       = 40;
+const CELL_H       = 40;
 const CELL_GAP     = 4;
 const ELEM_W       = 56;   // px per array-index slot  (X axis)
 const LEVEL_H      = 170;  // px between tree levels    (Y axis)
