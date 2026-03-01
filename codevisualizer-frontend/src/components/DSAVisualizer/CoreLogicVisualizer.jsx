@@ -375,6 +375,26 @@ const CoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]', onPro
     const splitNodeIds    = useMemo(() => new Set(processedEvents.filter(e => e.type === 'split').map(e => e.nodeId)), [processedEvents]);
     const mergedNodeIds   = useMemo(() => new Set(processedEvents.filter(e => e.type === 'merge_result').map(e => e.nodeId)), [processedEvents]);
 
+    // Dismiss children (and their descendants) once their parent is merged
+    const dismissedIds = useMemo(() => {
+        const ids = new Set();
+        processedEvents.forEach(e => {
+            if (e.type === 'merge_result') {
+                const mergedNode = allNodes.find(n => n.id === e.nodeId);
+                if (mergedNode && !mergedNode.isLeaf) {
+                    const collectAll = (n) => {
+                        if (!n) return;
+                        ids.add(n.id);
+                        if (!n.isLeaf) { collectAll(n.left); collectAll(n.right); }
+                    };
+                    collectAll(mergedNode.left);
+                    collectAll(mergedNode.right);
+                }
+            }
+        });
+        return ids;
+    }, [processedEvents, allNodes]);
+
     // Derived: is the current event a detail-panel event?
     const currentEvent  = events[eventIdx];
     const isDetailEvent = currentEvent?.type === 'merge_detail' && currentEvent?.phase !== 'done';
@@ -477,17 +497,18 @@ const CoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]', onPro
         onProgress?.({ idx: eventIdx, total: events.length });
     }, [eventIdx, events.length, onProgress]);
 
-    // Build SVG lines between parent and children (only if split has happened)
+    // Build SVG lines between parent and children (only if split has happened and children not dismissed)
     const svgLines = useMemo(() => {
         const lines = [];
         allNodes.forEach(node => {
             if (node.isLeaf || !splitNodeIds.has(node.id)) return;
+            if (dismissedIds.has(node.left.id) || dismissedIds.has(node.right.id)) return;
             // line from node to left child
             lines.push({ key: node.id + '-L', x1: node.x, y1: node.y + CELL_H + 8, x2: node.left.x,  y2: node.left.y  - 4, merging: mergedNodeIds.has(node.id) });
             lines.push({ key: node.id + '-R', x1: node.x, y1: node.y + CELL_H + 8, x2: node.right.x, y2: node.right.y - 4, merging: mergedNodeIds.has(node.id) });
         });
         return lines;
-    }, [allNodes, splitNodeIds, mergedNodeIds]);
+    }, [allNodes, splitNodeIds, mergedNodeIds, dismissedIds]);
 
     const getPhaseLabel = () => {
         if (!currentEvent) return 'Press Start to begin';
@@ -662,8 +683,8 @@ const CoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]', onPro
                     </svg>
 
                     {/* Nodes */}
-                    {allNodes.map(node => {
-                        if (!visibleNodeIds.has(node.id)) return null;
+                    <AnimatePresence>
+                    {allNodes.filter(node => visibleNodeIds.has(node.id) && !dismissedIds.has(node.id)).map(node => {
                         const isMerged   = mergedNodeIds.has(node.id);
                         const isHighMid  = highlightedMids.has(node.id) && !splitNodeIds.has(node.id);
                         const displayArr = isMerged ? node.merged : node.arr;
@@ -678,6 +699,7 @@ const CoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]', onPro
                                 style={{ left: node.x - boxW / 2, top: node.y }}
                                 initial={{ opacity: 0, scale: 0.6, y: -12 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.4, y: 20 }}
                                 transition={{ type: 'spring', stiffness: 220, damping: 20 }}
                             >
                                 {/* Merged label */}
@@ -736,6 +758,7 @@ const CoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]', onPro
                             </motion.div>
                         );
                     })}
+                    </AnimatePresence>
                 </div>
             </div>
 

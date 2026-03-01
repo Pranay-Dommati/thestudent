@@ -745,6 +745,19 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                 collectDesc(storedNode.left);
                 collectDesc(storedNode.right);
             }
+            if (e.type === 'merge_result') {
+                // dismiss both children (and their descendants) once the parent merges
+                const mergedNode = allNodes.find(n => n.id === e.nodeId);
+                if (mergedNode && !mergedNode.isLeaf) {
+                    const collectAll = (n) => {
+                        if (!n) return;
+                        ids.add(n.id);
+                        if (!n.isLeaf) { collectAll(n.left); collectAll(n.right); }
+                    };
+                    collectAll(mergedNode.left);
+                    collectAll(mergedNode.right);
+                }
+            }
             if (e.type === 'final_return') {
                 // dismiss all nodes except the root itself
                 const root = allNodes.find(n => n.id === e.nodeId);
