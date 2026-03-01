@@ -8,7 +8,7 @@
  * Computes its own tree from `customArray` — no tracer steps needed.
  */
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── Layout constants ───────────────────────────────────────────────────────
@@ -335,7 +335,7 @@ const MergeDetailPanel = ({ ev, mergeCount }) => {
 };
 
 // ─── Main component ──────────────────────────────────────────────────────────
-const CoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]' }) => {
+const CoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]', onProgress, seekRef }) => {
     // Parse customArray string → number[]
     const inputArr = useMemo(() => {
         try {
@@ -430,7 +430,6 @@ const CoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]' }) => 
 
     const handlePlay = () => {
         if (finished) {
-            // Reset
             setEventIdx(-1);
             setFinished(false);
             setSeenEvents(new Set());
@@ -441,6 +440,42 @@ const CoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]' }) => 
     };
 
     const handlePause = () => setPlaying(false);
+
+    const handleReset = () => {
+        setPlaying(false);
+        setEventIdx(-1);
+        setFinished(false);
+        setSeenEvents(new Set());
+        if (scrollRef.current) scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handlePrev = () => {
+        setPlaying(false);
+        setEventIdx(prev => Math.max(-1, prev - 1));
+    };
+
+    const handleNext = () => {
+        setPlaying(false);
+        if (finished) return;
+        const nextIdx = eventIdx + 1;
+        if (nextIdx >= events.length) { setFinished(true); return; }
+        setEventIdx(nextIdx);
+        setSeenEvents(prev => new Set([...prev, nextIdx]));
+    };
+
+    // Register seek function for external scrubber
+    useEffect(() => {
+        if (seekRef) seekRef.current = (idx) => {
+            setPlaying(false);
+            setFinished(idx >= events.length - 1);
+            setEventIdx(Math.max(-1, Math.min(events.length - 1, idx)));
+        };
+    }, [seekRef, events.length]);
+
+    // Report progress to parent scrubber
+    useEffect(() => {
+        onProgress?.({ idx: eventIdx, total: events.length });
+    }, [eventIdx, events.length, onProgress]);
 
     // Build SVG lines between parent and children (only if split has happened)
     const svgLines = useMemo(() => {
@@ -492,42 +527,95 @@ const CoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]' }) => 
                         ))}
                     </div>
 
-                    {!playing && !finished && (
+                    {/* Divider */}
+                    <div className="w-px h-6 bg-slate-700" />
+
+                    {/* Reset — separate */}
+                    <button
+                        onClick={handleReset}
+                        disabled={eventIdx < 0}
+                        title="Reset"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed text-slate-400 hover:text-white transition-all"
+                    >
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                            <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd"/>
+                        </svg>
+                    </button>
+
+                    {/* Divider */}
+                    <div className="w-px h-6 bg-slate-700" />
+
+                    {/* Prev | Play/Pause/Resume/Replay | Next */}
+                    <div className="flex items-center gap-2">
+                        {/* Prev */}
                         <button
-                            onClick={handlePlay}
-                            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-indigo-900/40"
+                            onClick={handlePrev}
+                            disabled={eventIdx < 0}
+                            title="Previous step"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed text-slate-300 hover:text-white transition-all"
                         >
-                            ▶ Start
+                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z"/>
+                            </svg>
                         </button>
-                    )}
-                    {playing && (
+
+                        {/* Start */}
+                        {!playing && !finished && eventIdx < 0 && (
+                            <button onClick={handlePlay} title="Start"
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-indigo-900/40"
+                            >
+                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 translate-x-px">
+                                    <path fillRule="evenodd" d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" clipRule="evenodd"/>
+                                </svg>
+                                Start
+                            </button>
+                        )}
+                        {/* Pause */}
+                        {playing && (
+                            <button onClick={handlePause} title="Pause"
+                                className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-500 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all"
+                            >
+                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                    <path fillRule="evenodd" d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z" clipRule="evenodd"/>
+                                </svg>
+                                Pause
+                            </button>
+                        )}
+                        {/* Resume */}
+                        {!playing && eventIdx >= 0 && !finished && (
+                            <button onClick={handlePlay} title="Resume"
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all"
+                            >
+                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 translate-x-px">
+                                    <path fillRule="evenodd" d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" clipRule="evenodd"/>
+                                </svg>
+                                Resume
+                            </button>
+                        )}
+                        {/* Replay */}
+                        {finished && (
+                            <button onClick={handlePlay} title="Replay"
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all"
+                            >
+                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                    <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd"/>
+                                </svg>
+                                Replay
+                            </button>
+                        )}
+
+                        {/* Next */}
                         <button
-                            onClick={handlePause}
-                            className="px-5 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold rounded-xl transition-all"
+                            onClick={handleNext}
+                            disabled={finished}
+                            title="Next step"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed text-slate-300 hover:text-white transition-all"
                         >
-                            ⏸ Pause
+                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                <path d="M11.555 5.168A1 1 0 0010 6v2.798L4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4z"/>
+                            </svg>
                         </button>
-                    )}
-                    {!playing && eventIdx >= 0 && !finished && (
-                        <button
-                            onClick={handlePlay}
-                            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-all"
-                        >
-                            ▶ Resume
-                        </button>
-                    )}
-                    {finished && (
-                        <button
-                            onClick={handlePlay}
-                            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl transition-all"
-                        >
-                            ↺ Replay
-                        </button>
-                    )}
-                    {/* Progress dots */}
-                    <span className="text-xs text-slate-500 font-mono">
-                        {Math.max(0, eventIdx + 1)}/{events.length}
-                    </span>
+                    </div>
                 </div>
             </div>
 
@@ -658,25 +746,7 @@ const CoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]' }) => 
                 )}
             </AnimatePresence>
 
-            {/* Bottom legend */}
-            <div className="flex-shrink-0 flex items-center justify-center gap-8 py-3 border-t border-slate-800 bg-slate-900 text-xs text-slate-500">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-0.5 bg-indigo-500" />
-                    <span>Divide</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-0.5 bg-emerald-500" />
-                    <span>Merge</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-amber-500/80 border border-amber-400" />
-                    <span>Mid element</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-emerald-500/80 border border-emerald-400" />
-                    <span>Sorted</span>
-                </div>
-            </div>
+
         </div>
     );
 };

@@ -8,8 +8,8 @@
  * Uses same layout as ImmersiveVisualizer but with custom visualization
  */
 
-import React, { useState, useEffect } from 'react';
-import { Sparkles, X } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Sparkles } from 'lucide-react';
 import CoreLogicVisualizer from './CoreLogicVisualizer';
 import SyncedCoreLogicVisualizer from './SyncedCoreLogicVisualizer';
 
@@ -26,6 +26,37 @@ const DSAImmersiveVisualizer = ({
     onRerun = null // Callback to rerun with new array: (arrayString) => void
 }) => {
     const [activeTab, setActiveTab] = useState('logic'); // 'logic' | 'combined'
+
+    // Scrubber state (shared across tabs)
+    const [progress, setProgress]   = useState({ idx: -1, total: 0 });
+    const [hoverFrac, setHoverFrac] = useState(null);
+    const scrubberRef  = useRef(null);
+    const scrubbingRef = useRef(false);
+    const logicSeekRef = useRef(null);  // CoreLogicVisualizer seek fn
+    const synthSeekRef = useRef(null);  // SyncedCoreLogicVisualizer seek fn
+
+    // Reset progress indicator when switching tabs
+    useEffect(() => { setProgress({ idx: -1, total: 0 }); }, [activeTab]);
+
+    const seekFraction = useCallback((clientX) => {
+        if (!scrubberRef.current || !progress.total) return;
+        const rect = scrubberRef.current.getBoundingClientRect();
+        const frac = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        const newIdx = Math.round(frac * progress.total) - 1;
+        const fn = activeTab === 'logic' ? logicSeekRef.current : synthSeekRef.current;
+        fn?.(newIdx);
+    }, [progress.total, activeTab]);
+
+    useEffect(() => {
+        const onMove = (e) => { if (scrubbingRef.current) seekFraction(e.clientX); };
+        const onUp   = () => { scrubbingRef.current = false; };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup',   onUp);
+        return () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup',   onUp);
+        };
+    }, [seekFraction]);
 
     // Local array input state for inline editing
     const [localArrayInput, setLocalArrayInput] = useState(customArray);
@@ -111,7 +142,7 @@ const DSAImmersiveVisualizer = ({
                                 : 'text-slate-400 hover:text-white hover:bg-slate-700'
                         }`}
                     >
-                        Core Logic Visualization
+                        Core Logic
                     </button>
                     <button
                         onClick={() => setActiveTab('combined')}
@@ -121,21 +152,52 @@ const DSAImmersiveVisualizer = ({
                                 : 'text-slate-400 hover:text-white hover:bg-slate-700'
                         }`}
                     >
-                        New Code Exec Vis
+                        Code Execution
                     </button>
                 </div>
 
-                {/* Right of center: Array Input */}
-                <div className="flex items-center gap-3">
+                {/* Right: Compact Scrubber + Array Input */}
+                <div className="flex items-center gap-4">
+
+                    {/* Inline seek scrubber */}
+                    {progress.total > 0 && (
+                        <div className="flex items-center gap-2">
+                            <div
+                                ref={scrubberRef}
+                                className="relative w-64 h-[6px] rounded-full bg-slate-700 cursor-pointer group/scrub"
+                                onMouseDown={(e) => { scrubbingRef.current = true; seekFraction(e.clientX); }}
+                                onMouseMove={(e) => {
+                                    const rect = scrubberRef.current.getBoundingClientRect();
+                                    setHoverFrac(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)));
+                                }}
+                                onMouseLeave={() => setHoverFrac(null)}
+                            >
+                                {/* Fill */}
+                                <div className="absolute left-0 top-0 h-full rounded-full bg-indigo-500 transition-[width] duration-75"
+                                    style={{ width: `${((progress.idx + 1) / progress.total) * 100}%` }} />
+                                {/* Ghost hover */}
+                                {hoverFrac !== null && (
+                                    <div className="absolute left-0 top-0 h-full rounded-full bg-white/10 pointer-events-none"
+                                        style={{ width: `${hoverFrac * 100}%` }} />
+                                )}
+                                {/* Thumb */}
+                                <div
+                                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-white shadow opacity-0 group-hover/scrub:opacity-100 transition-opacity pointer-events-none"
+                                    style={{ left: `${((progress.idx + 1) / progress.total) * 100}%` }}
+                                />
+
+                            </div>
+                        </div>
+                    )}
+
                     {showInputPanel ? (
-                        <div className="flex items-center gap-2 bg-slate-700/50 rounded-xl px-3 py-1.5">
-                            <span className="text-slate-400 text-sm">arr =</span>
+                        <div className="flex items-center gap-2 bg-slate-800 border border-slate-600 rounded-xl px-3 py-1.5 shadow-lg">
+                            <span className="text-slate-400 text-xs font-mono">arr =</span>
                             <input
                                 type="text"
                                 value={localArrayInput}
                                 onChange={handleInputChange}
-                                className={`w-48 px-2 py-1 bg-slate-900 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/50' : 'border-slate-600 focus:border-blue-500'
-                                    }`}
+                                className={`w-44 px-2 py-1 bg-slate-900 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/60' : 'border-slate-600 focus:border-indigo-500'}`}
                                 placeholder="[1, 2, 3]"
                             />
                             {inputError && (
@@ -144,16 +206,17 @@ const DSAImmersiveVisualizer = ({
                             <button
                                 onClick={handleRerun}
                                 disabled={!!inputError || !onRerun}
-                                className={`px-3 py-1 text-sm font-medium rounded-lg transition-all ${inputError || !onRerun
-                                    ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
-                                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                                    }`}
+                                className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                                    inputError || !onRerun
+                                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                        : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                                }`}
                             >
-                                ▶ Run
+                                Run
                             </button>
                             <button
                                 onClick={() => setShowInputPanel(false)}
-                                className="text-slate-400 hover:text-white text-sm"
+                                className="text-slate-500 hover:text-slate-300 text-xs px-1"
                             >
                                 ✕
                             </button>
@@ -162,22 +225,16 @@ const DSAImmersiveVisualizer = ({
                         onRerun && (
                             <button
                                 onClick={() => setShowInputPanel(true)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg text-sm font-medium transition-all"
+                                className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 hover:border-slate-500 text-slate-200 hover:text-white rounded-xl text-sm font-medium transition-all shadow-sm"
                             >
-                                <span className="text-amber-400">✎</span>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-amber-400">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
                                 Change Input
                             </button>
                         )
                     )}
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={onClose}
-                        className="p-2 rounded-lg bg-slate-700 hover:bg-red-500 text-slate-400 hover:text-white transition-all"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
                 </div>
             </header>
 
@@ -186,9 +243,9 @@ const DSAImmersiveVisualizer = ({
                 {/* Visualization Area */}
                 <div className="flex-1 min-w-0">
                     {activeTab === 'combined' ? (
-                        <SyncedCoreLogicVisualizer customArray={customArray} code={code} />
+                        <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
                     ) : (
-                        <CoreLogicVisualizer customArray={customArray} />
+                        <CoreLogicVisualizer customArray={customArray} onProgress={setProgress} seekRef={logicSeekRef} />
                     )}
                 </div>
             </div>

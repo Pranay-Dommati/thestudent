@@ -621,7 +621,7 @@ const AnnotationBadge = ({ text }) => {
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]', code = '' }) => {
+const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]', code = '', onProgress, seekRef }) => {
 
     const inputArr = useMemo(() => {
         try {
@@ -695,6 +695,26 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
         if (nextIdx >= events.length) { setFinished(true); return; }
         setEventIdx(nextIdx);
     };
+
+    const handleReset = () => {
+        setPlaying(false);
+        setFinished(false);
+        setEventIdx(-1);
+    };
+
+    // Register seek function for external scrubber
+    useEffect(() => {
+        if (seekRef) seekRef.current = (idx) => {
+            setPlaying(false);
+            setFinished(idx >= events.length - 1);
+            setEventIdx(Math.max(-1, Math.min(events.length - 1, idx)));
+        };
+    }, [seekRef, events.length]);
+
+    // Report progress to parent scrubber
+    useEffect(() => {
+        onProgress?.({ idx: eventIdx, total: events.length });
+    }, [eventIdx, events.length, onProgress]);
 
     // ── Derived sets ─────────────────────────────────────────────────────────
     const processed     = useMemo(() => events.slice(0, eventIdx + 1), [events, eventIdx]);
@@ -1003,7 +1023,17 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                             ))}
                         </div>
                         {/* Navigation + playback */}
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
+                            {/* Reset */}
+                            <button onClick={handleReset} disabled={eventIdx < 0}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed text-slate-400 hover:text-white transition-all"
+                                title="Reset">
+                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                    <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd"/>
+                                </svg>
+                            </button>
+                            {/* Divider */}
+                            <div className="w-px h-5 bg-slate-700" />
                             {/* Previous */}
                             <button onClick={handleBack} disabled={eventIdx < 0}
                                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed text-slate-300 hover:text-white transition-all"
