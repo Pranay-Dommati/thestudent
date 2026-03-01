@@ -246,7 +246,7 @@ const buildSyncedEvents = (nodeMap, rootId) => {
                 type: 'while_outer', nodeId: node.id, scrollY: node.y,
                 codeLine: LINE.WHILE_OUTER,
                 annotation: `while ${outerI} <= ${outerJ} → True, continue`,
-                i: outerI, j: outerJ, arr: iter.iterStart.arr,
+                i: outerI, j: outerJ, arr: iter.iterStart.arr, iterIdx,
             });
 
             // i scan steps
@@ -255,13 +255,13 @@ const buildSyncedEvents = (nodeMap, rootId) => {
                     type: 'i_scan', nodeId: node.id, scrollY: node.y,
                     codeLine: LINE.WHILE_I,
                     annotation: `while nums[${step.from}]=${step.arr[step.from]} < pivot=${node.pivot}: True → i += 1`,
-                    i: step.from, j: jStop, arr: step.arr,
+                    i: step.from, j: outerJ, arr: step.arr,
                 });
                 evs.push({
                     type: 'i_scan', nodeId: node.id, scrollY: node.y,
                     codeLine: LINE.INC_I,
                     annotation: `i += 1 → i = ${step.to}`,
-                    i: step.to, j: jStop, arr: step.arr,
+                    i: step.to, j: outerJ, arr: step.arr,
                 });
             });
             // i scan done
@@ -269,7 +269,7 @@ const buildSyncedEvents = (nodeMap, rootId) => {
                 type: 'i_scan_done', nodeId: node.id, scrollY: node.y,
                 codeLine: LINE.WHILE_I,
                 annotation: `while nums[${iStop}]=${arrBeforeSwap[iStop]} < pivot=${node.pivot}: False → i stays at ${iStop}`,
-                i: iStop, j: jStop, arr: arrBeforeSwap,
+                i: iStop, j: outerJ, arr: arrBeforeSwap,
             });
 
             // j scan steps
@@ -450,6 +450,7 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
     let zones = null;
     let compareIIdx = null; // cell highlighted when checking nums[i] < pivot
     let compareJIdx = null; // cell highlighted when checking nums[j] > pivot
+    const blinkPointers = phase === 'while_outer' || phase === 'if_swap' || phase === 'while_outer_exit';
 
     if (phase === 'pivot_select') {
         pivotRelIdx = node.pivotIdx - node.low;
@@ -460,7 +461,7 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
             iRel = 0;
             jRel = node.high - node.low;
         }
-    } else if (['while_outer', 'i_scan', 'i_scan_done', 'j_scan', 'j_scan_done', 'if_swap', 'swap_exec', 'post_i', 'post_j'].includes(phase)) {
+    } else if (['while_outer', 'while_outer_exit', 'i_scan', 'i_scan_done', 'j_scan', 'j_scan_done', 'if_swap', 'swap_exec', 'post_i', 'post_j'].includes(phase)) {
         const ev = currentEvForNode;
         if (ev?.arr) {
             arr = ev.arr.slice(node.low, node.high + 1);
@@ -471,18 +472,24 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
                 swapJ = ev.sj - node.low;
             }
         }
-        // highlight the cell being compared; pivot highlighted only during scan comparisons
-        if ((phase === 'i_scan' || phase === 'i_scan_done') && iRel !== null) {
+        // highlight the cell being compared; pivot highlighted only during the comparison line itself
+        const evLine = ev?.codeLine;
+        if ((phase === 'i_scan' || phase === 'i_scan_done') && iRel !== null && evLine === LINE.WHILE_I) {
             compareIIdx = iRel;
             pivotRelIdx = node.pivotIdx - node.low;
         }
-        if ((phase === 'j_scan' || phase === 'j_scan_done') && jRel !== null) {
+        if ((phase === 'j_scan' || phase === 'j_scan_done') && jRel !== null && evLine === LINE.WHILE_J) {
             compareJIdx = jRel;
             pivotRelIdx = node.pivotIdx - node.low;
         }
-    } else if (phase === 'while_outer_exit' || phase === 'recurse_left' || phase === 'recurse_right') {
+    } else if (phase === 'recurse_left' || phase === 'recurse_right') {
         arr = node.arrAfterPartition.slice(node.low, node.high + 1);
         zones = { leftEnd: node.finalJ - node.low, rightStart: node.finalI - node.low };
+        if (phase === 'recurse_left') {
+            jRel = node.finalJ - node.low;
+        } else {
+            iRel = node.finalI - node.low;
+        }
     } else if (phase === 'node_sorted') {
         arr = node.arrAfterPartition.slice(node.low, node.high + 1);
         zones = 'sorted';
@@ -491,6 +498,19 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
     const isAllSorted = zones === 'sorted';
     const isBase2 = isBase || (phase === 'base_return' || phase === 'check_base' && node.isBase);
     const showLowHigh  = phase === 'check_base';
+    const showPivotLabel = ['pivot_select', 'init_i', 'init_j', 'while_outer', 'while_outer_exit', 'i_scan', 'i_scan_done', 'j_scan', 'j_scan_done', 'if_swap', 'swap_exec', 'post_i', 'post_j'].includes(phase);
+    const pivotLabelIdx = node.pivotIdx - node.low;
+
+    // Extra label above array during recurse calls (only the added label, not the existing pointer)
+    let recurseExtraIdx = null;
+    let recurseExtraLabel = null;
+    if (phase === 'recurse_left') {
+        recurseExtraIdx = 0;
+        recurseExtraLabel = 'low';
+    } else if (phase === 'recurse_right') {
+        recurseExtraIdx = node.high - node.low;
+        recurseExtraLabel = 'high';
+    }
 
     if (isBase) {
         const cell = node.low <= node.high ? node.arrAtEntry[node.low] : null;
@@ -533,14 +553,33 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
                 {arr.map((_, idx) => {
                     const isI = iRel !== null && idx === iRel;
                     const isJ = jRel !== null && idx === jRel;
+                    const isExtra = recurseExtraIdx !== null && idx === recurseExtraIdx;
                     return (
                         <div key={idx} style={{ width: CELL_W }} className="flex justify-center">
-                            {isI && !isJ && <motion.div className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold ${compareIIdx !== null ? 'bg-sky-500' : 'bg-indigo-600'}`}
-                                initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>i</motion.div>}
-                            {isJ && !isI && <motion.div className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold ${compareJIdx !== null ? 'bg-pink-500' : 'bg-pink-600'}`}
-                                initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>j</motion.div>}
-                            {isI && isJ && <motion.div className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center text-[9px] font-bold"
-                                initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>ij</motion.div>}
+                            {/* Extra recurse label (low or high) */}
+                            {isExtra && !isI && !isJ && <motion.div
+                                className="px-1.5 h-5 rounded-full bg-sky-600 text-white flex items-center justify-center text-[9px] font-bold"
+                                initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.2 }}>{recurseExtraLabel}</motion.div>}
+                            {/* Normal i/j pointers */}
+                            {isI && !isJ && <motion.div
+                                key={blinkPointers ? `i-blink-${currentEvForNode?.iterIdx ?? iRel}-${jRel}` : 'i-still'}
+                                className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold ${compareIIdx !== null ? 'bg-sky-500' : 'bg-indigo-600'}`}
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={blinkPointers ? { opacity: [1, 0.1, 1], y: 0 } : { opacity: 1, y: 0 }}
+                                transition={blinkPointers ? { repeat: Infinity, duration: 0.6, ease: 'easeInOut' } : { duration: 0.2 }}>i</motion.div>}
+                            {isJ && !isI && <motion.div
+                                key={blinkPointers ? `j-blink-${currentEvForNode?.iterIdx ?? iRel}-${jRel}` : 'j-still'}
+                                className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold ${compareJIdx !== null ? 'bg-pink-500' : 'bg-pink-600'}`}
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={blinkPointers ? { opacity: [1, 0.1, 1], y: 0 } : { opacity: 1, y: 0 }}
+                                transition={blinkPointers ? { repeat: Infinity, duration: 0.6, ease: 'easeInOut' } : { duration: 0.2 }}>j</motion.div>}
+                            {isI && isJ && <motion.div
+                                key={blinkPointers ? `ij-blink-${currentEvForNode?.iterIdx ?? iRel}-${jRel}` : 'ij-still'}
+                                className="px-1.5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center text-[9px] font-bold whitespace-nowrap"
+                                initial={{ opacity: 0, y: -4 }}
+                                animate={blinkPointers ? { opacity: [1, 0.1, 1], y: 0 } : { opacity: 1, y: 0 }}
+                                transition={blinkPointers ? { repeat: Infinity, duration: 0.6, ease: 'easeInOut' } : { duration: 0.2 }}>i,j</motion.div>}
                         </div>
                     );
                 })}
@@ -549,38 +588,72 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
             <div className={`flex flex-col rounded-xl border-2 ${boxBg}`}
                 style={{ padding: `10px ${NODE_PAD}px` }}>
                 <div className="flex items-center" style={{ gap: CELL_GAP }}>
-                    {arr.map((v, idx) => {
-                        const zone = getZone(idx);
-                        const isPivCell = pivotRelIdx !== null && idx === pivotRelIdx;
-                        const isSorted  = zones === 'sorted';
-                        const isLeft    = zone === 'left';
-                        const isPivZone = zone === 'pivot';
-                        const isSwp     = idx === swapI || idx === swapJ;
-                        const isCompareI = compareIIdx !== null && idx === compareIIdx;
-                        const isCompareJ = compareJIdx !== null && idx === compareJIdx;
+                    {(() => {
+                        const swapDist = swapI !== null && swapJ !== null
+                            ? (swapJ - swapI) * (CELL_W + CELL_GAP) : 0;
+                        return arr.map((v, idx) => {
+                            const zone = getZone(idx);
+                            const isPivCell = pivotRelIdx !== null && idx === pivotRelIdx;
+                            const isSorted  = zones === 'sorted';
+                            const isLeft    = zone === 'left';
+                            const isPivZone = zone === 'pivot';
+                            const isSwpI    = idx === swapI;
+                            const isSwpJ    = idx === swapJ;
+                            const isSwp     = isSwpI || isSwpJ;
+                            const isCompareI = compareIIdx !== null && idx === compareIIdx;
+                            const isCompareJ = compareJIdx !== null && idx === compareJIdx;
 
-                        let bg = 'bg-slate-700 border-slate-500 text-slate-200';
-                        if (isSorted)   bg = 'bg-emerald-600 border-emerald-400 text-white';
-                        if (isLeft)     bg = 'bg-indigo-800 border-indigo-500 text-white';
-                        if (isPivZone)  bg = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300';
-                        if (zone === 'right') bg = 'bg-slate-600 border-slate-400 text-slate-200';
-                        if (isPivCell)  bg = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-300 shadow-md shadow-amber-500/50';
-                        if (isCompareI) bg = 'bg-sky-500 border-sky-300 text-white ring-2 ring-sky-300 shadow-md shadow-sky-500/50';
-                        if (isCompareJ) bg = 'bg-pink-500 border-pink-300 text-white ring-2 ring-pink-300 shadow-md shadow-pink-500/50';
-                        if (isSwp)      bg = 'bg-rose-600 border-rose-400 text-white ring-2 ring-rose-300';
+                            let bg = 'bg-slate-700 border-slate-500 text-slate-200';
+                            if (isSorted)   bg = 'bg-emerald-600 border-emerald-400 text-white';
+                            if (isLeft)     bg = 'bg-indigo-800 border-indigo-500 text-white';
+                            if (isPivZone)  bg = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300';
+                            if (zone === 'right') bg = 'bg-slate-600 border-slate-400 text-slate-200';
+                            if (isPivCell)  bg = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-300 shadow-md shadow-amber-500/50';
+                            if (isCompareI) bg = 'bg-sky-500 border-sky-300 text-white ring-2 ring-sky-300 shadow-md shadow-sky-500/50';
+                            if (isCompareJ) bg = 'bg-pink-500 border-pink-300 text-white ring-2 ring-pink-300 shadow-md shadow-pink-500/50';
+                            if (isSwp)      bg = 'bg-rose-600 border-rose-400 text-white ring-2 ring-rose-300 shadow-lg shadow-rose-500/60';
 
-                        return (
-                            <motion.div key={idx}
-                                className={`flex items-center justify-center rounded-lg border-2 text-sm font-bold flex-shrink-0 ${bg}`}
-                                style={{ width: CELL_W, height: CELL_H, minWidth: CELL_W }}
-                                animate={isSwp ? { scale: [1, 1.3, 1] } : {}}
-                                transition={isSwp ? { duration: 0.35 } : {}}>
-                                {v}
-                            </motion.div>
-                        );
-                    })}
+                            // Flying-cross swap animation:
+                            // arr already holds post-swap values, so swapI's value came from swapJ (animate from +dist),
+                            // and swapJ's value came from swapI (animate from -dist). Arc them so they don't collide.
+                            let swapAnim = { x: 0, y: 0 };
+                            if (isSwpI && swapDist > 0) {
+                                swapAnim = { x: [swapDist, swapDist * 0.5, 0], y: [0, -18, 0] };
+                            } else if (isSwpJ && swapDist > 0) {
+                                swapAnim = { x: [-swapDist, -swapDist * 0.5, 0], y: [0, 18, 0] };
+                            }
+
+                            return (
+                                <motion.div key={idx}
+                                    className={`flex items-center justify-center rounded-lg border-2 text-sm font-bold flex-shrink-0 ${bg}`}
+                                    style={{ width: CELL_W, height: CELL_H, minWidth: CELL_W, position: 'relative', zIndex: isSwp ? 10 : 0 }}
+                                    animate={swapAnim}
+                                    transition={isSwp ? { duration: 0.5, ease: 'easeInOut' } : { duration: 0 }}>
+                                    {v}
+                                </motion.div>
+                            );
+                        });
+                    })()}
                 </div>
             </div>
+            {/* Pivot label below array */}
+            {showPivotLabel && (
+                <div className="flex items-start" style={{ gap: CELL_GAP, height: 18 }}>
+                    {arr.map((_, idx) => (
+                        <div key={idx} style={{ width: CELL_W }} className="flex justify-center">
+                            {idx === pivotLabelIdx && (
+                                <motion.div
+                                    className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-[8px] font-bold"
+                                    initial={{ opacity: 0, y: 4 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.2 }}>
+                                    P
+                                </motion.div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
             {/* low / high labels below box during base-check */}
             <AnimatePresence>
             {showLowHigh && (
@@ -694,21 +767,9 @@ const QuickSortSyncedVisualizer = ({
     // Phase per node (based on latest event for that node)
     const nodePhases = useMemo(() => {
         const m = new Map(); // nodeId -> { phase, ev }
-        const PHASE_ORDER = {
-            call: 0, check_base: 1, base_return: 2,
-            pivot_select: 3, init_i: 4, init_j: 5,
-            while_outer: 6, i_scan: 7, i_scan_done: 8,
-            j_scan: 9, j_scan_done: 10, if_swap: 11,
-            swap_exec: 12, post_i: 13, post_j: 14,
-            while_outer_exit: 15, recurse_left: 16, recurse_right: 17,
-            node_sorted: 18,
-        };
         processed.forEach(ev => {
             if (!ev.nodeId) return;
-            const cur = m.get(ev.nodeId);
-            const curPriority   = cur  ? (PHASE_ORDER[cur.phase] ?? -1) : -1;
-            const thisPriority  = PHASE_ORDER[ev.type] ?? -1;
-            if (thisPriority >= curPriority) m.set(ev.nodeId, { phase: ev.type, ev });
+            m.set(ev.nodeId, { phase: ev.type, ev });
         });
         return m;
     }, [processed]);
