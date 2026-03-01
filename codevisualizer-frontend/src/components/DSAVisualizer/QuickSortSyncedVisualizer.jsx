@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const CELL_W   = 40;
 const CELL_H   = 40;
 const CELL_GAP = 4;
-const ELEM_W   = 56;
+const ELEM_W   = 72;
 const LEVEL_H  = 180;
 const NODE_PAD = 16;
 const LEFT_PAD = 340;
@@ -439,7 +439,7 @@ const SyncedCodePanel = ({ code, activeLine, executedLines }) => {
 };
 
 // ── Node display ──────────────────────────────────────────────────────────────
-const NodeVisual = ({ node, phase, currentEvForNode }) => {
+const NodeVisual = ({ node, phase, currentEvForNode, returningRanges = [] }) => {
     const isBase = node.isBase;
 
     // Pick which array state and highlights to show
@@ -602,16 +602,20 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
                             const isSwp     = isSwpI || isSwpJ;
                             const isCompareI = compareIIdx !== null && idx === compareIIdx;
                             const isCompareJ = compareJIdx !== null && idx === compareJIdx;
+                            const isChildReturning = returningRanges.some(([lo, hi]) => idx >= lo && idx <= hi);
 
                             let bg = 'bg-slate-700 border-slate-500 text-slate-200';
                             if (isSorted)   bg = 'bg-emerald-600 border-emerald-400 text-white';
-                            if (isLeft)     bg = 'bg-indigo-800 border-indigo-500 text-white';
+                            if (isLeft)     bg = phase === 'recurse_right'
+                                ? 'bg-emerald-700 border-emerald-500 text-white'
+                                : 'bg-indigo-800 border-indigo-500 text-white';
                             if (isPivZone)  bg = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300';
                             if (zone === 'right') bg = 'bg-slate-600 border-slate-400 text-slate-200';
                             if (isPivCell)  bg = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-300 shadow-md shadow-amber-500/50';
                             if (isCompareI) bg = 'bg-sky-500 border-sky-300 text-white ring-2 ring-sky-300 shadow-md shadow-sky-500/50';
                             if (isCompareJ) bg = 'bg-pink-500 border-pink-300 text-white ring-2 ring-pink-300 shadow-md shadow-pink-500/50';
                             if (isSwp)      bg = 'bg-rose-600 border-rose-400 text-white ring-2 ring-rose-300 shadow-lg shadow-rose-500/60';
+                            if (isChildReturning) bg = 'bg-emerald-500 border-emerald-300 text-white ring-2 ring-emerald-300 shadow-md shadow-emerald-500/50';
 
                             // Flying-cross swap animation:
                             // arr already holds post-swap values, so swapI's value came from swapJ (animate from +dist),
@@ -783,6 +787,8 @@ const QuickSortSyncedVisualizer = ({
             const sorted = phaseInfo?.phase === 'node_sorted';
             [node.left, node.right].forEach(child => {
                 if (!child || !visibleIds.has(child.id)) return;
+                // Hide edge when child is flying upward (base_return)
+                if (nodePhases.get(child.id)?.phase === 'base_return') return;
                 lines.push({
                     key: `${node.id}->${child.id}`,
                     x1: node.x, y1: node.y + CELL_H + 14,
@@ -940,18 +946,35 @@ const QuickSortSyncedVisualizer = ({
                                     const span    = node.high - node.low + 1;
                                     const boxW    = Math.max(span * (CELL_W + CELL_GAP) + NODE_PAD * 2, 70);
 
+                                    const isReturning = node.isBase && phase === 'base_return';
+
+                                    // Compute which cell ranges in this node correspond to a child currently returning
+                                    const returningRanges = [];
+                                    if (!node.isBase) {
+                                        [node.left, node.right].forEach(child => {
+                                            if (!child) return;
+                                            if (nodePhases.get(child.id)?.phase === 'base_return' && child.low <= child.high) {
+                                                returningRanges.push([child.low - node.low, child.high - node.low]);
+                                            }
+                                        });
+                                    }
+
                                     return (
                                         <motion.div key={node.id}
                                             className="absolute flex flex-col items-center"
                                             style={{ left: node.x - boxW / 2, top: node.y }}
                                             initial={{ opacity: 0, scale: 0.6, y: -12 }}
-                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                            animate={isReturning
+                                                ? { opacity: 0, scale: 0.5, y: -55 }
+                                                : { opacity: 1, scale: 1, y: 0 }}
                                             exit={{ opacity: 0, scale: 0.4, y: 20 }}
-                                            transition={{ type: 'spring', stiffness: 220, damping: 20 }}>
+                                            transition={isReturning
+                                                ? { duration: 0.45, ease: 'easeIn' }
+                                                : { type: 'spring', stiffness: 220, damping: 20 }}>
                                             <div className="text-[10px] text-slate-500 font-mono mb-0.5">
                                                 sort({node.low}, {node.high})
                                             </div>
-                                            <NodeVisual node={node} phase={phase} currentEvForNode={curEvForNode} />
+                                            <NodeVisual node={node} phase={phase} currentEvForNode={curEvForNode} returningRanges={returningRanges} />
                                         </motion.div>
                                     );
                                 })}
