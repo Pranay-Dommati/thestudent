@@ -88,13 +88,14 @@ const simulateQuickSort = (inputArr) => {
             partitionIter: [], // each outer-while iteration
             finalI: null, finalJ: null,
             arrAfterPartition: null,
+            arrSorted: null,
             leftChildId: null, rightChildId: null,
             left: null, right: null,
             x: 0, y: 0,
         };
         nodeMap.set(id, node);
 
-        if (low >= high) return id;
+        if (low >= high) { node.arrSorted = [...nums]; return id; }
 
         const pivotIdx = Math.floor((low + high) / 2);
         node.pivot  = nums[pivotIdx];
@@ -148,8 +149,11 @@ const simulateQuickSort = (inputArr) => {
         node.finalJ = j;
         node.arrAfterPartition = [...nums];
 
-        if (j >= low)  node.leftChildId  = dfs(low, j, depth + 1, id);
-        if (i <= high) node.rightChildId = dfs(i, high, depth + 1, id);
+        // Always recurse both sides — mirrors actual Python code which has no guard.
+        // When j < low or i > high the child is an immediate base-case return (low >= high).
+        node.leftChildId  = dfs(low, j, depth + 1, id);
+        node.rightChildId = dfs(i, high, depth + 1, id);
+        node.arrSorted = [...nums];
 
         return id;
     };
@@ -280,10 +284,13 @@ const buildSyncedEvents = (nodeMap, rootId) => {
                     annotation: `while nums[${step.from}]=${step.arr[step.from]} > pivot=${node.pivot}: True → j -= 1`,
                     i: iStop, j: step.from, arr: step.arr,
                 });
+                const jDecLabel = step.to < node.low
+                    ? `${step.to - node.low} (← exits subarray)`
+                    : step.to;
                 evs.push({
                     type: 'j_scan', nodeId: node.id, scrollY: node.y,
                     codeLine: LINE.DEC_J,
-                    annotation: `j -= 1 → j = ${step.to}`,
+                    annotation: `j -= 1 → j = ${jDecLabel}`,
                     i: iStop, j: step.to, arr: step.arr,
                 });
             });
@@ -444,6 +451,7 @@ const NodeVisual = ({ node, phase, currentEvForNode, returningRanges = [] }) => 
 
     // Pick which array state and highlights to show
     let arr = node.arrAtEntry.slice(node.low, node.high + 1);
+
     let pivotRelIdx = null;
     let iRel = null, jRel = null;
     let swapI = null, swapJ = null;
@@ -466,7 +474,8 @@ const NodeVisual = ({ node, phase, currentEvForNode, returningRanges = [] }) => 
         if (ev?.arr) {
             arr = ev.arr.slice(node.low, node.high + 1);
             if (ev.i !== undefined) iRel = Math.max(0, Math.min(ev.i - node.low, arr.length - 1));
-            if (ev.j !== undefined) jRel = Math.max(0, Math.min(ev.j - node.low, arr.length - 1));
+            // Allow jRel = -1 so j can animate off the left edge of the subarray
+            if (ev.j !== undefined) jRel = Math.max(-1, Math.min(ev.j - node.low, arr.length - 1));
             if (phase === 'swap_exec' && ev.si !== undefined) {
                 swapI = ev.si - node.low;
                 swapJ = ev.sj - node.low;
@@ -494,6 +503,13 @@ const NodeVisual = ({ node, phase, currentEvForNode, returningRanges = [] }) => 
         arr = node.arrAfterPartition.slice(node.low, node.high + 1);
         zones = 'sorted';
     }
+
+    // Overlay sorted values from returning children (applied AFTER phase-specific arr selection)
+    returningRanges.forEach(([lo, hi, sortedVals]) => {
+        if (sortedVals) {
+            for (let r = lo; r <= hi; r++) arr[r] = sortedVals[r - lo];
+        }
+    });
 
     const isAllSorted = zones === 'sorted';
     const isBase2 = isBase || (phase === 'base_return' || phase === 'check_base' && node.isBase);
@@ -549,7 +565,21 @@ const NodeVisual = ({ node, phase, currentEvForNode, returningRanges = [] }) => 
                 </motion.span>
             )}
             {/* Pointer row */}
-            <div className="flex items-end" style={{ gap: CELL_GAP, height: 20 }}>
+            <div className="flex items-end" style={{ gap: CELL_GAP, height: 20, position: 'relative' }}>
+                {/* j badge slides off the left edge when j < node.low */}
+                {jRel === -1 && (
+                    <motion.div
+                        key="j-off-left"
+                        className="w-5 h-5 rounded-full bg-pink-600 text-white flex items-center justify-center text-[10px] font-bold"
+                        style={{ position: 'absolute', left: -(Math.floor(CELL_W / 2) + CELL_GAP + 10), bottom: 0 }}
+                        initial={{ opacity: 0.6, x: CELL_W + CELL_GAP }}
+                        animate={blinkPointers
+                            ? { opacity: [1, 0.1, 1], x: 0 }
+                            : { opacity: 1, x: 0 }}
+                        transition={blinkPointers
+                            ? { opacity: { repeat: Infinity, duration: 0.6, ease: 'easeInOut' }, x: { type: 'spring', stiffness: 180, damping: 22 } }
+                            : { type: 'spring', stiffness: 180, damping: 22 }}>j</motion.div>
+                )}
                 {arr.map((_, idx) => {
                     const isI = iRel !== null && idx === iRel;
                     const isJ = jRel !== null && idx === jRel;
@@ -787,8 +817,9 @@ const QuickSortSyncedVisualizer = ({
             const sorted = phaseInfo?.phase === 'node_sorted';
             [node.left, node.right].forEach(child => {
                 if (!child || !visibleIds.has(child.id)) return;
-                // Hide edge when child is flying upward (base_return)
-                if (nodePhases.get(child.id)?.phase === 'base_return') return;
+                const childPhase = nodePhases.get(child.id)?.phase;
+                // Hide edge when child is flying upward
+                if (childPhase === 'base_return' || childPhase === 'node_sorted') return;
                 lines.push({
                     key: `${node.id}->${child.id}`,
                     x1: node.x, y1: node.y + CELL_H + 14,
@@ -946,15 +977,17 @@ const QuickSortSyncedVisualizer = ({
                                     const span    = node.high - node.low + 1;
                                     const boxW    = Math.max(span * (CELL_W + CELL_GAP) + NODE_PAD * 2, 70);
 
-                                    const isReturning = node.isBase && phase === 'base_return';
+                                    const isReturning = (node.isBase && phase === 'base_return') || phase === 'node_sorted';
 
-                                    // Compute which cell ranges in this node correspond to a child currently returning
+                                    // Compute which cell ranges in this node correspond to a child that has finished
                                     const returningRanges = [];
                                     if (!node.isBase) {
                                         [node.left, node.right].forEach(child => {
                                             if (!child) return;
-                                            if (nodePhases.get(child.id)?.phase === 'base_return' && child.low <= child.high) {
-                                                returningRanges.push([child.low - node.low, child.high - node.low]);
+                                            const cp = nodePhases.get(child.id)?.phase;
+                                            if ((cp === 'base_return' || cp === 'node_sorted') && child.low <= child.high) {
+                                                const sortedSlice = (child.arrSorted || child.arrAtEntry).slice(child.low, child.high + 1);
+                                                returningRanges.push([child.low - node.low, child.high - node.low, sortedSlice]);
                                             }
                                         });
                                     }
@@ -962,7 +995,7 @@ const QuickSortSyncedVisualizer = ({
                                     return (
                                         <motion.div key={node.id}
                                             className="absolute flex flex-col items-center"
-                                            style={{ left: node.x - boxW / 2, top: node.y }}
+                                            style={{ left: node.x - boxW / 2, top: node.y, overflow: 'visible' }}
                                             initial={{ opacity: 0, scale: 0.6, y: -12 }}
                                             animate={isReturning
                                                 ? { opacity: 0, scale: 0.5, y: -55 }
