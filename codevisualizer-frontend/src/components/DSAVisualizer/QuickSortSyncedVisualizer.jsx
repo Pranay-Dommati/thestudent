@@ -448,10 +448,15 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
     let iRel = null, jRel = null;
     let swapI = null, swapJ = null;
     let zones = null;
+    let compareIIdx = null; // cell highlighted when checking nums[i] < pivot
+    let compareJIdx = null; // cell highlighted when checking nums[j] > pivot
 
-    if (phase === 'pivot_select' || phase === 'init_i' || phase === 'init_j') {
+    if (phase === 'pivot_select') {
         pivotRelIdx = node.pivotIdx - node.low;
-        if (phase === 'init_i' || phase === 'init_j') {
+    } else if (phase === 'init_i' || phase === 'init_j') {
+        if (phase === 'init_i') {
+            iRel = 0;
+        } else if (phase === 'init_j') {
             iRel = 0;
             jRel = node.high - node.low;
         }
@@ -466,7 +471,15 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
                 swapJ = ev.sj - node.low;
             }
         }
-        pivotRelIdx = null;
+        // highlight the cell being compared; pivot highlighted only during scan comparisons
+        if ((phase === 'i_scan' || phase === 'i_scan_done') && iRel !== null) {
+            compareIIdx = iRel;
+            pivotRelIdx = node.pivotIdx - node.low;
+        }
+        if ((phase === 'j_scan' || phase === 'j_scan_done') && jRel !== null) {
+            compareJIdx = jRel;
+            pivotRelIdx = node.pivotIdx - node.low;
+        }
     } else if (phase === 'while_outer_exit' || phase === 'recurse_left' || phase === 'recurse_right') {
         arr = node.arrAfterPartition.slice(node.low, node.high + 1);
         zones = { leftEnd: node.finalJ - node.low, rightStart: node.finalI - node.low };
@@ -477,7 +490,6 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
 
     const isAllSorted = zones === 'sorted';
     const isBase2 = isBase || (phase === 'base_return' || phase === 'check_base' && node.isBase);
-    const showIJValues = phase === 'init_i' || phase === 'init_j';
     const showLowHigh  = phase === 'check_base';
 
     if (isBase) {
@@ -523,9 +535,9 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
                     const isJ = jRel !== null && idx === jRel;
                     return (
                         <div key={idx} style={{ width: CELL_W }} className="flex justify-center">
-                            {isI && !isJ && <motion.div className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold"
+                            {isI && !isJ && <motion.div className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold ${compareIIdx !== null ? 'bg-sky-500' : 'bg-indigo-600'}`}
                                 initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>i</motion.div>}
-                            {isJ && !isI && <motion.div className="w-5 h-5 rounded-full bg-pink-600 text-white flex items-center justify-center text-[10px] font-bold"
+                            {isJ && !isI && <motion.div className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold ${compareJIdx !== null ? 'bg-pink-500' : 'bg-pink-600'}`}
                                 initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>j</motion.div>}
                             {isI && isJ && <motion.div className="w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center text-[9px] font-bold"
                                 initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>ij</motion.div>}
@@ -544,14 +556,18 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
                         const isLeft    = zone === 'left';
                         const isPivZone = zone === 'pivot';
                         const isSwp     = idx === swapI || idx === swapJ;
+                        const isCompareI = compareIIdx !== null && idx === compareIIdx;
+                        const isCompareJ = compareJIdx !== null && idx === compareJIdx;
 
                         let bg = 'bg-slate-700 border-slate-500 text-slate-200';
-                        if (isSorted)  bg = 'bg-emerald-600 border-emerald-400 text-white';
-                        if (isLeft)    bg = 'bg-indigo-800 border-indigo-500 text-white';
-                        if (isPivZone) bg = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300';
+                        if (isSorted)   bg = 'bg-emerald-600 border-emerald-400 text-white';
+                        if (isLeft)     bg = 'bg-indigo-800 border-indigo-500 text-white';
+                        if (isPivZone)  bg = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300';
                         if (zone === 'right') bg = 'bg-slate-600 border-slate-400 text-slate-200';
-                        if (isPivCell) bg = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-300 shadow-md shadow-amber-500/50';
-                        if (isSwp)     bg = 'bg-rose-600 border-rose-400 text-white ring-2 ring-rose-300';
+                        if (isPivCell)  bg = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-300 shadow-md shadow-amber-500/50';
+                        if (isCompareI) bg = 'bg-sky-500 border-sky-300 text-white ring-2 ring-sky-300 shadow-md shadow-sky-500/50';
+                        if (isCompareJ) bg = 'bg-pink-500 border-pink-300 text-white ring-2 ring-pink-300 shadow-md shadow-pink-500/50';
+                        if (isSwp)      bg = 'bg-rose-600 border-rose-400 text-white ring-2 ring-rose-300';
 
                         return (
                             <motion.div key={idx}
@@ -564,20 +580,6 @@ const NodeVisual = ({ node, phase, currentEvForNode }) => {
                         );
                     })}
                 </div>
-                {showIJValues && (
-                    <div className="flex justify-between items-center mt-2 pt-1.5 border-t border-slate-600/40">
-                        <motion.span
-                            className="px-2 py-0.5 rounded-full bg-indigo-900/60 border border-indigo-500/50 text-[11px] font-bold font-mono text-indigo-300"
-                            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
-                            i = {node.low}
-                        </motion.span>
-                        <motion.span
-                            className="px-2 py-0.5 rounded-full bg-pink-900/60 border border-pink-500/50 text-[11px] font-bold font-mono text-pink-300"
-                            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
-                            j = {node.high}
-                        </motion.span>
-                    </div>
-                )}
             </div>
             {/* low / high labels below box during base-check */}
             <AnimatePresence>
