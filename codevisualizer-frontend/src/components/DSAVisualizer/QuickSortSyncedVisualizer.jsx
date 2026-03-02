@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import VisualizerControls from './VisualizerControls';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
 const CELL_W   = 40;
@@ -404,7 +405,7 @@ const highlightSyntax = (line) => {
 };
 
 // ── Code panel ────────────────────────────────────────────────────────────────
-const SyncedCodePanel = ({ code, activeLine, executedLines }) => {
+const SyncedCodePanel = ({ code, activeLine, executedLines, innerOnly }) => {
     const lines    = code ? code.split('\n') : [];
     const lineRefs = useRef({});
 
@@ -414,30 +415,34 @@ const SyncedCodePanel = ({ code, activeLine, executedLines }) => {
         }
     }, [activeLine]);
 
-    return (
-        <div className="w-[380px] flex-shrink-0 h-full bg-slate-900 border-l border-slate-700/60 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto py-2 font-mono text-[13px] leading-[1.7]">
-                {lines.map((line, idx) => {
-                    const num    = idx + 1;
-                    const isCur  = num === activeLine;
-                    const wasDone = executedLines.includes(num);
-                    return (
-                        <div key={idx} ref={el => lineRefs.current[num] = el}
-                            className={`flex transition-all duration-200 ${
-                                isCur    ? 'bg-blue-500/20 border-l-2 border-blue-400'
-                                : wasDone ? 'bg-slate-800/30 border-l-2 border-emerald-500/30'
-                                : 'border-l-2 border-transparent'}`}>
-                            <span className={`w-10 text-right pr-3 select-none shrink-0 ${
-                                isCur    ? 'text-blue-400 font-bold'
-                                : wasDone ? 'text-emerald-500/70'
-                                : 'text-slate-600'}`}>{num}</span>
-                            <span className={`pr-4 select-text cursor-text ${isCur ? 'text-blue-100' : wasDone ? 'text-slate-400' : 'text-slate-500'}`}>
-                                {highlightSyntax(line) || <span>&nbsp;</span>}
-                            </span>
-                        </div>
-                    );
-                })}
-            </div>
+    const inner = (
+        <div className="flex-1 overflow-y-auto py-2 font-mono text-[13px] leading-[1.7]">
+            {lines.map((line, idx) => {
+                const num     = idx + 1;
+                const isCur   = num === activeLine;
+                const wasDone = executedLines.includes(num);
+                return (
+                    <div key={idx} ref={el => lineRefs.current[num] = el}
+                        className={`flex transition-all duration-200 ${
+                            isCur    ? 'bg-blue-500/20 border-l-2 border-blue-400'
+                            : wasDone ? 'bg-slate-800/30 border-l-2 border-emerald-500/30'
+                            : 'border-l-2 border-transparent'}`}>
+                        <span className={`w-10 text-right pr-3 select-none shrink-0 ${
+                            isCur    ? 'text-blue-400 font-bold'
+                            : wasDone ? 'text-emerald-500/70'
+                            : 'text-slate-600'}`}>{num}</span>
+                        <span className={`pr-4 select-text cursor-text ${isCur ? 'text-blue-100' : wasDone ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {highlightSyntax(line) || <span>&nbsp;</span>}
+                        </span>
+                    </div>
+                );
+            })}
+        </div>
+    );
+
+    return innerOnly ? inner : (
+        <div className="w-[380px] flex-shrink-0 h-full bg-slate-900 flex flex-col overflow-hidden">
+            {inner}
         </div>
     );
 };
@@ -595,6 +600,7 @@ const NodeVisual = ({ node, phase, currentEvForNode, returningRanges = [] }) => 
                             <motion.div
                                 className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold bg-sky-500`}
                                 style={{ position: 'absolute', bottom: 0, left: 0 }}
+                                initial={{ x: iX }}
                                 animate={blinkPointers
                                     ? { x: iX, ...blinkOpacity }
                                     : { x: iX, opacity: 1 }}
@@ -605,6 +611,7 @@ const NodeVisual = ({ node, phase, currentEvForNode, returningRanges = [] }) => 
                             <motion.div
                                 className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold ${compareJIdx !== null ? 'bg-pink-500' : 'bg-pink-600'}`}
                                 style={{ position: 'absolute', bottom: 0, left: 0 }}
+                                initial={{ x: jX }}
                                 animate={blinkPointers
                                     ? { x: jX, ...blinkOpacity }
                                     : { x: jX, opacity: 1 }}
@@ -780,6 +787,15 @@ const QuickSortSyncedVisualizer = ({
         if (finished) { setEventIdx(-1); setFinished(false); setTimeout(() => setPlaying(true), 80); }
         else setPlaying(true);
     };
+    const handlePause = () => setPlaying(false);
+    const handleReset = () => { setPlaying(false); setFinished(false); setEventIdx(-1); };
+    const handleBack  = () => { setPlaying(false); setFinished(false); setEventIdx(i => Math.max(-1, i - 1)); };
+    const handleNext  = () => {
+        setPlaying(false);
+        const ni = eventIdx + 1;
+        if (ni >= events.length) { setFinished(true); }
+        else { setEventIdx(ni); if (ni >= events.length - 1) setFinished(true); }
+    };
 
     useEffect(() => {
         if (seekRef) seekRef.current = (idx) => {
@@ -873,74 +889,6 @@ const QuickSortSyncedVisualizer = ({
             <div className="flex-1 flex overflow-hidden min-h-0">
                 {/* Tree canvas */}
                 <div className="flex-1 flex flex-col overflow-hidden relative min-w-0">
-                    {/* Status + controls */}
-                    <div className="flex-shrink-0 flex items-center justify-between px-6 py-2.5 border-b border-slate-800 bg-slate-900/80">
-                        <span className="text-sm text-slate-200 font-medium truncate max-w-xs">{statusLabel}</span>
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0.5">
-                                {[0.5, 1, 1.5, 2, 3].map(s => (
-                                    <button key={s} onClick={() => setSpeed(s)}
-                                        className={`px-2 py-0.5 text-xs font-semibold rounded-md transition-all ${speed === s ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}>
-                                        {s}×
-                                    </button>
-                                ))}
-                            </div>
-                            <div className="w-px h-5 bg-slate-700" />
-                            <button onClick={() => { setPlaying(false); setFinished(false); setEventIdx(-1); }}
-                                disabled={eventIdx < 0}
-                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 disabled:opacity-25 disabled:cursor-not-allowed text-slate-400 hover:text-white transition-all">
-                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
-                                    <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd" />
-                                </svg>
-                            </button>
-                            <div className="w-px h-5 bg-slate-700" />
-                            <button onClick={() => { setPlaying(false); setFinished(false); setEventIdx(i => Math.max(-1, i - 1)); }}
-                                disabled={eventIdx < 0}
-                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 disabled:opacity-25 transition-all text-slate-300">
-                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                                    <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" />
-                                </svg>
-                            </button>
-
-                            {!playing && !finished && eventIdx < 0 && (
-                                <button onClick={handlePlay} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-indigo-900/40">
-                                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 translate-x-px">
-                                        <path fillRule="evenodd" d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" clipRule="evenodd" />
-                                    </svg> Start
-                                </button>
-                            )}
-                            {playing && (
-                                <button onClick={() => setPlaying(false)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-sm font-semibold rounded-xl transition-all">
-                                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                                        <path fillRule="evenodd" d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z" clipRule="evenodd" />
-                                    </svg> Pause
-                                </button>
-                            )}
-                            {!playing && eventIdx >= 0 && !finished && (
-                                <button onClick={handlePlay} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-all">
-                                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 translate-x-px">
-                                        <path fillRule="evenodd" d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" clipRule="evenodd" />
-                                    </svg> Resume
-                                </button>
-                            )}
-                            {finished && (
-                                <button onClick={handlePlay} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl transition-all">
-                                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                                        <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd" />
-                                    </svg> Replay
-                                </button>
-                            )}
-
-                            <button onClick={() => { setPlaying(false); const ni = eventIdx + 1; if (ni >= events.length) { setFinished(true); } else { setEventIdx(ni); if (ni >= events.length - 1) setFinished(true); } }}
-                                disabled={finished}
-                                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 disabled:opacity-25 transition-all text-slate-300">
-                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                                    <path d="M11.555 5.168A1 1 0 0010 6v2.798L4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4z" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
                     {/* Scrollable tree */}
                     <div ref={scrollRef} className="flex-1 overflow-auto">
                         <div className="relative mx-auto" style={{ width: canvasW, height: canvasH + 80, minHeight: '100%' }}>
@@ -1042,12 +990,16 @@ const QuickSortSyncedVisualizer = ({
                     </div>
                 </div>
 
-                {/* Code panel */}
-                <SyncedCodePanel
-                    code={code}
-                    activeLine={activeLine}
-                    executedLines={executedLines}
-                />
+                {/* Code panel + compact controls — same layout as Merge Sort */}
+                <div className="w-[380px] flex-shrink-0 h-full flex flex-col border-l border-slate-700/60 bg-slate-900 overflow-hidden">
+                    <VisualizerControls
+                        speed={speed} setSpeed={setSpeed}
+                        eventIdx={eventIdx} playing={playing} finished={finished}
+                        onPlay={handlePlay} onPause={handlePause}
+                        onReset={handleReset} onBack={handleBack} onNext={handleNext}
+                    />
+                    <SyncedCodePanel code={code} activeLine={activeLine} executedLines={executedLines} innerOnly />
+                </div>
             </div>
         </div>
     );
