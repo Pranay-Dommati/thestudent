@@ -1,27 +1,44 @@
 /**
- * QuickSortCoreLogicVisualizer
+ * QuickSortCoreLogicVisualizer — redesigned
  *
- * Core Logic tab — animated call-tree for Quick Sort (in-place, middle pivot).
- * Shows: recursive call tree, pivot selection, two-pointer scan, swaps,
- * partition zones, and step-by-step merge-style detail panel.
+ * Powerful visual walkthrough of Quick Sort (in-place, middle pivot):
+ *  • Recursive call-tree with SVG connector lines
+ *  • Sliding i/j pointer badges (sky/pink, spring animation — matches Code Execution tab)
+ *  • Amber P-badge at pivot cell; zone coloring (left / pivot-zone / right / sorted)
+ *  • Swap highlight with scale bounce; low/high index labels below cells
+ *  • Shared VisualizerControls playback bar
+ *  • Persistent bottom annotation panel with step description
  *
- * Completely self-contained. Mirrors the Python code:
- *   pivot = nums[(low + high) // 2]
+ * Mirrors Python:  pivot = nums[(low + high) // 2]
+ * DO NOT touch QuickSortSyncedVisualizer.jsx (Code Execution tab) — it is final.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import VisualizerControls from './VisualizerControls';
 
-// ── Layout constants ─────────────────────────────────────────────────────────
-const CELL_W       = 40;
-const CELL_H       = 40;
-const CELL_GAP     = 4;
-const ELEM_W       = 56;   // px per array-index slot  (X axis)
-const LEVEL_H      = 170;  // px between tree levels    (Y axis)
-const NODE_PAD     = 14;   // internal padding inside node box
-const LEFT_PAD     = 340;  // left canvas margin
+// ── Layout constants (mirror Code Execution tab) ──────────────────────────────
+const CELL_W   = 40;
+const CELL_H   = 40;
+const CELL_GAP = 4;
+const STRIDE   = CELL_W + CELL_GAP;   // per-index stride
+const NODE_PAD = 16;                   // horizontal padding inside node box
+const ELEM_W   = 56;                   // tree-layout: horizontal spacing per element
+const LEVEL_H  = 195;                  // tree-layout: vertical spacing between levels
+const LEFT_PAD = 340;                  // tree-layout: left canvas margin
 
-// ── Simulation: run quick_sort, capture call tree ────────────────────────────
+const BADGE   = 20;   // normal badge diameter
+const BADGE_S = 14;   // small badge (same-index collision)
+
+// ── Animation helpers ─────────────────────────────────────────────────────────
+const slideT    = { type: 'spring', stiffness: 260, damping: 28 };
+const badgeT    = { x: slideT, opacity: { duration: 0.18 }, width: { duration: 0.12 }, height: { duration: 0.12 } };
+const nodeSpring = { type: 'spring', stiffness: 220, damping: 22 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SIMULATION — unchanged logic
+// ══════════════════════════════════════════════════════════════════════════════
+
 const simulateQuickSort = (inputArr) => {
     const nums = [...inputArr];
     let counter = 0;
@@ -32,7 +49,7 @@ const simulateQuickSort = (inputArr) => {
         const node = {
             id, low, high, depth, parentId,
             isBase: low >= high,
-            arrAtEntry: nums.slice(0, nums.length), // full array snapshot at entry
+            arrAtEntry: [...nums],
             pivot: null, pivotIdx: null,
             partitionSteps: [],
             finalI: null, finalJ: null,
@@ -46,7 +63,7 @@ const simulateQuickSort = (inputArr) => {
         if (low >= high) return id;
 
         const pivotIdx = Math.floor((low + high) / 2);
-        node.pivot = nums[pivotIdx];
+        node.pivot    = nums[pivotIdx];
         node.pivotIdx = pivotIdx;
 
         let i = low, j = high;
@@ -59,22 +76,18 @@ const simulateQuickSort = (inputArr) => {
             while (nums[j] > node.pivot) j--;
 
             const iStop = i, jStop = j;
-            let didSwap = false;
-            let si = null, sj = null;
+            let didSwap = false, si = null, sj = null;
 
             if (i <= j) {
-                didSwap = true;
-                si = i; sj = j;
+                didSwap = true; si = i; sj = j;
                 [nums[i], nums[j]] = [nums[j], nums[i]];
                 i++; j--;
             }
 
             node.partitionSteps.push({
-                iFrom, jFrom,    // where scan started
-                iStop, jStop,    // where pointers stopped (before possible swap)
+                iFrom, jFrom, iStop, jStop,
                 didSwap, si, sj,
-                arrBefore,
-                arrAfter: [...nums],
+                arrBefore, arrAfter: [...nums],
             });
         }
 
@@ -82,8 +95,8 @@ const simulateQuickSort = (inputArr) => {
         node.finalJ = j;
         node.arrAfterPartition = [...nums];
 
-        if (j >= low)  node.leftChildId  = dfs(low, j, depth + 1, id);
-        if (i <= high) node.rightChildId = dfs(i, high, depth + 1, id);
+        if (j >= low)  node.leftChildId  = dfs(low,  j,    depth + 1, id);
+        if (i <= high) node.rightChildId = dfs(i,     high, depth + 1, id);
 
         return id;
     };
@@ -98,7 +111,6 @@ const simulateQuickSort = (inputArr) => {
     return { nodeMap, rootId, finalArr: [...nums] };
 };
 
-// ── Layout: x = index-midpoint based, y = depth based ───────────────────────
 const assignLayout = (nodeMap) => {
     for (const node of nodeMap.values()) {
         const mid = (node.low + node.high) / 2;
@@ -107,255 +119,410 @@ const assignLayout = (nodeMap) => {
     }
 };
 
-// ── Build event list ─────────────────────────────────────────────────────────
+// ── Event stream ──────────────────────────────────────────────────────────────
 const BUILD_EVENTS = (nodeMap, rootId) => {
     const evs = [];
-    const fmt = arr => `[${arr.join(', ')}]`;
 
     const dfs = (node) => {
         evs.push({
-            type: 'appear', nodeId: node.id,
-            scrollY: node.y,
+            type: 'appear', nodeId: node.id, scrollY: node.y,
             annotation: node.isBase
-                ? `sort(${node.low}, ${node.high}) — base case, already sorted`
-                : `sort(${node.low}, ${node.high}) — subarray of ${node.high - node.low + 1} elements`,
+                ? `sort(${node.low}, ${node.high})  —  single element, already sorted`
+                : `sort(${node.low}, ${node.high})  —  ${node.high - node.low + 1} elements`,
         });
 
         if (node.isBase) {
-            evs.push({ type: 'base_case', nodeId: node.id, scrollY: node.y,
-                annotation: `${node.low} >= ${node.high} → return (nothing to sort)` });
+            evs.push({
+                type: 'base_case', nodeId: node.id, scrollY: node.y,
+                annotation: `${node.low} ≥ ${node.high}  →  return immediately (base case)`,
+            });
             return;
         }
 
-        evs.push({ type: 'pivot_select', nodeId: node.id, scrollY: node.y,
-            annotation: `pivot = nums[(${node.low}+${node.high})//2] = nums[${node.pivotIdx}] = ${node.pivot}` });
-
-        evs.push({ type: 'init_pointers', nodeId: node.id, scrollY: node.y,
-            annotation: `i = ${node.low} (left pointer), j = ${node.high} (right pointer)` });
-
-        node.partitionSteps.forEach((step, idx) => {
-            const desc = step.didSwap
-                ? `Swap nums[${step.si}]=${step.arrBefore[step.si]} ↔ nums[${step.sj}]=${step.arrBefore[step.sj]}, then i++, j--`
-                : `nums[${step.iStop}]=${step.arrBefore[step.iStop]} ≥ pivot and nums[${step.jStop}]=${step.arrBefore[step.jStop]} ≤ pivot — ${step.iStop > step.jStop ? 'i > j, exit loop' : 'pointers met at pivot, i++, j--'}`;
-            evs.push({ type: 'partition_step', nodeId: node.id, stepIdx: idx,
-                scrollY: node.y, annotation: desc });
+        evs.push({
+            type: 'pivot_select', nodeId: node.id, scrollY: node.y,
+            annotation: `Pick pivot:  nums[(${node.low}+${node.high})÷2]  =  nums[${node.pivotIdx}]  =  ${node.pivot}`,
         });
 
-        evs.push({ type: 'partition_done', nodeId: node.id,
+        evs.push({
+            type: 'init_pointers', nodeId: node.id, scrollY: node.y,
+            annotation: `Init pointers:  i = ${node.low}  (left end),   j = ${node.high}  (right end)`,
+        });
+
+        // ── Step-by-step i scan (before first partition step) ──────────────
+        const step0 = node.partitionSteps[0];
+        if (step0) {
+            evs.push({
+                type: 'scan_i_explain', nodeId: node.id, scrollY: node.y,
+                annotation: `i starts at [${node.low}] — scan right to find the first value LARGER than pivot (${node.pivot})`,
+            });
+            // i moves one cell at a time while nums[pos] < pivot
+            for (let pos = step0.iFrom; pos < step0.iStop; pos++) {
+                evs.push({
+                    type: 'scan_i_move', nodeId: node.id, scrollY: node.y,
+                    scanI: pos,
+                    annotation: `nums[${pos}] = ${step0.arrBefore[pos]} < pivot (${node.pivot}) — not large enough, i moves right →`,
+                });
+            }
+            evs.push({
+                type: 'scan_i_found', nodeId: node.id, scrollY: node.y,
+                scanI: step0.iStop,
+                annotation: `nums[${step0.iStop}] = ${step0.arrBefore[step0.iStop]} ≥ pivot (${node.pivot}) — found the large element! Stop i here`,
+            });
+
+            // ── Step-by-step j scan ────────────────────────────────────────
+            evs.push({
+                type: 'scan_j_explain', nodeId: node.id, scrollY: node.y,
+                annotation: `j starts at [${node.high}] — scan left to find the first value SMALLER than pivot (${node.pivot})`,
+            });
+            for (let pos = step0.jFrom; pos > step0.jStop; pos--) {
+                evs.push({
+                    type: 'scan_j_move', nodeId: node.id, scrollY: node.y,
+                    scanJ: pos,
+                    annotation: `nums[${pos}] = ${step0.arrBefore[pos]} > pivot (${node.pivot}) — not small enough, j moves left ←`,
+                });
+            }
+            evs.push({
+                type: 'scan_j_found', nodeId: node.id, scrollY: node.y,
+                scanJ: step0.jStop,
+                annotation: `nums[${step0.jStop}] = ${step0.arrBefore[step0.jStop]} ≤ pivot (${node.pivot}) — found the small element! Stop j here`,
+            });
+
+            // ── Pre-swap: animate the actual swap ──────────────────────────
+            if (step0.didSwap) {
+                evs.push({
+                    type: 'pre_swap', nodeId: node.id, scrollY: node.y,
+                    annotation: `Now swap! nums[${step0.si}] = ${step0.arrBefore[step0.si]}  ↔  nums[${step0.sj}] = ${step0.arrBefore[step0.sj]}`,
+                });
+                evs.push({
+                    type: 'post_swap', nodeId: node.id, scrollY: node.y,
+                    annotation: `Swap done! i++ → [${step0.si + 1}],  j-- → [${step0.sj - 1}]  —  now repeat: scan i → and j ← again until they cross`,
+                });
+            }
+        }
+
+        node.partitionSteps.forEach((step, idx) => {
+            // step 0 is already fully covered by the educational scan/swap steps above
+            if (idx === 0) return;
+            const desc = step.didSwap
+                ? `i stopped at [${step.iStop}]=${step.arrBefore[step.iStop]},  j stopped at [${step.jStop}]=${step.arrBefore[step.jStop]}  →  Swap!  i++,  j--`
+                : `i=[${step.iStop}] ≥ pivot  &  j=[${step.jStop}] ≤ pivot  →  i > j,  partition loop ends`;
+            evs.push({
+                type: 'partition_step', nodeId: node.id, stepIdx: idx, scrollY: node.y,
+                annotation: desc,
+            });
+        });
+
+        evs.push({
+            type: 'partition_done', nodeId: node.id,
             scrollY: Math.max(0, node.y + LEVEL_H - 80),
-            annotation: `Partition done — left [${node.low}..${node.finalJ}] ≤ ${node.pivot} ≤ right [${node.finalI}..${node.high}]` });
+            annotation: `Partition done:  [${node.low}..${node.finalJ}] ≤ ${node.pivot} ≤ [${node.finalI}..${node.high}]`,
+        });
 
         if (node.left) {
-            evs.push({ type: 'spawn_child', nodeId: node.id, childId: node.leftChildId,
+            evs.push({
+                type: 'spawn_child', nodeId: node.id, childId: node.leftChildId,
                 scrollY: Math.max(0, node.y + LEVEL_H - 80),
-                annotation: `Recurse left: sort(${node.low}, ${node.finalJ})` });
+                annotation: `Recurse left partition:  sort(${node.low}, ${node.finalJ})`,
+            });
             dfs(node.left);
         }
         if (node.right) {
-            evs.push({ type: 'spawn_child', nodeId: node.id, childId: node.rightChildId,
+            evs.push({
+                type: 'spawn_child', nodeId: node.id, childId: node.rightChildId,
                 scrollY: Math.max(0, node.y + LEVEL_H - 80),
-                annotation: `Recurse right: sort(${node.finalI}, ${node.high})` });
+                annotation: `Recurse right partition:  sort(${node.finalI}, ${node.high})`,
+            });
             dfs(node.right);
         }
 
-        evs.push({ type: 'node_sorted', nodeId: node.id,
+        evs.push({
+            type: 'node_sorted', nodeId: node.id,
             scrollY: Math.max(0, node.y - 40),
-            annotation: `Range [${node.low}..${node.high}] fully sorted ✓` });
+            annotation: `Range [${node.low}..${node.high}] is fully sorted ✓`,
+        });
     };
 
     dfs(nodeMap.get(rootId));
-    evs.push({ type: 'final_done', scrollY: 0,
-        annotation: `Quick Sort complete! Array is sorted.` });
+    evs.push({ type: 'final_done', scrollY: 0, annotation: `Quick Sort complete! The array is now sorted.` });
     return evs;
 };
 
-// ── Event delays ─────────────────────────────────────────────────────────────
 const DELAY = {
-    appear:          700,
-    base_case:      1000,
-    pivot_select:   1200,
-    init_pointers:   900,
-    partition_step: 1100,
-    partition_done: 1000,
-    spawn_child:     700,
-    node_sorted:     900,
-    final_done:     1800,
+    appear: 650, base_case: 900, pivot_select: 1100, init_pointers: 900,
+    scan_i_explain: 1400, scan_i_move: 700, scan_i_found: 1200,
+    scan_j_explain: 1400, scan_j_move: 700, scan_j_found: 1200,
+    pre_swap: 1500, post_swap: 1400,
+    partition_step: 1000, partition_done: 900, spawn_child: 600,
+    node_sorted: 800, final_done: 1800,
 };
 const getDelay = (ev, speed) => (DELAY[ev.type] ?? 800) / speed;
 
-// ── Small UI: single array cell ───────────────────────────────────────────────
-const ArrayCell = ({ val, highlight, sorted, dim, pivotGlow, swapped, small }) => {
-    const size   = small ? 28 : CELL_H;
-    const font   = small ? 'text-xs' : 'text-sm font-bold';
-    let bg = 'bg-slate-700 border-slate-500 text-slate-200';
-    if (dim)       bg = 'bg-slate-800/50 border-slate-700 text-slate-600';
-    if (sorted)    bg = 'bg-emerald-600 border-emerald-400 text-white';
-    if (highlight) bg = 'bg-amber-500 border-amber-300 text-white';
-    if (swapped)   bg = 'bg-rose-500 border-rose-300 text-white ring-2 ring-rose-300';
-    if (pivotGlow) bg = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-300 shadow-lg shadow-amber-500/50';
-    return (
-        <div className={`flex items-center justify-center rounded-lg border-2 ${font} ${bg} flex-shrink-0`}
-            style={{ width: size, height: size, minWidth: size }}>
-            {val}
-        </div>
-    );
-};
+// ════════════════════════════════════════════════════════════════════════════════
+// NodeCard  — one call-tree node with sliding i/j/P badges
+// ════════════════════════════════════════════════════════════════════════════════
 
-// ── Pointer badge (i or j) ────────────────────────────────────────────────────
-const PointerBadge = ({ label, color }) => (
-    <motion.div key={label + color}
-        className={`flex items-center justify-center w-5 h-5 rounded-full font-bold text-[11px] leading-none text-white ${color}`}
-        initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 22 }}>
-        {label}
-    </motion.div>
-);
+const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs }) => {
+    const n      = node.high - node.low + 1;
+    const cellsW = n * CELL_W + Math.max(0, n - 1) * CELL_GAP;
+    const boxW   = cellsW + NODE_PAD * 2 + 4;
 
-// ── Node display: computes what to show based on node phase ───────────────────
-const NodeDisplay = ({ node, phase, stepIdx, currentEv }) => {
-    const n = node.high - node.low + 1;
+    // ── Compute visible state ──────────────────────────────────────────────────
+    let arr       = node.arrAtEntry.slice(node.low, node.high + 1);
+    let iRel      = null;   // relative to low
+    let jRel      = null;
+    let pivotRel  = null;
+    let zones     = null;   // 'all_sorted' | { leftEnd, rightStart } | null
+    let swappedI  = null;
+    let swappedJ  = null;
 
+    if (phase === 'pivot_select' || phase === 'init_pointers') {
+        pivotRel = node.pivotIdx - node.low;
+        if (phase === 'init_pointers') { iRel = 0; jRel = n - 1; }
+    } else if (phase === 'scan_i_explain') {
+        pivotRel = node.pivotIdx - node.low;
+        iRel = 0; jRel = n - 1;
+    } else if (phase === 'scan_i_move' || phase === 'scan_i_found') {
+        pivotRel = node.pivotIdx - node.low;
+        iRel = scanIAbs !== null ? Math.max(0, scanIAbs - node.low) : 0;
+        jRel = n - 1;
+    } else if (phase === 'scan_j_explain') {
+        pivotRel = node.pivotIdx - node.low;
+        iRel = scanIAbs !== null ? Math.max(0, scanIAbs - node.low) : 0;
+        jRel = n - 1;
+    } else if (phase === 'scan_j_move' || phase === 'scan_j_found') {
+        pivotRel = node.pivotIdx - node.low;
+        iRel = scanIAbs !== null ? Math.max(0, scanIAbs - node.low) : 0;
+        jRel = scanJAbs !== null ? Math.max(0, scanJAbs - node.low) : n - 1;
+    } else if (phase === 'pre_swap') {
+        const st0 = node.partitionSteps[0];
+        if (st0) {
+            arr      = st0.arrAfter.slice(node.low, node.high + 1);
+            pivotRel = node.pivotIdx - node.low;
+            iRel     = st0.si - node.low;
+            jRel     = st0.sj - node.low;
+            swappedI = st0.si - node.low;
+            swappedJ = st0.sj - node.low;
+        }
+    } else if (phase === 'post_swap') {
+        const st0 = node.partitionSteps[0];
+        if (st0) {
+            arr      = st0.arrAfter.slice(node.low, node.high + 1);
+            pivotRel = node.pivotIdx - node.low;
+            iRel     = Math.min(n - 1, st0.si + 1 - node.low);
+            jRel     = Math.max(0, st0.sj - 1 - node.low);
+        }
+    } else if (phase === 'partition_step') {
+        const st = node.partitionSteps[stepIdx ?? 0]
+            ?? node.partitionSteps[node.partitionSteps.length - 1];
+        if (st) {
+            arr = st.arrAfter.slice(node.low, node.high + 1);
+            // Show i and j at their post-step positions — no swap highlight
+            // (swap was already animated in pre_swap; here i/j just move silently)
+            const ni = st.didSwap ? st.si + 1 : st.iStop;
+            const nj = st.didSwap ? st.sj - 1 : st.jStop;
+            iRel = Math.max(0, Math.min(n - 1, ni - node.low));
+            jRel = Math.max(0, Math.min(n - 1, nj - node.low));
+        }
+    } else if (phase === 'partition_done') {
+        arr   = node.arrAfterPartition.slice(node.low, node.high + 1);
+        zones = { leftEnd: node.finalJ - node.low, rightStart: node.finalI - node.low };
+    } else if (phase === 'node_sorted') {
+        arr   = node.arrAfterPartition.slice(node.low, node.high + 1);
+        zones = 'all_sorted';
+    }
+
+    // ── Badge positions (x = translate from left edge of cellsW container) ────
+    const showI  = iRel !== null;
+    const showJ  = jRel !== null;
+    const showP  = pivotRel !== null;
+    const same   = showI && showJ && iRel === jRel;
+    const iSz    = same ? BADGE_S : BADGE;
+    const jSz    = same ? BADGE_S : BADGE;
+
+    // Centre of cell k: k*STRIDE + CELL_W/2
+    const iXp = iRel !== null
+        ? same
+            ? iRel * STRIDE + CELL_W / 2 - iSz - 1
+            : iRel * STRIDE + CELL_W / 2 - iSz / 2
+        : 0;
+    const jXp = jRel !== null
+        ? same
+            ? jRel * STRIDE + CELL_W / 2 + 1
+            : jRel * STRIDE + CELL_W / 2 - jSz / 2
+        : (n - 1) * STRIDE + CELL_W / 2 - BADGE / 2;
+    const pXp = pivotRel !== null ? pivotRel * STRIDE + CELL_W / 2 - BADGE / 2 : 0;
+
+    // ── Zone helper ───────────────────────────────────────────────────────────
+    const getZone = (idx) => {
+        if (zones === 'all_sorted') return 'sorted';
+        if (!zones) return null;
+        if (idx <= zones.leftEnd)    return 'left';
+        if (idx < zones.rightStart)  return 'pivot';
+        return 'right';
+    };
+
+    // ── Box border/bg tint by phase ───────────────────────────────────────────
+    const isScanPhase = phase === 'scan_i_explain' || phase === 'scan_i_move' || phase === 'scan_i_found'
+        || phase === 'scan_j_explain' || phase === 'scan_j_move' || phase === 'scan_j_found';
+    const isPreSwap = phase === 'pre_swap';
+    const boxBorder =
+        zones === 'all_sorted'                                      ? 'border-emerald-600/60' :
+        zones                                                       ? 'border-slate-600/50'   :
+        phase === 'pivot_select' || phase === 'init_pointers'       ? 'border-amber-500/50'   :
+        isScanPhase                                                 ? 'border-sky-400/60'     :
+        isPreSwap                                                   ? 'border-rose-500/60'    :
+        phase === 'partition_step'                                  ? 'border-sky-500/50'     :
+        isActive                                                    ? 'border-indigo-500/60'  :
+                                                                      'border-slate-700/40';
+    const boxBg = zones === 'all_sorted' ? 'bg-emerald-900/40' : 'bg-slate-800/70';
+
+    // ── Base case ─────────────────────────────────────────────────────────────
     if (phase === 'base_case') {
-        // Single element (or empty) — always green
-        const cell = node.low <= node.high ? node.arrAtEntry[node.low] : null;
+        const v = (node.low <= node.high) ? node.arrAtEntry[node.low] : null;
         return (
-            <div className="flex flex-col items-center gap-1">
-                <motion.div
-                    className="flex items-center justify-center rounded-xl border-2 bg-emerald-900/40 border-emerald-500/70 shadow-lg shadow-emerald-900/30"
-                    style={{ padding: `6px ${NODE_PAD}px`, gap: CELL_GAP }}>
-                    {cell !== null
-                        ? <ArrayCell val={cell} sorted />
+            <div className="flex flex-col items-center gap-0.5" style={{ width: boxW }}>
+                <div className="flex items-center justify-center rounded-xl border-2 bg-emerald-900/50 border-emerald-600/60 shadow-md"
+                    style={{ padding: `7px ${NODE_PAD}px`, gap: CELL_GAP, width: boxW }}>
+                    {v !== null
+                        ? <div className="flex items-center justify-center rounded-lg border-2 text-sm font-bold bg-emerald-600 border-emerald-400 text-white flex-shrink-0"
+                            style={{ width: CELL_W, height: CELL_H }}>{v}</div>
                         : <span className="text-slate-500 text-xs italic px-2">empty</span>}
-                </motion.div>
-                <span className="text-[11px] text-emerald-400 font-semibold">sorted ✓</span>
+                </div>
+                <span className="text-[10px] text-emerald-400 font-semibold">sorted ✓</span>
             </div>
         );
     }
 
-    // Determine which array slice and highlights to display
-    let arr, pivotRelIdx = null, iPos = null, jPos = null, swappedI = null, swappedJ = null, zones = null;
-
-    if (phase === 'appear') {
-        arr = node.arrAtEntry.slice(node.low, node.high + 1);
-    } else if (phase === 'pivot_select' || phase === 'init_pointers') {
-        arr = node.arrAtEntry.slice(node.low, node.high + 1);
-        pivotRelIdx = node.pivotIdx - node.low;
-        if (phase === 'init_pointers') { iPos = 0; jPos = n - 1; }
-    } else if (phase === 'partition_step') {
-        const step = node.partitionSteps[stepIdx] ?? node.partitionSteps[node.partitionSteps.length - 1];
-        if (step) {
-            arr = step.arrAfter.slice(node.low, node.high + 1);
-            pivotRelIdx = null; // don't show pivot highlight during swap
-            if (step.didSwap) {
-                swappedI = step.si - node.low;
-                swappedJ = step.sj - node.low;
-            }
-            // Show where i and j ended up (after increment/decrement)
-            const nextI = step.didSwap ? step.si + 1 : step.iStop;
-            const nextJ = step.didSwap ? step.sj - 1 : step.jStop;
-            iPos = Math.min(nextI - node.low, n - 1);
-            jPos = Math.max(nextJ - node.low, 0);
-        } else {
-            arr = node.arrAtEntry.slice(node.low, node.high + 1);
-        }
-    } else if (phase === 'partition_done' || phase === 'waiting') {
-        arr = node.arrAfterPartition.slice(node.low, node.high + 1);
-        // Color zones: [low..finalJ] = left, [finalJ+1..finalI-1] = pivot zone, [finalI..high] = right
-        zones = { leftEnd: node.finalJ - node.low, rightStart: node.finalI - node.low };
-    } else if (phase === 'node_sorted') {
-        arr = node.arrAfterPartition.slice(node.low, node.high + 1);
-        zones = 'all_sorted';
-    } else {
-        arr = node.arrAtEntry.slice(node.low, node.high + 1);
-    }
-
-    if (!arr) arr = node.arrAtEntry.slice(node.low, node.high + 1);
-
-    const getZoneColor = (idx) => {
-        if (zones === 'all_sorted') return 'sorted';
-        if (!zones) return null;
-        if (idx <= zones.leftEnd)   return 'left';
-        if (idx < zones.rightStart) return 'pivot';
-        return 'right';
-    };
-
-    const boxBg = zones === 'all_sorted'
-        ? 'bg-emerald-900/40 border-emerald-500/70 shadow-emerald-900/30'
-        : zones ? 'bg-slate-800/60 border-slate-600/50'
-        : 'bg-slate-800/80 border-indigo-500/40';
-
+    // ── Normal node ───────────────────────────────────────────────────────────
     return (
-        <div className="flex flex-col items-center gap-1">
-            {zones === 'all_sorted' && (
-                <motion.span className="text-xs text-emerald-400 font-semibold"
-                    initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
-                    sorted ✓
-                </motion.span>
-            )}
-            {/* Pointer badges row */}
-            <div className="flex items-end" style={{ gap: CELL_GAP, height: 22 }}>
-                {arr.map((_, idx) => {
-                    const isI = iPos !== null && idx === iPos;
-                    const isJ = jPos !== null && idx === jPos;
-                    return (
-                        <div key={idx} style={{ width: CELL_W }} className="flex justify-center">
-                            {isI && !isJ && <PointerBadge label="i" color="bg-indigo-600" />}
-                            {isJ && !isI && <PointerBadge label="j" color="bg-pink-600" />}
-                            {isI && isJ  && <PointerBadge label="i=j" color="bg-indigo-500" />}
-                        </div>
-                    );
-                })}
-            </div>
-            {/* Array box */}
-            <motion.div
-                className={`flex items-center rounded-xl border-2 shadow-lg ${boxBg}`}
-                style={{ padding: `6px ${NODE_PAD}px`, gap: CELL_GAP }}>
-                {arr.map((v, idx) => {
-                    const zone = getZoneColor(idx);
-                    const isPivot   = pivotRelIdx !== null && idx === pivotRelIdx;
-                    const isSorted  = zone === 'sorted';
-                    const isHighlight = isPivot;
-                    const isSwapped  = idx === swappedI || idx === swappedJ;
-                    const isLeft    = zone === 'left';
-                    const isPivZone = zone === 'pivot';
-                    const isRight   = zone === 'right';
+        <div className="flex flex-col items-center" style={{ width: boxW }}>
 
-                    let cellBg = 'bg-slate-700 border-slate-500 text-slate-200';
-                    if (isSorted)   cellBg = 'bg-emerald-600 border-emerald-400 text-white';
-                    if (isLeft)     cellBg = 'bg-indigo-800 border-indigo-500 text-white';
-                    if (isPivZone)  cellBg = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300';
-                    if (isRight)    cellBg = 'bg-slate-600 border-slate-400 text-slate-200';
-                    if (isHighlight) cellBg = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-300 shadow-amber-500/60 shadow-md';
-                    if (isSwapped)  cellBg = 'bg-rose-600 border-rose-400 text-white ring-2 ring-rose-300';
+            {/* ── i / j badge row (above cells) ── */}
+            <div className="relative flex-shrink-0" style={{ width: cellsW, height: BADGE + 6 }}>
+                {/* i badge */}
+                <motion.div
+                    key="i-badge"
+                    className="absolute flex items-center justify-center rounded-full bg-sky-500 text-white font-bold text-[11px] leading-none shadow shadow-sky-900/60"
+                    style={{ bottom: 2, left: 0, width: iSz, height: iSz }}
+                    initial={{ x: iXp, opacity: 0 }}
+                    animate={{ x: iXp, opacity: showI ? 1 : 0, width: iSz, height: iSz }}
+                    transition={badgeT}>
+                    i
+                </motion.div>
+                {/* j badge */}
+                <motion.div
+                    key="j-badge"
+                    className="absolute flex items-center justify-center rounded-full bg-pink-600 text-white font-bold text-[11px] leading-none shadow shadow-pink-900/60"
+                    style={{ bottom: 2, left: 0, width: jSz, height: jSz }}
+                    initial={{ x: jXp, opacity: 0 }}
+                    animate={{ x: jXp, opacity: showJ ? 1 : 0, width: jSz, height: jSz }}
+                    transition={badgeT}>
+                    j
+                </motion.div>
+            </div>
+
+            {/* ── Array cell box ── */}
+            <motion.div
+                className={`flex items-center rounded-xl border-2 shadow-lg flex-shrink-0 ${boxBg} ${boxBorder}`}
+                style={{ padding: `7px ${NODE_PAD}px`, gap: CELL_GAP, width: boxW }}
+                animate={isActive && phase !== 'node_sorted' && phase !== 'base_case'
+                    ? { boxShadow: ['0 0 0px rgba(99,102,241,0)', '0 0 14px rgba(99,102,241,0.35)', '0 0 0px rgba(99,102,241,0)'] }
+                    : { boxShadow: '0 0 0px rgba(0,0,0,0)' }
+                }
+                transition={{ duration: 1.6, repeat: isActive ? Infinity : 0, ease: 'easeInOut' }}>
+                {arr.map((v, idx) => {
+                    const zone   = getZone(idx);
+                    const isPiv  = pivotRel !== null && idx === pivotRel;
+                    const isSwpI = idx === swappedI;
+                    const isSwpJ = idx === swappedJ;
+
+                    let cls = 'bg-slate-700 border-slate-500 text-slate-200';
+                    if (zone === 'sorted') cls = 'bg-emerald-600 border-emerald-400 text-white';
+                    else if (zone === 'left')  cls = 'bg-indigo-800 border-indigo-500 text-indigo-100';
+                    else if (zone === 'pivot') cls = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300/60';
+                    else if (zone === 'right') cls = 'bg-slate-600 border-slate-400 text-slate-100';
+                    if (isPiv) cls = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-200/80 shadow-md shadow-amber-500/40';
+                    if (isSwpI || isSwpJ) cls = 'bg-rose-600 border-rose-400 text-white ring-2 ring-rose-300 shadow-lg shadow-rose-500/60';
+
+                    // Flying-cross swap arc (same as Code Execution tab):
+                    // arr holds post-swap values, so each cell animates FROM its original offset TO 0.
+                    const swapDist = (swappedI !== null && swappedJ !== null)
+                        ? (swappedJ - swappedI) * STRIDE : 0;
+                    let swapAnim = { x: 0, y: 0 };
+                    if (isSwpI && swapDist > 0) {
+                        swapAnim = { x: [swapDist, swapDist * 0.5, 0], y: [0, -22, 0] };
+                    } else if (isSwpJ && swapDist > 0) {
+                        swapAnim = { x: [-swapDist, -swapDist * 0.5, 0], y: [0, 22, 0] };
+                    }
 
                     return (
                         <motion.div key={idx}
-                            className={`flex items-center justify-center rounded-lg border-2 text-sm font-bold flex-shrink-0 ${cellBg}`}
-                            style={{ width: CELL_W, height: CELL_H, minWidth: CELL_W }}
-                            animate={isSwapped ? { scale: [1, 1.25, 1] } : {}}
-                            transition={isSwapped ? { duration: 0.4 } : {}}>
+                            className={`flex items-center justify-center rounded-lg border-2 text-sm font-bold flex-shrink-0 ${cls}`}
+                            style={{ width: CELL_W, height: CELL_H, minWidth: CELL_W, position: 'relative', zIndex: (isSwpI || isSwpJ) ? 10 : 0 }}
+                            animate={swapAnim}
+                            transition={(isSwpI || isSwpJ) ? { duration: 0.55, ease: 'easeInOut' } : { duration: 0 }}>
                             {v}
                         </motion.div>
                     );
                 })}
             </motion.div>
-            {/* Zone legend */}
+
+            {/* ── P pivot badge row (below cells) ── */}
+            <div className="relative flex-shrink-0" style={{ width: cellsW, height: BADGE + 4 }}>
+                <motion.div
+                    key="p-badge"
+                    className="absolute flex items-center justify-center rounded-full bg-amber-500 text-white font-bold text-[10px] leading-none shadow shadow-amber-900/60"
+                    style={{ top: 3, left: 0, width: BADGE, height: BADGE }}
+                    initial={{ x: pXp, opacity: 0 }}
+                    animate={{ x: pXp, opacity: showP ? 1 : 0 }}
+                    transition={{ x: slideT, opacity: { duration: 0.2 } }}>
+                    P
+                </motion.div>
+            </div>
+
+            {/* ── Index labels (low / high positions) ── */}
+            <div className="flex flex-shrink-0" style={{ width: cellsW, gap: CELL_GAP }}>
+                {arr.map((_, idx) => {
+                    const absIdx = node.low + idx;
+                    const isLow  = idx === 0;
+                    const isHigh = idx === n - 1;
+                    return (
+                        <div key={idx} style={{ width: CELL_W, minWidth: CELL_W }}
+                            className="text-center text-[9px] leading-none mt-0.5">
+                            {(isLow || isHigh) && (
+                                <span className={isLow ? 'text-indigo-400/70' : 'text-pink-400/70'}>
+                                    {absIdx}
+                                </span>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* ── Zone legend ── */}
+            {zones === 'all_sorted' && (
+                <motion.span className="text-[10px] text-emerald-400 font-semibold mt-0.5"
+                    initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }}>
+                    sorted ✓
+                </motion.span>
+            )}
             {zones && zones !== 'all_sorted' && (
-                <motion.div className="flex items-center gap-2 mt-0.5"
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <motion.div className="flex items-center gap-1.5 mt-1"
+                    initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }}>
                     {node.finalJ >= node.low && (
-                        <span className="text-[10px] text-indigo-300 font-medium px-1.5 py-0.5 rounded bg-indigo-900/40">
-                            left ≤ {node.pivot}
+                        <span className="text-[9px] text-indigo-300 font-medium px-1.5 py-0.5 rounded bg-indigo-900/50 border border-indigo-700/40">
+                            ≤ {node.pivot}
                         </span>
                     )}
                     {node.finalJ < node.finalI - 1 && (
-                        <span className="text-[10px] text-amber-300 font-medium px-1.5 py-0.5 rounded bg-amber-900/40">
-                            ={node.pivot}
+                        <span className="text-[9px] text-amber-300 font-medium px-1.5 py-0.5 rounded bg-amber-900/50 border border-amber-700/40">
+                            = {node.pivot}
                         </span>
                     )}
                     {node.finalI <= node.high && (
-                        <span className="text-[10px] text-slate-300 font-medium px-1.5 py-0.5 rounded bg-slate-700/60">
-                            right ≥ {node.pivot}
+                        <span className="text-[9px] text-slate-300 font-medium px-1.5 py-0.5 rounded bg-slate-700/60 border border-slate-600/40">
+                            ≥ {node.pivot}
                         </span>
                     )}
                 </motion.div>
@@ -364,137 +531,31 @@ const NodeDisplay = ({ node, phase, stepIdx, currentEv }) => {
     );
 };
 
-// ── Detail panel (bottom) — shows full array during partition ─────────────────
-const PartitionDetailPanel = ({ node, stepIdx, partitionCount }) => {
-    if (!node || node.isBase) return null;
-
-    const step = node.partitionSteps[stepIdx] ?? null;
-    if (!step) return null;
-
-    const { low, high, pivot } = node;
-    const arr = step.arrAfter;
-    const i = step.didSwap ? step.si + 1 : step.iStop;
-    const j = step.didSwap ? step.sj - 1 : step.jStop;
-
-    return (
-        <motion.div
-            className="flex-shrink-0 border-t-2 border-indigo-900/60 bg-slate-900 px-5 py-3"
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 28 }}>
-            <div className="flex items-center gap-3 mb-2">
-                <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                    <span className="text-xs font-bold text-amber-300 uppercase tracking-widest">
-                        Partition {partitionCount} — sort({node.low}, {node.high})
-                    </span>
-                </div>
-                <div className="h-px flex-1 bg-slate-700/60" />
-                <span className="text-xs text-slate-500">
-                    pivot = {pivot}
-                </span>
-            </div>
-
-            <div className="flex items-start gap-3 overflow-x-auto pb-1">
-                {/* Full array view */}
-                <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Array</span>
-                    {/* Pointer row */}
-                    <div className="flex items-end" style={{ gap: CELL_GAP, height: 24 }}>
-                        {arr.map((_, idx) => {
-                            const relI = i - low;
-                            const relJ = j - low;
-                            const relIdx = idx - low;
-                            const isI = idx >= low && idx <= high && relIdx === relI;
-                            const isJ = idx >= low && idx <= high && relIdx === relJ;
-                            return (
-                                <div key={idx} style={{ width: 32, minWidth: 32 }} className="flex justify-center">
-                                    {isI && !isJ && (
-                                        <motion.div className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold"
-                                            initial={{ y: -4, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>i</motion.div>
-                                    )}
-                                    {isJ && !isI && (
-                                        <motion.div className="flex items-center justify-center w-5 h-5 rounded-full bg-pink-600 text-white text-[10px] font-bold"
-                                            initial={{ y: -4, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>j</motion.div>
-                                    )}
-                                    {isI && isJ && (
-                                        <motion.div className="flex items-center justify-center w-5 h-5 rounded-full bg-purple-600 text-white text-[9px] font-bold"
-                                            initial={{ y: -4, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>ij</motion.div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                    {/* Cells */}
-                    <div className="flex items-center" style={{ gap: CELL_GAP }}>
-                        {arr.map((v, idx) => {
-                            const inRange = idx >= low && idx <= high;
-                            const relIdx = idx - low;
-                            const relI = i - low;
-                            const relJ = j - low;
-                            const isPivotCell = v === pivot && inRange;
-                            const justSwappedI = step.didSwap && idx === step.si;
-                            const justSwappedJ = step.didSwap && idx === step.sj;
-                            let cellBg = 'bg-slate-800 border-slate-700 text-slate-600';
-                            if (inRange) cellBg = 'bg-slate-700 border-slate-500 text-slate-200';
-                            if (isPivotCell) cellBg = 'bg-amber-600/40 border-amber-400 text-amber-200';
-                            if (justSwappedI || justSwappedJ) cellBg = 'bg-rose-600 border-rose-400 text-white ring-1 ring-rose-300';
-                            return (
-                                <motion.div key={idx}
-                                    className={`flex items-center justify-center rounded-md border-2 text-xs font-bold flex-shrink-0 ${cellBg}`}
-                                    style={{ width: 32, height: 32, minWidth: 32 }}
-                                    animate={(justSwappedI || justSwappedJ) ? { scale: [1, 1.2, 1] } : {}}
-                                    transition={{ duration: 0.35 }}>
-                                    {v}
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                    {/* Index labels */}
-                    <div className="flex items-center" style={{ gap: CELL_GAP }}>
-                        {arr.map((_, idx) => (
-                            <div key={idx} style={{ width: 32, minWidth: 32 }}
-                                className={`text-center text-[9px] ${idx === low || idx === high ? 'text-slate-400' : 'text-slate-600'}`}>
-                                {idx}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Step info */}
-                <div className="flex flex-col gap-2 flex-shrink-0 ml-4 mt-4">
-                    <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white">i</div>
-                        <span className="text-xs text-indigo-300 font-mono">= {i < low ? low : i > high + 1 ? high + 1 : i}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded-full bg-pink-600 flex items-center justify-center text-[10px] font-bold text-white">j</div>
-                        <span className="text-xs text-pink-300 font-mono">= {j < low - 1 ? low - 1 : j > high ? high : j}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-amber-500" />
-                        <span className="text-xs text-amber-300 font-mono">pivot = {pivot}</span>
-                    </div>
-                    {step.didSwap && (
-                        <motion.div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-900/40 border border-rose-600/40"
-                            initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}>
-                            <span className="text-[11px] text-rose-300 font-semibold">
-                                Swapped [{step.si}] ↔ [{step.sj}]
-                            </span>
-                        </motion.div>
-                    )}
-                    {!step.didSwap && (
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-700/40 border border-slate-600/40">
-                            <span className="text-[11px] text-slate-400">i {'>'} j → exit loop</span>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </motion.div>
-    );
+// ── Annotation step metadata ──────────────────────────────────────────────────
+const STEP_META = {
+    appear:         { icon: '🔍', color: 'text-slate-200',   bar: 'border-slate-600/40 bg-slate-800/50' },
+    base_case:      { icon: '✅', color: 'text-emerald-300', bar: 'border-emerald-700/40 bg-emerald-900/30' },
+    pivot_select:   { icon: '🎯', color: 'text-amber-300',   bar: 'border-amber-700/40 bg-amber-900/30' },
+    init_pointers:   { icon: '👆', color: 'text-sky-300',     bar: 'border-sky-700/40 bg-sky-900/30' },
+    scan_i_explain:  { icon: '🔍', color: 'text-sky-200',     bar: 'border-sky-800/40 bg-sky-950/60' },
+    scan_i_move:     { icon: '➡️', color: 'text-slate-300',   bar: 'border-slate-700/30 bg-slate-900/60' },
+    scan_i_found:    { icon: '✋', color: 'text-emerald-300', bar: 'border-emerald-700/40 bg-emerald-900/30' },
+    scan_j_explain:  { icon: '🔍', color: 'text-pink-200',   bar: 'border-pink-800/40 bg-pink-950/60' },
+    scan_j_move:     { icon: '⬅️', color: 'text-slate-300',  bar: 'border-slate-700/30 bg-slate-900/60' },
+    scan_j_found:    { icon: '✋', color: 'text-pink-300',   bar: 'border-pink-700/40 bg-pink-900/30' },
+    pre_swap:        { icon: '🔀', color: 'text-rose-200',   bar: 'border-rose-600/50 bg-rose-950/60' },
+    post_swap:       { icon: '🔁', color: 'text-sky-200',    bar: 'border-sky-700/40 bg-sky-950/50' },
+    partition_step:  { icon: '🔄', color: 'text-pink-300',    bar: 'border-pink-700/30 bg-pink-900/20' },
+    partition_done: { icon: '✂️', color: 'text-violet-300',  bar: 'border-violet-700/40 bg-violet-900/30' },
+    spawn_child:    { icon: '🔁', color: 'text-indigo-300',  bar: 'border-indigo-700/40 bg-indigo-900/30' },
+    node_sorted:    { icon: '✅', color: 'text-emerald-300', bar: 'border-emerald-700/40 bg-emerald-900/30' },
+    final_done:     { icon: '🎉', color: 'text-emerald-200', bar: 'border-emerald-600/60 bg-emerald-900/40' },
 };
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// Main component
+// ══════════════════════════════════════════════════════════════════════════════
+
 const QuickSortCoreLogicVisualizer = ({
     customArray = '[8, 3, 1, 5, 2, 7, 4]',
     onProgress,
@@ -508,38 +569,40 @@ const QuickSortCoreLogicVisualizer = ({
         return [8, 3, 1, 5, 2, 7, 4];
     }, [customArray]);
 
-    const { nodeMap, rootId, finalArr } = useMemo(() => simulateQuickSort(inputArr), [inputArr]);
-
+    const { nodeMap, rootId } = useMemo(() => simulateQuickSort(inputArr), [inputArr]);
     useMemo(() => assignLayout(nodeMap), [nodeMap]);
 
-    const allNodes    = useMemo(() => [...nodeMap.values()], [nodeMap]);
-    const events      = useMemo(() => BUILD_EVENTS(nodeMap, rootId), [nodeMap, rootId]);
-    const maxDepth    = useMemo(() => Math.max(...allNodes.map(n => n.depth)), [allNodes]);
+    const allNodes = useMemo(() => [...nodeMap.values()], [nodeMap]);
+    const events   = useMemo(() => BUILD_EVENTS(nodeMap, rootId), [nodeMap, rootId]);
+    const maxDepth = useMemo(() => Math.max(...allNodes.map(n => n.depth)), [allNodes]);
 
-    const n        = inputArr.length;
-    const canvasW  = n * ELEM_W + LEFT_PAD * 2;
-    const canvasH  = (maxDepth + 1) * LEVEL_H + 180;
+    const n       = inputArr.length;
+    const canvasW = n * ELEM_W + LEFT_PAD * 2;
+    const canvasH = (maxDepth + 1) * LEVEL_H + 220;
 
-    // ── Animation state ───────────────────────────────────────────────────────
+    // ── Playback state ────────────────────────────────────────────────────────
     const [eventIdx, setEventIdx] = useState(-1);
     const [playing,  setPlaying]  = useState(false);
     const [finished, setFinished] = useState(false);
     const [speed,    setSpeed]    = useState(1);
     const scrollRef = useRef(null);
 
+    // Reset when array changes
     useEffect(() => {
         setEventIdx(-1); setPlaying(false); setFinished(false);
-        if (scrollRef.current) scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
     }, [inputArr]);
 
+    // Auto-advance
     useEffect(() => {
         if (!playing || finished) return;
-        const nextIdx = eventIdx + 1;
-        if (nextIdx >= events.length) { setFinished(true); setPlaying(false); return; }
-        const t = setTimeout(() => setEventIdx(nextIdx), getDelay(events[nextIdx], speed));
+        const next = eventIdx + 1;
+        if (next >= events.length) { setFinished(true); setPlaying(false); return; }
+        const t = setTimeout(() => setEventIdx(next), getDelay(events[next], speed));
         return () => clearTimeout(t);
     }, [playing, eventIdx, events, finished, speed]);
 
+    // Auto-scroll
     useEffect(() => {
         const ev = events[eventIdx];
         if (!ev || !scrollRef.current || ev.type === 'partition_step') return;
@@ -562,31 +625,35 @@ const QuickSortCoreLogicVisualizer = ({
 
     useEffect(() => { onProgress?.({ idx: eventIdx, total: events.length }); }, [eventIdx, events.length, onProgress]);
 
-    // ── Derived state ─────────────────────────────────────────────────────────
+    // ── Derived: per-node phase ───────────────────────────────────────────────
     const processed = useMemo(() => events.slice(0, eventIdx + 1), [events, eventIdx]);
 
-    // Per-node phase
-    const nodePhases = useMemo(() => {
-        const phases = new Map();
-        const stepIdxMap = new Map();
+    const { nodePhases, stepIdxMap, scanIMap, scanJMap } = useMemo(() => {
+        const phases  = new Map();
+        const stepMap = new Map();
+        const scanMap = new Map();
+        const scanJM  = new Map();
         processed.forEach(ev => {
             if (!ev.nodeId) return;
-            if (ev.type === 'appear')         phases.set(ev.nodeId, 'appear');
-            if (ev.type === 'base_case')      phases.set(ev.nodeId, 'base_case');
-            if (ev.type === 'pivot_select')   phases.set(ev.nodeId, 'pivot_select');
-            if (ev.type === 'init_pointers')  phases.set(ev.nodeId, 'init_pointers');
-            if (ev.type === 'partition_step') {
-                phases.set(ev.nodeId, 'partition_step');
-                stepIdxMap.set(ev.nodeId, ev.stepIdx);
-            }
-            if (ev.type === 'partition_done') phases.set(ev.nodeId, 'partition_done');
-            if (ev.type === 'spawn_child')    { /* parent stays at partition_done */ }
-            if (ev.type === 'node_sorted')    phases.set(ev.nodeId, 'node_sorted');
+            if (ev.type === 'appear')          phases.set(ev.nodeId, 'appear');
+            if (ev.type === 'base_case')       phases.set(ev.nodeId, 'base_case');
+            if (ev.type === 'pivot_select')    phases.set(ev.nodeId, 'pivot_select');
+            if (ev.type === 'init_pointers')   phases.set(ev.nodeId, 'init_pointers');
+            if (ev.type === 'scan_i_explain')  phases.set(ev.nodeId, 'scan_i_explain');
+            if (ev.type === 'scan_i_move')   { phases.set(ev.nodeId, 'scan_i_move');  scanMap.set(ev.nodeId, ev.scanI); }
+            if (ev.type === 'scan_i_found')  { phases.set(ev.nodeId, 'scan_i_found'); scanMap.set(ev.nodeId, ev.scanI); }
+            if (ev.type === 'scan_j_explain')  phases.set(ev.nodeId, 'scan_j_explain');
+            if (ev.type === 'scan_j_move')   { phases.set(ev.nodeId, 'scan_j_move');  scanJM.set(ev.nodeId, ev.scanJ); }
+            if (ev.type === 'scan_j_found')  { phases.set(ev.nodeId, 'scan_j_found'); scanJM.set(ev.nodeId, ev.scanJ); }
+            if (ev.type === 'pre_swap')        phases.set(ev.nodeId, 'pre_swap');
+            if (ev.type === 'post_swap')       phases.set(ev.nodeId, 'post_swap');
+            if (ev.type === 'partition_step') { phases.set(ev.nodeId, 'partition_step'); stepMap.set(ev.nodeId, ev.stepIdx); }
+            if (ev.type === 'partition_done')  phases.set(ev.nodeId, 'partition_done');
+            if (ev.type === 'node_sorted')     phases.set(ev.nodeId, 'node_sorted');
         });
-        return { phases, stepIdxMap };
+        return { nodePhases: phases, stepIdxMap: stepMap, scanIMap: scanMap, scanJMap: scanJM };
     }, [processed]);
 
-    // Visible node IDs (appeared)
     const visibleIds = useMemo(() => {
         const s = new Set();
         processed.forEach(ev => { if (ev.type === 'appear') s.add(ev.nodeId); });
@@ -597,147 +664,57 @@ const QuickSortCoreLogicVisualizer = ({
     const svgLines = useMemo(() => {
         const lines = [];
         allNodes.forEach(node => {
-            if (!visibleIds.has(node.id)) return;
-            if (node.isBase) return;
-            const phase = nodePhases.phases.get(node.id);
-            const isSorted = phase === 'node_sorted';
+            if (!visibleIds.has(node.id) || node.isBase) return;
+            const sorted = nodePhases.get(node.id) === 'node_sorted';
             [node.left, node.right].forEach(child => {
                 if (!child || !visibleIds.has(child.id)) return;
+                // y1: top of node + call-label (14px) + badge-row (BADGE+6) + cell box (CELL_H+14+7px pad) 
                 lines.push({
                     key: `${node.id}->${child.id}`,
-                    x1: node.x, y1: node.y + CELL_H + 14,
-                    x2: child.x, y2: child.y - 4,
-                    sorted: isSorted,
+                    x1: node.x, y1: node.y + 14 + (BADGE + 6) + CELL_H + 18,
+                    x2: child.x, y2: child.y + 8,
+                    sorted,
                 });
             });
         });
         return lines;
     }, [allNodes, visibleIds, nodePhases]);
 
-    // Current event for detail panel
     const currentEv = events[eventIdx];
-    const detailEvent = currentEv?.type === 'partition_step' ? currentEv : null;
-    const detailNode  = detailEvent ? nodeMap.get(detailEvent.nodeId) : null;
-
-    const partitionCount = useMemo(() => {
-        let c = 0; let lastId = null;
-        for (let k = 0; k <= eventIdx; k++) {
-            const e = events[k];
-            if (e?.type === 'pivot_select' && e.nodeId !== lastId) { c++; lastId = e.nodeId; }
-        }
-        return c;
-    }, [events, eventIdx]);
-
-    const statusLabel = (() => {
-        if (!currentEv) return 'Press ▶ Start to begin';
-        if (finished)   return '✅ Array sorted! Replay to watch again.';
-        const map = {
-            appear:          '📋 New recursive call',
-            base_case:       '↩️ Base case — returns',
-            pivot_select:    '🎯 Selecting pivot',
-            init_pointers:   '👆 Initializing i & j pointers',
-            partition_step:  '🔄 Partitioning — scan & swap',
-            partition_done:  '✂️ Partition complete',
-            spawn_child:     '🔁 Recursing into sub-range',
-            node_sorted:     '✅ Range sorted',
-            final_done:      '🎉 Quick Sort complete',
-        };
-        return map[currentEv.type] ?? '';
-    })();
+    const meta      = currentEv ? (STEP_META[currentEv.type] ?? STEP_META.appear) : null;
+    const activeId  = currentEv?.nodeId ?? null;
 
     return (
         <div className="flex flex-col h-full bg-slate-950 text-white select-none overflow-hidden">
-            {/* Status bar */}
-            <div className="flex-shrink-0 flex items-center justify-between px-8 py-3 border-b border-slate-800 bg-slate-900">
-                <span className="text-sm text-slate-200 font-medium">{statusLabel}</span>
-                <div className="flex items-center gap-3">
-                    {/* Speed */}
-                    <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
-                        {[0.5, 1, 1.5, 2, 3].map(s => (
-                            <button key={s} onClick={() => setSpeed(s)}
-                                className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${speed === s ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'}`}>
-                                {s}×
-                            </button>
-                        ))}
-                    </div>
-                    <div className="w-px h-6 bg-slate-700" />
-                    {/* Reset */}
-                    <button onClick={() => { setPlaying(false); setFinished(false); setEventIdx(-1); }}
-                        disabled={eventIdx < 0}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed text-slate-400 hover:text-white transition-all">
-                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                            <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd" />
-                        </svg>
-                    </button>
-                    <div className="w-px h-6 bg-slate-700" />
-                    {/* Controls */}
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => { setPlaying(false); setFinished(false); setEventIdx(i => Math.max(-1, i - 1)); }}
-                            disabled={eventIdx < 0}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 active:scale-95 disabled:opacity-25 transition-all text-slate-300 hover:text-white">
-                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                                <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z" />
-                            </svg>
-                        </button>
 
-                        {!playing && !finished && eventIdx < 0 && (
-                            <button onClick={handlePlay}
-                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-indigo-900/40">
-                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 translate-x-px">
-                                    <path fillRule="evenodd" d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" clipRule="evenodd" />
-                                </svg>
-                                Start
-                            </button>
-                        )}
-                        {playing && (
-                            <button onClick={() => setPlaying(false)}
-                                className="flex items-center gap-2 px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white text-sm font-semibold rounded-xl transition-all">
-                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                                    <path fillRule="evenodd" d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z" clipRule="evenodd" />
-                                </svg>
-                                Pause
-                            </button>
-                        )}
-                        {!playing && eventIdx >= 0 && !finished && (
-                            <button onClick={handlePlay}
-                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl transition-all">
-                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 translate-x-px">
-                                    <path fillRule="evenodd" d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" clipRule="evenodd" />
-                                </svg>
-                                Resume
-                            </button>
-                        )}
-                        {finished && (
-                            <button onClick={handlePlay}
-                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl transition-all">
-                                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                                    <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd" />
-                                </svg>
-                                Replay
-                            </button>
-                        )}
+            {/* ── Shared playback controls ──────────────────────────────────── */}
+            <VisualizerControls
+                speed={speed} setSpeed={setSpeed}
+                eventIdx={eventIdx} playing={playing} finished={finished}
+                onPlay={handlePlay}
+                onPause={() => setPlaying(false)}
+                onReset={() => { setPlaying(false); setFinished(false); setEventIdx(-1); }}
+                onBack={() => { setPlaying(false); setFinished(false); setEventIdx(i => Math.max(-1, i - 1)); }}
+                onNext={() => {
+                    setPlaying(false);
+                    const ni = eventIdx + 1;
+                    if (ni >= events.length) setFinished(true);
+                    else setEventIdx(ni);
+                }}
+            />
 
-                        <button onClick={() => { setPlaying(false); const ni = eventIdx + 1; if (ni >= events.length) setFinished(true); else setEventIdx(ni); }}
-                            disabled={finished}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 active:scale-95 disabled:opacity-25 transition-all text-slate-300 hover:text-white">
-                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                                <path d="M11.555 5.168A1 1 0 0010 6v2.798L4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4z" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Scrollable tree */}
+            {/* ── Scrollable call-tree canvas ───────────────────────────────── */}
             <div ref={scrollRef} className="flex-1 overflow-auto">
-                <div className="relative mx-auto" style={{ width: canvasW, height: canvasH + 80, minHeight: '100%' }}>
+                <div className="relative mx-auto" style={{ width: canvasW, height: canvasH, minHeight: '100%' }}>
+
                     {/* SVG connector lines */}
-                    <svg className="absolute inset-0 pointer-events-none" width={canvasW} height={canvasH + 80} overflow="visible">
+                    <svg className="absolute inset-0 pointer-events-none"
+                        width={canvasW} height={canvasH} overflow="visible">
                         <defs>
-                            <marker id="qs-arr-down" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+                            <marker id="cl-arr" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
                                 <path d="M0,0 L0,8 L8,4 Z" fill="#6366f1" />
                             </marker>
-                            <marker id="qs-arr-sort" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+                            <marker id="cl-sort" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
                                 <path d="M0,0 L0,8 L8,4 Z" fill="#10b981" />
                             </marker>
                         </defs>
@@ -746,87 +723,115 @@ const QuickSortCoreLogicVisualizer = ({
                                 <motion.line key={l.key}
                                     x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
                                     stroke={l.sorted ? '#10b981' : '#6366f1'} strokeWidth={2}
-                                    markerEnd={!l.sorted ? 'url(#qs-arr-down)' : 'url(#qs-arr-sort)'}
-                                    initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }}
-                                    exit={{ opacity: 0 }} transition={{ duration: 0.5, ease: 'easeOut' }} />
+                                    markerEnd={l.sorted ? 'url(#cl-sort)' : 'url(#cl-arr)'}
+                                    initial={{ pathLength: 0, opacity: 0 }}
+                                    animate={{ pathLength: 1, opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{ duration: 0.45, ease: 'easeOut' }} />
                             ))}
                         </AnimatePresence>
                     </svg>
 
-                    {/* Nodes */}
+                    {/* Node cards */}
                     <AnimatePresence>
                         {allNodes.map(node => {
                             if (!visibleIds.has(node.id)) return null;
-                            const phase   = nodePhases.phases.get(node.id) ?? 'appear';
-                            const stepIdx = nodePhases.stepIdxMap.get(node.id) ?? -1;
-                            const boxW = Math.max(
-                                (node.high - node.low + 1) * (CELL_W + CELL_GAP) + NODE_PAD * 2,
-                                80
-                            );
+                            const phase    = nodePhases.get(node.id) ?? 'appear';
+                            const st       = stepIdxMap.get(node.id) ?? 0;
+                            const isActive = node.id === activeId;
+                            const arrLen   = node.high - node.low + 1;
+                            const cellsW2  = arrLen * CELL_W + Math.max(0, arrLen - 1) * CELL_GAP;
+                            const cardW    = Math.max(cellsW2 + NODE_PAD * 2 + 4, 80);
 
                             return (
                                 <motion.div key={node.id}
                                     className="absolute flex flex-col items-center"
-                                    style={{ left: node.x - boxW / 2, top: node.y }}
-                                    initial={{ opacity: 0, scale: 0.6, y: -12 }}
+                                    style={{ left: node.x - cardW / 2, top: node.y }}
+                                    initial={{ opacity: 0, scale: 0.6, y: -14 }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.4, y: 20 }}
-                                    transition={{ type: 'spring', stiffness: 220, damping: 20 }}>
-                                    {/* Call label */}
-                                    <div className="text-[10px] text-slate-500 font-mono mb-0.5">
+                                    exit={{ opacity: 0, scale: 0.4, y: 18 }}
+                                    transition={nodeSpring}>
+                                    {/* Call label — amber when active */}
+                                    <div className={`text-[10px] font-mono mb-0.5 transition-colors duration-200 ${isActive ? 'text-amber-400 font-semibold' : 'text-slate-500'}`}>
                                         sort({node.low}, {node.high})
                                     </div>
-                                    <NodeDisplay
+                                    <NodeCard
                                         node={node}
                                         phase={phase}
-                                        stepIdx={stepIdx}
-                                        currentEv={currentEv}
+                                        stepIdx={st}
+                                        isActive={isActive}
+                                        scanIAbs={scanIMap.get(node.id) ?? null}
+                                        scanJAbs={scanJMap.get(node.id) ?? null}
                                     />
                                 </motion.div>
                             );
                         })}
                     </AnimatePresence>
 
-                    {/* Annotation badge */}
-                    <AnimatePresence mode="wait">
-                        {currentEv?.annotation && (() => {
-                            const activeNode = allNodes.find(n => n.id === currentEv.nodeId && visibleIds.has(n.id));
-                            if (!activeNode) return null;
-                            const boxW = Math.max((activeNode.high - activeNode.low + 1) * (CELL_W + CELL_GAP) + NODE_PAD * 2, 80);
-                            const parentNode = allNodes.find(n => !n.isBase && (n.left?.id === activeNode.id || n.right?.id === activeNode.id));
-                            const isRight = !parentNode || parentNode.right?.id === activeNode.id;
+                    {/* ── Floating annotation tooltip — only for scan / swap steps ── */}
+                    <AnimatePresence>
+                        {currentEv && !finished && (() => {
+                            const SHOW_TYPES = new Set([
+                                'scan_i_explain', 'scan_i_move', 'scan_i_found',
+                                'scan_j_explain', 'scan_j_move', 'scan_j_found',
+                                'pre_swap', 'post_swap',
+                            ]);
+                            if (!SHOW_TYPES.has(currentEv.type)) return null;
+
+                            const isJSide = currentEv.type === 'scan_j_explain' || currentEv.type === 'scan_j_move' || currentEv.type === 'scan_j_found';
+                            const nd = currentEv.nodeId ? allNodes.find(n => n.id === currentEv.nodeId && visibleIds.has(n.id)) : null;
+                            if (!nd) return null;
+
+                            const aLen = nd.high - nd.low + 1;
+                            const cWid = aLen * CELL_W + Math.max(0, aLen - 1) * CELL_GAP;
+                            const bWid = Math.max(cWid + NODE_PAD * 2 + 4, 80);
+                            const tipLeft = isJSide ? nd.x - bWid / 2 - 256 : nd.x + bWid / 2 + 16;
+                            const tipTop  = nd.y + 28;
+                            const m = meta ?? STEP_META.appear;
+
+                            const tipCls =
+                                currentEv.type === 'scan_i_found'
+                                    ? 'border-emerald-500/60 bg-emerald-900/85 text-emerald-100'
+                                : currentEv.type === 'scan_i_move' || currentEv.type === 'scan_j_move'
+                                    ? 'border-slate-600/50 bg-slate-800/90 text-slate-200'
+                                : currentEv.type === 'scan_j_found'
+                                    ? 'border-pink-500/60 bg-pink-900/85 text-pink-100'
+                                : currentEv.type === 'scan_j_explain' || currentEv.type === 'scan_i_explain'
+                                    ? 'border-sky-500/60 bg-sky-900/85 text-sky-100'
+                                : currentEv.type === 'pre_swap'
+                                    ? 'border-rose-500/60 bg-rose-900/85 text-rose-100'
+                                : 'border-sky-600/50 bg-sky-950/85 text-sky-100'; // post_swap
+
                             return (
-                                <motion.div key={currentEv.annotation}
-                                    style={{
-                                        position: 'absolute',
-                                        left: isRight ? activeNode.x + boxW / 2 + 12 : activeNode.x - boxW / 2 - 12,
-                                        top: activeNode.y + 2,
-                                        zIndex: 30, maxWidth: 260,
-                                        transform: isRight ? 'none' : 'translateX(-100%)',
-                                    }}
-                                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.15 }}>
-                                    <div className="rounded-xl border border-amber-600/50 px-4 py-2.5 text-sm font-medium leading-snug shadow-xl backdrop-blur bg-amber-900/60 text-amber-200">
-                                        {currentEv.annotation}
+                                <motion.div
+                                    key={`tip-${eventIdx}`}
+                                    className="absolute z-30 pointer-events-none"
+                                    style={{ left: tipLeft, top: tipTop }}
+                                    initial={{ opacity: 0, x: isJSide ? 10 : -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: isJSide ? 6 : -6 }}
+                                    transition={{ duration: 0.18 }}>
+                                    <div className={`rounded-xl border px-4 py-2.5 shadow-xl backdrop-blur max-w-[260px] ${tipCls}`}>
+                                        <div className="flex items-start gap-2">
+                                            <span className="text-base leading-none flex-shrink-0 mt-0.5">{m.icon}</span>
+                                            <span className="text-sm font-medium leading-snug">{currentEv.annotation}</span>
+                                        </div>
                                     </div>
                                 </motion.div>
                             );
                         })()}
                     </AnimatePresence>
+
+                    {/* idle hint */}
+                    {eventIdx < 0 && !finished && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="rounded-2xl border border-slate-700/50 bg-slate-800/70 px-6 py-3 text-sm text-slate-400 backdrop-blur shadow-xl">
+                                ▶ Press Start to begin the Quick Sort visualization
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
-
-            {/* Partition detail panel */}
-            <AnimatePresence>
-                {detailNode && (
-                    <PartitionDetailPanel
-                        key={detailNode.id}
-                        node={detailNode}
-                        stepIdx={detailEvent?.stepIdx ?? 0}
-                        partitionCount={partitionCount}
-                    />
-                )}
-            </AnimatePresence>
         </div>
     );
 };
