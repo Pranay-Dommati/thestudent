@@ -691,12 +691,13 @@ const NodeVisual = ({ node, phase, currentEvForNode, returningRanges = [] }) => 
                             const iPivotCollide = isCompareI && isPivCell;
                             const jPivotCollide = isCompareJ && isPivCell;
 
+                            const isRecursePhase = phase === 'recurse_left' || phase === 'recurse_right';
                             let bg = 'bg-slate-700 border-slate-500 text-slate-200';
                             if (isSorted)   bg = 'bg-emerald-600 border-emerald-400 text-white';
                             if (isLeft)     bg = phase === 'recurse_right'
                                 ? 'bg-emerald-700 border-emerald-500 text-white'
                                 : 'bg-indigo-800 border-indigo-500 text-white';
-                            if (isPivZone)  bg = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300';
+                            if (isPivZone && !isRecursePhase)  bg = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300';
                             if (zone === 'right') bg = 'bg-slate-600 border-slate-400 text-slate-200';
                             if (isPivCell)  bg = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-300 shadow-md shadow-amber-500/50';
                             if (isCompareI) bg = 'bg-sky-500 border-sky-300 text-white ring-2 ring-sky-300 shadow-md shadow-sky-500/50';
