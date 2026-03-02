@@ -177,7 +177,7 @@ const assignLayout = (nodeMap) => {
 };
 
 // ── Build detailed synced events ─────────────────────────────────────────────
-const buildSyncedEvents = (nodeMap, rootId) => {
+const buildSyncedEvents = (nodeMap, rootId, finalArr) => {
     const evs = [];
     const fmt = arr => `[${arr.join(', ')}]`;
 
@@ -361,17 +361,14 @@ const buildSyncedEvents = (nodeMap, rootId) => {
         // node sorted
         evs.push({
             type: 'node_sorted', nodeId: node.id, scrollY: Math.max(0, node.y - 40),
-            codeLine: node.parentId ? LINE.RECURSE_LEFT : LINE.RETURN_NUMS,
-            annotation: `Range [${node.low}..${node.high}] is sorted ✓`,
+            codeLine: LINE.RETURN_NUMS,
+            annotation: node.parentId
+                ? `Range [${node.low}..${node.high}] is sorted ✓`
+                : `print(nums)  →  [${node.arrSorted.join(', ')}]`,
         });
     };
 
     dfs(nodeMap.get(rootId), true);
-    evs.push({
-        type: 'final_done', scrollY: 0,
-        codeLine: LINE.RETURN_NUMS,
-        annotation: `return nums — quick sort complete! Array is sorted.`,
-    });
     return evs;
 };
 
@@ -564,56 +561,58 @@ const NodeVisual = ({ node, phase, currentEvForNode, returningRanges = [] }) => 
                     sorted ✓
                 </motion.span>
             )}
-            {/* Pointer row */}
-            <div className="flex items-end" style={{ gap: CELL_GAP, height: 20, position: 'relative' }}>
-                {/* j badge slides off the left edge when j < node.low */}
-                {jRel === -1 && (
-                    <motion.div
-                        key="j-off-left"
-                        className="w-5 h-5 rounded-full bg-pink-600 text-white flex items-center justify-center text-[10px] font-bold"
-                        style={{ position: 'absolute', left: -(Math.floor(CELL_W / 2) + CELL_GAP + 10), bottom: 0 }}
-                        initial={{ opacity: 0.6, x: CELL_W + CELL_GAP }}
-                        animate={blinkPointers
-                            ? { opacity: [1, 0.1, 1], x: 0 }
-                            : { opacity: 1, x: 0 }}
-                        transition={blinkPointers
-                            ? { opacity: { repeat: Infinity, duration: 0.6, ease: 'easeInOut' }, x: { type: 'spring', stiffness: 180, damping: 22 } }
-                            : { type: 'spring', stiffness: 180, damping: 22 }}>j</motion.div>
-                )}
-                {arr.map((_, idx) => {
-                    const isI = iRel !== null && idx === iRel;
-                    const isJ = jRel !== null && idx === jRel;
-                    const isExtra = recurseExtraIdx !== null && idx === recurseExtraIdx;
-                    return (
-                        <div key={idx} style={{ width: CELL_W }} className="flex justify-center">
-                            {/* Extra recurse label (low or high) */}
-                            {isExtra && !isI && !isJ && <motion.div
+            {/* Pointer row — i and j slide to their index position */}
+            {(() => {
+                const BADGE = 20; // w-5 h-5
+                const rowW = arr.length * CELL_W + (arr.length - 1) * CELL_GAP;
+                // center x of a relative index within the row
+                const centerX = (rel) => rel * (CELL_W + CELL_GAP) + CELL_W / 2;
+                // when i===j offset them so they don't overlap
+                const sameIdx = iRel !== null && jRel !== null && iRel === jRel;
+                const iX = iRel !== null
+                    ? (sameIdx ? centerX(iRel) - BADGE / 2 - 1 : centerX(iRel) - BADGE / 2)
+                    : null;
+                // j off-left edge
+                const jX = jRel === -1
+                    ? -(BADGE + CELL_GAP + 4)
+                    : jRel !== null
+                        ? (sameIdx ? centerX(jRel) + 1 : centerX(jRel) - BADGE / 2)
+                        : null;
+                const slideTransition = { type: 'spring', stiffness: 260, damping: 28 };
+                const blinkOpacity = { opacity: [1, 0.1, 1], transition: { repeat: Infinity, duration: 0.6, ease: 'easeInOut' } };
+                return (
+                    <div style={{ position: 'relative', width: rowW, height: 24, flexShrink: 0 }}>
+                        {/* Extra recurse label (low or high) — static per column */}
+                        {recurseExtraIdx !== null && (
+                            <motion.div
                                 className="px-1.5 h-5 rounded-full bg-sky-600 text-white flex items-center justify-center text-[9px] font-bold"
+                                style={{ position: 'absolute', bottom: 0, left: centerX(recurseExtraIdx), transform: 'translateX(-50%)' }}
                                 initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                                transition={{ duration: 0.2 }}>{recurseExtraLabel}</motion.div>}
-                            {/* Normal i/j pointers */}
-                            {isI && !isJ && <motion.div
-                                key={blinkPointers ? `i-blink-${currentEvForNode?.iterIdx ?? iRel}-${jRel}` : 'i-still'}
-                                className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold ${compareIIdx !== null ? 'bg-sky-500' : 'bg-indigo-600'}`}
-                                initial={{ opacity: 0, y: -4 }}
-                                animate={blinkPointers ? { opacity: [1, 0.1, 1], y: 0 } : { opacity: 1, y: 0 }}
-                                transition={blinkPointers ? { repeat: Infinity, duration: 0.6, ease: 'easeInOut' } : { duration: 0.2 }}>i</motion.div>}
-                            {isJ && !isI && <motion.div
-                                key={blinkPointers ? `j-blink-${currentEvForNode?.iterIdx ?? iRel}-${jRel}` : 'j-still'}
+                                transition={{ duration: 0.2 }}>{recurseExtraLabel}</motion.div>
+                        )}
+                        {/* i badge — slides */}
+                        {iX !== null && (
+                            <motion.div
+                                className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold bg-sky-500`}
+                                style={{ position: 'absolute', bottom: 0, left: 0 }}
+                                animate={blinkPointers
+                                    ? { x: iX, ...blinkOpacity }
+                                    : { x: iX, opacity: 1 }}
+                                transition={slideTransition}>i</motion.div>
+                        )}
+                        {/* j badge — slides */}
+                        {jX !== null && (
+                            <motion.div
                                 className={`w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold ${compareJIdx !== null ? 'bg-pink-500' : 'bg-pink-600'}`}
-                                initial={{ opacity: 0, y: -4 }}
-                                animate={blinkPointers ? { opacity: [1, 0.1, 1], y: 0 } : { opacity: 1, y: 0 }}
-                                transition={blinkPointers ? { repeat: Infinity, duration: 0.6, ease: 'easeInOut' } : { duration: 0.2 }}>j</motion.div>}
-                            {isI && isJ && <motion.div
-                                key={blinkPointers ? `ij-blink-${currentEvForNode?.iterIdx ?? iRel}-${jRel}` : 'ij-still'}
-                                className="px-1.5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center text-[9px] font-bold whitespace-nowrap"
-                                initial={{ opacity: 0, y: -4 }}
-                                animate={blinkPointers ? { opacity: [1, 0.1, 1], y: 0 } : { opacity: 1, y: 0 }}
-                                transition={blinkPointers ? { repeat: Infinity, duration: 0.6, ease: 'easeInOut' } : { duration: 0.2 }}>i,j</motion.div>}
-                        </div>
-                    );
-                })}
-            </div>
+                                style={{ position: 'absolute', bottom: 0, left: 0 }}
+                                animate={blinkPointers
+                                    ? { x: jX, ...blinkOpacity }
+                                    : { x: jX, opacity: 1 }}
+                                transition={slideTransition}>j</motion.div>
+                        )}
+                    </div>
+                );
+            })()}
             {/* Array box */}
             <div className={`flex flex-col rounded-xl border-2 ${boxBg}`}
                 style={{ padding: `10px ${NODE_PAD}px` }}>
@@ -734,11 +733,11 @@ const QuickSortSyncedVisualizer = ({
         return [8, 3, 1, 5, 2, 7, 4];
     }, [customArray]);
 
-    const { nodeMap, rootId } = useMemo(() => simulateQuickSort(inputArr), [inputArr]);
+    const { nodeMap, rootId, finalArr } = useMemo(() => simulateQuickSort(inputArr), [inputArr]);
     useMemo(() => assignLayout(nodeMap), [nodeMap]);
 
     const allNodes = useMemo(() => [...nodeMap.values()], [nodeMap]);
-    const events   = useMemo(() => buildSyncedEvents(nodeMap, rootId), [nodeMap, rootId]);
+    const events   = useMemo(() => buildSyncedEvents(nodeMap, rootId, finalArr), [nodeMap, rootId, finalArr]);
     const maxDepth = useMemo(() => Math.max(...allNodes.map(n => n.depth)), [allNodes]);
 
     const n       = inputArr.length;
@@ -761,7 +760,10 @@ const QuickSortSyncedVisualizer = ({
         if (!playing || finished) return;
         const nextIdx = eventIdx + 1;
         if (nextIdx >= events.length) { setFinished(true); setPlaying(false); return; }
-        const t = setTimeout(() => setEventIdx(nextIdx), getDelay(events[nextIdx], speed));
+        const t = setTimeout(() => {
+            setEventIdx(nextIdx);
+            if (nextIdx >= events.length - 1) { setFinished(true); setPlaying(false); }
+        }, getDelay(events[nextIdx], speed));
         return () => clearTimeout(t);
     }, [playing, eventIdx, events, finished, speed]);
 
@@ -841,7 +843,7 @@ const QuickSortSyncedVisualizer = ({
 
     const statusLabel = (() => {
         if (!currentEv) return 'Press ▶ Start to begin';
-        if (finished)   return '✅ Sorted! Replay to watch again.';
+        if (finished)   return '✅ Quick Sort complete! Array is sorted.';
         const map = {
             call:             '📋 Entering sort()',
             check_base:       '🔎 Checking base case',
@@ -862,7 +864,6 @@ const QuickSortSyncedVisualizer = ({
             recurse_left:     '🔁 Recursing left',
             recurse_right:    '🔁 Recursing right',
             node_sorted:      '✅ Range sorted',
-            final_done:       '🎉 Quick Sort complete',
         };
         return map[currentEv.type] ?? '';
     })();
@@ -930,7 +931,7 @@ const QuickSortSyncedVisualizer = ({
                                 </button>
                             )}
 
-                            <button onClick={() => { setPlaying(false); const ni = eventIdx + 1; if (ni >= events.length) setFinished(true); else setEventIdx(ni); }}
+                            <button onClick={() => { setPlaying(false); const ni = eventIdx + 1; if (ni >= events.length) { setFinished(true); } else { setEventIdx(ni); if (ni >= events.length - 1) setFinished(true); } }}
                                 disabled={finished}
                                 className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-700/80 hover:bg-slate-600 disabled:opacity-25 transition-all text-slate-300">
                                 <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
@@ -977,7 +978,8 @@ const QuickSortSyncedVisualizer = ({
                                     const span    = node.high - node.low + 1;
                                     const boxW    = Math.max(span * (CELL_W + CELL_GAP) + NODE_PAD * 2, 70);
 
-                                    const isReturning = (node.isBase && phase === 'base_return') || phase === 'node_sorted';
+                                    const isRoot = !node.parentId;
+                                    const isReturning = ((node.isBase && phase === 'base_return') || phase === 'node_sorted') && !isRoot;
 
                                     // Compute which cell ranges in this node correspond to a child that has finished
                                     const returningRanges = [];
@@ -1004,9 +1006,6 @@ const QuickSortSyncedVisualizer = ({
                                             transition={isReturning
                                                 ? { duration: 0.45, ease: 'easeIn' }
                                                 : { type: 'spring', stiffness: 220, damping: 20 }}>
-                                            <div className="text-[10px] text-slate-500 font-mono mb-0.5">
-                                                sort({node.low}, {node.high})
-                                            </div>
                                             <NodeVisual node={node} phase={phase} currentEvForNode={curEvForNode} returningRanges={returningRanges} />
                                         </motion.div>
                                     );
