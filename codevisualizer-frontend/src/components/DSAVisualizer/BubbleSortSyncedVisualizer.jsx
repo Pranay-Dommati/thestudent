@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import PointerBadgeRow from './PointerBadgeRow';
 import VisualizerControls from './VisualizerControls';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
@@ -214,133 +215,121 @@ const SyncedCodePanel = ({ code, activeLine, executedLines }) => {
 const ArrayVisual = ({ arr, ev, n }) => {
     if (!arr || arr.length === 0) return null;
 
-    const { type, j: jIdx, sortedFrom = n, swapJ } = ev ?? {};
+    const { type, i: outerI, j: jIdx, sortedFrom = n, swapJ } = ev ?? {};
 
-    const showPointers = ['inner_iter', 'compare', 'swap_exec', 'swapped_true'].includes(type);
     const isSwapEvent  = type === 'swap_exec';
 
-    // Determine cell coloring states
-    const getCellBg = (idx, val) => {
+    // Which events show the j pointer sliding
+    const showJ = ['inner_iter', 'compare', 'swap_exec', 'swapped_true'].includes(type);
+    // Which events show the i boundary pointer
+    const showI = ['outer_iter', 'inner_iter', 'compare',
+                   'swap_exec', 'swapped_true', 'check_sorted', 'early_break'].includes(type);
+
+    // i badge sits at index outerI (0, 1, 2 … as passes progress)
+    const iPos = outerI !== undefined && outerI !== null ? outerI : null;
+
+    // Cell coloring
+    const getCellBg = (idx) => {
         const isSorted = idx >= sortedFrom;
-        const isJ      = showPointers && jIdx !== undefined && idx === jIdx;
-        const isJ1     = showPointers && jIdx !== undefined && idx === jIdx + 1;
         const isSwpJ   = isSwapEvent && idx === swapJ;
         const isSwpJ1  = isSwapEvent && idx === swapJ + 1;
+        const isAtJ    = showJ && jIdx !== undefined && idx === jIdx;
+        const isAtJ1   = showJ && jIdx !== undefined && idx === jIdx + 1;
+        const isAtI    = showI && iPos !== null && idx === iPos;
 
-        if (isSwpJ || isSwpJ1)           return 'bg-rose-600 border-rose-400 text-white ring-2 ring-rose-300 shadow-lg shadow-rose-500/50';
-        if (isSorted)                    return 'bg-emerald-600 border-emerald-400 text-white ring-1 ring-emerald-300/50';
-        if (isJ && type === 'compare')   return 'bg-sky-500 border-sky-300 text-white ring-2 ring-sky-300 shadow-md shadow-sky-400/50';
-        if (isJ1 && type === 'compare')  return 'bg-pink-500 border-pink-300 text-white ring-2 ring-pink-300 shadow-md shadow-pink-400/50';
-        if (isJ)                         return 'bg-sky-700 border-sky-500 text-white ring-1 ring-sky-400/60';
-        if (isJ1)                        return 'bg-pink-700 border-pink-500 text-white ring-1 ring-pink-400/60';
+        if (isSwpJ || isSwpJ1)          return 'bg-rose-600 border-rose-400 text-white ring-2 ring-rose-300 shadow-lg shadow-rose-500/50';
+        if (isSorted)                   return 'bg-emerald-600 border-emerald-400 text-white ring-1 ring-emerald-300/50';
+        if (isAtJ && type === 'compare') return 'bg-pink-500 border-pink-300 text-white ring-2 ring-pink-300 shadow-md shadow-pink-400/50';
+        if (isAtJ1 && type === 'compare') return 'bg-yellow-400 border-yellow-300 text-slate-900 ring-2 ring-yellow-200 shadow-md shadow-yellow-400/50';
         return 'bg-slate-700 border-slate-500 text-slate-100';
     };
 
-    const cells = arr.map((val, idx) => {
-        const isSwpJ   = isSwapEvent && idx === swapJ;
-        const isSwpJ1  = isSwapEvent && idx === swapJ + 1;
-        const isSwpAny = isSwpJ || isSwpJ1;
-
-        // arr is POST-swap: value at swapJ came from swapJ+1 → animate from +STRIDE
-        //                   value at swapJ+1 came from swapJ   → animate from -STRIDE
-        let swapAnim = { x: 0, y: 0 };
-        if (isSwpJ)  swapAnim = { x: [STRIDE,  STRIDE * 0.5,  0], y: [0, -18, 0] };
-        if (isSwpJ1) swapAnim = { x: [-STRIDE, -STRIDE * 0.5, 0], y: [0,  18, 0] };
-
-        return (
-            <motion.div
-                key={idx}
-                className={`flex items-center justify-center rounded-lg border-2 text-sm font-bold flex-shrink-0 select-none ${getCellBg(idx, val)}`}
-                style={{
-                    width: CELL_W, height: CELL_H,
-                    minWidth: CELL_W,
-                    position: 'relative',
-                    zIndex: isSwpAny ? 10 : 0,
-                }}
-                animate={swapAnim}
-                transition={isSwpAny ? { duration: 0.45, ease: 'easeInOut' } : { duration: 0 }}
-            >
-                {val}
-            </motion.div>
-        );
-    });
-
-    // Index row
-    const indexRow = arr.map((_, idx) => (
-        <div
-            key={idx}
-            style={{ width: CELL_W }}
-            className="flex justify-center text-[10px] text-slate-600 font-mono select-none"
-        >
-            {idx}
-        </div>
-    ));
-
-    const totalW = n * CELL_W + Math.max(0, n - 1) * CELL_GAP;
-
     return (
-        <div className="flex flex-col items-center gap-1" style={{ position: 'relative' }}>
-            {/* Cell row */}
-            <div className="flex items-center" style={{ gap: CELL_GAP }}>
-                {cells}
-            </div>
+        <div className="flex flex-col items-center gap-0" style={{ position: 'relative' }}>
 
-            {/* Index numbers */}
-            <div className="flex items-center" style={{ gap: CELL_GAP }}>
-                {indexRow}
-            </div>
-
-            {/* Pointer badges — slide smoothly using x animation */}
-            <div className="relative" style={{ width: totalW, height: 34 }}>
-                <AnimatePresence>
-                    {showPointers && jIdx !== undefined && jIdx !== null && jIdx >= 0 && jIdx < n && (
+            {/* ── Boundary marker — arrow + label at cell n-i-1 ── */}
+            {(() => {
+                const showBoundary = jIdx !== null && jIdx !== undefined
+                    && outerI !== null && outerI !== undefined;
+                if (!showBoundary) return <div style={{ height: 36 }} />;
+                const a    = n - outerI - 1;
+                const rowW = n * CELL_W + (n - 1) * CELL_GAP;
+                const cx   = a * STRIDE + CELL_W / 2;
+                return (
+                    <div style={{ position: 'relative', width: rowW, height: 36, flexShrink: 0 }}>
                         <motion.div
-                            key="j-badge"
-                            className="absolute flex flex-col items-center"
-                            style={{ top: 2, left: 0, width: CELL_W }}
-                            animate={{ x: jIdx * STRIDE }}
-                            transition={{ type: 'spring', stiffness: 380, damping: 30, mass: 0.7 }}
+                            key={a}
+                            style={{ position: 'absolute', left: cx, transform: 'translateX(-50%)', bottom: 0,
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}
                             initial={{ opacity: 0, y: -4 }}
-                            exit={{ opacity: 0 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.2 }}
                         >
-                            <div style={{
-                                width: 0, height: 0,
-                                borderLeft: '5px solid transparent',
-                                borderRight: '5px solid transparent',
-                                borderBottom: '6px solid rgb(56,189,248)',
-                            }} />
-                            <span className="px-1.5 py-0.5 rounded-md bg-sky-900/80 border border-sky-500/60 text-[10px] font-bold font-mono text-sky-300 whitespace-nowrap mt-0.5">
-                                j
+                            <span className="text-[9px] text-indigo-300 font-mono whitespace-nowrap leading-tight">
+                                n-i-1&nbsp;=&nbsp;{a},&nbsp;j:&nbsp;(0,&nbsp;{a - 1})
                             </span>
+                            <span className="text-indigo-400 leading-none" style={{ fontSize: 14 }}>↓</span>
                         </motion.div>
-                    )}
-                    {showPointers && jIdx !== undefined && jIdx !== null && (jIdx + 1) < n && (
-                        <motion.div
-                            key="j1-badge"
-                            className="absolute flex flex-col items-center"
-                            style={{ top: 2, left: 0, width: CELL_W }}
-                            animate={{ x: (jIdx + 1) * STRIDE }}
-                            transition={{ type: 'spring', stiffness: 380, damping: 30, mass: 0.7 }}
-                            initial={{ opacity: 0, y: -4 }}
-                            exit={{ opacity: 0 }}
-                        >
-                            <div style={{
-                                width: 0, height: 0,
-                                borderLeft: '5px solid transparent',
-                                borderRight: '5px solid transparent',
-                                borderBottom: '6px solid rgb(244,114,182)',
-                            }} />
-                            <span className="px-1.5 py-0.5 rounded-md bg-pink-900/80 border border-pink-500/60 text-[10px] font-bold font-mono text-pink-300 whitespace-nowrap mt-0.5">
-                                j+1
-                            </span>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                    </div>
+                );
+            })()}
+
+            {/* ── Pointer badge row (above array) — i and j spring-slide ── */}
+            <PointerBadgeRow
+                cellW={CELL_W}
+                cellGap={CELL_GAP}
+                count={n}
+                iRel={showI && iPos !== null ? iPos : null}
+                jRel={showJ && jIdx !== null && jIdx !== undefined ? jIdx : null}
+                j1Rel={type === 'compare' && jIdx !== null && jIdx !== undefined ? jIdx + 1 : null}
+                iClass="bg-sky-500"
+                jClass="bg-pink-600"
+                j1Class="bg-yellow-400"
+                blink={false}
+                extraLabel={null}
+            />
+
+            {/* ── Array box ── */}
+            <div className="flex flex-col rounded-xl border-2 border-slate-600 bg-slate-800/60"
+                style={{ padding: `10px 16px` }}>
+                <div className="flex items-center" style={{ gap: CELL_GAP }}>
+                    {arr.map((val, idx) => {
+                        const isSwpJ   = isSwapEvent && idx === swapJ;
+                        const isSwpJ1  = isSwapEvent && idx === swapJ + 1;
+                        const isSwpAny = isSwpJ || isSwpJ1;
+
+                        let swapAnim = { x: 0, y: 0 };
+                        if (isSwpJ)  swapAnim = { x: [STRIDE,  STRIDE * 0.5,  0], y: [0, -18, 0] };
+                        if (isSwpJ1) swapAnim = { x: [-STRIDE, -STRIDE * 0.5, 0], y: [0,  18, 0] };
+
+                        return (
+                            <motion.div
+                                key={idx}
+                                className={`flex items-center justify-center rounded-lg border-2 text-sm font-bold flex-shrink-0 select-none ${getCellBg(idx)}`}
+                                style={{ width: CELL_W, height: CELL_H, minWidth: CELL_W, position: 'relative', zIndex: isSwpAny ? 10 : 0 }}
+                                animate={swapAnim}
+                                transition={isSwpAny ? { duration: 0.45, ease: 'easeInOut' } : { duration: 0 }}
+                            >
+                                {val}
+                            </motion.div>
+                        );
+                    })}
+                </div>
             </div>
 
-            {/* Sorted zone label */}
+            {/* ── Index row ── */}
+            <div className="flex items-center mt-1" style={{ gap: CELL_GAP }}>
+                {arr.map((_, idx) => (
+                    <div key={idx} style={{ width: CELL_W }}
+                        className="flex justify-center text-[10px] text-slate-600 font-mono select-none">
+                        {idx}
+                    </div>
+                ))}
+            </div>
+
+            {/* ── Sorted boundary label ── */}
             {sortedFrom < n && (
-                <div className="flex items-center" style={{ gap: CELL_GAP, marginTop: 4 }}>
+                <div className="flex items-center mt-1" style={{ gap: CELL_GAP }}>
                     {arr.map((_, idx) => (
                         <div key={idx} style={{ width: CELL_W }} className="flex justify-center">
                             {idx === sortedFrom && (
@@ -473,27 +462,6 @@ const BubbleSortSyncedVisualizer = ({
                 <div className="flex-1 flex flex-col overflow-hidden relative min-w-0">
                     <div className="flex-1 flex flex-col items-center justify-center overflow-auto px-8 py-10 gap-8">
 
-                        {/* Pass / outer-loop indicator */}
-                        <AnimatePresence mode="wait">
-                            {passLabel && (
-                                <motion.div
-                                    key={passLabel}
-                                    className="flex items-center gap-3"
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1,  y: 0   }}
-                                    exit={{ opacity: 0,     y: -10 }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <span className="px-4 py-1.5 rounded-xl bg-indigo-900/60 border border-indigo-500/50 text-indigo-200 text-sm font-semibold font-mono">
-                                        {passLabel}
-                                    </span>
-                                    <span className="text-slate-600 text-xs">
-                                        Comparing up to index {n - (currentEv?.i ?? 0) - 2}
-                                    </span>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
                         {/* Array */}
                         <ArrayVisual arr={displayArr} ev={currentEv} n={n} />
 
@@ -512,22 +480,6 @@ const BubbleSortSyncedVisualizer = ({
                                 </motion.div>
                             )}
                         </AnimatePresence>
-
-                        {/* Legend */}
-                        <div className="flex items-center gap-5 text-xs text-slate-500">
-                            <span className="flex items-center gap-1.5">
-                                <span className="w-3 h-3 rounded bg-sky-500 inline-block" /> j (left)
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                                <span className="w-3 h-3 rounded bg-pink-500 inline-block" /> j+1 (right)
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                                <span className="w-3 h-3 rounded bg-rose-600 inline-block" /> swapping
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                                <span className="w-3 h-3 rounded bg-emerald-600 inline-block" /> sorted
-                            </span>
-                        </div>
                     </div>
 
                     {/* Status bar */}

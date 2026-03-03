@@ -11,6 +11,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import VisualizerControls from './VisualizerControls';
+import PointerBadgeRow from './PointerBadgeRow';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
 const CELL_W   = 40;
@@ -567,107 +568,18 @@ const NodeVisual = ({ node, phase, currentEvForNode, returningRanges = [] }) => 
                     sorted ✓
                 </motion.span>
             )}
-            {/* Pointer row — i and j slide; low/high pill; shrink pairs that share a cell */}
-            {(() => {
-                const BADGE    = 20;  // normal badge diameter
-                const BADGE_SM = 16;  // shrunk when sharing a cell
-                const LABEL_W  = 22;  // estimated px width of 'low'/'high' pill at normal size
-                const LABEL_SM = 18;  // shrunk pill width when sharing a cell
-                const PAIR_GAP = 2;   // gap between two elements sharing a cell
-
-                const rowW    = arr.length * CELL_W + (arr.length - 1) * CELL_GAP;
-                const centerX = (rel) => rel * (CELL_W + CELL_GAP) + CELL_W / 2;
-
-                const hasPointers = iRel !== null || jRel !== null;
-                const hasLabels   = recurseExtraIdx !== null;
-                if (!hasPointers && !hasLabels) return null;
-
-                // --- detect collisions ---
-                const ijSame     = iRel !== null && jRel !== null && iRel === jRel;
-                const labelHitsJ = hasLabels && jRel !== null && recurseExtraIdx === jRel;
-                const labelHitsI = hasLabels && iRel !== null && recurseExtraIdx === iRel;
-
-                // --- compute badge sizes (i & j) ---
-                const iSize = (ijSame || labelHitsI) ? BADGE_SM : BADGE;
-                const jSize = (ijSame || labelHitsJ) ? BADGE_SM : BADGE;
-
-                // --- compute x positions for i and j badges ---
-                let iX = iRel !== null
-                    ? (ijSame ? centerX(iRel) - 17        // left of the i+j pair
-                      : labelHitsI ? centerX(iRel) - (BADGE_SM + PAIR_GAP + LABEL_SM) / 2  // i left, label right
-                      : centerX(iRel) - BADGE / 2)       // normal center
-                    : null;
-
-                let jX = jRel === -1
-                    ? -(BADGE + CELL_GAP + 4)             // off left edge
-                    : jRel !== null
-                        ? (ijSame ? centerX(jRel) + 1            // right of the i+j pair (16+1)
-                          : labelHitsJ ? centerX(jRel) + (LABEL_SM + PAIR_GAP) / 2 // j right, label left
-                          : centerX(jRel) - BADGE / 2)   // normal center
-                        : null;
-
-                // --- compute label position ---
-                // label is rendered via left+transform by default; override when colliding
-                let labelStyle = {
-                    position: 'absolute', bottom: 0,
-                    left: hasLabels ? centerX(recurseExtraIdx) : 0,
-                    transform: 'translateX(-50%)',
-                };
-                let labelSm = false;
-                if (labelHitsJ && jX !== null) {
-                    // label sits LEFT of j badge
-                    const start = centerX(recurseExtraIdx) - (LABEL_SM + PAIR_GAP + BADGE_SM) / 2;
-                    labelStyle  = { position: 'absolute', bottom: 0, left: start, transform: 'none' };
-                    jX          = start + LABEL_SM + PAIR_GAP;
-                    labelSm     = true;
-                } else if (labelHitsI && iX !== null) {
-                    // label sits RIGHT of i badge
-                    const start = centerX(recurseExtraIdx) - (BADGE_SM + PAIR_GAP + LABEL_SM) / 2;
-                    iX          = start;
-                    labelStyle  = { position: 'absolute', bottom: 0, left: start + BADGE_SM + PAIR_GAP, transform: 'none' };
-                    labelSm     = true;
-                }
-
-                const slideTransition = { type: 'spring', stiffness: 260, damping: 28 };
-                // Per-property transition: x uses spring (no repeat), opacity loops independently
-                const blinkTransition = {
-                    x:       slideTransition,
-                    opacity: { repeat: Infinity, duration: 0.6, ease: 'easeInOut' },
-                };
-
-                return (
-                    <div style={{ position: 'relative', width: rowW, height: 22, flexShrink: 0 }}>
-                        {/* recurse low/high label pill — outer div owns the CSS transform, inner motion.div animates */}
-                        {hasLabels && (
-                            <div style={{ position: 'absolute', bottom: 0, left: labelStyle.left, transform: labelStyle.transform ?? 'none' }}>
-                                <motion.div
-                                    className={`rounded-full bg-sky-600 text-white flex items-center justify-center font-bold
-                                        ${labelSm ? 'px-1 h-4 text-[8px]' : 'px-1.5 h-5 text-[9px]'}`}
-                                    initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.2 }}>{recurseExtraLabel}</motion.div>
-                            </div>
-                        )}
-                        {/* i badge */}
-                        {iX !== null && (
-                            <motion.div
-                                className="rounded-full text-white flex items-center justify-center font-bold bg-sky-500"
-                                style={{ position: 'absolute', bottom: 0, left: 0, width: iSize, height: iSize, fontSize: iSize < BADGE ? 9 : 10 }}
-                                initial={{ x: iX }}
-                                animate={blinkPointers ? { x: iX, opacity: [1, 0.1, 1] } : { x: iX, opacity: 1 }}
-                                transition={blinkPointers ? blinkTransition : slideTransition}>i</motion.div>
-                        )}
-                        {/* j badge */}
-                        {jX !== null && (
-                            <motion.div
-                                className={`rounded-full text-white flex items-center justify-center font-bold ${compareJIdx !== null ? 'bg-pink-500' : 'bg-pink-600'}`}
-                                style={{ position: 'absolute', bottom: 0, left: 0, width: jSize, height: jSize, fontSize: jSize < BADGE ? 9 : 10 }}
-                                initial={{ x: jX }}
-                                animate={blinkPointers ? { x: jX, opacity: [1, 0.1, 1] } : { x: jX, opacity: 1 }}
-                                transition={blinkPointers ? blinkTransition : slideTransition}>j</motion.div>
-                        )}
-                    </div>
-                );
-            })()}
+            {/* Pointer row — i and j slide; low/high pill; collision handling */}
+            <PointerBadgeRow
+                cellW={CELL_W}
+                cellGap={CELL_GAP}
+                count={arr.length}
+                iRel={iRel}
+                jRel={jRel}
+                iClass="bg-sky-500"
+                jClass={compareJIdx !== null ? 'bg-pink-500' : 'bg-pink-600'}
+                blink={blinkPointers}
+                extraLabel={recurseExtraIdx !== null ? { rel: recurseExtraIdx, text: recurseExtraLabel } : null}
+            />
             {/* Array box */}
             <div className={`flex flex-col rounded-xl border-2 ${boxBg}`}
                 style={{ padding: `10px ${NODE_PAD}px` }}>
