@@ -16,6 +16,7 @@ import QuickSortCoreLogicVisualizer from './QuickSortCoreLogicVisualizer';
 import QuickSortSyncedVisualizer from './QuickSortSyncedVisualizer';
 import BubbleSortSyncedVisualizer from './BubbleSortSyncedVisualizer';
 import SelectionSortSyncedVisualizer from './SelectionSortSyncedVisualizer';
+import InsertionSortSyncedVisualizer from './InsertionSortSyncedVisualizer';
 
 // ============ MAIN DSA IMMERSIVE VISUALIZER ============
 const DSAImmersiveVisualizer = ({
@@ -135,6 +136,7 @@ const DSAImmersiveVisualizer = ({
                         {algorithmType === 'quick-sort' ? 'Quick Sort Visualizer'
                          : algorithmType === 'bubble-sort' ? 'Bubble Sort Visualizer'
                          : algorithmType === 'selection-sort' ? 'Selection Sort Visualizer'
+                         : algorithmType === 'insertion-sort' ? 'Insertion Sort Visualizer'
                          : 'Merge Sort Visualizer'}
                     </h1>
                 </div>
@@ -245,6 +247,8 @@ const DSAImmersiveVisualizer = ({
                         <BubbleSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
                     ) : algorithmType === 'selection-sort' ? (
                         <SelectionSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                    ) : algorithmType === 'insertion-sort' ? (
+                        <InsertionSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
                     ) : (
                         activeTab === 'combined' ? (
                             <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />

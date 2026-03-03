@@ -106,6 +106,30 @@ arr = ${arrString}
 sorted_arr = bubble_sort(arr)
 print("Sorted Array:", sorted_arr)`,
 
+    'insertion-sort': (arrString) => `def insertion_sort(arr):
+    n = len(arr)
+
+    for i in range(1, n):
+        key = arr[i]
+        j = i - 1
+
+        # Shift elements greater than key
+        # to one position ahead
+        while j >= 0 and arr[j] > key:
+            arr[j + 1] = arr[j]
+            j -= 1
+
+        arr[j + 1] = key
+
+    return arr
+
+
+
+arr = ${arrString}
+
+sorted_arr = insertion_sort(arr)
+print("Sorted Array:", sorted_arr)`,
+
     'selection-sort': (arrString) => `def selection_sort(arr):
     n = len(arr)
 
@@ -137,6 +161,7 @@ const DEFAULT_ARRAYS = {
     'quick-sort':      '[8, 3, 1, 5, 2, 7, 4]',
     'bubble-sort':     '[5, 1, 4, 2, 8, 0, 2]',
     'selection-sort':  '[64, 25, 12, 22, 11]',
+    'insertion-sort':  '[12, 11, 13, 5, 6]',
 };
 
 // Problem metadata
@@ -184,6 +209,21 @@ const problemsData = {
             "In-place Sorting",
             "Early Exit Optimization",
             "Pass-based Iteration"
+        ]
+    },
+    'insertion-sort': {
+        id: 5,
+        name: "Insertion Sort",
+        difficulty: "Easy",
+        category: "Sorting",
+        timeComplexity: "O(n²)",
+        spaceComplexity: "O(1)",
+        description: "Implement Insertion Sort to sort an array of integers. Insertion Sort builds the sorted array one element at a time by picking each element (the \"key\") and shifting larger sorted elements one position to the right until the correct position for the key is found. It is efficient for small or nearly-sorted arrays.",
+        concepts: [
+            "Key Element Selection",
+            "In-place Sorting",
+            "Shifting vs Swapping",
+            "Best Case O(n) on Nearly Sorted Data"
         ]
     },
     'selection-sort': {
