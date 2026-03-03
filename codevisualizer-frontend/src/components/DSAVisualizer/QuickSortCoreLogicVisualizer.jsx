@@ -149,69 +149,60 @@ const BUILD_EVENTS = (nodeMap, rootId) => {
             annotation: `Init pointers:  i = ${node.low}  (left end),   j = ${node.high}  (right end)`,
         });
 
-        // ── Step-by-step i scan (before first partition step) ──────────────
-        const step0 = node.partitionSteps[0];
-        if (step0) {
-            evs.push({
-                type: 'scan_i_explain', nodeId: node.id, scrollY: node.y,
-                annotation: `i starts at [${node.low}] — scan right to find the first value LARGER than pivot (${node.pivot})`,
-            });
-            // i moves one cell at a time while nums[pos] < pivot
-            for (let pos = step0.iFrom; pos < step0.iStop; pos++) {
+        // ── Scan + swap for every partition iteration ─────────────────────
+        node.partitionSteps.forEach((step, si_idx) => {
+            const ab = step.arrBefore;
+            const aa = step.arrAfter;
+            const slice = (a) => a.slice(node.low, node.high + 1);
+
+            // i scan — each step: move i to pos AND explain simultaneously
+            for (let pos = step.iFrom; pos < step.iStop; pos++) {
+                const isFirst = pos === step.iFrom;
                 evs.push({
                     type: 'scan_i_move', nodeId: node.id, scrollY: node.y,
-                    scanI: pos,
-                    annotation: `nums[${pos}] = ${step0.arrBefore[pos]} < pivot (${node.pivot}) — not large enough, i moves right →`,
+                    scanI: pos, arrSlice: slice(ab), iAbs: pos, jAbs: step.jFrom,
+                    annotation: isFirst && si_idx === 0
+                        ? `Scanning i →  nums[${pos}] = ${ab[pos]} < pivot (${node.pivot}) — not large enough, move right`
+                        : `nums[${pos}] = ${ab[pos]} < pivot (${node.pivot}) — not large enough, i moves right →`,
                 });
             }
             evs.push({
                 type: 'scan_i_found', nodeId: node.id, scrollY: node.y,
-                scanI: step0.iStop,
-                annotation: `nums[${step0.iStop}] = ${step0.arrBefore[step0.iStop]} ≥ pivot (${node.pivot}) — found the large element! Stop i here`,
+                scanI: step.iStop, arrSlice: slice(ab), iAbs: step.iStop, jAbs: step.jFrom,
+                annotation: `nums[${step.iStop}] = ${ab[step.iStop]} ≥ pivot (${node.pivot}) — found the large element! i stops here ✓`,
             });
 
-            // ── Step-by-step j scan ────────────────────────────────────────
-            evs.push({
-                type: 'scan_j_explain', nodeId: node.id, scrollY: node.y,
-                annotation: `j starts at [${node.high}] — scan left to find the first value SMALLER than pivot (${node.pivot})`,
-            });
-            for (let pos = step0.jFrom; pos > step0.jStop; pos--) {
+            // j scan — each step: move j to pos AND explain simultaneously
+            for (let pos = step.jFrom; pos > step.jStop; pos--) {
+                const isFirst = pos === step.jFrom;
                 evs.push({
                     type: 'scan_j_move', nodeId: node.id, scrollY: node.y,
-                    scanJ: pos,
-                    annotation: `nums[${pos}] = ${step0.arrBefore[pos]} > pivot (${node.pivot}) — not small enough, j moves left ←`,
+                    scanJ: pos, arrSlice: slice(ab), iAbs: step.iStop, jAbs: pos,
+                    annotation: isFirst && si_idx === 0
+                        ? `Scanning j ←  nums[${pos}] = ${ab[pos]} > pivot (${node.pivot}) — not small enough, move left`
+                        : `nums[${pos}] = ${ab[pos]} > pivot (${node.pivot}) — not small enough, j moves left ←`,
                 });
             }
             evs.push({
                 type: 'scan_j_found', nodeId: node.id, scrollY: node.y,
-                scanJ: step0.jStop,
-                annotation: `nums[${step0.jStop}] = ${step0.arrBefore[step0.jStop]} ≤ pivot (${node.pivot}) — found the small element! Stop j here`,
+                scanJ: step.jStop, arrSlice: slice(ab), iAbs: step.iStop, jAbs: step.jStop,
+                annotation: `nums[${step.jStop}] = ${ab[step.jStop]} ≤ pivot (${node.pivot}) — found the small element! j stops here ✓`,
             });
 
-            // ── Pre-swap: animate the actual swap ──────────────────────────
-            if (step0.didSwap) {
+            if (step.didSwap) {
                 evs.push({
                     type: 'pre_swap', nodeId: node.id, scrollY: node.y,
-                    annotation: `Now swap! nums[${step0.si}] = ${step0.arrBefore[step0.si]}  ↔  nums[${step0.sj}] = ${step0.arrBefore[step0.sj]}`,
+                    arrSlice: slice(aa), iAbs: step.si, jAbs: step.sj, swapI: step.si, swapJ: step.sj,
+                    annotation: `Now swap! nums[${step.si}] = ${ab[step.si]}  ↔  nums[${step.sj}] = ${ab[step.sj]}`,
                 });
                 evs.push({
                     type: 'post_swap', nodeId: node.id, scrollY: node.y,
-                    annotation: `Swap done! i++ → [${step0.si + 1}],  j-- → [${step0.sj - 1}]  —  now repeat: scan i → and j ← again until they cross`,
+                    arrSlice: slice(aa), iAbs: step.si + 1, jAbs: step.sj - 1,
+                    annotation: `Swap done! i++ → [${step.si + 1}],  j-- → [${step.sj - 1}]  —  now repeat: scan i → and j ← again until they cross`,
                 });
             }
-        }
-
-        node.partitionSteps.forEach((step, idx) => {
-            // step 0 is already fully covered by the educational scan/swap steps above
-            if (idx === 0) return;
-            const desc = step.didSwap
-                ? `i stopped at [${step.iStop}]=${step.arrBefore[step.iStop]},  j stopped at [${step.jStop}]=${step.arrBefore[step.jStop]}  →  Swap!  i++,  j--`
-                : `i=[${step.iStop}] ≥ pivot  &  j=[${step.jStop}] ≤ pivot  →  i > j,  partition loop ends`;
-            evs.push({
-                type: 'partition_step', nodeId: node.id, stepIdx: idx, scrollY: node.y,
-                annotation: desc,
-            });
         });
+        // No partition_step events — everything is shown educationally above
 
         evs.push({
             type: 'partition_done', nodeId: node.id,
@@ -250,8 +241,8 @@ const BUILD_EVENTS = (nodeMap, rootId) => {
 
 const DELAY = {
     appear: 650, base_case: 900, pivot_select: 1100, init_pointers: 900,
-    scan_i_explain: 1400, scan_i_move: 700, scan_i_found: 1200,
-    scan_j_explain: 1400, scan_j_move: 700, scan_j_found: 1200,
+    scan_i_move: 700, scan_i_found: 1200,
+    scan_j_move: 700, scan_j_found: 1200,
     pre_swap: 1500, post_swap: 1400,
     partition_step: 1000, partition_done: 900, spawn_child: 600,
     node_sorted: 800, final_done: 1800,
@@ -262,7 +253,7 @@ const getDelay = (ev, speed) => (DELAY[ev.type] ?? 800) / speed;
 // NodeCard  — one call-tree node with sliding i/j/P badges
 // ════════════════════════════════════════════════════════════════════════════════
 
-const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs }) => {
+const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs, evData }) => {
     const n      = node.high - node.low + 1;
     const cellsW = n * CELL_W + Math.max(0, n - 1) * CELL_GAP;
     const boxW   = cellsW + NODE_PAD * 2 + 4;
@@ -276,54 +267,24 @@ const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs }) => {
     let swappedI  = null;
     let swappedJ  = null;
 
-    if (phase === 'pivot_select' || phase === 'init_pointers') {
+    // Helper: use evData (live event snapshot) when available for scan/swap phases
+    const SCAN_SWAP_PHASES = new Set([
+        'scan_i_move','scan_i_found',
+        'scan_j_move','scan_j_found',
+        'pre_swap','post_swap',
+    ]);
+    if (SCAN_SWAP_PHASES.has(phase) && evData) {
+        arr      = evData.arrSlice ?? arr;
+        pivotRel = node.pivotIdx - node.low;
+        iRel     = evData.iAbs != null ? Math.max(0, Math.min(n - 1, evData.iAbs - node.low)) : null;
+        jRel     = evData.jAbs != null ? Math.max(0, Math.min(n - 1, evData.jAbs - node.low)) : null;
+        if (phase === 'pre_swap' && evData.swapI != null) {
+            swappedI = evData.swapI - node.low;
+            swappedJ = evData.swapJ - node.low;
+        }
+    } else if (phase === 'pivot_select' || phase === 'init_pointers') {
         pivotRel = node.pivotIdx - node.low;
         if (phase === 'init_pointers') { iRel = 0; jRel = n - 1; }
-    } else if (phase === 'scan_i_explain') {
-        pivotRel = node.pivotIdx - node.low;
-        iRel = 0; jRel = n - 1;
-    } else if (phase === 'scan_i_move' || phase === 'scan_i_found') {
-        pivotRel = node.pivotIdx - node.low;
-        iRel = scanIAbs !== null ? Math.max(0, scanIAbs - node.low) : 0;
-        jRel = n - 1;
-    } else if (phase === 'scan_j_explain') {
-        pivotRel = node.pivotIdx - node.low;
-        iRel = scanIAbs !== null ? Math.max(0, scanIAbs - node.low) : 0;
-        jRel = n - 1;
-    } else if (phase === 'scan_j_move' || phase === 'scan_j_found') {
-        pivotRel = node.pivotIdx - node.low;
-        iRel = scanIAbs !== null ? Math.max(0, scanIAbs - node.low) : 0;
-        jRel = scanJAbs !== null ? Math.max(0, scanJAbs - node.low) : n - 1;
-    } else if (phase === 'pre_swap') {
-        const st0 = node.partitionSteps[0];
-        if (st0) {
-            arr      = st0.arrAfter.slice(node.low, node.high + 1);
-            pivotRel = node.pivotIdx - node.low;
-            iRel     = st0.si - node.low;
-            jRel     = st0.sj - node.low;
-            swappedI = st0.si - node.low;
-            swappedJ = st0.sj - node.low;
-        }
-    } else if (phase === 'post_swap') {
-        const st0 = node.partitionSteps[0];
-        if (st0) {
-            arr      = st0.arrAfter.slice(node.low, node.high + 1);
-            pivotRel = node.pivotIdx - node.low;
-            iRel     = Math.min(n - 1, st0.si + 1 - node.low);
-            jRel     = Math.max(0, st0.sj - 1 - node.low);
-        }
-    } else if (phase === 'partition_step') {
-        const st = node.partitionSteps[stepIdx ?? 0]
-            ?? node.partitionSteps[node.partitionSteps.length - 1];
-        if (st) {
-            arr = st.arrAfter.slice(node.low, node.high + 1);
-            // Show i and j at their post-step positions — no swap highlight
-            // (swap was already animated in pre_swap; here i/j just move silently)
-            const ni = st.didSwap ? st.si + 1 : st.iStop;
-            const nj = st.didSwap ? st.sj - 1 : st.jStop;
-            iRel = Math.max(0, Math.min(n - 1, ni - node.low));
-            jRel = Math.max(0, Math.min(n - 1, nj - node.low));
-        }
     } else if (phase === 'partition_done') {
         arr   = node.arrAfterPartition.slice(node.low, node.high + 1);
         zones = { leftEnd: node.finalJ - node.low, rightStart: node.finalI - node.low };
@@ -363,8 +324,8 @@ const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs }) => {
     };
 
     // ── Box border/bg tint by phase ───────────────────────────────────────────
-    const isScanPhase = phase === 'scan_i_explain' || phase === 'scan_i_move' || phase === 'scan_i_found'
-        || phase === 'scan_j_explain' || phase === 'scan_j_move' || phase === 'scan_j_found';
+    const isScanPhase = phase === 'scan_i_move' || phase === 'scan_i_found'
+        || phase === 'scan_j_move' || phase === 'scan_j_found';
     const isPreSwap = phase === 'pre_swap';
     const boxBorder =
         zones === 'all_sorted'                                      ? 'border-emerald-600/60' :
@@ -537,10 +498,8 @@ const STEP_META = {
     base_case:      { icon: '✅', color: 'text-emerald-300', bar: 'border-emerald-700/40 bg-emerald-900/30' },
     pivot_select:   { icon: '🎯', color: 'text-amber-300',   bar: 'border-amber-700/40 bg-amber-900/30' },
     init_pointers:   { icon: '👆', color: 'text-sky-300',     bar: 'border-sky-700/40 bg-sky-900/30' },
-    scan_i_explain:  { icon: '🔍', color: 'text-sky-200',     bar: 'border-sky-800/40 bg-sky-950/60' },
     scan_i_move:     { icon: '➡️', color: 'text-slate-300',   bar: 'border-slate-700/30 bg-slate-900/60' },
     scan_i_found:    { icon: '✋', color: 'text-emerald-300', bar: 'border-emerald-700/40 bg-emerald-900/30' },
-    scan_j_explain:  { icon: '🔍', color: 'text-pink-200',   bar: 'border-pink-800/40 bg-pink-950/60' },
     scan_j_move:     { icon: '⬅️', color: 'text-slate-300',  bar: 'border-slate-700/30 bg-slate-900/60' },
     scan_j_found:    { icon: '✋', color: 'text-pink-300',   bar: 'border-pink-700/40 bg-pink-900/30' },
     pre_swap:        { icon: '🔀', color: 'text-rose-200',   bar: 'border-rose-600/50 bg-rose-950/60' },
@@ -628,30 +587,29 @@ const QuickSortCoreLogicVisualizer = ({
     // ── Derived: per-node phase ───────────────────────────────────────────────
     const processed = useMemo(() => events.slice(0, eventIdx + 1), [events, eventIdx]);
 
-    const { nodePhases, stepIdxMap, scanIMap, scanJMap } = useMemo(() => {
+    const { nodePhases, stepIdxMap, scanIMap, scanJMap, evDataMap } = useMemo(() => {
         const phases  = new Map();
         const stepMap = new Map();
         const scanMap = new Map();
         const scanJM  = new Map();
+        const evDM    = new Map(); // nodeId → latest evData for scan/swap phases
         processed.forEach(ev => {
             if (!ev.nodeId) return;
             if (ev.type === 'appear')          phases.set(ev.nodeId, 'appear');
             if (ev.type === 'base_case')       phases.set(ev.nodeId, 'base_case');
             if (ev.type === 'pivot_select')    phases.set(ev.nodeId, 'pivot_select');
             if (ev.type === 'init_pointers')   phases.set(ev.nodeId, 'init_pointers');
-            if (ev.type === 'scan_i_explain')  phases.set(ev.nodeId, 'scan_i_explain');
-            if (ev.type === 'scan_i_move')   { phases.set(ev.nodeId, 'scan_i_move');  scanMap.set(ev.nodeId, ev.scanI); }
-            if (ev.type === 'scan_i_found')  { phases.set(ev.nodeId, 'scan_i_found'); scanMap.set(ev.nodeId, ev.scanI); }
-            if (ev.type === 'scan_j_explain')  phases.set(ev.nodeId, 'scan_j_explain');
-            if (ev.type === 'scan_j_move')   { phases.set(ev.nodeId, 'scan_j_move');  scanJM.set(ev.nodeId, ev.scanJ); }
-            if (ev.type === 'scan_j_found')  { phases.set(ev.nodeId, 'scan_j_found'); scanJM.set(ev.nodeId, ev.scanJ); }
-            if (ev.type === 'pre_swap')        phases.set(ev.nodeId, 'pre_swap');
-            if (ev.type === 'post_swap')       phases.set(ev.nodeId, 'post_swap');
+            if (ev.type === 'scan_i_move')   { phases.set(ev.nodeId, 'scan_i_move');  scanMap.set(ev.nodeId, ev.scanI); evDM.set(ev.nodeId, ev); }
+            if (ev.type === 'scan_i_found')  { phases.set(ev.nodeId, 'scan_i_found'); scanMap.set(ev.nodeId, ev.scanI); evDM.set(ev.nodeId, ev); }
+            if (ev.type === 'scan_j_move')   { phases.set(ev.nodeId, 'scan_j_move');  scanJM.set(ev.nodeId, ev.scanJ); evDM.set(ev.nodeId, ev); }
+            if (ev.type === 'scan_j_found')  { phases.set(ev.nodeId, 'scan_j_found'); scanJM.set(ev.nodeId, ev.scanJ); evDM.set(ev.nodeId, ev); }
+            if (ev.type === 'pre_swap')      { phases.set(ev.nodeId, 'pre_swap');  evDM.set(ev.nodeId, ev); }
+            if (ev.type === 'post_swap')     { phases.set(ev.nodeId, 'post_swap'); evDM.set(ev.nodeId, ev); }
             if (ev.type === 'partition_step') { phases.set(ev.nodeId, 'partition_step'); stepMap.set(ev.nodeId, ev.stepIdx); }
             if (ev.type === 'partition_done')  phases.set(ev.nodeId, 'partition_done');
             if (ev.type === 'node_sorted')     phases.set(ev.nodeId, 'node_sorted');
         });
-        return { nodePhases: phases, stepIdxMap: stepMap, scanIMap: scanMap, scanJMap: scanJM };
+        return { nodePhases: phases, stepIdxMap: stepMap, scanIMap: scanMap, scanJMap: scanJM, evDataMap: evDM };
     }, [processed]);
 
     const visibleIds = useMemo(() => {
@@ -762,6 +720,7 @@ const QuickSortCoreLogicVisualizer = ({
                                         isActive={isActive}
                                         scanIAbs={scanIMap.get(node.id) ?? null}
                                         scanJAbs={scanJMap.get(node.id) ?? null}
+                                        evData={evDataMap.get(node.id) ?? null}
                                     />
                                 </motion.div>
                             );
@@ -772,8 +731,8 @@ const QuickSortCoreLogicVisualizer = ({
                     <AnimatePresence>
                         {currentEv && !finished && (() => {
                             const SHOW_TYPES = new Set([
-                                'scan_i_explain', 'scan_i_move', 'scan_i_found',
-                                'scan_j_explain', 'scan_j_move', 'scan_j_found',
+                                'scan_i_move', 'scan_i_found',
+                                'scan_j_move', 'scan_j_found',
                                 'pre_swap', 'post_swap',
                             ]);
                             if (!SHOW_TYPES.has(currentEv.type)) return null;
@@ -796,8 +755,6 @@ const QuickSortCoreLogicVisualizer = ({
                                     ? 'border-slate-600/50 bg-slate-800/90 text-slate-200'
                                 : currentEv.type === 'scan_j_found'
                                     ? 'border-pink-500/60 bg-pink-900/85 text-pink-100'
-                                : currentEv.type === 'scan_j_explain' || currentEv.type === 'scan_i_explain'
-                                    ? 'border-sky-500/60 bg-sky-900/85 text-sky-100'
                                 : currentEv.type === 'pre_swap'
                                     ? 'border-rose-500/60 bg-rose-900/85 text-rose-100'
                                 : 'border-sky-600/50 bg-sky-950/85 text-sky-100'; // post_swap
