@@ -45,6 +45,7 @@ const PointerBadgeRow = ({
     jClass     = 'bg-pink-600',
     j1Class    = 'bg-yellow-400',
     blink      = false,
+    jBlink     = false,   // blink only j badge (e.g. OOB in InsertionSort)
     extraLabel = null,   // { rel, text }
 }) => {
     const hasPointers = iRel !== null || jRel !== null || j1Rel !== null;
@@ -111,7 +112,7 @@ const PointerBadgeRow = ({
         opacity: { repeat: Infinity, duration: 0.6, ease: 'easeInOut' },
     };
     const iTrans  = blink ? blinkT : slide;
-    const jTrans  = blink ? blinkT : slide;
+    const jTrans  = (blink || jBlink) ? blinkT : slide;
     const j1Trans = slide;
 
     // ── j+1 badge x position (simple: always centred on its cell) ───────────
@@ -161,7 +162,7 @@ const PointerBadgeRow = ({
                         fontSize: jSize < BADGE ? 9 : 10,
                     }}
                     initial={{ x: jX }}
-                    animate={blink ? { x: jX, opacity: [1, 0.1, 1] } : { x: jX, opacity: 1 }}
+                    animate={(blink || jBlink) ? { x: jX, opacity: [1, 0.1, 1] } : { x: jX, opacity: 1 }}
                     transition={jTrans}
                 >
                     j

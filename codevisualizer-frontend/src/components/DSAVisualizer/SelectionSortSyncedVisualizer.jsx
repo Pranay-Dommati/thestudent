@@ -12,6 +12,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import VisualizerControls from './VisualizerControls';
+import PointerBadgeRow from './PointerBadgeRow';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
 const CELL_W   = 44;
@@ -276,37 +277,16 @@ const ArrayVisual = ({ arr, ev, n }) => {
     return (
         <div className="flex flex-col items-center gap-0" style={{ position: 'relative' }}>
 
-            {/* ── Pointer row ABOVE array (i = pink, j = sky) — QuickSort style ── */}
-            <div style={{ position: 'relative', width: rowW, height: 28, flexShrink: 0 }}>
-                <AnimatePresence>
-                    {/* i badge — sky circle */}
-                    {showIPtr && iIdx !== undefined && iIdx !== null && iIdx >= 0 && iIdx < n && (
-                        <motion.div
-                            key="i-badge"
-                            className="rounded-full bg-sky-500 text-white flex items-center justify-center font-bold text-[10px] select-none"
-                            style={{ position: 'absolute', bottom: 0, left: 0, width: BADGE, height: BADGE }}
-                            initial={{ x: centerX(iIdx) - BADGE / 2 }}
-                            animate={{ x: centerX(iIdx) - BADGE / 2 }}
-                            transition={slideTransition}
-                        >
-                            i
-                        </motion.div>
-                    )}
-                    {/* j badge — pink circle */}
-                    {showJPtr && jIdx !== undefined && jIdx !== null && jIdx >= 0 && jIdx < n && (
-                        <motion.div
-                            key="j-badge"
-                            className="rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-[10px] select-none"
-                            style={{ position: 'absolute', bottom: 0, left: 0, width: BADGE, height: BADGE }}
-                            initial={{ x: centerX(jIdx) - BADGE / 2 }}
-                            animate={{ x: centerX(jIdx) - BADGE / 2 }}
-                            transition={slideTransition}
-                        >
-                            j
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
+            {/* ── Pointer badge row (above array) — shared PointerBadgeRow ── */}
+            <PointerBadgeRow
+                cellW={CELL_W}
+                cellGap={CELL_GAP}
+                count={n}
+                iRel={showIPtr && iIdx !== undefined && iIdx !== null && iIdx >= 0 && iIdx < n ? iIdx : null}
+                jRel={showJPtr && jIdx !== undefined && jIdx !== null && jIdx >= 0 && jIdx < n ? jIdx : null}
+                iClass="bg-sky-500"
+                jClass="bg-pink-500"
+            />
 
             {/* ── Cell row ── */}
             <div className="flex items-center" style={{ gap: CELL_GAP }}>

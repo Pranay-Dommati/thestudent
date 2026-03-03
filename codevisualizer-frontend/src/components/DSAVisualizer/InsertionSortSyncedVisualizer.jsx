@@ -14,6 +14,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import VisualizerControls from './VisualizerControls';
+import PointerBadgeRow from './PointerBadgeRow';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
 const CELL_W   = 44;
@@ -202,8 +203,6 @@ const SyncedCodePanel = ({ code, activeLine, executedLines }) => {
 };
 
 // ── Array visual ──────────────────────────────────────────────────────────────
-const BADGE = 20;
-
 const ArrayVisual = ({ arr, ev, n }) => {
     if (!arr || arr.length === 0) return null;
 
@@ -235,8 +234,6 @@ const ArrayVisual = ({ arr, ev, n }) => {
     // Key box: floats above i; also shows on place_key so it can fly into the slot
     const showKeyBox = ['pick_key', 'init_j', 'while_check', 'shift', 'decrement_j', 'place_key'].includes(type)
                        && keyVal !== undefined && iIdx !== undefined && iIdx >= 0 && iIdx < n;
-
-    const slideTransition = { type: 'spring', stiffness: 320, damping: 28, mass: 0.8 };
 
     const getCellBg = (idx) => {
         const isSorted   = ['return_arr', 'final_done'].includes(type) && idx < sortedCount;
@@ -326,42 +323,23 @@ const ArrayVisual = ({ arr, ev, n }) => {
                 </AnimatePresence>
             </div>
 
-            {/* ── Pointer row ABOVE array ── */}
-            <div style={{ position: 'relative', width: rowW, height: 24, flexShrink: 0 }}>
-                <AnimatePresence>
-                    {/* i badge — sky circle */}
-                    {showIPtr && iIdx !== undefined && iIdx !== null && iIdx >= 0 && iIdx < n && (
-                        <motion.div
-                            key="i-badge"
-                            className="rounded-full bg-sky-500 text-white flex items-center justify-center font-bold text-[10px] select-none"
-                            style={{ position: 'absolute', bottom: 0, left: 0, width: BADGE, height: BADGE }}
-                            initial={{ x: iIdx * STRIDE + (CELL_W - BADGE) / 2 }}
-                            animate={{ x: iIdx * STRIDE + (CELL_W - BADGE) / 2 }}
-                            transition={slideTransition}
-                        >
-                            i
-                        </motion.div>
-                    )}
-                    {/* j badge — pink circle; stays visible at last known position */}
-                    {showJPtr && (() => {
-                        const jOOB      = stableJ < 0;
-                        const jBlinking = type === 'while_check' && !ev?.passed && jOOB;
-                        const jX        = (jOOB ? -(BADGE + 18) : stableJ * STRIDE) + (CELL_W - BADGE) / 2;
-                        return (
-                            <motion.div
-                                key="j-badge"
-                                className={`rounded-full bg-pink-600 text-white flex items-center justify-center font-bold text-[10px] select-none${jBlinking ? ' animate-pulse' : ''}`}
-                                style={{ position: 'absolute', bottom: 0, left: 0, width: BADGE, height: BADGE }}
-                                initial={{ x: jX }}
-                                animate={{ x: jX }}
-                                transition={slideTransition}
-                            >
-                                j
-                            </motion.div>
-                        );
-                    })()}
-                </AnimatePresence>
-            </div>
+            {/* ── Pointer badge row (above array) — shared PointerBadgeRow ── */}
+            {(() => {
+                const jOOB      = stableJ !== undefined && stableJ < 0;
+                const jBlinking = type === 'while_check' && !ev?.passed && jOOB;
+                return (
+                    <PointerBadgeRow
+                        cellW={CELL_W}
+                        cellGap={CELL_GAP}
+                        count={n}
+                        iRel={showIPtr && iIdx !== undefined && iIdx !== null && iIdx >= 0 && iIdx < n ? iIdx : null}
+                        jRel={showJPtr ? (stableJ < 0 ? -1 : stableJ) : null}
+                        iClass="bg-sky-500"
+                        jClass="bg-pink-600"
+                        jBlink={jBlinking}
+                    />
+                );
+            })()}
 
             {/* ── Cell row ── */}
             <div className="flex items-center" style={{ gap: CELL_GAP, position: 'relative' }}>
@@ -399,21 +377,14 @@ const ArrayVisual = ({ arr, ev, n }) => {
                 ))}
             </div>
 
-            {/* ── j+1 badge below array — always reserves height to prevent layout shifts ── */}
-            <div style={{ position: 'relative', width: rowW, height: BADGE + 4, marginTop: 4, flexShrink: 0 }}>
-                {showJPtr && (
-                    <motion.div
-                        key="j1-badge"
-                        className="rounded-full bg-pink-400 text-white flex items-center justify-center font-bold text-[9px] select-none"
-                        style={{ position: 'absolute', top: 0, left: 0, width: BADGE + 4, height: BADGE, lineHeight: 1 }}
-                        initial={{ x: (stableJ + 1) * STRIDE + (CELL_W - (BADGE + 4)) / 2 }}
-                        animate={{ x: (stableJ + 1) * STRIDE + (CELL_W - (BADGE + 4)) / 2 }}
-                        transition={slideTransition}
-                    >
-                        j+1
-                    </motion.div>
-                )}
-            </div>
+            {/* ── j+1 badge below index row — shared PointerBadgeRow ── */}
+            <PointerBadgeRow
+                cellW={CELL_W}
+                cellGap={CELL_GAP}
+                count={n}
+                j1Rel={showJPtr ? stableJ + 1 : null}
+                j1Class="bg-pink-400"
+            />
 
             {/* ── Sorted zone label — always reserves height to prevent layout shifts ── */}
             <div className="flex items-center" style={{ gap: CELL_GAP, marginTop: 4, height: 16 }}>
