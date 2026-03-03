@@ -81,12 +81,37 @@ print(result)`,
 nums = ${arrString}
 quick_sort(nums, 0, len(nums) - 1)
 print(nums)`,
+
+    'bubble-sort': (arrString) => `def bubble_sort(arr):
+    n = len(arr)
+
+    for i in range(n):
+        swapped = False
+
+        for j in range(0, n - i - 1):
+            if arr[j] > arr[j + 1]:
+                arr[j], arr[j + 1] = arr[j + 1], arr[j]
+                swapped = True
+
+        # If no swaps -> already sorted
+        if not swapped:
+            break
+
+    return arr
+
+
+
+arr = ${arrString}
+
+sorted_arr = bubble_sort(arr)
+print("Sorted Array:", sorted_arr)`,
 };
 
 // Default array for each problem
 const DEFAULT_ARRAYS = {
-    'merge-sort': '[38, 27, 43, 3, 9, 82, 10]',
-    'quick-sort': '[8, 3, 1, 5, 2, 7, 4]',
+    'merge-sort':  '[38, 27, 43, 3, 9, 82, 10]',
+    'quick-sort':  '[8, 3, 1, 5, 2, 7, 4]',
+    'bubble-sort': '[5, 1, 4, 2, 8, 0, 2]',
 };
 
 // Problem metadata
@@ -119,6 +144,21 @@ const problemsData = {
             "Two-pointer Technique",
             "Pivot Selection Strategy",
             "Recursive Divide & Conquer"
+        ]
+    },
+    'bubble-sort': {
+        id: 3,
+        name: "Bubble Sort",
+        difficulty: "Easy",
+        category: "Sorting",
+        timeComplexity: "O(n²)",
+        spaceComplexity: "O(1)",
+        description: "Implement Bubble Sort to sort an array of integers. Bubble Sort repeatedly steps through the list, compares adjacent elements and swaps them if they are in the wrong order. After each pass, the largest unsorted element \"bubbles up\" to its correct position. An early-exit optimization stops the algorithm when no swaps occur in a pass.",
+        concepts: [
+            "Adjacent Element Comparison",
+            "In-place Sorting",
+            "Early Exit Optimization",
+            "Pass-based Iteration"
         ]
     },
 };
@@ -517,7 +557,7 @@ const DSAProblemPage = () => {
                             {problem.name}
                         </h1>
                         <p className="text-slate-400 text-lg">
-                            Problem #{problem.id} • Sorting Algorithm
+                            Problem #{problem.id} • {problem.category}
                         </p>
                     </div>
 

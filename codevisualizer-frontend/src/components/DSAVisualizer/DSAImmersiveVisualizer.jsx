@@ -14,6 +14,7 @@ import CoreLogicVisualizer from './CoreLogicVisualizer';
 import SyncedCoreLogicVisualizer from './SyncedCoreLogicVisualizer';
 import QuickSortCoreLogicVisualizer from './QuickSortCoreLogicVisualizer';
 import QuickSortSyncedVisualizer from './QuickSortSyncedVisualizer';
+import BubbleSortSyncedVisualizer from './BubbleSortSyncedVisualizer';
 
 // ============ MAIN DSA IMMERSIVE VISUALIZER ============
 const DSAImmersiveVisualizer = ({
@@ -130,7 +131,9 @@ const DSAImmersiveVisualizer = ({
 
                     <h1 className="text-base font-semibold text-white flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-amber-400" />
-                        {algorithmType === 'quick-sort' ? 'Quick Sort Visualizer' : 'Merge Sort Visualizer'}
+                        {algorithmType === 'quick-sort' ? 'Quick Sort Visualizer'
+                         : algorithmType === 'bubble-sort' ? 'Bubble Sort Visualizer'
+                         : 'Merge Sort Visualizer'}
                     </h1>
                 </div>
 
@@ -236,6 +239,8 @@ const DSAImmersiveVisualizer = ({
                         ) : (
                             <QuickSortCoreLogicVisualizer customArray={customArray} onProgress={setProgress} seekRef={logicSeekRef} />
                         )
+                    ) : algorithmType === 'bubble-sort' ? (
+                        <BubbleSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
                     ) : (
                         activeTab === 'combined' ? (
                             <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
