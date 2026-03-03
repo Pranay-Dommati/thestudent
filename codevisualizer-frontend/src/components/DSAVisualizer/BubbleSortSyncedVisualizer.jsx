@@ -247,30 +247,35 @@ const ArrayVisual = ({ arr, ev, n }) => {
     return (
         <div className="flex flex-col items-center gap-0" style={{ position: 'relative' }}>
 
-            {/* ── Boundary marker — arrow + label at cell n-i-1 ── */}
+            {/* ── Boundary marker — label centered, arrow precisely on last-j cell ── */}
             {(() => {
                 const showBoundary = jIdx !== null && jIdx !== undefined
                     && outerI !== null && outerI !== undefined;
-                if (!showBoundary) return <div style={{ height: 36 }} />;
-                const a    = n - outerI - 1;
+                if (!showBoundary) return <div style={{ height: 44 }} />;
+                const a    = n - outerI - 1;          // exclusive upper bound (n-i-1)
+                const last = a - 1;                   // last valid j index
                 const rowW = n * CELL_W + (n - 1) * CELL_GAP;
-                const cx   = (a - 1) * STRIDE + CELL_W / 2;
+                const arrowCx = last * STRIDE + CELL_W / 2;
                 return (
-                    <div style={{ position: 'relative', width: rowW, height: 36, flexShrink: 0 }}>
-                        <motion.div
-                            key={a}
-                            style={{ position: 'absolute', left: cx, transform: 'translateX(-50%)', bottom: 0,
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}
-                            initial={{ opacity: 0, y: -4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.2 }}
-                        >
-                            <span className="text-[9px] text-indigo-300 font-mono whitespace-nowrap leading-tight">
-                                n-i-1&nbsp;=&nbsp;{a},&nbsp;j:&nbsp;(0,&nbsp;{a - 1})
+                    <motion.div
+                        key={a}
+                        style={{ position: 'relative', width: rowW, height: 44, flexShrink: 0 }}
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        {/* Label + arrow — together, pinned to last-j cell */}
+                        <div style={{ position: 'absolute', bottom: 0, left: arrowCx, transform: 'translateX(-50%)',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                            <span className="px-2 py-0.5 rounded-md bg-indigo-900/80 border border-indigo-500/60
+                                text-[9px] text-indigo-200 font-mono whitespace-nowrap leading-tight tracking-wide shadow-sm">
+                                n‑i‑1&nbsp;=&nbsp;{a},&nbsp;j:&nbsp;(0,&nbsp;{last})
                             </span>
-                            <span className="text-indigo-400 leading-none" style={{ fontSize: 14 }}>↓</span>
-                        </motion.div>
-                    </div>
+                            <svg width="10" height="14" viewBox="0 0 10 14" fill="none">
+                                <path d="M5 0 L5 10 M2 7 L5 12 L8 7" stroke="#818cf8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                        </div>
+                    </motion.div>
                 );
             })()}
 
