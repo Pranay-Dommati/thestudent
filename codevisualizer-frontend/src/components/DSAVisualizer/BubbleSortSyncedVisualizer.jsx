@@ -7,10 +7,11 @@
  * Code panel on the right with line highlighting + VisualizerControls.
  */
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PointerBadgeRow from './PointerBadgeRow';
 import VisualizerControls from './VisualizerControls';
+import { highlightSyntax, SyncedCodePanel, AnnotationCard, parseInputArray, useVisualizerPlayback } from './visualizerShared';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
 const CELL_W   = 40;
@@ -129,88 +130,6 @@ const simulateBubbleSort = (inputArr) => {
     return { events, finalArr: [...arr] };
 };
 
-// ── Syntax highlight (matches QuickSort / MergeSort panels) ─────────────────
-const KW = new Set([
-    'def', 'if', 'for', 'while', 'return', 'True', 'False',
-    'break', 'in', 'not', 'and', 'or', 'range', 'print', 'len',
-]);
-
-const highlightSyntax = (line) => {
-    const tokens = line.split(/(\s+|[(),=\[\]#:+><!])/);
-    let key = 0;
-    const result = [];
-    for (const tok of tokens) {
-        if (!tok) continue;
-        if (tok.startsWith('#')) {
-            result.push(<span key={key++} className="text-slate-500 italic">{tok}</span>);
-            break;
-        }
-        if (KW.has(tok)) {
-            result.push(<span key={key++} className="text-purple-400 font-semibold">{tok}</span>);
-            continue;
-        }
-        if (/^[0-9]+$/.test(tok)) {
-            result.push(<span key={key++} className="text-amber-300">{tok}</span>);
-            continue;
-        }
-        if (/^["']/.test(tok)) {
-            result.push(<span key={key++} className="text-emerald-300">{tok}</span>);
-            continue;
-        }
-        result.push(<span key={key++} className="text-slate-300">{tok}</span>);
-    }
-    return result;
-};
-
-// ── Code panel (identical interface to QuickSort / MergeSort) ────────────────
-const SyncedCodePanel = ({ code, activeLine, executedLines }) => {
-    const lines    = code ? code.split('\n') : [];
-    const lineRefs = useRef({});
-
-    useEffect(() => {
-        if (activeLine && lineRefs.current[activeLine]) {
-            lineRefs.current[activeLine].scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    }, [activeLine]);
-
-    return (
-        <div className="flex-1 overflow-y-auto py-2 font-mono text-[13px] leading-[1.7]">
-            {lines.map((line, idx) => {
-                const num     = idx + 1;
-                const isCur   = num === activeLine;
-                const wasDone = executedLines.includes(num);
-                return (
-                    <div
-                        key={idx}
-                        ref={el => lineRefs.current[num] = el}
-                        className={`flex transition-all duration-200 ${
-                            isCur    ? 'bg-blue-500/20 border-l-2 border-blue-400'
-                            : wasDone ? 'bg-slate-800/30 border-l-2 border-emerald-500/30'
-                            : 'border-l-2 border-transparent'
-                        }`}
-                    >
-                        <span className={`w-10 text-right pr-3 select-none shrink-0 ${
-                            isCur    ? 'text-blue-400 font-bold'
-                            : wasDone ? 'text-emerald-500/70'
-                            : 'text-slate-600'
-                        }`}>
-                            {num}
-                        </span>
-                        <span
-                            className={`pr-4 select-text cursor-text ${
-                                isCur ? 'text-blue-100' : wasDone ? 'text-slate-400' : 'text-slate-500'
-                            }`}
-                            style={{ whiteSpace: 'pre' }}
-                        >
-                            {highlightSyntax(line) || <span>&nbsp;</span>}
-                        </span>
-                    </div>
-                );
-            })}
-        </div>
-    );
-};
-
 // ── Array visual ─────────────────────────────────────────────────────────────
 const ArrayVisual = ({ arr, ev, n }) => {
     if (!arr || arr.length === 0) return null;
@@ -222,7 +141,7 @@ const ArrayVisual = ({ arr, ev, n }) => {
     // Which events show the j pointer sliding
     const showJ = ['inner_iter', 'compare', 'swap_exec', 'swapped_true'].includes(type);
     // Which events show the i boundary pointer
-    const showI = ['outer_iter', 'inner_iter', 'compare',
+    const showI = ['outer_iter', 'swapped_false', 'inner_iter', 'compare',
                    'swap_exec', 'swapped_true', 'check_sorted', 'early_break'].includes(type);
 
     // i badge sits at index outerI (0, 1, 2 … as passes progress)
@@ -357,77 +276,15 @@ const BubbleSortSyncedVisualizer = ({
     onProgress,
     seekRef,
 }) => {
-    const inputArr = useMemo(() => {
-        try {
-            const p = JSON.parse(customArray.trim());
-            if (Array.isArray(p)) return p.map(Number);
-        } catch {}
-        return [5, 1, 4, 2, 8, 0, 2];
-    }, [customArray]);
+    const inputArr = useMemo(() => parseInputArray(customArray, [5, 1, 4, 2, 8, 0, 2]), [customArray]);
 
     const { events, finalArr } = useMemo(() => simulateBubbleSort(inputArr), [inputArr]);
 
-    // ── Animation state ───────────────────────────────────────────────────────
-    const [eventIdx, setEventIdx] = useState(-1);
-    const [playing,  setPlaying]  = useState(false);
-    const [finished, setFinished] = useState(false);
-    const [speed,    setSpeed]    = useState(1);
-
-    // Reset when input changes
-    useEffect(() => {
-        setEventIdx(-1); setPlaying(false); setFinished(false);
-    }, [inputArr]);
-
-    // Auto-advance timer
-    useEffect(() => {
-        if (!playing || finished) return;
-        const nextIdx = eventIdx + 1;
-        if (nextIdx >= events.length) { setFinished(true); setPlaying(false); return; }
-        const t = setTimeout(() => {
-            setEventIdx(nextIdx);
-            if (nextIdx >= events.length - 1) { setFinished(true); setPlaying(false); }
-        }, getDelay(events[nextIdx], speed));
-        return () => clearTimeout(t);
-    }, [playing, eventIdx, events, finished, speed]);
-
-    // Controls
-    const handlePlay  = () => {
-        if (finished) { setEventIdx(-1); setFinished(false); setTimeout(() => setPlaying(true), 80); }
-        else setPlaying(true);
-    };
-    const handlePause = () => setPlaying(false);
-    const handleReset = () => { setPlaying(false); setFinished(false); setEventIdx(-1); };
-    const handleBack  = () => {
-        setPlaying(false); setFinished(false);
-        setEventIdx(i => Math.max(-1, i - 1));
-    };
-    const handleNext  = () => {
-        setPlaying(false);
-        const ni = eventIdx + 1;
-        if (ni >= events.length) { setFinished(true); }
-        else { setEventIdx(ni); if (ni >= events.length - 1) setFinished(true); }
-    };
-
-    // Seek support (scrubber in header)
-    useEffect(() => {
-        if (seekRef) seekRef.current = (idx) => {
-            setPlaying(false);
-            setFinished(idx >= events.length - 1);
-            setEventIdx(Math.max(-1, Math.min(events.length - 1, idx)));
-        };
-    }, [seekRef, events.length]);
-
-    // Report progress to header scrubber
-    useEffect(() => { onProgress?.({ idx: eventIdx, total: events.length }); }, [eventIdx, events.length, onProgress]);
-
-    // ── Derived state ─────────────────────────────────────────────────────────
-    const currentEv     = events[eventIdx] ?? null;
-    const activeLine    = currentEv?.codeLine ?? null;
-    const executedLines = useMemo(() => {
-        const s = new Set();
-        events.slice(0, eventIdx + 1).forEach(e => { if (e.codeLine) s.add(e.codeLine); });
-        return [...s];
-    }, [events, eventIdx]);
+    // ── Playback state machine ────────────────────────────────────────────────
+    const { eventIdx, playing, finished, speed, setSpeed,
+            handlePlay, handlePause, handleReset, handleBack, handleNext,
+            currentEv, activeLine, executedLines } =
+        useVisualizerPlayback({ events, getDelay, inputArr, seekRef, onProgress });
 
     const displayArr    = currentEv?.arr ?? inputArr;
     const n             = inputArr.length;
@@ -471,20 +328,7 @@ const BubbleSortSyncedVisualizer = ({
                         <ArrayVisual arr={displayArr} ev={currentEv} n={n} />
 
                         {/* Annotation card */}
-                        <AnimatePresence mode="wait">
-                            {currentEv?.annotation && (
-                                <motion.div
-                                    key={currentEv.annotation}
-                                    className="max-w-lg text-center px-5 py-3 rounded-xl border border-amber-600/50 bg-amber-900/40 text-amber-200 text-sm font-medium leading-snug shadow-xl backdrop-blur-sm"
-                                    initial={{ opacity: 0, y: 8  }}
-                                    animate={{ opacity: 1, y: 0  }}
-                                    exit={{    opacity: 0, y: -8 }}
-                                    transition={{ duration: 0.18 }}
-                                >
-                                    {currentEv.annotation}
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                        <AnnotationCard text={currentEv?.annotation} />
                     </div>
 
                     {/* Status bar */}
