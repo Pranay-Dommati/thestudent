@@ -5,15 +5,16 @@ import { HiBookOpen } from 'react-icons/hi2';
 
 // List of DSA Problems
 const dsaProblems = [
-    { id: 1, name: "Merge Sort",   slug: "merge-sort",   difficulty: "Medium", category: "Divide & Conquer", available: true },
-    { id: 2, name: "Quick Sort",   slug: "quick-sort",   difficulty: "Medium", category: "Divide & Conquer", available: true },
-    { id: 3, name: "Bubble Sort",  slug: "bubble-sort",  difficulty: "Easy",   category: "Sorting",         available: true },
-    { id: 4, name: "Binary Search",       slug: "binary-search",       difficulty: "Easy",   category: "Searching",           available: false },
-    { id: 5, name: "Two Sum",             slug: "two-sum",             difficulty: "Easy",   category: "Arrays",              available: false },
-    { id: 6, name: "Linked List Reversal", slug: "linked-list-reversal", difficulty: "Easy", category: "Linked List",         available: false },
-    { id: 7, name: "Valid Parentheses",   slug: "valid-parentheses",   difficulty: "Easy",   category: "Stack",               available: false },
-    { id: 8, name: "Maximum Subarray",    slug: "maximum-subarray",    difficulty: "Medium", category: "Dynamic Programming", available: false },
-    { id: 9, name: "Binary Tree Inorder", slug: "binary-tree-inorder", difficulty: "Easy",   category: "Trees",               available: false },
+    { id: 1,  name: "Merge Sort",          slug: "merge-sort",          difficulty: "Medium", category: "Divide & Conquer",    available: true  },
+    { id: 2,  name: "Quick Sort",          slug: "quick-sort",          difficulty: "Medium", category: "Divide & Conquer",    available: true  },
+    { id: 3,  name: "Bubble Sort",         slug: "bubble-sort",         difficulty: "Easy",   category: "Sorting",             available: true  },
+    { id: 4,  name: "Selection Sort",      slug: "selection-sort",      difficulty: "Easy",   category: "Sorting",             available: true  },
+    { id: 5,  name: "Binary Search",       slug: "binary-search",       difficulty: "Easy",   category: "Searching",           available: false },
+    { id: 6,  name: "Two Sum",             slug: "two-sum",             difficulty: "Easy",   category: "Arrays",              available: false },
+    { id: 7,  name: "Linked List Reversal", slug: "linked-list-reversal", difficulty: "Easy", category: "Linked List",        available: false },
+    { id: 8,  name: "Valid Parentheses",   slug: "valid-parentheses",   difficulty: "Easy",   category: "Stack",               available: false },
+    { id: 9,  name: "Maximum Subarray",    slug: "maximum-subarray",    difficulty: "Medium", category: "Dynamic Programming", available: false },
+    { id: 10, name: "Binary Tree Inorder", slug: "binary-tree-inorder", difficulty: "Easy",   category: "Trees",               available: false },
 ];
 
 const DSASheetsPanel = ({ isOpen, onClose }) => {

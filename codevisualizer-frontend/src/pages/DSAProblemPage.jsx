@@ -105,13 +105,38 @@ arr = ${arrString}
 
 sorted_arr = bubble_sort(arr)
 print("Sorted Array:", sorted_arr)`,
+
+    'selection-sort': (arrString) => `def selection_sort(arr):
+    n = len(arr)
+
+    for i in range(n - 1):
+        min_index = i
+
+        # Find minimum in remaining unsorted array
+        for j in range(i + 1, n):
+            if arr[j] < arr[min_index]:
+                min_index = j
+
+        # Swap only if needed
+        if min_index != i:
+            arr[i], arr[min_index] = arr[min_index], arr[i]
+
+    return arr
+
+
+
+arr = ${arrString}
+
+sorted_arr = selection_sort(arr)
+print("Sorted Array:", sorted_arr)`,
 };
 
 // Default array for each problem
 const DEFAULT_ARRAYS = {
-    'merge-sort':  '[38, 27, 43, 3, 9, 82, 10]',
-    'quick-sort':  '[8, 3, 1, 5, 2, 7, 4]',
-    'bubble-sort': '[5, 1, 4, 2, 8, 0, 2]',
+    'merge-sort':      '[38, 27, 43, 3, 9, 82, 10]',
+    'quick-sort':      '[8, 3, 1, 5, 2, 7, 4]',
+    'bubble-sort':     '[5, 1, 4, 2, 8, 0, 2]',
+    'selection-sort':  '[64, 25, 12, 22, 11]',
 };
 
 // Problem metadata
@@ -158,6 +183,21 @@ const problemsData = {
             "Adjacent Element Comparison",
             "In-place Sorting",
             "Early Exit Optimization",
+            "Pass-based Iteration"
+        ]
+    },
+    'selection-sort': {
+        id: 4,
+        name: "Selection Sort",
+        difficulty: "Easy",
+        category: "Sorting",
+        timeComplexity: "O(n²)",
+        spaceComplexity: "O(1)",
+        description: "Implement Selection Sort to sort an array of integers. Selection Sort divides the input into a sorted left region and an unsorted right region. On each pass it scans the unsorted region to find the minimum element, then swaps it into its correct sorted position. The swap is skipped when the minimum is already in place.",
+        concepts: [
+            "Minimum Element Selection",
+            "In-place Sorting",
+            "Conditional Swap Optimisation",
             "Pass-based Iteration"
         ]
     },
