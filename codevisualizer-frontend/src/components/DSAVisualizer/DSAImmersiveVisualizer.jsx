@@ -27,7 +27,7 @@ const DSAImmersiveVisualizer = ({
     customArray = '[38, 27, 43, 3, 9, 82, 10]',
     onRerun = null // Callback to rerun with new array: (arrayString) => void
 }) => {
-    const [activeTab, setActiveTab] = useState('logic'); // 'logic' | 'combined'
+    const [activeTab, setActiveTab] = useState('combined'); // 'logic' | 'combined'
 
     // Scrubber state (shared across tabs)
     const [progress, setProgress]   = useState({ idx: -1, total: 0 });
@@ -134,25 +134,11 @@ const DSAImmersiveVisualizer = ({
                     </h1>
                 </div>
 
-                {/* Center: View Tabs */}
+                {/* Center: View Tabs — Core Logic hidden */}
                 <div className="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-slate-700">
                     <button
-                        onClick={() => setActiveTab('logic')}
-                        className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${
-                            activeTab === 'logic'
-                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
-                                : 'text-slate-400 hover:text-white hover:bg-slate-700'
-                        }`}
-                    >
-                        Core Logic
-                    </button>
-                    <button
                         onClick={() => setActiveTab('combined')}
-                        className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${
-                            activeTab === 'combined'
-                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
-                                : 'text-slate-400 hover:text-white hover:bg-slate-700'
-                        }`}
+                        className="px-4 py-1.5 text-sm font-medium rounded-lg transition-all bg-indigo-600 text-white shadow-md shadow-indigo-900/50"
                     >
                         Code Execution
                     </button>

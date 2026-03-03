@@ -98,6 +98,9 @@ const simulateQuickSort = (inputArr) => {
         if (j >= low)  node.leftChildId  = dfs(low,  j,    depth + 1, id);
         if (i <= high) node.rightChildId = dfs(i,     high, depth + 1, id);
 
+        // After all children have recursed, nums[low..high] is fully sorted
+        node.arrSorted = [...nums];
+
         return id;
     };
 
@@ -111,12 +114,48 @@ const simulateQuickSort = (inputArr) => {
     return { nodeMap, rootId, finalArr: [...nums] };
 };
 
-const assignLayout = (nodeMap) => {
-    for (const node of nodeMap.values()) {
-        const mid = (node.low + node.high) / 2;
-        node.x = mid * ELEM_W + LEFT_PAD;
-        node.y = node.depth * LEVEL_H;
-    }
+const assignLayout = (nodeMap, rootId) => {
+    const GAP = 24; // horizontal gap between sibling subtrees
+
+    // Bottom-up: compute minimum enclosing subtree width for each node
+    const computeSubW = (node) => {
+        if (!node || node._subW != null) return node?._subW ?? 0;
+        const n = node.high - node.low + 1;
+        const selfW = n * CELL_W + Math.max(0, n - 1) * CELL_GAP + NODE_PAD * 2 + 4 + 48;
+        const lw = computeSubW(node.left);
+        const rw = computeSubW(node.right);
+        const childW = lw + (lw > 0 && rw > 0 ? GAP : 0) + rw;
+        node._subW = Math.max(selfW, childW);
+        return node._subW;
+    };
+
+    const root = nodeMap.get(rootId);
+    computeSubW(root);
+
+    // Y: depth-based
+    for (const node of nodeMap.values()) node.y = node.depth * LEVEL_H;
+
+    // Top-down: assign x from subtree widths
+    const MIN_OFF = 80; // minimum horizontal offset so single children always draw a diagonal
+    const assignX = (node, cx) => {
+        if (!node) return;
+        node.x = cx;
+        const lw = node.left  ? node.left._subW  : 0;
+        const rw = node.right ? node.right._subW : 0;
+        const tot = lw + (lw > 0 && rw > 0 ? GAP : 0) + rw;
+        if (node.left && node.right) {
+            assignX(node.left,  cx - tot / 2 + lw / 2);
+            assignX(node.right, cx + tot / 2 - rw / 2);
+        } else if (node.left) {
+            assignX(node.left,  cx - Math.max(MIN_OFF, lw / 2));
+        } else if (node.right) {
+            assignX(node.right, cx + Math.max(MIN_OFF, rw / 2));
+        }
+    };
+
+    const rootW = root._subW;
+    assignX(root, rootW / 2 + 20);
+    return rootW + 40; // total canvas width
 };
 
 // ── Event stream ──────────────────────────────────────────────────────────────
@@ -155,66 +194,48 @@ const BUILD_EVENTS = (nodeMap, rootId) => {
             const aa = step.arrAfter;
             const slice = (a) => a.slice(node.low, node.high + 1);
 
-            // i scan — each step: move i to pos AND explain simultaneously
-            for (let pos = step.iFrom; pos < step.iStop; pos++) {
-                const isFirst = pos === step.iFrom;
-                evs.push({
-                    type: 'scan_i_move', nodeId: node.id, scrollY: node.y,
-                    scanI: pos, arrSlice: slice(ab), iAbs: pos, jAbs: step.jFrom,
-                    annotation: isFirst && si_idx === 0
-                        ? `Scanning i →  nums[${pos}] = ${ab[pos]} < pivot (${node.pivot}) — not large enough, move right`
-                        : `nums[${pos}] = ${ab[pos]} < pivot (${node.pivot}) — not large enough, i moves right →`,
-                });
-            }
+            // i scan — jump straight to the first element ≥ pivot (no intermediate steps)
             evs.push({
                 type: 'scan_i_found', nodeId: node.id, scrollY: node.y,
                 scanI: step.iStop, arrSlice: slice(ab), iAbs: step.iStop, jAbs: step.jFrom,
-                annotation: `nums[${step.iStop}] = ${ab[step.iStop]} ≥ pivot (${node.pivot}) — found the large element! i stops here ✓`,
+                annotation: `Scanning i →  nums[${step.iStop}] = ${ab[step.iStop]} ≥ pivot (${node.pivot}) — first element ≥ pivot found, i stops ✓`,
             });
 
-            // j scan — each step: move j to pos AND explain simultaneously
-            for (let pos = step.jFrom; pos > step.jStop; pos--) {
-                const isFirst = pos === step.jFrom;
-                evs.push({
-                    type: 'scan_j_move', nodeId: node.id, scrollY: node.y,
-                    scanJ: pos, arrSlice: slice(ab), iAbs: step.iStop, jAbs: pos,
-                    annotation: isFirst && si_idx === 0
-                        ? `Scanning j ←  nums[${pos}] = ${ab[pos]} > pivot (${node.pivot}) — not small enough, move left`
-                        : `nums[${pos}] = ${ab[pos]} > pivot (${node.pivot}) — not small enough, j moves left ←`,
-                });
-            }
+            // j scan — jump straight to the first element ≤ pivot (no intermediate steps)
             evs.push({
                 type: 'scan_j_found', nodeId: node.id, scrollY: node.y,
                 scanJ: step.jStop, arrSlice: slice(ab), iAbs: step.iStop, jAbs: step.jStop,
-                annotation: `nums[${step.jStop}] = ${ab[step.jStop]} ≤ pivot (${node.pivot}) — found the small element! j stops here ✓`,
+                annotation: `Scanning j ←  nums[${step.jStop}] = ${ab[step.jStop]} ≤ pivot (${node.pivot}) — first element ≤ pivot found, j stops ✓`,
             });
 
             if (step.didSwap) {
                 evs.push({
                     type: 'pre_swap', nodeId: node.id, scrollY: node.y,
                     arrSlice: slice(aa), iAbs: step.si, jAbs: step.sj, swapI: step.si, swapJ: step.sj,
-                    annotation: `Now swap! nums[${step.si}] = ${ab[step.si]}  ↔  nums[${step.sj}] = ${ab[step.sj]}`,
+                    annotation: `i ≤ j so swap! nums[${step.si}] = ${ab[step.si]}  ↔  nums[${step.sj}] = ${ab[step.sj]}`,
                 });
                 evs.push({
                     type: 'post_swap', nodeId: node.id, scrollY: node.y,
                     arrSlice: slice(aa), iAbs: step.si + 1, jAbs: step.sj - 1,
-                    annotation: `Swap done! i++ → [${step.si + 1}],  j-- → [${step.sj - 1}]  —  now repeat: scan i → and j ← again until they cross`,
+                    annotation: `Swap done — advance: i++ → [${step.si + 1}],  j-- → [${step.sj - 1}] — repeat the scan`,
                 });
             }
         });
-        // No partition_step events — everything is shown educationally above
 
+        // i and j have crossed — partition complete, show zones now
         evs.push({
-            type: 'partition_done', nodeId: node.id,
-            scrollY: Math.max(0, node.y + LEVEL_H - 80),
-            annotation: `Partition done:  [${node.low}..${node.finalJ}] ≤ ${node.pivot} ≤ [${node.finalI}..${node.high}]`,
+            type: 'i_j_cross', nodeId: node.id, scrollY: node.y,
+            arrSlice: node.arrAfterPartition.slice(node.low, node.high + 1),
+            iAbs: node.finalI, jAbs: node.finalJ,
+            annotation: `i (=[${node.finalI}]) crossed past j (=[${node.finalJ}])! ` +
+                `Left half: sort(${node.low}, ${node.finalJ}) — Right half: sort(${node.finalI}, ${node.high})`,
         });
 
         if (node.left) {
             evs.push({
                 type: 'spawn_child', nodeId: node.id, childId: node.leftChildId,
                 scrollY: Math.max(0, node.y + LEVEL_H - 80),
-                annotation: `Recurse left partition:  sort(${node.low}, ${node.finalJ})`,
+                annotation: `Recursing left: sort(${node.low}, ${node.finalJ})`,
             });
             dfs(node.left);
         }
@@ -222,7 +243,7 @@ const BUILD_EVENTS = (nodeMap, rootId) => {
             evs.push({
                 type: 'spawn_child', nodeId: node.id, childId: node.rightChildId,
                 scrollY: Math.max(0, node.y + LEVEL_H - 80),
-                annotation: `Recurse right partition:  sort(${node.finalI}, ${node.high})`,
+                annotation: `Recursing right: sort(${node.finalI}, ${node.high})`,
             });
             dfs(node.right);
         }
@@ -241,10 +262,10 @@ const BUILD_EVENTS = (nodeMap, rootId) => {
 
 const DELAY = {
     appear: 650, base_case: 900, pivot_select: 1100, init_pointers: 900,
-    scan_i_move: 700, scan_i_found: 1200,
-    scan_j_move: 700, scan_j_found: 1200,
-    pre_swap: 1500, post_swap: 1400,
-    partition_step: 1000, partition_done: 900, spawn_child: 600,
+    scan_i_found: 1100, scan_j_found: 1100,
+    pre_swap: 1500, post_swap: 1300, i_j_cross: 1600,
+    spawn_child: 800,
+    partition_step: 1000, partition_done: 900,
     node_sorted: 800, final_done: 1800,
 };
 const getDelay = (ev, speed) => (DELAY[ev.type] ?? 800) / speed;
@@ -253,7 +274,7 @@ const getDelay = (ev, speed) => (DELAY[ev.type] ?? 800) / speed;
 // NodeCard  — one call-tree node with sliding i/j/P badges
 // ════════════════════════════════════════════════════════════════════════════════
 
-const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs, evData }) => {
+const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs, evData, returningRanges }) => {
     const n      = node.high - node.low + 1;
     const cellsW = n * CELL_W + Math.max(0, n - 1) * CELL_GAP;
     const boxW   = cellsW + NODE_PAD * 2 + 4;
@@ -269,23 +290,26 @@ const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs, evData }
 
     // Helper: use evData (live event snapshot) when available for scan/swap phases
     const SCAN_SWAP_PHASES = new Set([
-        'scan_i_move','scan_i_found',
-        'scan_j_move','scan_j_found',
-        'pre_swap','post_swap',
+        'scan_i_found', 'scan_j_found',
+        'pre_swap', 'post_swap', 'i_j_cross',
     ]);
     if (SCAN_SWAP_PHASES.has(phase) && evData) {
         arr      = evData.arrSlice ?? arr;
         pivotRel = node.pivotIdx - node.low;
-        iRel     = evData.iAbs != null ? Math.max(0, Math.min(n - 1, evData.iAbs - node.low)) : null;
-        jRel     = evData.jAbs != null ? Math.max(0, Math.min(n - 1, evData.jAbs - node.low)) : null;
+        // Allow off-edge: iRel may go to n (right exit), jRel may go to -1 (left exit)
+        iRel     = evData.iAbs != null ? Math.min(n, evData.iAbs - node.low) : null;
+        jRel     = evData.jAbs != null ? Math.max(-1, evData.jAbs - node.low) : null;
         if (phase === 'pre_swap' && evData.swapI != null) {
             swappedI = evData.swapI - node.low;
             swappedJ = evData.swapJ - node.low;
         }
+        if (phase === 'i_j_cross' && evData.iAbs != null) {
+            zones = { leftEnd: evData.jAbs - node.low, rightStart: evData.iAbs - node.low };
+        }
     } else if (phase === 'pivot_select' || phase === 'init_pointers') {
         pivotRel = node.pivotIdx - node.low;
         if (phase === 'init_pointers') { iRel = 0; jRel = n - 1; }
-    } else if (phase === 'partition_done') {
+    } else if (phase === 'partition_done' || phase === 'spawn_child') {
         arr   = node.arrAfterPartition.slice(node.low, node.high + 1);
         zones = { leftEnd: node.finalJ - node.low, rightStart: node.finalI - node.low };
     } else if (phase === 'node_sorted') {
@@ -293,15 +317,28 @@ const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs, evData }
         zones = 'all_sorted';
     }
 
+    // Overlay sorted values from children that are flying back up
+    const returnedCells = new Set();
+    if (returningRanges?.length) {
+        returningRanges.forEach(([lo, hi, sortedVals]) => {
+            for (let r = lo; r <= hi; r++) {
+                if (r >= 0 && r < n) { arr[r] = sortedVals[r - lo]; returnedCells.add(r); }
+            }
+        });
+    }
+
     // ── Badge positions (x = translate from left edge of cellsW container) ────
-    const showI  = iRel !== null;
-    const showJ  = jRel !== null;
-    const showP  = pivotRel !== null;
-    const same   = showI && showJ && iRel === jRel;
+    const showI      = iRel !== null;
+    const showJ      = jRel !== null;
+    const iOffEdge   = iRel !== null && (iRel < 0 || iRel >= n);
+    const jOffEdge   = jRel !== null && (jRel < 0 || jRel >= n);
+    const showP      = pivotRel !== null;
+    const same       = showI && showJ && !iOffEdge && !jOffEdge && iRel === jRel;
     const iSz    = same ? BADGE_S : BADGE;
     const jSz    = same ? BADGE_S : BADGE;
 
     // Centre of cell k: k*STRIDE + CELL_W/2
+    // iRel/jRel may be off-edge (-1 or n); compute x anyway so the badge slides in/out smoothly
     const iXp = iRel !== null
         ? same
             ? iRel * STRIDE + CELL_W / 2 - iSz - 1
@@ -324,8 +361,7 @@ const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs, evData }
     };
 
     // ── Box border/bg tint by phase ───────────────────────────────────────────
-    const isScanPhase = phase === 'scan_i_move' || phase === 'scan_i_found'
-        || phase === 'scan_j_move' || phase === 'scan_j_found';
+    const isScanPhase = phase === 'scan_i_found' || phase === 'scan_j_found' || phase === 'i_j_cross';
     const isPreSwap = phase === 'pre_swap';
     const boxBorder =
         zones === 'all_sorted'                                      ? 'border-emerald-600/60' :
@@ -360,14 +396,14 @@ const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs, evData }
         <div className="flex flex-col items-center" style={{ width: boxW }}>
 
             {/* ── i / j badge row (above cells) ── */}
-            <div className="relative flex-shrink-0" style={{ width: cellsW, height: BADGE + 6 }}>
+            <div className="relative flex-shrink-0" style={{ width: cellsW, height: BADGE + 6, overflow: 'visible' }}>
                 {/* i badge */}
                 <motion.div
                     key="i-badge"
                     className="absolute flex items-center justify-center rounded-full bg-sky-500 text-white font-bold text-[11px] leading-none shadow shadow-sky-900/60"
-                    style={{ bottom: 2, left: 0, width: iSz, height: iSz }}
+                    style={{ bottom: 2, left: 0, width: iSz, height: iSz, opacity: iOffEdge ? 0.45 : 1 }}
                     initial={{ x: iXp, opacity: 0 }}
-                    animate={{ x: iXp, opacity: showI ? 1 : 0, width: iSz, height: iSz }}
+                    animate={{ x: iXp, opacity: showI ? (iOffEdge ? 0.45 : 1) : 0, width: iSz, height: iSz }}
                     transition={badgeT}>
                     i
                 </motion.div>
@@ -375,9 +411,9 @@ const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs, evData }
                 <motion.div
                     key="j-badge"
                     className="absolute flex items-center justify-center rounded-full bg-pink-600 text-white font-bold text-[11px] leading-none shadow shadow-pink-900/60"
-                    style={{ bottom: 2, left: 0, width: jSz, height: jSz }}
+                    style={{ bottom: 2, left: 0, width: jSz, height: jSz, opacity: jOffEdge ? 0.45 : 1 }}
                     initial={{ x: jXp, opacity: 0 }}
-                    animate={{ x: jXp, opacity: showJ ? 1 : 0, width: jSz, height: jSz }}
+                    animate={{ x: jXp, opacity: showJ ? (jOffEdge ? 0.45 : 1) : 0, width: jSz, height: jSz }}
                     transition={badgeT}>
                     j
                 </motion.div>
@@ -399,10 +435,11 @@ const NodeCard = ({ node, phase, stepIdx, isActive, scanIAbs, scanJAbs, evData }
                     const isSwpJ = idx === swappedJ;
 
                     let cls = 'bg-slate-700 border-slate-500 text-slate-200';
-                    if (zone === 'sorted') cls = 'bg-emerald-600 border-emerald-400 text-white';
-                    else if (zone === 'left')  cls = 'bg-indigo-800 border-indigo-500 text-indigo-100';
-                    else if (zone === 'pivot') cls = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300/60';
-                    else if (zone === 'right') cls = 'bg-slate-600 border-slate-400 text-slate-100';
+                    if (returnedCells.has(idx)) cls = 'bg-emerald-600 border-emerald-400 text-white';
+                    else if (zone === 'sorted') cls = 'bg-emerald-600 border-emerald-400 text-white';
+                    else if (zone === 'left')   cls = 'bg-indigo-800 border-indigo-500 text-indigo-100';
+                    else if (zone === 'pivot')  cls = 'bg-amber-600 border-amber-400 text-white ring-2 ring-amber-300/60';
+                    else if (zone === 'right')  cls = 'bg-slate-600 border-slate-400 text-slate-100';
                     if (isPiv) cls = 'bg-amber-500 border-amber-300 text-white ring-2 ring-amber-200/80 shadow-md shadow-amber-500/40';
                     if (isSwpI || isSwpJ) cls = 'bg-rose-600 border-rose-400 text-white ring-2 ring-rose-300 shadow-lg shadow-rose-500/60';
 
@@ -498,10 +535,10 @@ const STEP_META = {
     base_case:      { icon: '✅', color: 'text-emerald-300', bar: 'border-emerald-700/40 bg-emerald-900/30' },
     pivot_select:   { icon: '🎯', color: 'text-amber-300',   bar: 'border-amber-700/40 bg-amber-900/30' },
     init_pointers:   { icon: '👆', color: 'text-sky-300',     bar: 'border-sky-700/40 bg-sky-900/30' },
-    scan_i_move:     { icon: '➡️', color: 'text-slate-300',   bar: 'border-slate-700/30 bg-slate-900/60' },
     scan_i_found:    { icon: '✋', color: 'text-emerald-300', bar: 'border-emerald-700/40 bg-emerald-900/30' },
-    scan_j_move:     { icon: '⬅️', color: 'text-slate-300',  bar: 'border-slate-700/30 bg-slate-900/60' },
     scan_j_found:    { icon: '✋', color: 'text-pink-300',   bar: 'border-pink-700/40 bg-pink-900/30' },
+    i_j_cross:       { icon: '⚡', color: 'text-amber-300',  bar: 'border-amber-600/50 bg-amber-950/60' },
+    spawn_child:     { icon: '↳', color: 'text-indigo-300', bar: 'border-indigo-600/50 bg-indigo-950/60' },
     pre_swap:        { icon: '🔀', color: 'text-rose-200',   bar: 'border-rose-600/50 bg-rose-950/60' },
     post_swap:       { icon: '🔁', color: 'text-sky-200',    bar: 'border-sky-700/40 bg-sky-950/50' },
     partition_step:  { icon: '🔄', color: 'text-pink-300',    bar: 'border-pink-700/30 bg-pink-900/20' },
@@ -529,14 +566,13 @@ const QuickSortCoreLogicVisualizer = ({
     }, [customArray]);
 
     const { nodeMap, rootId } = useMemo(() => simulateQuickSort(inputArr), [inputArr]);
-    useMemo(() => assignLayout(nodeMap), [nodeMap]);
+    const treeCanvasW = useMemo(() => assignLayout(nodeMap, rootId), [nodeMap, rootId]);
 
     const allNodes = useMemo(() => [...nodeMap.values()], [nodeMap]);
     const events   = useMemo(() => BUILD_EVENTS(nodeMap, rootId), [nodeMap, rootId]);
     const maxDepth = useMemo(() => Math.max(...allNodes.map(n => n.depth)), [allNodes]);
 
-    const n       = inputArr.length;
-    const canvasW = n * ELEM_W + LEFT_PAD * 2;
+    const canvasW = treeCanvasW;
     const canvasH = (maxDepth + 1) * LEVEL_H + 220;
 
     // ── Playback state ────────────────────────────────────────────────────────
@@ -599,10 +635,9 @@ const QuickSortCoreLogicVisualizer = ({
             if (ev.type === 'base_case')       phases.set(ev.nodeId, 'base_case');
             if (ev.type === 'pivot_select')    phases.set(ev.nodeId, 'pivot_select');
             if (ev.type === 'init_pointers')   phases.set(ev.nodeId, 'init_pointers');
-            if (ev.type === 'scan_i_move')   { phases.set(ev.nodeId, 'scan_i_move');  scanMap.set(ev.nodeId, ev.scanI); evDM.set(ev.nodeId, ev); }
             if (ev.type === 'scan_i_found')  { phases.set(ev.nodeId, 'scan_i_found'); scanMap.set(ev.nodeId, ev.scanI); evDM.set(ev.nodeId, ev); }
-            if (ev.type === 'scan_j_move')   { phases.set(ev.nodeId, 'scan_j_move');  scanJM.set(ev.nodeId, ev.scanJ); evDM.set(ev.nodeId, ev); }
             if (ev.type === 'scan_j_found')  { phases.set(ev.nodeId, 'scan_j_found'); scanJM.set(ev.nodeId, ev.scanJ); evDM.set(ev.nodeId, ev); }
+            if (ev.type === 'i_j_cross')     { phases.set(ev.nodeId, 'i_j_cross'); evDM.set(ev.nodeId, ev); }
             if (ev.type === 'pre_swap')      { phases.set(ev.nodeId, 'pre_swap');  evDM.set(ev.nodeId, ev); }
             if (ev.type === 'post_swap')     { phases.set(ev.nodeId, 'post_swap'); evDM.set(ev.nodeId, ev); }
             if (ev.type === 'partition_step') { phases.set(ev.nodeId, 'partition_step'); stepMap.set(ev.nodeId, ev.stepIdx); }
@@ -626,7 +661,10 @@ const QuickSortCoreLogicVisualizer = ({
             const sorted = nodePhases.get(node.id) === 'node_sorted';
             [node.left, node.right].forEach(child => {
                 if (!child || !visibleIds.has(child.id)) return;
-                // y1: top of node + call-label (14px) + badge-row (BADGE+6) + cell box (CELL_H+14+7px pad) 
+                // Hide edge when child is flying back up (returning)
+                const childPhase = nodePhases.get(child.id);
+                if (childPhase === 'base_case' || childPhase === 'node_sorted') return;
+                // y1: top of node + call-label (14px) + badge-row (BADGE+6) + cell box (CELL_H+14+7px pad)
                 lines.push({
                     key: `${node.id}->${child.id}`,
                     x1: node.x, y1: node.y + 14 + (BADGE + 6) + CELL_H + 18,
@@ -701,14 +739,36 @@ const QuickSortCoreLogicVisualizer = ({
                             const cellsW2  = arrLen * CELL_W + Math.max(0, arrLen - 1) * CELL_GAP;
                             const cardW    = Math.max(cellsW2 + NODE_PAD * 2 + 4, 80);
 
+                            const isRoot      = !node.parentId;
+                            const isReturning = !isRoot && (
+                                phase === 'node_sorted' || (node.isBase && phase === 'base_case')
+                            );
+
+                            // Cells from children that are flying back up turn green in the parent
+                            const returningRanges = [];
+                            if (!node.isBase) {
+                                [node.left, node.right].forEach(child => {
+                                    if (!child) return;
+                                    const cp = nodePhases.get(child.id);
+                                    if ((cp === 'base_case' || cp === 'node_sorted') && child.low <= child.high) {
+                                        const sorted = (child.arrSorted || child.arrAfterPartition || child.arrAtEntry).slice(child.low, child.high + 1);
+                                        returningRanges.push([child.low - node.low, child.high - node.low, sorted]);
+                                    }
+                                });
+                            }
+
                             return (
                                 <motion.div key={node.id}
                                     className="absolute flex flex-col items-center"
                                     style={{ left: node.x - cardW / 2, top: node.y }}
                                     initial={{ opacity: 0, scale: 0.6, y: -14 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    animate={isReturning
+                                        ? { opacity: [1, 1, 0], scale: [1, 1, 0.5], y: [0, 0, -70] }
+                                        : { opacity: 1, scale: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.4, y: 18 }}
-                                    transition={nodeSpring}>
+                                    transition={isReturning
+                                        ? { duration: 0.75, times: [0, 0.35, 1], ease: 'easeIn' }
+                                        : nodeSpring}>
                                     {/* Call label — amber when active */}
                                     <div className={`text-[10px] font-mono mb-0.5 transition-colors duration-200 ${isActive ? 'text-amber-400 font-semibold' : 'text-slate-500'}`}>
                                         sort({node.low}, {node.high})
@@ -721,6 +781,7 @@ const QuickSortCoreLogicVisualizer = ({
                                         scanIAbs={scanIMap.get(node.id) ?? null}
                                         scanJAbs={scanJMap.get(node.id) ?? null}
                                         evData={evDataMap.get(node.id) ?? null}
+                                        returningRanges={returningRanges}
                                     />
                                 </motion.div>
                             );
@@ -731,13 +792,12 @@ const QuickSortCoreLogicVisualizer = ({
                     <AnimatePresence>
                         {currentEv && !finished && (() => {
                             const SHOW_TYPES = new Set([
-                                'scan_i_move', 'scan_i_found',
-                                'scan_j_move', 'scan_j_found',
-                                'pre_swap', 'post_swap',
+                                'scan_i_found', 'scan_j_found',
+                                'pre_swap', 'post_swap', 'i_j_cross', 'spawn_child',
                             ]);
                             if (!SHOW_TYPES.has(currentEv.type)) return null;
 
-                            const isJSide = currentEv.type === 'scan_j_explain' || currentEv.type === 'scan_j_move' || currentEv.type === 'scan_j_found';
+                            const isJSide = currentEv.type === 'scan_j_found';
                             const nd = currentEv.nodeId ? allNodes.find(n => n.id === currentEv.nodeId && visibleIds.has(n.id)) : null;
                             if (!nd) return null;
 
@@ -751,12 +811,14 @@ const QuickSortCoreLogicVisualizer = ({
                             const tipCls =
                                 currentEv.type === 'scan_i_found'
                                     ? 'border-emerald-500/60 bg-emerald-900/85 text-emerald-100'
-                                : currentEv.type === 'scan_i_move' || currentEv.type === 'scan_j_move'
-                                    ? 'border-slate-600/50 bg-slate-800/90 text-slate-200'
                                 : currentEv.type === 'scan_j_found'
                                     ? 'border-pink-500/60 bg-pink-900/85 text-pink-100'
                                 : currentEv.type === 'pre_swap'
                                     ? 'border-rose-500/60 bg-rose-900/85 text-rose-100'
+                                : currentEv.type === 'i_j_cross'
+                                    ? 'border-amber-500/60 bg-amber-950/90 text-amber-100'
+                                : currentEv.type === 'spawn_child'
+                                    ? 'border-indigo-500/50 bg-indigo-950/90 text-indigo-100'
                                 : 'border-sky-600/50 bg-sky-950/85 text-sky-100'; // post_swap
 
                             return (
