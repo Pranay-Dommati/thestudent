@@ -254,7 +254,7 @@ const ArrayVisual = ({ arr, ev, n }) => {
                 if (!showBoundary) return <div style={{ height: 36 }} />;
                 const a    = n - outerI - 1;
                 const rowW = n * CELL_W + (n - 1) * CELL_GAP;
-                const cx   = a * STRIDE + CELL_W / 2;
+                const cx   = (a - 1) * STRIDE + CELL_W / 2;
                 return (
                     <div style={{ position: 'relative', width: rowW, height: 36, flexShrink: 0 }}>
                         <motion.div
