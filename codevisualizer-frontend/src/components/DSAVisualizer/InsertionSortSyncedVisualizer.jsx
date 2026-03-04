@@ -341,27 +341,6 @@ const InsertionSortSyncedVisualizer = ({
     const displayArr = currentEv?.arr ?? inputArr;
     const n          = inputArr.length;
 
-    // Status bar label
-    const statusLabel = (() => {
-        if (!currentEv) return '▶ Press Start to begin the Insertion Sort visualization';
-        if (finished)   return '✅ Insertion Sort complete! Array is fully sorted.';
-        const map = {
-            arr_assign:      '📋 Assigning input array',
-            call_insertion:  '📞 Calling insertion_sort(arr)',
-            init_n:          '📏 Computing n = len(arr)',
-            outer_iter:      '🔁 Starting outer pass (i loop)',
-            pick_key:        '🔑 Picking key = arr[i]',
-            init_j:          '📌 Setting j = i - 1',
-            while_check:     currentEv?.passed ? '🔎 While condition true — shift element right' : '🛑 While condition false — insert key',
-            shift:           '→ Shifting arr[j+1] = arr[j]',
-            decrement_j:     '⬅ Moving j one step left (j -= 1)',
-            place_key:       '✅ Placing key into correct position',
-            return_arr:      '↩️ Returning sorted array',
-            final_done:      '✅ Printing sorted result',
-        };
-        return map[currentEv.type] ?? '';
-    })();
-
     return (
         <div className="flex flex-col h-full bg-slate-950 text-white overflow-hidden">
             <div className="flex-1 flex overflow-hidden min-h-0">
@@ -378,10 +357,6 @@ const InsertionSortSyncedVisualizer = ({
 
                     </div>
 
-                    {/* Status bar */}
-                    <div className="flex-shrink-0 px-6 py-3 bg-slate-900/80 border-t border-slate-700/50 text-slate-300 text-sm font-medium">
-                        {statusLabel}
-                    </div>
                 </div>
 
                 {/* ── Right: code panel + controls ─────────────────────────── */}

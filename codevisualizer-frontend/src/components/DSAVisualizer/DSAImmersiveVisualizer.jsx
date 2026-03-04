@@ -133,22 +133,12 @@ const DSAImmersiveVisualizer = ({
 
                     <h1 className="text-base font-semibold text-white flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-amber-400" />
-                        {algorithmType === 'quick-sort' ? 'Quick Sort Visualizer'
-                         : algorithmType === 'bubble-sort' ? 'Bubble Sort Visualizer'
-                         : algorithmType === 'selection-sort' ? 'Selection Sort Visualizer'
-                         : algorithmType === 'insertion-sort' ? 'Insertion Sort Visualizer'
-                         : 'Merge Sort Visualizer'}
+                        {algorithmType === 'quick-sort' ? 'Quick Sort'
+                         : algorithmType === 'bubble-sort' ? 'Bubble Sort'
+                         : algorithmType === 'selection-sort' ? 'Selection Sort'
+                         : algorithmType === 'insertion-sort' ? 'Insertion Sort'
+                         : 'Merge Sort'}
                     </h1>
-                </div>
-
-                {/* Center: View Tabs — Core Logic hidden */}
-                <div className="flex items-center gap-1 bg-slate-900/60 p-1 rounded-xl border border-slate-700">
-                    <button
-                        onClick={() => setActiveTab('combined')}
-                        className="px-4 py-1.5 text-sm font-medium rounded-lg transition-all bg-indigo-600 text-white shadow-md shadow-indigo-900/50"
-                    >
-                        Code Execution
-                    </button>
                 </div>
 
                 {/* Right: Compact Scrubber + Array Input */}
