@@ -296,13 +296,13 @@ const ArrayVisual = ({ arr, ev, n }) => {
                 ))}
             </div>
 
-            {/* ── j+1 badge below index row — shared PointerBadgeRow ── */}
+            {/* ── j+1 badge below index row — visible during shift and place_key ── */}
             <PointerBadgeRow
                 cellW={CELL_W}
                 cellGap={CELL_GAP}
                 count={n}
-                j1Rel={showJPtr ? stableJ + 1 : null}
-                j1Class="bg-pink-400"
+                j1Rel={['shift', 'place_key'].includes(type) ? stableJ + 1 : null}
+                j1Class="bg-yellow-400"
             />
 
             {/* ── Sorted zone label — always reserves height to prevent layout shifts ── */}
