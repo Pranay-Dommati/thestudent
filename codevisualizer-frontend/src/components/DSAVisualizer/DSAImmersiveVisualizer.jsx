@@ -17,6 +17,8 @@ import QuickSortSyncedVisualizer from './QuickSortSyncedVisualizer';
 import BubbleSortSyncedVisualizer from './BubbleSortSyncedVisualizer';
 import SelectionSortSyncedVisualizer from './SelectionSortSyncedVisualizer';
 import InsertionSortSyncedVisualizer from './InsertionSortSyncedVisualizer';
+import CharReplacementVisualizer from './CharReplacementVisualizer';
+import BinarySearchVisualizer from './BinarySearchVisualizer';
 
 // ============ MAIN DSA IMMERSIVE VISUALIZER ============
 const DSAImmersiveVisualizer = ({
@@ -75,6 +77,27 @@ const DSAImmersiveVisualizer = ({
 
     // Validate array input
     const validateInput = (input) => {
+        if (algorithmType === 'char-replacement') {
+            const trimmed = input.trim();
+            const parts = trimmed.split(',');
+            if (parts.length !== 2) return 'Format: LETTERS,k';
+            const s = parts[0].trim();
+            const k = parts[1].trim();
+            if (!/^[A-Za-z]+$/.test(s)) return 'Letters only before comma';
+            if (!/^\d+$/.test(k)) return 'Number required after comma';
+            if (s.length > 20) return 'Max 20 chars';
+            return '';
+        }
+        if (algorithmType === 'binary-search') {
+            const trimmed = input.trim();
+            const commaIdx = trimmed.lastIndexOf(',');
+            if (commaIdx < 0) return 'Format: [arr],target';
+            const arrPart = trimmed.slice(0, commaIdx).trim();
+            const tgtPart = trimmed.slice(commaIdx + 1).trim();
+            if (!arrPart.startsWith('[') || !arrPart.endsWith(']')) return 'Array must be in []';
+            if (!/^-?\d+$/.test(tgtPart)) return 'Target must be a number';
+            return '';
+        }
         const trimmed = input.trim();
         if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) return 'Invalid format';
         const inner = trimmed.slice(1, -1).trim();
@@ -137,6 +160,8 @@ const DSAImmersiveVisualizer = ({
                          : algorithmType === 'bubble-sort' ? 'Bubble Sort'
                          : algorithmType === 'selection-sort' ? 'Selection Sort'
                          : algorithmType === 'insertion-sort' ? 'Insertion Sort'
+                         : algorithmType === 'char-replacement' ? 'Longest Repeating Character Replacement'
+                         : algorithmType === 'binary-search' ? 'Binary Search'
                          : 'Merge Sort'}
                     </h1>
                 </div>
@@ -177,13 +202,15 @@ const DSAImmersiveVisualizer = ({
 
                     {showInputPanel ? (
                         <div className="flex items-center gap-2 bg-slate-800 border border-slate-600 rounded-xl px-3 py-1.5 shadow-lg">
-                            <span className="text-slate-400 text-xs font-mono">arr =</span>
+                            <span className="text-slate-400 text-xs font-mono">
+                                {algorithmType === 'char-replacement' ? 's, k =' : algorithmType === 'binary-search' ? 'arr, target =' : 'arr ='}
+                            </span>
                             <input
                                 type="text"
                                 value={localArrayInput}
                                 onChange={handleInputChange}
                                 className={`w-44 px-2 py-1 bg-slate-900 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/60' : 'border-slate-600 focus:border-indigo-500'}`}
-                                placeholder="[1, 2, 3]"
+                                placeholder={algorithmType === 'char-replacement' ? 'AABCBA,2' : algorithmType === 'binary-search' ? '[3,12,25,31,42],31' : '[1, 2, 3]'}
                             />
                             {inputError && (
                                 <span className="text-red-400 text-xs">{inputError}</span>
@@ -239,6 +266,10 @@ const DSAImmersiveVisualizer = ({
                         <SelectionSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
                     ) : algorithmType === 'insertion-sort' ? (
                         <InsertionSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                    ) : algorithmType === 'char-replacement' ? (
+                        <CharReplacementVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                    ) : algorithmType === 'binary-search' ? (
+                        <BinarySearchVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
                     ) : (
                         activeTab === 'combined' ? (
                             <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />

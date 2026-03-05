@@ -3,3 +3,5 @@ export { default as DSAImmersiveVisualizer } from './DSAImmersiveVisualizer';
 export { default as MergeSortVisualizer } from './MergeSortVisualizer';
 export { default as BubbleSortSyncedVisualizer } from './BubbleSortSyncedVisualizer';
 export { default as SelectionSortSyncedVisualizer } from './SelectionSortSyncedVisualizer';
+export { default as CharReplacementVisualizer } from './CharReplacementVisualizer';
+export { default as BinarySearchVisualizer } from './BinarySearchVisualizer';

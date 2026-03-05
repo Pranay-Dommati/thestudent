@@ -153,15 +153,76 @@ arr = ${arrString}
 
 sorted_arr = selection_sort(arr)
 print("Sorted Array:", sorted_arr)`,
+
+    'char-replacement': (inputStr) => {
+        const parts = inputStr.split(',');
+        const s = (parts[0]?.trim() || 'AABABBAC').toUpperCase();
+        const k = parseInt(parts[1]?.trim(), 10) || 2;
+        return `def character_replacement(s, k):
+    freq = [0] * 26
+    left = 0
+    max_len = 0
+    max_freq = 0
+
+    for right in range(len(s)):
+        index = ord(s[right]) - ord('A')
+        freq[index] += 1
+        max_freq = max(max_freq, freq[index])
+
+        # If replacements needed exceed k, shrink window
+        if (right - left + 1) - max_freq > k:
+            freq[ord(s[left]) - ord('A')] -= 1
+            left += 1
+
+        max_len = max(max_len, right - left + 1)
+
+    return max_len
+
+s = "${s}"
+k = ${k}
+result = character_replacement(s, k)
+print(result)`;
+    },
+
+    'binary-search': (inputStr) => {
+        const commaIdx = inputStr.lastIndexOf(',');
+        const arrPart = commaIdx >= 0 ? inputStr.slice(0, commaIdx).trim() : '[3, 12, 18, 25, 31, 42, 63]';
+        const tgt     = commaIdx >= 0 ? inputStr.slice(commaIdx + 1).trim() : '31';
+        return `def binary_search(arr, target):
+    left = 0
+    right = len(arr) - 1
+
+    while left <= right:
+        mid = left + (right - left) // 2
+
+        if arr[mid] == target:
+            return mid
+
+        elif arr[mid] < target:
+            left = mid + 1
+
+        else:
+            right = mid - 1
+
+    return -1
+
+
+arr = ${arrPart}
+target = ${tgt}
+result = binary_search(arr, target)
+print("Index:", result)`;
+    },
 };
 
 // Default array for each problem
 const DEFAULT_ARRAYS = {
-    'merge-sort':      '[38, 27, 43, 3, 9, 82, 10]',
-    'quick-sort':      '[8, 3, 1, 5, 2, 7, 4]',
-    'bubble-sort':     '[5, 1, 4, 2, 8, 0, 2]',
-    'selection-sort':  '[64, 25, 12, 22, 11]',
-    'insertion-sort':  '[12, 11, 13, 5, 6]',
+    'merge-sort':        '[38, 27, 43, 3, 9, 82, 10]',
+    'quick-sort':        '[8, 3, 1, 5, 2, 7, 4]',
+    'bubble-sort':       '[5, 1, 4, 2, 8, 0, 2]',
+    'selection-sort':    '[64, 25, 12, 22, 11]',
+    'insertion-sort':    '[12, 11, 13, 5, 6]',
+    'char-replacement':  'AABABBAC,2',
+    'binary-search':     '[3, 12, 18, 25, 31, 42, 63],31',
 };
 
 // Problem metadata
@@ -241,6 +302,36 @@ const problemsData = {
             "Pass-based Iteration"
         ]
     },
+    'char-replacement': {
+        id: 6,
+        name: "Longest Repeating Character Replacement",
+        difficulty: "Medium",
+        category: "Sliding Window",
+        timeComplexity: "O(n)",
+        spaceComplexity: "O(1)",
+        description: "Given a string s and an integer k, find the length of the longest substring you can get by replacing at most k characters. A sliding window tracks the current window size and the count of the most frequent character inside it. If the remaining characters (window size − max_freq) exceed k, shrink the window from the left.",
+        concepts: [
+            "Sliding Window Technique",
+            "Character Frequency Tracking",
+            "Two-Pointer Approach",
+            "Greedy Window Expansion"
+        ]
+    },
+    'binary-search': {
+        id: 7,
+        name: "Binary Search",
+        difficulty: "Easy",
+        category: "Searching",
+        timeComplexity: "O(log n)",
+        spaceComplexity: "O(1)",
+        description: "Given a sorted array and a target value, return the index of the target if found, or -1 if not present. Binary Search repeatedly halves the search range by comparing the middle element to the target, discarding the half that cannot contain the target.",
+        concepts: [
+            "Divide and Conquer",
+            "Two-Pointer (L / R) Approach",
+            "Logarithmic Time Complexity",
+            "Sorted Array Requirement"
+        ]
+    },
 };
 
 const DSAProblemPage = () => {
@@ -264,8 +355,19 @@ const DSAProblemPage = () => {
     const [executionId, setExecutionId] = useState(null);
     const [error, setError] = useState(null);
 
-    // Validate array input
+    // Validate array input (handles both numeric arrays and char-replacement 'S,k' format)
     const validateArrayInput = (input) => {
+        if (problemName === 'char-replacement') {
+            const trimmed = input.trim();
+            const parts = trimmed.split(',');
+            if (parts.length !== 2) return 'Format: LETTERS,k  (e.g. AABABBAC,2)';
+            const s = parts[0].trim();
+            const k = parts[1].trim();
+            if (!/^[A-Za-z]+$/.test(s)) return 'First part must be letters only (e.g. AABABBAC)';
+            if (!/^\d+$/.test(k)) return 'Second part must be a non-negative integer (e.g. 2)';
+            if (s.length > 20) return 'String too long (max 20 characters)';
+            return '';
+        }
         const trimmed = input.trim();
         if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
             return 'Array must start with [ and end with ]';
@@ -707,7 +809,7 @@ const DSAProblemPage = () => {
                                     type="text"
                                     value={customArrayInput}
                                     onChange={handleArrayInputChange}
-                                    placeholder="[1, 2, 3, 4, 5]"
+                                    placeholder={problemName === 'char-replacement' ? 'AABABBAC,2' : '[1, 2, 3, 4, 5]'}
                                     className={`w-full px-4 py-3 bg-slate-800 border rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 transition-all ${arrayError
                                         ? 'border-red-500/50 focus:ring-red-500/30'
                                         : 'border-white/20 focus:ring-blue-500/30 focus:border-blue-500/50'
@@ -731,7 +833,9 @@ const DSAProblemPage = () => {
                                 </p>
                             ) : (
                                 <p className="text-slate-500 text-sm">
-                                    Enter comma-separated integers (max 15 elements)
+                                    {problemName === 'char-replacement'
+                                        ? 'Format: UPPERCASE_LETTERS,k  (e.g. AABABBAC,2)'
+                                        : 'Enter comma-separated integers (max 15 elements)'}
                                 </p>
                             )}
                         </div>

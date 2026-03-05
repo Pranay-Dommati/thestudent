@@ -44,6 +44,9 @@ const PointerBadgeRow = ({
     iClass     = 'bg-sky-500',
     jClass     = 'bg-pink-600',
     j1Class    = 'bg-yellow-400',
+    iLabel     = 'i',
+    jLabel     = 'j',
+    j1Label    = 'j+1',
     blink      = false,
     jBlink     = false,   // blink only j badge (e.g. OOB in InsertionSort)
     extraLabel = null,   // { rel, text }
@@ -148,7 +151,7 @@ const PointerBadgeRow = ({
                     animate={blink ? { x: iX, opacity: [1, 0.1, 1] } : { x: iX, opacity: 1 }}
                     transition={iTrans}
                 >
-                    i
+                    {iLabel}
                 </motion.div>
             )}
 
@@ -165,7 +168,7 @@ const PointerBadgeRow = ({
                     animate={(blink || jBlink) ? { x: jX, opacity: [1, 0.1, 1] } : { x: jX, opacity: 1 }}
                     transition={jTrans}
                 >
-                    j
+                    {jLabel}
                 </motion.div>
             )}
 
@@ -182,7 +185,7 @@ const PointerBadgeRow = ({
                     animate={{ x: j1X, opacity: 1 }}
                     transition={j1Trans}
                 >
-                    j+1
+                    {j1Label}
                 </motion.div>
             )}
         </div>
