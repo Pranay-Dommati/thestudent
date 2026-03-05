@@ -479,38 +479,26 @@ function CodeVisualizerPage() {
                         <p className="text-white/90 text-base font-medium">See your Python code come alive</p>
                         <p className="text-white/60 text-sm mt-1">Step-by-step execution visualization</p>
 
-                        {/* Mobile DSA Sheets Button - Hidden in Production */}
-                        {!import.meta.env.PROD && (
-                            <button
-                                onClick={() => setShowDSAPanel(true)}
-                                className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur-sm border border-white/20 rounded-xl text-white text-sm font-medium transition-all duration-300 group"
-                            >
-                                <HiSparkles className="text-amber-300 group-hover:animate-pulse" />
-                                <span>DSA Practice Sheets</span>
-                                <FaBook className="text-white/60 text-xs" />
-                            </button>
-                        )}
+                        {/* Mobile DSA Sheets Button removed — sheet is now the homepage */}
                     </div>
 
                     {/* Mobile Beta Banner */}
                     {showBetaBanner && (
-                        <div className="mb-4 bg-white shadow-sm">
-                            <div className="h-9 flex items-center justify-between px-4">
-                                <div className="flex-1" />
-                                <p className="text-xs font-medium text-slate-700 tracking-wide">
-                                    Beta Version · Experimental · Testing Stage
+                        <div className="mb-3 flex justify-center">
+                            <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm border border-slate-200 shadow-sm rounded-full px-3 py-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                <p className="text-[10px] font-medium text-slate-600 tracking-wide">
+                                    Beta · Experimental · Testing Stage
                                 </p>
-                                <div className="flex-1 flex justify-end">
-                                    <button
-                                        onClick={() => setShowBetaBanner(false)}
-                                        className="text-slate-400 hover:text-slate-600 transition-colors p-1"
-                                        aria-label="Dismiss"
-                                    >
-                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={() => setShowBetaBanner(false)}
+                                    className="text-slate-400 hover:text-slate-600 transition-colors ml-0.5"
+                                    aria-label="Dismiss"
+                                >
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
                             </div>
                         </div>
                     )}
@@ -600,31 +588,6 @@ function CodeVisualizerPage() {
 
                 {/* Main Content - Editor centered and prominent */}
                 <main className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4">
-                    {/* Public Beta Status Pill */}
-                    {/* Public Beta Status Band */}
-                    {showBetaBanner && (
-                        <div className="absolute left-0 right-0 top-24 z-20 animate-fade-in-down bg-white shadow-sm">
-                            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                                <div className="h-10 flex items-center justify-between">
-                                    <div className="flex-1" />
-                                    <p className="text-sm font-medium text-slate-700 tracking-wide">
-                                        Beta Version · Experimental · Testing Stage
-                                    </p>
-                                    <div className="flex-1 flex justify-end">
-                                        <button
-                                            onClick={() => setShowBetaBanner(false)}
-                                            className="text-slate-400 hover:text-slate-600 transition-colors p-1"
-                                            aria-label="Dismiss"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
                     <div className="w-full max-w-4xl">
                         <CodeEditor
@@ -643,23 +606,7 @@ function CodeVisualizerPage() {
                     </div>
                 </main>
 
-                {/* Desktop DSA Sheets Floating Button - Hidden in Production */}
-                {!import.meta.env.PROD && (
-                    <div className="fixed bottom-8 right-8 z-50 animate-float">
-                        <button
-                            onClick={() => setShowDSAPanel(true)}
-                            className="group flex items-center gap-3 px-5 py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white font-semibold rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 dsa-button-glow"
-                        >
-                            <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <HiSparkles className="text-amber-300 text-lg" />
-                            </div>
-                            <div className="text-left">
-                                <p className="text-sm font-bold">DSA Sheets</p>
-                                <p className="text-[10px] text-white/70">Practice problems</p>
-                            </div>
-                        </button>
-                    </div>
-                )}
+                {/* Desktop DSA Sheets Floating Button removed — sheet is now the homepage */}
             </div >
 
             {/* Input Modal */}
@@ -688,11 +635,7 @@ function CodeVisualizerPage() {
                 executionId={executionId}
             />
 
-            {/* DSA Sheets Panel */}
-            <DSASheetsPanel
-                isOpen={showDSAPanel}
-                onClose={() => setShowDSAPanel(false)}
-            />
+            {/* DSA Sheets Panel removed — sheet is now the homepage */}
         </div >
     );
 }

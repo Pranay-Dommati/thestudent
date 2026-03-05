@@ -53,12 +53,15 @@ const DELAY = {
     calc_mid:        1600,
     compare_equal:   2000,
     return_found:    2400,
+    check_elif:      1600,
     compare_less:    1800,
     update_left:     1800,
     compare_greater: 1800,
     update_right:    1800,
     while_fail:      2200,
     return_not_found:2400,
+    assign_result:   1800,
+    print_result:    2000,
 };
 
 const getDelay = (ev, speed) => (DELAY[ev.type] ?? 1400) / speed;
@@ -103,15 +106,18 @@ function simulate(arr, target) {
         // Always evaluate the if-check at line 8 before branching
         push('check_if', { left, right, mid, found: false },
              LINE.IF_EQUAL,
-             `if arr[${mid}] == target  →  ${arr[mid]} == ${target}? ${arr[mid] === target ? 'Yes ✓' : 'No'}`);
+             `if arr[${mid}] == target  →  ${arr[mid]} == ${target}? ${arr[mid] === target ? 'Yes ✓ → Found!' : 'No'}`);
 
         if (arr[mid] === target) {
-            push('compare_equal', { left, right, mid, found: false },
-                 LINE.IF_EQUAL,
-                 `arr[${mid}] = ${arr[mid]} == target(${target}) → Found!`);
             push('return_found', { left, right, mid, found: true },
                  LINE.RETURN_FOUND,
                  `return ${mid}  →  target ${target} is at index ${mid} ✓`);
+            push('assign_result', { left, right, mid, found: true, result: mid },
+                 LINE.CALL_FN,
+                 `result = binary_search(arr, ${target})  →  result = ${mid}`);
+            push('print_result',  { left, right, mid, found: true, result: mid },
+                 LINE.PRINT,
+                 `print("Index:", result)  →  Index: ${mid}`);
             return { events };
         } else if (arr[mid] < target) {
             push('compare_less', { left, right, mid, found: false },
@@ -122,6 +128,10 @@ function simulate(arr, target) {
                  LINE.UPDATE_LEFT,
                  `left = ${mid} + 1 = ${left}  →  new search range [${left}..${right}]`);
         } else {
+            // Show elif being evaluated (and found False) before reaching else
+            push('check_elif', { left, right, mid, found: false },
+                 LINE.ELIF_LESS,
+                 `elif arr[${mid}] < target  →  ${arr[mid]} < ${target}? No`);
             push('compare_greater', { left, right, mid, found: false },
                  LINE.ELSE,
                  `arr[${mid}] = ${arr[mid]} > target(${target}) → discard right half, move R left`);
@@ -138,6 +148,12 @@ function simulate(arr, target) {
     push('return_not_found', { left, right, mid: null, found: false },
          LINE.RETURN_NEG1,
          `return -1  →  ${target} is not present in the array`);
+    push('assign_result', { left, right, mid: null, found: false, result: -1 },
+         LINE.CALL_FN,
+         `result = binary_search(arr, ${target})  →  result = -1`);
+    push('print_result',  { left, right, mid: null, found: false, result: -1 },
+         LINE.PRINT,
+         `print("Index:", result)  →  Index: -1`);
 
     return { events };
 }
@@ -187,7 +203,7 @@ const ArrayVisual = ({ arr, ev, n }) => {
     const showMid   = mid !== null && SHOW_R.has(type);
 
     const target      = ev?.target ?? null;
-    const isCheckIf   = type === 'check_if' || type === 'compare_equal' || type === 'compare_less';
+    const isCheckIf   = type === 'check_if' || type === 'check_elif' || type === 'compare_equal' || type === 'compare_less';
 
     const isLRSame  = type === 'while_check';
 

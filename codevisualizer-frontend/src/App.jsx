@@ -24,6 +24,7 @@ const PrivacyPolicy = React.lazy(() => import('./components/Legal/PrivacyPolicy'
 
 // DSA Sheet
 const DSAProblemPage = React.lazy(() => import('./pages/DSAProblemPage'));
+const DSASheetPage   = React.lazy(() => import('./pages/DSASheetPage'));
 
 const Layout = ({ children }) => {
     const location = useLocation();
@@ -38,12 +39,12 @@ const Layout = ({ children }) => {
     // For now, keeping a simple check to hide nav on specific full-screen views if needed.
     const hideNav = location.pathname.startsWith('/auth') || location.pathname.startsWith('/dsa-sheet');
 
-    // Use transparent navbar on homepage and code-visualizer, light on others
-    const isHomePage = location.pathname === '/' || location.pathname === '/code-visualizer';
-    const navStyle = isHomePage ? 'transparent' : 'light';
+    // Use transparent navbar on code-visualizer page only
+    const isVisualizerPage = location.pathname === '/visualizer' || location.pathname === '/code-visualizer';
+    const navStyle = isVisualizerPage ? 'transparent' : 'light';
 
-    // Hide navbar on mobile for homepage (has its own mobile header)
-    const hideNavOnMobile = isHomePage;
+    // Hide navbar on mobile for visualizer (has its own mobile header)
+    const hideNavOnMobile = isVisualizerPage;
 
     return (
         <>
@@ -83,9 +84,12 @@ const App = () => {
                             </div>
                         }>
                             <Routes>
-                                {/* Main Product Route */}
-                                <Route path="/" element={<CodeVisualizerPage />} />
-                                <Route path="/code-visualizer" element={<Navigate to="/" replace />} />
+                                {/* DSA Sheet — main homepage */}
+                                <Route path="/" element={<DSASheetPage />} />
+
+                                {/* Code Visualizer tool */}
+                                <Route path="/visualizer" element={<CodeVisualizerPage />} />
+                                <Route path="/code-visualizer" element={<Navigate to="/visualizer" replace />} />
 
                                 {/* Auth Routes */}
                                 <Route path="/auth" element={<AuthForm />} />

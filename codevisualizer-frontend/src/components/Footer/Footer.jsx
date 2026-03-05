@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { FaLinkedin, FaInstagram } from "react-icons/fa";
+import { FaLinkedin, FaInstagram, FaCode } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 
 
@@ -14,6 +14,10 @@ const Footer = () => {
 
                     {/* Navigation Links */}
                     <div className="flex flex-wrap justify-center md:justify-start gap-8 mb-6 md:mb-0">
+                        <Link to="/visualizer" className="flex items-center gap-1.5 text-slate-600 hover:text-blue-600 text-sm transition-colors font-medium">
+                            <FaCode className="text-base" />
+                            Dry Runner
+                        </Link>
                         <Link to="/feedback" className="text-slate-600 hover:text-blue-600 text-sm transition-colors">
                             Feedback
                         </Link>

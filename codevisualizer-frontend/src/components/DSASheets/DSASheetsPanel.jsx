@@ -3,20 +3,26 @@ import { useNavigate } from 'react-router-dom';
 import { FaTimes, FaArrowLeft } from 'react-icons/fa';
 import { HiBookOpen } from 'react-icons/hi2';
 
-// List of DSA Problems
+// List of DSA Problems (mirrors DSASheetPage patterns, flat list for the panel)
 const dsaProblems = [
-    { id: 1,  name: "Merge Sort",          slug: "merge-sort",          difficulty: "Medium", category: "Divide & Conquer",    available: true  },
-    { id: 2,  name: "Quick Sort",          slug: "quick-sort",          difficulty: "Medium", category: "Divide & Conquer",    available: true  },
-    { id: 3,  name: "Bubble Sort",         slug: "bubble-sort",         difficulty: "Easy",   category: "Sorting",             available: true  },
-    { id: 4,  name: "Selection Sort",      slug: "selection-sort",      difficulty: "Easy",   category: "Sorting",             available: true  },
-    { id: 5,  name: "Insertion Sort",      slug: "insertion-sort",      difficulty: "Easy",   category: "Sorting",             available: true  },
-    { id: 6,  name: "Char Replacement",     slug: "char-replacement",    difficulty: "Medium", category: "Sliding Window",       available: true  },
-    { id: 7,  name: "Binary Search",       slug: "binary-search",       difficulty: "Easy",   category: "Searching",           available: true  },
-    { id: 8,  name: "Two Sum",             slug: "two-sum",             difficulty: "Easy",   category: "Arrays",              available: false },
-    { id: 9,  name: "Linked List Reversal", slug: "linked-list-reversal", difficulty: "Easy", category: "Linked List",        available: false },
-    { id: 10, name: "Valid Parentheses",   slug: "valid-parentheses",   difficulty: "Easy",   category: "Stack",               available: false },
-    { id: 11, name: "Maximum Subarray",    slug: "maximum-subarray",    difficulty: "Medium", category: "Dynamic Programming", available: false },
-    { id: 12, name: "Binary Tree Inorder", slug: "binary-tree-inorder", difficulty: "Easy",   category: "Trees",               available: false },
+    { id: 1,  name: "Bubble Sort",          slug: "bubble-sort",               difficulty: "Easy",   category: "Sorting",         available: true  },
+    { id: 2,  name: "Selection Sort",       slug: "selection-sort",            difficulty: "Easy",   category: "Sorting",         available: true  },
+    { id: 3,  name: "Insertion Sort",       slug: "insertion-sort",            difficulty: "Easy",   category: "Sorting",         available: true  },
+    { id: 4,  name: "Merge Sort",           slug: "merge-sort",                difficulty: "Medium", category: "Sorting",         available: true  },
+    { id: 5,  name: "Quick Sort",           slug: "quick-sort",                difficulty: "Medium", category: "Sorting",         available: true  },
+    { id: 6,  name: "Binary Search",        slug: "binary-search",             difficulty: "Easy",   category: "Binary Search",   available: true  },
+    { id: 7,  name: "Find Peak Element",    slug: "find-peak-element",         difficulty: "Medium", category: "Binary Search",   available: false },
+    { id: 8,  name: "First/Last Position",  slug: "first-last-position",       difficulty: "Medium", category: "Binary Search",   available: false },
+    { id: 9,  name: "Search Rotated Array", slug: "search-rotated-array",      difficulty: "Medium", category: "Binary Search",   available: false },
+    { id: 10, name: "Fibonacci Tree",       slug: "fibonacci",                 difficulty: "Easy",   category: "Recursion",       available: false },
+    { id: 11, name: "Factorial",            slug: "factorial",                 difficulty: "Easy",   category: "Recursion",       available: false },
+    { id: 12, name: "Subsets",              slug: "subsets",                   difficulty: "Medium", category: "Recursion",       available: false },
+    { id: 13, name: "Permutations",         slug: "permutations",              difficulty: "Hard",   category: "Recursion",       available: false },
+    { id: 14, name: "Valid Parentheses",    slug: "valid-parentheses",         difficulty: "Easy",   category: "Stack",           available: false },
+    { id: 15, name: "Next Greater Element", slug: "next-greater-element",      difficulty: "Medium", category: "Stack",           available: false },
+    { id: 16, name: "Daily Temperatures",   slug: "daily-temperatures",        difficulty: "Medium", category: "Stack",           available: false },
+    { id: 17, name: "Largest Rectangle",    slug: "largest-rectangle-histogram",difficulty:"Hard",   category: "Stack",           available: false },
+    { id: 18, name: "Char Replacement",     slug: "char-replacement",          difficulty: "Medium", category: "Sliding Window",  available: true  },
 ];
 
 const DSASheetsPanel = ({ isOpen, onClose }) => {

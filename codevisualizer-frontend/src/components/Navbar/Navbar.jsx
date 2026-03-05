@@ -82,6 +82,14 @@ const Navbar = ({ initialStyle = "light" }) => {
                             </span>
                         </Link>
 
+                        {/* Center: Beta pill — only on the Dry Runner page */}
+                        {location.pathname === '/visualizer' && (
+                            <div className="hidden lg:flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                <span className="text-xs font-medium text-white/80 tracking-wide">Beta · Experimental · Testing Stage</span>
+                            </div>
+                        )}
+
                         {/* Desktop Auth */}
                         <div className="hidden lg:flex items-center space-x-4">
                             {loading ? (
