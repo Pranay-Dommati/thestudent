@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HiChevronDown, HiChevronRight } from 'react-icons/hi2';
+import { HiChevronDown, HiChevronRight, HiArrowsUpDown, HiMagnifyingGlass } from 'react-icons/hi2';
+import { TbArrowIteration, TbStack2, TbAppWindow } from 'react-icons/tb';
 
 // ── Floating code tokens shown in the hero background ────────────────────────
 const CODE_TOKENS = [
@@ -35,18 +36,18 @@ const AnimatedHero = ({ completedCount, progressPct }) => {
     ).current;
 
     return (
-        <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg,#0f0c29,#1a1060,#24243e 60%,#0d1b4b)' }}>
+        <div className="relative overflow-hidden" style={{ background: '#0B0E1A' }}>
             {/* Animated grid — subtle perspective floor */}
             <div className="absolute inset-0 pointer-events-none" style={{
-                backgroundImage: 'linear-gradient(rgba(99,102,241,0.08) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.08) 1px,transparent 1px)',
+                backgroundImage: 'linear-gradient(rgba(99,102,241,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.05) 1px,transparent 1px)',
                 backgroundSize: '40px 40px',
                 maskImage: 'linear-gradient(to bottom,transparent 0%,black 30%,black 70%,transparent 100%)'
             }} />
 
             {/* Glowing orbs */}
-            <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full opacity-20 blur-3xl" style={{ background: 'radial-gradient(circle,#6366f1,transparent 70%)' }} />
-            <div className="absolute -bottom-20 right-0 w-80 h-80 rounded-full opacity-15 blur-3xl" style={{ background: 'radial-gradient(circle,#a855f7,transparent 70%)' }} />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full opacity-10 blur-3xl" style={{ background: 'radial-gradient(ellipse,#3b82f6,transparent 70%)' }} />
+            <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full opacity-[0.12] blur-3xl" style={{ background: 'radial-gradient(circle,#6366f1,transparent 70%)' }} />
+            <div className="absolute -bottom-20 right-0 w-80 h-80 rounded-full opacity-[0.08] blur-3xl" style={{ background: 'radial-gradient(circle,#a855f7,transparent 70%)' }} />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full opacity-[0.07] blur-3xl" style={{ background: 'radial-gradient(ellipse,#6366f1,transparent 70%)' }} />
 
             {/* Floating code tokens */}
             <style>{`
@@ -145,7 +146,7 @@ const PATTERNS = [
     {
         id: 'sorting',
         name: 'Sorting',
-        icon: '↕️',
+        Icon: HiArrowsUpDown,
         description: 'Compare, swap, and order — the foundation of algorithms',
         color: 'from-blue-500 to-indigo-600',
         lightColor: 'bg-blue-50 border-blue-200',
@@ -161,7 +162,7 @@ const PATTERNS = [
     {
         id: 'binary-search',
         name: 'Binary Search',
-        icon: '🔍',
+        Icon: HiMagnifyingGlass,
         description: 'Halve the search space every step — lightning fast',
         color: 'from-emerald-500 to-teal-600',
         lightColor: 'bg-emerald-50 border-emerald-200',
@@ -176,7 +177,7 @@ const PATTERNS = [
     {
         id: 'recursion',
         name: 'Recursion',
-        icon: '🌀',
+        Icon: TbArrowIteration,
         description: 'A function calling itself — elegant and powerful',
         color: 'from-violet-500 to-purple-600',
         lightColor: 'bg-violet-50 border-violet-200',
@@ -191,7 +192,7 @@ const PATTERNS = [
     {
         id: 'stack',
         name: 'Stack',
-        icon: '📚',
+        Icon: TbStack2,
         description: 'Last in, first out — master the bracket and histogram problems',
         color: 'from-orange-500 to-rose-500',
         lightColor: 'bg-orange-50 border-orange-200',
@@ -206,7 +207,7 @@ const PATTERNS = [
     {
         id: 'sliding-window',
         name: 'Sliding Window',
-        icon: '🪟',
+        Icon: TbAppWindow,
         description: 'Maintain a moving window over data — O(n) solutions',
         color: 'from-pink-500 to-fuchsia-600',
         lightColor: 'bg-pink-50 border-pink-200',
@@ -242,17 +243,12 @@ const PatternSection = ({ pattern, completed, onToggleComplete, onProblemClick, 
                 className="w-full flex items-center gap-4 px-5 py-4 text-left"
             >
                 {/* Pattern icon + gradient pill */}
-                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${pattern.color} flex items-center justify-center text-xl shrink-0 shadow-sm`}>
-                    {pattern.icon}
+                <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${pattern.color} flex items-center justify-center shrink-0 shadow-sm`}>
+                    <pattern.Icon className="text-white text-xl" />
                 </div>
 
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-slate-800 text-base">{pattern.name}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pattern.badgeColor}`}>
-                            {availableCount}/{pattern.problems.length} available
-                        </span>
-                    </div>
+                    <span className="font-bold text-slate-800 text-base">{pattern.name}</span>
                     <p className="text-slate-500 text-xs mt-0.5">{pattern.description}</p>
                 </div>
 
@@ -358,14 +354,13 @@ const DSASheetPage = () => {
 
             {/* ── Pattern sections (lift up slightly over hero bottom edge) ── */}
             <div className="max-w-2xl mx-auto px-4 -mt-4 pb-10 space-y-4 relative z-10">
-                {PATTERNS.map((pattern, i) => (
+                {PATTERNS.filter(p => p.id !== 'sliding-window').map((pattern) => (
                     <PatternSection
                         key={pattern.id}
                         pattern={pattern}
                         completed={completed}
                         onToggleComplete={toggleComplete}
                         onProblemClick={handleProblemClick}
-                        defaultOpen={i === 0}
                     />
                 ))}
 

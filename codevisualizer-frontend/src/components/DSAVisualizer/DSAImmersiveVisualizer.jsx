@@ -138,13 +138,13 @@ const DSAImmersiveVisualizer = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-slate-900">
             {/* Header */}
-            <header className="flex-shrink-0 flex items-center justify-between px-6 py-3 bg-slate-800 border-b border-slate-700">
+            <header className="relative flex-shrink-0 flex items-center justify-between px-6 py-3 bg-slate-900 border-b border-slate-700/60">
                 <div className="flex items-center gap-4">
                     <button
                         onClick={onClose}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all"
                     >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <polyline points="15,18 9,12 15,6" />
@@ -152,7 +152,7 @@ const DSAImmersiveVisualizer = ({
                         Back
                     </button>
 
-                    <div className="h-5 w-px bg-slate-700" />
+                    <div className="h-5 w-px bg-white/20" />
 
                     <h1 className="text-base font-semibold text-white flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-amber-400" />
@@ -174,7 +174,7 @@ const DSAImmersiveVisualizer = ({
                         <div className="flex items-center gap-2">
                             <div
                                 ref={scrubberRef}
-                                className="relative w-64 h-[6px] rounded-full bg-slate-700 cursor-pointer group/scrub"
+                                className="relative w-64 h-[6px] rounded-full bg-white/10 cursor-pointer group/scrub"
                                 onMouseDown={(e) => { scrubbingRef.current = true; seekFraction(e.clientX); }}
                                 onMouseMove={(e) => {
                                     const rect = scrubberRef.current.getBoundingClientRect();
@@ -201,15 +201,15 @@ const DSAImmersiveVisualizer = ({
                     )}
 
                     {showInputPanel ? (
-                        <div className="flex items-center gap-2 bg-slate-800 border border-slate-600 rounded-xl px-3 py-1.5 shadow-lg">
-                            <span className="text-slate-400 text-xs font-mono">
+                        <div className="flex items-center gap-2 bg-white/5 border border-white/15 rounded-xl px-3 py-1.5 shadow-lg backdrop-blur-sm">
+                            <span className="text-white/40 text-xs font-mono">
                                 {algorithmType === 'char-replacement' ? 's, k =' : algorithmType === 'binary-search' ? 'arr, target =' : 'arr ='}
                             </span>
                             <input
                                 type="text"
                                 value={localArrayInput}
                                 onChange={handleInputChange}
-                                className={`w-44 px-2 py-1 bg-slate-900 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/60' : 'border-slate-600 focus:border-indigo-500'}`}
+                                className={`w-44 px-2 py-1 bg-black/30 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/60' : 'border-white/20 focus:border-indigo-400'}`}
                                 placeholder={algorithmType === 'char-replacement' ? 'AABCBA,2' : algorithmType === 'binary-search' ? '[3,12,25,31,42],31' : '[1, 2, 3]'}
                             />
                             {inputError && (
@@ -228,7 +228,7 @@ const DSAImmersiveVisualizer = ({
                             </button>
                             <button
                                 onClick={() => setShowInputPanel(false)}
-                                className="text-slate-500 hover:text-slate-300 text-xs px-1"
+                                className="text-white/30 hover:text-white/70 text-xs px-1"
                             >
                                 ✕
                             </button>
@@ -237,7 +237,7 @@ const DSAImmersiveVisualizer = ({
                         onRerun && (
                             <button
                                 onClick={() => setShowInputPanel(true)}
-                                className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 hover:border-slate-500 text-slate-200 hover:text-white rounded-xl text-sm font-medium transition-all shadow-sm"
+                                className="flex items-center gap-2 px-4 py-2 bg-white/8 hover:bg-white/15 border border-white/15 hover:border-white/25 text-white/70 hover:text-white rounded-xl text-sm font-medium transition-all shadow-sm"
                             >
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-amber-400">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />

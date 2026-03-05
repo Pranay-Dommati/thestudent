@@ -663,11 +663,11 @@ const DSAProblemPage = () => {
 
     if (!problem) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+            <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#0f0c29,#1a1060,#24243e 60%,#0d1b4b)' }}>
                 <div className="text-center">
-                    <h1 className="text-2xl font-bold text-slate-800 mb-2">Problem Not Found</h1>
-                    <p className="text-slate-500 mb-4">This problem is coming soon!</p>
-                    <Link to="/" className="text-blue-600 hover:underline">← Back to Home</Link>
+                    <h1 className="text-2xl font-bold text-white mb-2">Problem Not Found</h1>
+                    <p className="text-white/40 mb-4">This problem is coming soon!</p>
+                    <Link to="/" className="text-indigo-300 hover:text-white transition-colors">← Back to Home</Link>
                 </div>
             </div>
         );
@@ -675,10 +675,10 @@ const DSAProblemPage = () => {
 
     const getDifficultyColor = (difficulty) => {
         switch (difficulty) {
-            case 'Easy': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-            case 'Medium': return 'bg-amber-100 text-amber-700 border-amber-200';
-            case 'Hard': return 'bg-red-100 text-red-700 border-red-200';
-            default: return 'bg-slate-100 text-slate-700';
+            case 'Easy':   return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+            case 'Medium': return 'bg-amber-500/15  text-amber-300  border-amber-500/30';
+            case 'Hard':   return 'bg-red-500/15    text-red-300    border-red-500/30';
+            default:       return 'bg-white/10      text-white/60   border-white/20';
         }
     };
 
@@ -698,193 +698,169 @@ const DSAProblemPage = () => {
                 onRerun={handleRerunWithArray}
             />
 
-            {/* Problem Detail View */}
-            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 relative overflow-hidden">
-                {/* Background decorations */}
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
-                    <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
-                    <div className="absolute top-1/2 left-1/2 w-[800px] h-[800px] bg-indigo-500/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-                </div>
+            {/* ═══════ Problem Preview — Premium Layout ═══════ */}
+            <div className="min-h-screen bg-[#0B0E1A]">
 
-                {/* Header */}
-                <header className="relative z-10 border-b border-white/10">
-                    <div className="max-w-6xl mx-auto px-6 py-4">
-                        <div className="flex items-center justify-between">
-                            <Link to="/" className="flex items-center gap-2 text-white/70 hover:text-white transition-colors">
-                                <FaArrowLeft className="text-sm" />
-                                <span className="text-sm font-medium">Back to Home</span>
-                            </Link>
-                            <div className="flex items-center gap-2">
-                                <HiBookOpen className="text-blue-400" />
-                                <span className="text-white/80 text-sm font-medium">EasyLearnova DSA Sheet</span>
-                            </div>
-                        </div>
+                {/* ── Compact Top Bar ── */}
+                <nav className="sticky top-0 z-20 bg-[#0B0E1A] border-b border-white/[0.06]">
+                    <div className="max-w-3xl mx-auto px-5 h-14 flex items-center justify-between">
+                        <Link to="/" className="group flex items-center gap-2 text-white/40 hover:text-white/80 transition-colors text-sm">
+                            <FaArrowLeft className="text-xs group-hover:-translate-x-0.5 transition-transform" />
+                            Home
+                        </Link>
+                        <span className="text-white/20 text-[10px] font-semibold tracking-[0.2em] uppercase">DSA Sheet</span>
                     </div>
-                </header>
+                </nav>
 
-                {/* Main Content */}
-                <main className="relative z-10 max-w-4xl mx-auto px-6 py-12">
-                    {/* Problem Header */}
-                    <div className="text-center mb-12">
-                        <div className="flex items-center justify-center gap-3 mb-4">
-                            <span className={`px-3 py-1 text-xs font-bold rounded-full border ${getDifficultyColor(problem.difficulty)}`}>
+                {/* ── Hero Banner ── */}
+                <div className="relative overflow-hidden">
+                    {/* Ambient glow */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[250px] rounded-full opacity-[0.12] blur-[100px] pointer-events-none" style={{ background: 'radial-gradient(ellipse, #6366f1, transparent 70%)' }} />
+
+                    <div className="relative max-w-3xl mx-auto px-5 pt-10 pb-12 text-center">
+                        {/* Badges */}
+                        <div className="flex items-center justify-center gap-2.5 mb-5">
+                            <span className={`px-3 py-1 text-[11px] font-bold rounded-full border ${getDifficultyColor(problem.difficulty)}`}>
                                 {problem.difficulty}
                             </span>
-                            <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 text-xs font-semibold rounded-full border border-indigo-500/30">
+                            <span className="px-3 py-1 text-[11px] font-semibold rounded-full border border-white/[0.08] text-white/40 bg-white/[0.04]">
                                 {problem.category}
                             </span>
                         </div>
-                        <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
+
+                        {/* Title */}
+                        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-3">
                             {problem.name}
                         </h1>
-                        <p className="text-slate-400 text-lg">
-                            Problem #{problem.id} • {problem.category}
+                        <p className="text-white/25 text-sm mb-8">
+                            Problem #{problem.id}
                         </p>
-                    </div>
 
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-2 gap-4 mb-10 max-w-md mx-auto">
-                        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-4 text-center">
-                            <div className="flex items-center justify-center gap-2 text-blue-400 mb-1">
-                                <FaClock className="text-sm" />
-                                <span className="text-xs font-medium text-slate-400">Time</span>
+                        {/* Complexity chips — horizontal */}
+                        <div className="flex items-center justify-center gap-3">
+                            <div className="flex items-center gap-2 bg-white/[0.05] border border-white/[0.08] rounded-full px-4 py-2">
+                                <FaClock className="text-indigo-400/70 text-[10px]" />
+                                <span className="text-white/30 text-[10px] font-semibold uppercase tracking-wider">Time</span>
+                                <span className="text-white/90 font-bold text-xs">{problem.timeComplexity}</span>
                             </div>
-                            <p className="text-white font-bold">{problem.timeComplexity}</p>
-                        </div>
-                        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-4 text-center">
-                            <div className="flex items-center justify-center gap-2 text-emerald-400 mb-1">
-                                <HiChartBar className="text-sm" />
-                                <span className="text-xs font-medium text-slate-400">Space</span>
+                            <div className="flex items-center gap-2 bg-white/[0.05] border border-white/[0.08] rounded-full px-4 py-2">
+                                <HiChartBar className="text-emerald-400/70 text-[10px]" />
+                                <span className="text-white/30 text-[10px] font-semibold uppercase tracking-wider">Space</span>
+                                <span className="text-white/90 font-bold text-xs">{problem.spaceComplexity}</span>
                             </div>
-                            <p className="text-white font-bold">{problem.spaceComplexity}</p>
                         </div>
                     </div>
+                </div>
 
-                    {/* Description Card */}
-                    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 mb-8">
-                        <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-                            <FaLightbulb className="text-amber-400" />
-                            About this Problem
-                        </h3>
-                        <p className="text-slate-300 leading-relaxed">
+                {/* ── Content Cards ── */}
+                <div className="max-w-2xl mx-auto px-5 pb-16 space-y-3">
+
+                    {/* Description */}
+                    <div className="bg-white/[0.04] border border-white/[0.07] rounded-2xl p-5">
+                        <div className="flex items-center gap-2.5 mb-3">
+                            <div className="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                                <FaLightbulb className="text-amber-400 text-[10px]" />
+                            </div>
+                            <h3 className="font-semibold text-white/90 text-sm">About this Problem</h3>
+                        </div>
+                        <p className="text-white/45 text-[13px] leading-relaxed pl-[34px]">
                             {problem.description}
                         </p>
                     </div>
 
                     {/* Concepts */}
-                    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 mb-10">
-                        <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                            <FaCheckCircle className="text-emerald-400" />
-                            What You'll Learn
-                        </h3>
-                        <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white/[0.04] border border-white/[0.07] rounded-2xl p-5">
+                        <div className="flex items-center gap-2.5 mb-4">
+                            <div className="w-6 h-6 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                                <FaCheckCircle className="text-emerald-400 text-[10px]" />
+                            </div>
+                            <h3 className="font-semibold text-white/90 text-sm">What You'll Learn</h3>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-[34px]">
                             {problem.concepts.map((concept, idx) => (
-                                <div key={idx} className="flex items-center gap-3 bg-white/5 rounded-xl p-3">
-                                    <div className="w-6 h-6 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                                        <span className="text-emerald-400 text-xs">✓</span>
-                                    </div>
-                                    <span className="text-slate-300 text-sm">{concept}</span>
+                                <div key={idx} className="flex items-center gap-2.5 py-2">
+                                    <div className="w-1 h-1 rounded-full bg-emerald-400/60 shrink-0" />
+                                    <span className="text-white/50 text-[13px]">{concept}</span>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* Error Display */}
-                    {error && (
-                        <div className="mb-6 p-4 bg-red-500/20 border border-red-500/30 rounded-xl text-red-300 text-center">
-                            {error}
+                    {/* ── Input & CTA Section ── */}
+                    <div className="bg-gradient-to-b from-white/[0.06] to-white/[0.03] border border-white/[0.08] rounded-2xl p-5">
+                        <div className="flex items-center gap-2.5 mb-4">
+                            <div className="w-6 h-6 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                                <HiSparkles className="text-indigo-400 text-[10px]" />
+                            </div>
+                            <h3 className="font-semibold text-white/90 text-sm">Custom Input</h3>
                         </div>
-                    )}
-
-                    {/* Custom Array Input */}
-                    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 mb-8">
-                        <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                            <HiSparkles className="text-amber-400" />
-                            Try Your Own Array
-                        </h3>
-                        <div className="space-y-3">
+                        <div className="pl-[34px] space-y-4">
                             <div className="relative">
                                 <input
                                     type="text"
                                     value={customArrayInput}
                                     onChange={handleArrayInputChange}
                                     placeholder={problemName === 'char-replacement' ? 'AABABBAC,2' : '[1, 2, 3, 4, 5]'}
-                                    className={`w-full px-4 py-3 bg-slate-800 border rounded-xl text-white font-mono text-lg focus:outline-none focus:ring-2 transition-all ${arrayError
-                                        ? 'border-red-500/50 focus:ring-red-500/30'
-                                        : 'border-white/20 focus:ring-blue-500/30 focus:border-blue-500/50'
-                                        }`}
+                                    className={`w-full px-4 py-3 bg-black/40 border rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 transition-all placeholder-white/15 ${
+                                        arrayError
+                                            ? 'border-red-500/40 focus:ring-red-500/20'
+                                            : 'border-white/[0.1] focus:ring-indigo-500/30 focus:border-indigo-400/40'
+                                    }`}
                                 />
                                 {customArrayInput !== DEFAULT_ARRAYS[problemName] && (
                                     <button
-                                        onClick={() => {
-                                            setCustomArrayInput(DEFAULT_ARRAYS[problemName]);
-                                            setArrayError('');
-                                        }}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-sm px-2 py-1 bg-slate-700 rounded-lg transition-colors"
+                                        onClick={() => { setCustomArrayInput(DEFAULT_ARRAYS[problemName]); setArrayError(''); }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 text-[11px] px-2 py-0.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] transition-all"
                                     >
                                         Reset
                                     </button>
                                 )}
                             </div>
                             {arrayError ? (
-                                <p className="text-red-400 text-sm flex items-center gap-1">
+                                <p className="text-red-400/80 text-[11px] flex items-center gap-1.5">
                                     <span>⚠️</span> {arrayError}
                                 </p>
                             ) : (
-                                <p className="text-slate-500 text-sm">
+                                <p className="text-white/20 text-[11px]">
                                     {problemName === 'char-replacement'
-                                        ? 'Format: UPPERCASE_LETTERS,k  (e.g. AABABBAC,2)'
-                                        : 'Enter comma-separated integers (max 15 elements)'}
+                                        ? 'Format: LETTERS,k (e.g. AABABBAC,2)'
+                                        : 'Comma-separated integers · max 15 elements'}
                                 </p>
                             )}
-                        </div>
-                    </div>
 
-                    {/* CTA Button */}
-                    <div className="text-center">
-                        <button
-                            onClick={handleVisualize}
-                            disabled={!!arrayError}
-                            className={`group relative inline-flex items-center gap-4 px-10 py-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-bold text-xl rounded-2xl shadow-2xl transition-all duration-300 ${arrayError
-                                ? 'opacity-50 cursor-not-allowed shadow-none'
-                                : 'hover:from-blue-500 hover:via-indigo-500 hover:to-purple-500 shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105'
-                                }`}
-                        >
-                            {/* Glow effect */}
-                            {!arrayError && (
-                                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl blur-xl opacity-50 group-hover:opacity-70 transition-opacity" />
+                            {/* Error Display */}
+                            {error && (
+                                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300/80 text-center text-xs">
+                                    {error}
+                                </div>
                             )}
 
-                            <div className="relative flex items-center gap-4">
-                                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                                    <FaPlay className="text-lg" />
-                                </div>
-                                <div className="text-left">
-                                    <span className="block text-xl font-bold">Let's Visualize!</span>
-                                    <span className="block text-sm text-white/70 font-normal">See the algorithm in action</span>
-                                </div>
-                                <HiSparkles className="text-2xl text-amber-300 group-hover:animate-pulse" />
-                            </div>
-                        </button>
-
-                        <p className="mt-6 text-slate-500 text-sm">
-                            Watch each step of the algorithm execute with our interactive visualizer
-                        </p>
-                    </div>
-                </main>
-
-                {/* Footer */}
-                <footer className="relative z-10 border-t border-white/10 mt-16">
-                    <div className="max-w-6xl mx-auto px-6 py-6">
-                        <div className="flex items-center justify-between">
-                            <span className="text-slate-500 text-sm">© 2026 EasyLearnova</span>
-                            <Link to="/" className="text-slate-400 hover:text-white text-sm transition-colors">
-                                ← Back to Code Visualizer
-                            </Link>
+                            {/* CTA */}
+                            <button
+                                onClick={handleVisualize}
+                                disabled={!!arrayError}
+                                className={`w-full relative group flex items-center justify-center gap-3 py-4 rounded-xl font-bold text-base transition-all duration-200 ${
+                                    arrayError
+                                        ? 'bg-white/[0.05] text-white/20 cursor-not-allowed'
+                                        : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 active:scale-[0.98]'
+                                }`}
+                            >
+                                <FaPlay className="text-xs" />
+                                Visualize
+                                {!arrayError && (
+                                    <HiSparkles className="text-amber-300/80 text-sm" />
+                                )}
+                            </button>
                         </div>
                     </div>
-                </footer>
+
+                    {/* Footer */}
+                    <div className="text-center pt-6 pb-4">
+                        <p className="text-white/15 text-[11px]">
+                            © 2026 EasyLearnova · <Link to="/" className="text-white/25 hover:text-white/50 transition-colors">Home</Link>
+                        </p>
+                    </div>
+                </div>
             </div>
         </>
     );
