@@ -196,17 +196,21 @@ const ArrayVisual = ({ arr, ev, n }) => {
 
             {/* Target box — above the pointer row */}
             {target !== null && (
-                <motion.div
-                    className={`flex items-center gap-2 rounded-xl border-2 px-4 py-1.5 text-sm font-bold select-none bg-slate-800/60 text-slate-200 transition-colors duration-300 ${
-                        isCheckIf
-                            ? 'border-amber-400 shadow-[0_0_10px_2px_rgba(251,191,36,0.4)]'
-                            : 'border-slate-600'
-                    }`}
+                <div
+                    className={isCheckIf ? 'shimmer-border' : ''}
                     style={{ marginBottom: 28 }}
                 >
-                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">target</span>
-                    <span>{target}</span>
-                </motion.div>
+                    <div
+                        className={`flex items-center gap-2 px-4 py-1.5 text-sm font-bold select-none text-slate-200 transition-colors duration-300 ${
+                            isCheckIf
+                                ? 'rounded-[8px] bg-slate-800'
+                                : 'rounded-xl border-2 border-slate-600 bg-slate-800/60'
+                        }`}
+                    >
+                        <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">target</span>
+                        <span>{target}</span>
+                    </div>
+                </div>
             )}
 
             {/* PointerBadgeRow — L (emerald), M (sky, j1), R (rose) */}
@@ -233,7 +237,20 @@ const ArrayVisual = ({ arr, ev, n }) => {
             >
                 <div className="flex items-center" style={{ gap: CELL_GAP }}>
                     {arr.map((val, idx) => {
-                        return (
+                        const isShimmerCell = isCheckIf && idx === mid && mid !== null;
+                        return isShimmerCell ? (
+                            <div
+                                key={idx}
+                                className="shimmer-border flex-shrink-0"
+                                style={{ width: CELL_W, height: CELL_H, minWidth: CELL_W, borderRadius: 8, padding: 2 }}
+                            >
+                                <div
+                                    className="flex items-center justify-center rounded-[6px] bg-sky-500 text-white text-sm font-bold w-full h-full"
+                                >
+                                    {val}
+                                </div>
+                            </div>
+                        ) : (
                             <motion.div
                                 key={idx}
                                 layout
