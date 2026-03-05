@@ -13,8 +13,28 @@ const VisualizerControls = ({
     onReset,
     onBack,
     onNext,
+    onCloseCode,
 }) => (
-    <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-700/60 bg-slate-800/80 gap-3">
+    <>
+        {onCloseCode && (
+            <div className="md:hidden flex-shrink-0 flex items-center justify-between px-4 py-2.5 bg-slate-800 border-b border-slate-600/50">
+                <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="16,18 22,12 16,6"/><polyline points="8,6 2,12 8,18"/>
+                    </svg>
+                    Code
+                </span>
+                <button
+                    className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                    onClick={onCloseCode}
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+        )}
+        <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-700/60 bg-slate-800/80 gap-3">
 
         {/* Reset — left */}
         <button onClick={onReset} disabled={eventIdx < 0}
@@ -47,6 +67,7 @@ const VisualizerControls = ({
             </button>
         </div>
     </div>
+    </>
 );
 
 export default VisualizerControls;

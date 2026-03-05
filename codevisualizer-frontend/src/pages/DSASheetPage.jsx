@@ -36,7 +36,7 @@ const AnimatedHero = ({ completedCount, progressPct }) => {
     ).current;
 
     return (
-        <div className="relative overflow-hidden" style={{ background: '#0B0E1A' }}>
+        <div className="relative overflow-hidden" style={{ background: '#0f172a' }}>
             {/* Animated grid — subtle perspective floor */}
             <div className="absolute inset-0 pointer-events-none" style={{
                 backgroundImage: 'linear-gradient(rgba(99,102,241,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.05) 1px,transparent 1px)',

@@ -70,6 +70,10 @@ const DSAImmersiveVisualizer = ({
     const [inputError, setInputError] = useState('');
     const [showInputPanel, setShowInputPanel] = useState(false);
 
+    // Mobile code panel toggle
+    const [showCode, setShowCode] = useState(false);
+    const closeCode = () => setShowCode(false);
+
     // Update local input when prop changes
     useEffect(() => {
         setLocalArrayInput(customArray);
@@ -140,38 +144,42 @@ const DSAImmersiveVisualizer = ({
     return (
         <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-slate-900">
             {/* Header */}
-            <header className="relative flex-shrink-0 flex items-center justify-between px-6 py-3 bg-slate-900 border-b border-slate-700/60">
-                <div className="flex items-center gap-4">
+            <header className="relative flex-shrink-0 flex items-center justify-between px-3 md:px-6 py-2.5 md:py-3 bg-slate-900 border-b border-slate-700/60">
+                <div className="flex items-center gap-2 md:gap-4 min-w-0">
                     <button
                         onClick={onClose}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all"
+                        className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all flex-shrink-0"
                     >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <polyline points="15,18 9,12 15,6" />
                         </svg>
+                        <span className="text-sm">Back</span>
                         Back
                     </button>
 
-                    <div className="h-5 w-px bg-white/20" />
+                    <div className="h-4 w-px bg-white/20" />
 
-                    <h1 className="text-base font-semibold text-white flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-amber-400" />
-                        {algorithmType === 'quick-sort' ? 'Quick Sort'
-                         : algorithmType === 'bubble-sort' ? 'Bubble Sort'
-                         : algorithmType === 'selection-sort' ? 'Selection Sort'
-                         : algorithmType === 'insertion-sort' ? 'Insertion Sort'
-                         : algorithmType === 'char-replacement' ? 'Longest Repeating Character Replacement'
-                         : algorithmType === 'binary-search' ? 'Binary Search'
-                         : 'Merge Sort'}
+                    <h1 className="text-sm md:text-base font-semibold text-white flex items-center gap-1.5 md:gap-2 truncate">
+                        <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4 text-amber-400 flex-shrink-0" />
+                        <span className="truncate">
+                            {algorithmType === 'quick-sort' ? 'Quick Sort'
+                             : algorithmType === 'bubble-sort' ? 'Bubble Sort'
+                             : algorithmType === 'selection-sort' ? 'Selection Sort'
+                             : algorithmType === 'insertion-sort' ? 'Insertion Sort'
+                             : algorithmType === 'char-replacement'
+                                 ? <><span className="md:hidden">Char Replacement</span><span className="hidden md:inline">Longest Repeating Char Replacement</span></>
+                             : algorithmType === 'binary-search' ? 'Binary Search'
+                             : 'Merge Sort'}
+                        </span>
                     </h1>
                 </div>
 
                 {/* Right: Compact Scrubber + Array Input */}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
 
-                    {/* Inline seek scrubber */}
+                    {/* Inline seek scrubber — desktop only */}
                     {progress.total > 0 && (
-                        <div className="flex items-center gap-2">
+                        <div className="hidden md:flex items-center gap-2">
                             <div
                                 ref={scrubberRef}
                                 className="relative w-64 h-[6px] rounded-full bg-white/10 cursor-pointer group/scrub"
@@ -237,18 +245,36 @@ const DSAImmersiveVisualizer = ({
                         onRerun && (
                             <button
                                 onClick={() => setShowInputPanel(true)}
-                                className="flex items-center gap-2 px-4 py-2 bg-white/8 hover:bg-white/15 border border-white/15 hover:border-white/25 text-white/70 hover:text-white rounded-xl text-sm font-medium transition-all shadow-sm"
+                                className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-4 py-2 bg-white/8 hover:bg-white/15 border border-white/15 hover:border-white/25 text-white/70 hover:text-white rounded-xl text-sm font-medium transition-all shadow-sm"
                             >
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-amber-400">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-amber-400 flex-shrink-0">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                 </svg>
-                                Change Input
+                                <span className="hidden md:inline">Change Input</span>
                             </button>
                         )
                     )}
+                    {/* Mobile: toggle code panel */}
+                    <button
+                        className="md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-white/15 text-white/60 hover:text-white hover:bg-white/10 transition-all text-xs font-medium flex-shrink-0"
+                        onClick={() => setShowCode(v => !v)}
+                    >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="16,18 22,12 16,6"/><polyline points="8,6 2,12 8,18"/>
+                        </svg>
+                        {showCode ? 'Hide' : 'Code'}
+                    </button>
                 </div>
             </header>
+
+            {/* Mobile backdrop for code panel */}
+            {showCode && (
+                <div
+                    className="md:hidden fixed inset-0 z-30 bg-black/60"
+                    onClick={closeCode}
+                />
+            )}
 
             {/* Main Content */}
             <div className="flex-1 flex overflow-hidden">
@@ -256,23 +282,23 @@ const DSAImmersiveVisualizer = ({
                 <div className="flex-1 min-w-0">
                     {algorithmType === 'quick-sort' ? (
                         activeTab === 'combined' ? (
-                            <QuickSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                            <QuickSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
                         ) : (
                             <QuickSortCoreLogicVisualizer customArray={customArray} onProgress={setProgress} seekRef={logicSeekRef} />
                         )
                     ) : algorithmType === 'bubble-sort' ? (
-                        <BubbleSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                        <BubbleSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
                     ) : algorithmType === 'selection-sort' ? (
-                        <SelectionSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                        <SelectionSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
                     ) : algorithmType === 'insertion-sort' ? (
-                        <InsertionSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                        <InsertionSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
                     ) : algorithmType === 'char-replacement' ? (
-                        <CharReplacementVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                        <CharReplacementVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
                     ) : algorithmType === 'binary-search' ? (
-                        <BinarySearchVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                        <BinarySearchVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
                     ) : (
                         activeTab === 'combined' ? (
-                            <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} />
+                            <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
                         ) : (
                             <CoreLogicVisualizer customArray={customArray} onProgress={setProgress} seekRef={logicSeekRef} />
                         )

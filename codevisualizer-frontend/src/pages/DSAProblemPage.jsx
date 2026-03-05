@@ -1,8 +1,33 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { FaArrowLeft, FaPlay, FaLightbulb, FaClock, FaCheckCircle } from 'react-icons/fa';
 import { HiSparkles, HiChartBar, HiBookOpen } from 'react-icons/hi2';
 import { DSAImmersiveVisualizer } from '../components/DSAVisualizer';
+
+// ── Floating DSA tokens for the page background ───────────────────────────
+const PAGE_TOKENS = [
+    'O(log n)', 'O(n²)', 'O(n log n)', 'O(1)', 'O(n)',
+    'left = mid+1', 'right = mid-1', 'arr[mid]', 'while l ≤ r',
+    'pivot', 'merge()', 'swap(i,j)', 'return mid', 'stack.pop()',
+    'BFS', 'DFS', 'Dijkstra', 'DP', 'memoize',
+    'f(n-1)+f(n-2)', 'T(n)=2T(n/2)+n', 'base case', 'recurse(n-1)',
+    'for i in range(n)', 'two pointer', 'sliding window',
+    '[ L · · · R ]', '{ key: val }', 'min_heap', 'max_heap',
+    'adj[u].append(v)', 'dp[i][j]', 'prefix sum', 'hash map',
+];
+
+const useFrozenTokens = () => useRef(
+    PAGE_TOKENS.map((t, i) => ({
+        text: t,
+        left: `${(i * 41 + 5) % 94}%`,
+        top:  `${(i * 67 + 8) % 92}%`,
+        delay: `${(i * 0.35) % 7}s`,
+        dur:   `${7 + (i % 6)}s`,
+        opacity: 0.045 + (i % 5) * 0.015,
+        scale:   0.65 + (i % 4) * 0.15,
+        rotate:  `${(i % 2 === 0 ? 1 : -1) * (i % 8)}deg`,
+    }))
+).current;
 
 // API Base URL - same as CodeVisualizerPage
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
@@ -338,9 +363,37 @@ const DSAProblemPage = () => {
     const { problemName } = useParams();
     const problem = problemsData[problemName];
 
-    // Custom array input state
-    const [customArrayInput, setCustomArrayInput] = useState(DEFAULT_ARRAYS[problemName] || '[38, 27, 43, 3, 9, 82, 10]');
-    const [arrayError, setArrayError] = useState('');
+    // ── Split input state per problem type ────────────────────────────────
+    // For binary-search: arrField=[...], targetField=number
+    // For char-replacement: arrField=LETTERS, targetField=k
+    // For sorting: arrField=[...] only
+    const getDefaultArr = () => {
+        if (problemName === 'binary-search') return '[3, 12, 18, 25, 31, 42, 63]';
+        if (problemName === 'char-replacement') return 'AABABBAC';
+        return DEFAULT_ARRAYS[problemName] || '[38, 27, 43, 3, 9, 82, 10]';
+    };
+    const getDefaultTarget = () => {
+        if (problemName === 'binary-search') return '31';
+        if (problemName === 'char-replacement') return '2';
+        return '';
+    };
+
+    const [arrField, setArrField]       = useState(getDefaultArr);
+    const [targetField, setTargetField] = useState(getDefaultTarget);
+    const [arrError, setArrError]       = useState('');
+    const [targetError, setTargetError] = useState('');
+
+    // Frozen tokens for the 3-D background layer
+    const pageTokens = useFrozenTokens();
+
+    // Combine fields into the single string the templates expect
+    const customArrayInput = (() => {
+        if (problemName === 'binary-search')   return `${arrField},${targetField}`;
+        if (problemName === 'char-replacement') return `${arrField},${targetField}`;
+        return arrField;
+    })();
+
+    const arrayError = arrError || targetError;
 
     // Generate code with custom array
     const code = PROBLEM_CODE_TEMPLATES[problemName]
@@ -356,47 +409,55 @@ const DSAProblemPage = () => {
     const [error, setError] = useState(null);
 
     // Validate array input (handles both numeric arrays and char-replacement 'S,k' format)
-    const validateArrayInput = (input) => {
+    // ── Per-field validators ─────────────────────────────────────────────────
+    const validateArr = (val) => {
         if (problemName === 'char-replacement') {
-            const trimmed = input.trim();
-            const parts = trimmed.split(',');
-            if (parts.length !== 2) return 'Format: LETTERS,k  (e.g. AABABBAC,2)';
-            const s = parts[0].trim();
-            const k = parts[1].trim();
-            if (!/^[A-Za-z]+$/.test(s)) return 'First part must be letters only (e.g. AABABBAC)';
-            if (!/^\d+$/.test(k)) return 'Second part must be a non-negative integer (e.g. 2)';
-            if (s.length > 20) return 'String too long (max 20 characters)';
+            if (!/^[A-Za-z]+$/.test(val.trim())) return 'Letters only (e.g. AABABBAC)';
+            if (val.trim().length > 20) return 'Max 20 characters';
             return '';
         }
-        const trimmed = input.trim();
-        if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
-            return 'Array must start with [ and end with ]';
-        }
-        const inner = trimmed.slice(1, -1).trim();
-        if (!inner) {
-            return 'Array cannot be empty';
-        }
+        const t = val.trim();
+        if (!t.startsWith('[') || !t.endsWith(']')) return 'Must be like [1, 2, 3]';
+        const inner = t.slice(1, -1).trim();
+        if (!inner) return 'Array cannot be empty';
         const parts = inner.split(',').map(p => p.trim());
-        for (const part of parts) {
-            if (!/^-?\d+$/.test(part)) {
-                return `Invalid number: ${part}`;
-            }
+        for (const p of parts) { if (!/^-?\d+$/.test(p)) return `Invalid number: ${p}`; }
+        if (parts.length > 15) return 'Max 15 elements';
+        return '';
+    };
+    const validateTarget = (val) => {
+        if (problemName === 'binary-search') {
+            if (!/^-?\d+$/.test(val.trim())) return 'Must be an integer';
+            return '';
         }
-        if (parts.length > 15) {
-            return 'Maximum 15 elements allowed for visualization';
+        if (problemName === 'char-replacement') {
+            if (!/^\d+$/.test(val.trim())) return 'Must be a number ≥ 0';
+            return '';
         }
         return '';
     };
 
-    const handleArrayInputChange = (e) => {
-        const value = e.target.value;
-        setCustomArrayInput(value);
-        setArrayError(validateArrayInput(value));
-    };
+    const handleArrChange = (e) => { setArrField(e.target.value); setArrError(validateArr(e.target.value)); };
+    const handleTargetChange = (e) => { setTargetField(e.target.value); setTargetError(validateTarget(e.target.value)); };
 
     // Handle rerun with a specific array (called from visualizer)
     const handleRerunWithArray = useCallback(async (newArrayString) => {
-        setCustomArrayInput(newArrayString);
+        // update arrField only (keep existing target)
+        if (problemName === 'binary-search') {
+            const commaIdx = newArrayString.lastIndexOf(',');
+            if (commaIdx >= 0) {
+                setArrField(newArrayString.slice(0, commaIdx).trim());
+                setTargetField(newArrayString.slice(commaIdx + 1).trim());
+            } else {
+                setArrField(newArrayString);
+            }
+        } else if (problemName === 'char-replacement') {
+            const parts = newArrayString.split(',');
+            setArrField(parts[0]?.trim() || newArrayString);
+            if (parts[1]) setTargetField(parts[1].trim());
+        } else {
+            setArrField(newArrayString);
+        }
         setShowVisualizer(true);
         setIsLoadingTrace(true);
         setSteps([]);
@@ -699,10 +760,44 @@ const DSAProblemPage = () => {
             />
 
             {/* ═══════ Problem Preview — Premium Layout ═══════ */}
-            <div className="min-h-screen bg-[#0B0E1A]">
+            <div className="relative min-h-screen bg-slate-900 overflow-hidden">
+
+                {/* ── Full-page 3-D floating token layer ── */}
+                <style>{`
+                    @keyframes dsaFloat {
+                        0%   { transform: translateY(0px) translateZ(0px) rotate(var(--r)); opacity: var(--o); }
+                        33%  { transform: translateY(-14px) translateZ(20px) rotate(var(--r)); opacity: calc(var(--o) * 1.6); }
+                        66%  { transform: translateY(-6px) translateZ(-10px) rotate(var(--r)); opacity: calc(var(--o) * 0.8); }
+                        100% { transform: translateY(0px) translateZ(0px) rotate(var(--r)); opacity: var(--o); }
+                    }
+                `}</style>
+                {pageTokens.map((tk, i) => (
+                    <div
+                        key={i}
+                        className="absolute font-mono font-semibold select-none pointer-events-none text-indigo-300"
+                        style={{
+                            left: tk.left, top: tk.top,
+                            fontSize: `${9 * tk.scale}px`,
+                            '--o': tk.opacity, '--r': tk.rotate,
+                            opacity: tk.opacity,
+                            animation: `dsaFloat ${tk.dur} ${tk.delay} ease-in-out infinite`,
+                            zIndex: 0,
+                        }}
+                    >{tk.text}</div>
+                ))}
+
+                {/* subtle grid overlay */}
+                <div className="absolute inset-0 pointer-events-none" style={{
+                    backgroundImage: 'linear-gradient(rgba(99,102,241,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,0.04) 1px,transparent 1px)',
+                    backgroundSize: '44px 44px',
+                    maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)'
+                }} />
+
+                {/* soft indigo glow top-center */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[260px] rounded-full opacity-[0.1] blur-[90px] pointer-events-none" style={{ background: 'radial-gradient(ellipse, #6366f1, transparent 70%)' }} />
 
                 {/* ── Compact Top Bar ── */}
-                <nav className="sticky top-0 z-20 bg-[#0B0E1A] border-b border-white/[0.06]">
+                <nav className="relative z-20 sticky top-0 bg-slate-900/90 backdrop-blur-sm border-b border-white/[0.06]">
                     <div className="max-w-3xl mx-auto px-5 h-14 flex items-center justify-between">
                         <Link to="/" className="group flex items-center gap-2 text-white/40 hover:text-white/80 transition-colors text-sm">
                             <FaArrowLeft className="text-xs group-hover:-translate-x-0.5 transition-transform" />
@@ -713,9 +808,7 @@ const DSAProblemPage = () => {
                 </nav>
 
                 {/* ── Hero Banner ── */}
-                <div className="relative overflow-hidden">
-                    {/* Ambient glow */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[250px] rounded-full opacity-[0.12] blur-[100px] pointer-events-none" style={{ background: 'radial-gradient(ellipse, #6366f1, transparent 70%)' }} />
+                <div className="relative z-10">
 
                     <div className="relative max-w-3xl mx-auto px-5 pt-10 pb-12 text-center">
                         {/* Badges */}
@@ -737,7 +830,7 @@ const DSAProblemPage = () => {
                         </p>
 
                         {/* Complexity chips — horizontal */}
-                        <div className="flex items-center justify-center gap-3">
+                        <div className="flex items-center justify-center gap-3 mb-8">
                             <div className="flex items-center gap-2 bg-white/[0.05] border border-white/[0.08] rounded-full px-4 py-2">
                                 <FaClock className="text-indigo-400/70 text-[10px]" />
                                 <span className="text-white/30 text-[10px] font-semibold uppercase tracking-wider">Time</span>
@@ -749,11 +842,68 @@ const DSAProblemPage = () => {
                                 <span className="text-white/90 font-bold text-xs">{problem.spaceComplexity}</span>
                             </div>
                         </div>
+
+                        {/* ── Input fields + Visualize CTA ── */}
+                        <div className="max-w-xl mx-auto w-full">
+                            {/* Input row */}
+                            <div className="flex flex-col sm:flex-row items-end gap-3 mb-3">
+
+                                {/* Primary field: Array or String */}
+                                <div className="flex-1 w-full text-left">
+                                    <label className="block text-white/35 text-[10px] font-semibold uppercase tracking-widest mb-1.5">
+                                        {problemName === 'char-replacement' ? 'String' : 'Array'}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={arrField}
+                                        onChange={handleArrChange}
+                                        placeholder={problemName === 'char-replacement' ? 'AABABBAC' : '[5, 1, 4, 2, 8]'}
+                                        className={`w-full px-4 py-3 bg-white/[0.06] border rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 transition-all placeholder-white/20 ${
+                                            arrError ? 'border-red-500/40 focus:ring-red-500/20' : 'border-white/[0.1] focus:ring-indigo-500/30 focus:border-indigo-400/40'
+                                        }`}
+                                    />
+                                    {arrError && <p className="text-red-400/80 text-[10px] mt-1">⚠ {arrError}</p>}
+                                </div>
+
+                                {/* Secondary field: Target or k (only for binary-search & char-replacement) */}
+                                {(problemName === 'binary-search' || problemName === 'char-replacement') && (
+                                    <div className="w-24 sm:w-28 shrink-0 text-left">
+                                        <label className="block text-white/35 text-[10px] font-semibold uppercase tracking-widest mb-1.5">
+                                            {problemName === 'binary-search' ? 'Target' : 'k'}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={targetField}
+                                            onChange={handleTargetChange}
+                                            placeholder={problemName === 'binary-search' ? '31' : '2'}
+                                            className={`w-full px-4 py-3 bg-white/[0.06] border rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 transition-all placeholder-white/20 ${
+                                                targetError ? 'border-red-500/40 focus:ring-red-500/20' : 'border-white/[0.1] focus:ring-indigo-500/30 focus:border-indigo-400/40'
+                                            }`}
+                                        />
+                                        {targetError && <p className="text-red-400/80 text-[10px] mt-1">⚠ {targetError}</p>}
+                                    </div>
+                                )}
+
+                                {/* Visualize button */}
+                                <button
+                                    onClick={handleVisualize}
+                                    disabled={!!arrayError}
+                                    className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all shrink-0 ${
+                                        arrayError
+                                            ? 'bg-white/[0.05] text-white/20 cursor-not-allowed'
+                                            : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25 active:scale-[0.97]'
+                                    }`}
+                                >
+                                    <FaPlay className="text-[10px]" />
+                                    Visualize
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 {/* ── Content Cards ── */}
-                <div className="max-w-2xl mx-auto px-5 pb-16 space-y-3">
+                <div className="relative z-10 max-w-2xl mx-auto px-5 pb-16 space-y-3">
 
                     {/* Description */}
                     <div className="bg-white/[0.04] border border-white/[0.07] rounded-2xl p-5">
@@ -786,73 +936,13 @@ const DSAProblemPage = () => {
                         </div>
                     </div>
 
-                    {/* ── Input & CTA Section ── */}
-                    <div className="bg-gradient-to-b from-white/[0.06] to-white/[0.03] border border-white/[0.08] rounded-2xl p-5">
-                        <div className="flex items-center gap-2.5 mb-4">
-                            <div className="w-6 h-6 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                                <HiSparkles className="text-indigo-400 text-[10px]" />
-                            </div>
-                            <h3 className="font-semibold text-white/90 text-sm">Custom Input</h3>
+                    {/* Error Display */}
+                    {error && (
+                        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300/80 text-center text-xs">
+                            {error}
                         </div>
-                        <div className="pl-[34px] space-y-4">
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    value={customArrayInput}
-                                    onChange={handleArrayInputChange}
-                                    placeholder={problemName === 'char-replacement' ? 'AABABBAC,2' : '[1, 2, 3, 4, 5]'}
-                                    className={`w-full px-4 py-3 bg-black/40 border rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 transition-all placeholder-white/15 ${
-                                        arrayError
-                                            ? 'border-red-500/40 focus:ring-red-500/20'
-                                            : 'border-white/[0.1] focus:ring-indigo-500/30 focus:border-indigo-400/40'
-                                    }`}
-                                />
-                                {customArrayInput !== DEFAULT_ARRAYS[problemName] && (
-                                    <button
-                                        onClick={() => { setCustomArrayInput(DEFAULT_ARRAYS[problemName]); setArrayError(''); }}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 text-[11px] px-2 py-0.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] transition-all"
-                                    >
-                                        Reset
-                                    </button>
-                                )}
-                            </div>
-                            {arrayError ? (
-                                <p className="text-red-400/80 text-[11px] flex items-center gap-1.5">
-                                    <span>⚠️</span> {arrayError}
-                                </p>
-                            ) : (
-                                <p className="text-white/20 text-[11px]">
-                                    {problemName === 'char-replacement'
-                                        ? 'Format: LETTERS,k (e.g. AABABBAC,2)'
-                                        : 'Comma-separated integers · max 15 elements'}
-                                </p>
-                            )}
+                    )}
 
-                            {/* Error Display */}
-                            {error && (
-                                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300/80 text-center text-xs">
-                                    {error}
-                                </div>
-                            )}
-
-                            {/* CTA */}
-                            <button
-                                onClick={handleVisualize}
-                                disabled={!!arrayError}
-                                className={`w-full relative group flex items-center justify-center gap-3 py-4 rounded-xl font-bold text-base transition-all duration-200 ${
-                                    arrayError
-                                        ? 'bg-white/[0.05] text-white/20 cursor-not-allowed'
-                                        : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/30 active:scale-[0.98]'
-                                }`}
-                            >
-                                <FaPlay className="text-xs" />
-                                Visualize
-                                {!arrayError && (
-                                    <HiSparkles className="text-amber-300/80 text-sm" />
-                                )}
-                            </button>
-                        </div>
-                    </div>
 
                     {/* Footer */}
                     <div className="text-center pt-6 pb-4">
