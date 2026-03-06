@@ -11,8 +11,8 @@ import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PointerBadgeRow from './PointerBadgeRow';
 import VisualizerControls from './VisualizerControls';
-import MobileCodeDrawer from './MobileCodeDrawer';
-import { highlightSyntax, SyncedCodePanel, AnnotationCard, parseInputArray, useVisualizerPlayback } from './visualizerShared';
+import SyncedVisualizerShell from './SyncedVisualizerShell';
+import { AnnotationCard, parseInputArray, useVisualizerPlayback, makeGetDelay } from './visualizerShared';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
 const CELL_W   = 40;
@@ -55,7 +55,7 @@ const DELAY = {
     final_done:    2600,
 };
 
-const getDelay = (ev, speed) => (DELAY[ev.type] ?? 1200) / speed;
+const getDelay = makeGetDelay(DELAY, 1200);
 
 // ── Simulation: walks through bubble sort and emits rich events ──────────────
 const simulateBubbleSort = (inputArr) => {
@@ -321,57 +321,29 @@ const BubbleSortSyncedVisualizer = ({
         return map[currentEv.type] ?? '';
     })();
 
+    const controls = (
+        <VisualizerControls
+            speed={speed} setSpeed={setSpeed}
+            eventIdx={eventIdx} playing={playing} finished={finished}
+            onPlay={handlePlay} onPause={handlePause}
+            onReset={handleReset} onBack={handleBack} onNext={handleNext}
+        />
+    );
+
     return (
-        <div className="flex flex-col h-full bg-slate-950 text-white overflow-hidden">
-            <div className="flex-1 flex overflow-hidden min-h-0">
-
-                {/* ── Left: array visualization ────────────────────────────── */}
-                <div className="flex-1 flex flex-col overflow-hidden relative min-w-0 pb-[64px] md:pb-0">
-                    <div className="flex-1 flex flex-col items-center justify-center overflow-y-auto overscroll-contain touch-pan-y px-3 py-4 gap-5 md:px-8 md:py-10 md:gap-8">
-
-                        {/* Array */}
-                        <div className="scale-110 md:scale-100 origin-center">
-                            <ArrayVisual arr={displayArr} ev={currentEv} n={n} />
-                        </div>
-
-                        {/* Annotation card */}
-                        <AnnotationCard text={currentEv?.annotation} />
-                    </div>
-
-                    {/* Mobile bottom-sheet code drawer */}
-                    <MobileCodeDrawer
-                        code={code}
-                        activeLine={activeLine}
-                        executedLines={[...executedLines]}
-                        drawerState={drawerState}
-                        setDrawerState={setDrawerState}
-                    >
-                        <VisualizerControls
-                            speed={speed} setSpeed={setSpeed}
-                            eventIdx={eventIdx} playing={playing} finished={finished}
-                            onPlay={handlePlay} onPause={handlePause}
-                            onReset={handleReset} onBack={handleBack} onNext={handleNext}
-                        />
-                    </MobileCodeDrawer>
-                </div>
-
-                {/* ── Right: code panel + controls (desktop only) ─────────── */}
-                <div className={`hidden md:flex flex-col border-l border-slate-700/60 bg-slate-900 overflow-hidden flex-shrink-0 h-full w-[380px]`}>
-                    <VisualizerControls
-                        speed={speed} setSpeed={setSpeed}
-                        eventIdx={eventIdx} playing={playing} finished={finished}
-                        onPlay={handlePlay} onPause={handlePause}
-                        onReset={handleReset} onBack={handleBack} onNext={handleNext}
-                    />
-                    <SyncedCodePanel
-                        code={code}
-                        activeLine={activeLine}
-                        executedLines={[...executedLines]}
-                    />
-                </div>
-
+        <SyncedVisualizerShell
+            code={code}
+            activeLine={activeLine}
+            executedLines={executedLines}
+            drawerState={drawerState}
+            setDrawerState={setDrawerState}
+            controls={controls}
+        >
+            <div className="scale-110 md:scale-100 origin-center">
+                <ArrayVisual arr={displayArr} ev={currentEv} n={n} />
             </div>
-        </div>
+            <AnnotationCard text={currentEv?.annotation} />
+        </SyncedVisualizerShell>
     );
 };
 

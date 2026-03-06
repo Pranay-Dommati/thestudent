@@ -245,3 +245,19 @@ export const useVisualizerPlayback = ({ events, getDelay, inputArr, seekRef, onP
 
     return { eventIdx, playing, finished, speed, setSpeed, handlePlay, handlePause, handleReset, handleBack, handleNext, currentEv, activeLine, executedLines };
 };
+
+/**
+ * makeGetDelay — factory that creates the standard per-event delay function.
+ *
+ * Each visualizer defines its own DELAY map (event type → ms). This factory
+ * avoids repeating the same one-liner across every file.
+ *
+ * @param {object} DELAY      Map of { eventType: milliseconds }
+ * @param {number} defaultMs  Fallback when the event type isn't in the map
+ * @returns {Function}        (event, speed) => ms
+ *
+ * Usage:
+ *   const getDelay = makeGetDelay(DELAY, 1200);
+ */
+export const makeGetDelay = (DELAY, defaultMs = 1200) =>
+    (ev, speed) => (DELAY[ev.type] ?? defaultMs) / speed;

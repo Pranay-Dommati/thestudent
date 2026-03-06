@@ -15,6 +15,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import VisualizerControls from './VisualizerControls';
 import MobileCodeDrawer from './MobileCodeDrawer';
+import { useTreeCanvas } from './useTreeCanvas';
 
 // ─── Layout constants (same as CoreLogicVisualizer) ─────────────────────────
 const CELL_W        = 38;
@@ -653,21 +654,14 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
     const [finished,  setFinished]  = useState(false);
     const [speed,     setSpeed]     = useState(1);
 
-    const scrollRef = useRef(null);
-
-    // ── Mobile detection + canvas zoom ───────────────────────────────────────
-    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
-    useEffect(() => {
-        const h = () => setIsMobile(window.innerWidth < 768);
-        window.addEventListener('resize', h);
-        return () => window.removeEventListener('resize', h);
-    }, []);
-    const canvasZoom = isMobile ? 0.6 : 1;
+    const { scrollRef, isMobile, canvasZoom } = useTreeCanvas({
+        events, allNodes, eventIdx, inputArr,
+        ignoreTypes: ['merge_detail'],
+    });
 
     // Reset when array changes
     useEffect(() => {
         setEventIdx(-1); setPlaying(false); setFinished(false);
-        if (scrollRef.current) scrollRef.current.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
     }, [inputArr]);
 
     // ── Timer ────────────────────────────────────────────────────────────────
@@ -678,22 +672,6 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
         const t = setTimeout(() => setEventIdx(nextIdx), getDelay(events[nextIdx], speed));
         return () => clearTimeout(t);
     }, [playing, eventIdx, events, finished, speed]);
-
-    // ── Auto-scroll: pan both X (to active node) and Y (to scrollY) ──────────
-    useEffect(() => {
-        const ev = events[eventIdx];
-        if (!ev || !scrollRef.current || ev.type === 'merge_detail') return;
-        const c = scrollRef.current;
-        const activeNode = allNodes.find(n => n.id === ev.nodeId);
-        const scrollLeft = activeNode
-            ? Math.max(0, activeNode.x * canvasZoom - c.clientWidth / 2)
-            : c.scrollLeft;
-        c.scrollTo({
-            top:  Math.max(0, ev.scrollY * canvasZoom - c.clientHeight / 2 + 80 * canvasZoom),
-            left: scrollLeft,
-            behavior: 'smooth',
-        });
-    }, [eventIdx, events, allNodes, canvasZoom]);
 
     const handlePlay = () => {
         if (finished) {

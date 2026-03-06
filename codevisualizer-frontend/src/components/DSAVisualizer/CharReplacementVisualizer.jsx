@@ -11,8 +11,8 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import VisualizerControls from './VisualizerControls';
 import PointerBadgeRow from './PointerBadgeRow';
-import MobileCodeDrawer from './MobileCodeDrawer';
-import { SyncedCodePanel, AnnotationCard, useVisualizerPlayback } from './visualizerShared';
+import SyncedVisualizerShell from './SyncedVisualizerShell';
+import { AnnotationCard, useVisualizerPlayback, makeGetDelay } from './visualizerShared';
 
 // ─── Layout constants (matching InsertionSortSyncedVisualizer) ────────────────
 const CELL_W   = 44;
@@ -122,7 +122,7 @@ const DELAY = {
     update_max_len:  1600,
     return_result:   2000,
 };
-const getDelay = (ev, speed) => (DELAY[ev.type] ?? 1400) / speed;
+const getDelay = makeGetDelay(DELAY, 1400);
 
 // ─── Simulation ───────────────────────────────────────────────────────────────
 function simulate(s, k) {
@@ -728,14 +728,25 @@ const CharReplacementVisualizer = ({
     const showMaxLen  = AFTER_MAX_LEN.has(type);
     const showMaxFreq = AFTER_MAX_FREQ.has(type);
     const showIndex   = AFTER_INDEX.has(type);
+    const controls = (
+        <VisualizerControls
+            speed={speed} setSpeed={setSpeed}
+            eventIdx={eventIdx} playing={false} finished={finished}
+            onPlay={handlePlay} onPause={handlePause}
+            onReset={handleReset} onBack={handleBack} onNext={handleNext}
+        />
+    );
+
     return (
-        <div className="flex flex-col h-full bg-slate-950 text-white overflow-hidden">
-            <div className="flex-1 flex overflow-hidden min-h-0">
-
-                {/* ── Left: visualization (centered, matches existing visualizers) ── */}
-                <div className="flex-1 flex flex-col overflow-hidden relative min-w-0 pb-[64px] md:pb-0">
-                    <div className="flex-1 flex flex-col items-center justify-start overflow-y-auto overscroll-contain touch-pan-y px-3 pt-4 pb-3 gap-4 md:px-8 md:pt-6 md:pb-4 md:gap-5">
-
+        <SyncedVisualizerShell
+            code={code}
+            activeLine={activeLine}
+            executedLines={executedLines}
+            drawerState={drawerState}
+            setDrawerState={setDrawerState}
+            controls={controls}
+            scrollClass="flex-1 flex flex-col items-center justify-start overflow-y-auto overscroll-contain touch-pan-y px-3 pt-4 pb-3 gap-4 md:px-8 md:pt-6 md:pb-4 md:gap-5"
+        >
                         {/* Stats row — TOP of canvas, revealed progressively */}
                         <FreqPanel
                             freq={freq}
@@ -774,42 +785,7 @@ const CharReplacementVisualizer = ({
 
                         {/* Step annotation — hidden at check_window */}
                         {eventIdx >= 0 && type !== 'check_window' && <AnnotationCard text={ev?.annotation} />}
-                    </div>
-
-                    {/* Mobile bottom-sheet code drawer */}
-                    <MobileCodeDrawer
-                        code={code}
-                        activeLine={activeLine}
-                        executedLines={[...executedLines]}
-                        drawerState={drawerState}
-                        setDrawerState={setDrawerState}
-                    >
-                        <VisualizerControls
-                            speed={speed} setSpeed={setSpeed}
-                            eventIdx={eventIdx} playing={false} finished={finished}
-                            onPlay={handlePlay} onPause={handlePause}
-                            onReset={handleReset} onBack={handleBack} onNext={handleNext}
-                        />
-                    </MobileCodeDrawer>
-                </div>
-
-                {/* ── Right: controls + code panel (desktop only) ─────────── */}
-                <div className="hidden md:flex flex-col border-l border-slate-700/60 bg-slate-900 overflow-hidden flex-shrink-0 h-full w-[380px]">
-                    <VisualizerControls
-                        speed={speed} setSpeed={setSpeed}
-                        eventIdx={eventIdx} playing={false} finished={finished}
-                        onPlay={handlePlay} onPause={handlePause}
-                        onReset={handleReset} onBack={handleBack} onNext={handleNext}
-                    />
-                    <SyncedCodePanel
-                        code={code}
-                        activeLine={activeLine}
-                        executedLines={[...executedLines]}
-                    />
-                </div>
-
-            </div>
-        </div>
+        </SyncedVisualizerShell>
     );
 };
 

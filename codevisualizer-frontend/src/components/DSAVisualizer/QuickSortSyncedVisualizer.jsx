@@ -13,6 +13,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import VisualizerControls from './VisualizerControls';
 import PointerBadgeRow from './PointerBadgeRow';
 import MobileCodeDrawer from './MobileCodeDrawer';
+import { makeGetDelay } from './visualizerShared';
+import { useTreeCanvas } from './useTreeCanvas';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
 const CELL_W   = 40;
@@ -71,7 +73,7 @@ const DELAY = {
     final_done:        3600,
 };
 
-const getDelay = (ev, speed) => (DELAY[ev.type] ?? 1200) / speed;
+const getDelay = makeGetDelay(DELAY, 1200);
 
 // ── Simulation: captures full execution detail for synced events ──────────────
 const simulateQuickSort = (inputArr) => {
@@ -737,20 +739,14 @@ const QuickSortSyncedVisualizer = ({
     const [playing,  setPlaying]  = useState(false);
     const [finished, setFinished] = useState(false);
     const [speed,    setSpeed]    = useState(1);
-    const scrollRef = useRef(null);
 
-    // ── Mobile detection + canvas zoom ────────────────────────────────────────
-    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
-    useEffect(() => {
-        const h = () => setIsMobile(window.innerWidth < 768);
-        window.addEventListener('resize', h);
-        return () => window.removeEventListener('resize', h);
-    }, []);
-    const canvasZoom = isMobile ? 0.6 : 1;
+    const { scrollRef, isMobile, canvasZoom } = useTreeCanvas({
+        events, allNodes, eventIdx, inputArr,
+        ignoreTypes: ['i_scan', 'j_scan', 'i_scan_done', 'j_scan_done', 'if_swap', 'swap_exec', 'post_i', 'post_j'],
+    });
 
     useEffect(() => {
         setEventIdx(-1); setPlaying(false); setFinished(false);
-        if (scrollRef.current) scrollRef.current.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
     }, [inputArr]);
 
     useEffect(() => {
@@ -763,24 +759,6 @@ const QuickSortSyncedVisualizer = ({
         }, getDelay(events[nextIdx], speed));
         return () => clearTimeout(t);
     }, [playing, eventIdx, events, finished, speed]);
-
-    // ── Auto-scroll: pan both X (to active node) and Y ────────────────────────
-    useEffect(() => {
-        const ev = events[eventIdx];
-        if (!ev || !scrollRef.current) return;
-        const ignore = ['i_scan', 'j_scan', 'i_scan_done', 'j_scan_done', 'if_swap', 'swap_exec', 'post_i', 'post_j'];
-        if (ignore.includes(ev.type)) return;
-        const c = scrollRef.current;
-        const activeNode = allNodes.find(n => n.id === ev.nodeId);
-        const scrollLeft = activeNode
-            ? Math.max(0, activeNode.x * canvasZoom - c.clientWidth / 2)
-            : c.scrollLeft;
-        c.scrollTo({
-            top:  Math.max(0, ev.scrollY * canvasZoom - c.clientHeight / 3),
-            left: scrollLeft,
-            behavior: 'smooth',
-        });
-    }, [eventIdx, events, allNodes, canvasZoom]);
 
     const handlePlay = () => {
         if (finished) { setEventIdx(-1); setFinished(false); setTimeout(() => setPlaying(true), 80); }
