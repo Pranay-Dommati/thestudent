@@ -15,6 +15,7 @@ import React, { useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import VisualizerControls from './VisualizerControls';
 import PointerBadgeRow from './PointerBadgeRow';
+import MobileCodeDrawer from './MobileCodeDrawer';
 import { highlightSyntax, SyncedCodePanel, AnnotationCard, BLINK_ANIM, BLINK_TRANS, parseInputArray, useVisualizerPlayback } from './visualizerShared';
 
 // ── Layout constants ─────────────────────────────────────────────────────────
@@ -323,12 +324,14 @@ const ArrayVisual = ({ arr, ev, n }) => {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 const InsertionSortSyncedVisualizer = ({
-    customArray = '[12, 11, 13, 5, 6]',
-    code        = '',
+    customArray    = '[12, 11, 13, 5, 6]',
+    code           = '',
     onProgress,
     seekRef,
-    showCode    = true,
+    showCode       = true,
     onCloseCode,
+    drawerState    = 'peek',
+    setDrawerState,
 }) => {
     const inputArr = useMemo(() => parseInputArray(customArray, [12, 11, 13, 5, 6]), [customArray]);
 
@@ -348,8 +351,8 @@ const InsertionSortSyncedVisualizer = ({
             <div className="flex-1 flex overflow-hidden min-h-0">
 
                 {/* ── Left: array visualization ────────────────────────────── */}
-                <div className="flex-1 flex flex-col overflow-hidden relative min-w-0">
-                    <div className="flex-1 flex flex-col items-center justify-center overflow-auto px-3 py-4 gap-5 md:px-8 md:py-10 md:gap-8">
+                <div className="flex-1 flex flex-col overflow-hidden relative min-w-0 pb-[64px] md:pb-0">
+                    <div className="flex-1 flex flex-col items-center justify-center overflow-y-auto overscroll-contain touch-pan-y px-3 py-4 gap-5 md:px-8 md:py-10 md:gap-8">
 
                         {/* Array */}
                         <div className="scale-110 md:scale-100 origin-center">
@@ -361,38 +364,30 @@ const InsertionSortSyncedVisualizer = ({
 
                     </div>
 
-                    {/* Mobile-only controls bar */}
-                    <div className="md:hidden flex-shrink-0 flex items-center gap-2 px-3 py-2.5 bg-slate-800 border-t border-slate-700/50">
-                        <button onClick={handleReset} disabled={eventIdx < 0}
-                            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-slate-700/80 text-slate-300 text-xs font-semibold disabled:opacity-30 active:scale-95 transition-all">
-                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5"><path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd"/></svg>
-                            Reset
-                        </button>
-                        <button onClick={handleBack} disabled={eventIdx < 0}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-slate-700/80 text-slate-200 text-sm font-semibold disabled:opacity-30 active:scale-95 transition-all">
-                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clipRule="evenodd"/></svg>
-                            Prev
-                        </button>
-                        <span className="text-slate-500 text-xs font-mono min-w-[54px] text-center">
-                            {eventIdx < 0 ? '\u2014' : `${eventIdx + 1}/${events.length}`}
-                        </span>
-                        <button onClick={handleNext} disabled={finished}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-30 active:scale-95 transition-all shadow-md shadow-indigo-900/40">
-                            Next
-                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd"/></svg>
-                        </button>
-                    </div>
-
+                    {/* Mobile bottom-sheet code drawer */}
+                    <MobileCodeDrawer
+                        code={code}
+                        activeLine={activeLine}
+                        executedLines={[...executedLines]}
+                        drawerState={drawerState}
+                        setDrawerState={setDrawerState}
+                    >
+                        <VisualizerControls
+                            speed={speed} setSpeed={setSpeed}
+                            eventIdx={eventIdx} playing={playing} finished={finished}
+                            onPlay={handlePlay} onPause={handlePause}
+                            onReset={handleReset} onBack={handleBack} onNext={handleNext}
+                        />
+                    </MobileCodeDrawer>
                 </div>
 
-                {/* ── Right: code panel + controls ─────────────────────────── */}
-                <div className={`flex-col border-slate-700/60 bg-slate-900 overflow-hidden fixed inset-y-0 right-0 w-full max-w-[380px] z-40 shadow-2xl md:relative md:inset-auto md:z-auto md:flex-shrink-0 md:h-full md:w-[380px] md:shadow-none md:border-l ${showCode ? 'flex' : 'hidden md:flex'}`}>
+                {/* ── Right: code panel + controls (desktop only) ─────────── */}
+                <div className="hidden md:flex flex-col border-l border-slate-700/60 bg-slate-900 overflow-hidden flex-shrink-0 h-full w-[380px]">
                     <VisualizerControls
                         speed={speed} setSpeed={setSpeed}
                         eventIdx={eventIdx} playing={playing} finished={finished}
                         onPlay={handlePlay} onPause={handlePause}
                         onReset={handleReset} onBack={handleBack} onNext={handleNext}
-                        onCloseCode={onCloseCode}
                     />
                     <SyncedCodePanel
                         code={code}

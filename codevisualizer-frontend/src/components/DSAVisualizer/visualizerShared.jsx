@@ -122,7 +122,7 @@ export const AnnotationCard = ({ text }) => (
         {text && (
             <motion.div
                 key={text}
-                className="max-w-lg text-center px-5 py-3 rounded-xl border border-amber-600/50 bg-amber-900/40 text-amber-200 text-sm font-medium leading-snug shadow-xl backdrop-blur-sm"
+                className="hidden md:flex max-w-lg text-center px-5 py-3 rounded-xl border border-amber-600/50 bg-amber-900/40 text-amber-200 text-sm font-medium leading-snug shadow-xl backdrop-blur-sm"
                 initial={{ opacity: 0, y: 8  }}
                 animate={{ opacity: 1, y: 0  }}
                 exit={{    opacity: 0, y: -8 }}

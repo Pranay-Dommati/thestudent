@@ -70,13 +70,32 @@ const DSAImmersiveVisualizer = ({
     const [inputError, setInputError] = useState('');
     const [showInputPanel, setShowInputPanel] = useState(false);
 
-    // Mobile code panel toggle
-    const [showCode, setShowCode] = useState(false);
-    const closeCode = () => setShowCode(false);
+    // Second param for split mobile inputs (binary-search → target, char-replacement → k)
+    const [localSecondInput, setLocalSecondInput] = useState(() => {
+        if (algorithmType === 'binary-search') {
+            const i = (customArray || '').lastIndexOf(',');
+            return i >= 0 ? (customArray || '').slice(i + 1).trim() : '';
+        }
+        if (algorithmType === 'char-replacement') {
+            const i = (customArray || '').indexOf(',');
+            return i >= 0 ? (customArray || '').slice(i + 1).trim() : '';
+        }
+        return '';
+    });
+
+    // Mobile code drawer state: 'peek' | 'half' | 'full'
+    const [drawerState, setDrawerState] = useState('half');
 
     // Update local input when prop changes
     useEffect(() => {
         setLocalArrayInput(customArray);
+        if (algorithmType === 'binary-search') {
+            const i = (customArray || '').lastIndexOf(',');
+            setLocalSecondInput(i >= 0 ? (customArray || '').slice(i + 1).trim() : '');
+        } else if (algorithmType === 'char-replacement') {
+            const i = (customArray || '').indexOf(',');
+            setLocalSecondInput(i >= 0 ? (customArray || '').slice(i + 1).trim() : '');
+        }
     }, [customArray]);
 
     // Validate array input
@@ -127,6 +146,27 @@ const DSAImmersiveVisualizer = ({
         }
     };
 
+    // Mobile split-field handlers — rebuild combined string from parts
+    const handleMobileFirstChange = (e) => {
+        const first = e.target.value;
+        const isMulti = algorithmType === 'binary-search' || algorithmType === 'char-replacement';
+        const combined = isMulti ? `${first},${localSecondInput}` : first;
+        setLocalArrayInput(combined);
+        setInputError(validateInput(combined));
+    };
+
+    const handleMobileSecondChange = (e) => {
+        const second = e.target.value;
+        setLocalSecondInput(second);
+        const sepIdx = algorithmType === 'binary-search'
+            ? localArrayInput.lastIndexOf(',')
+            : localArrayInput.indexOf(',');
+        const firstPart = sepIdx >= 0 ? localArrayInput.slice(0, sepIdx) : localArrayInput;
+        const combined = `${firstPart},${second}`;
+        setLocalArrayInput(combined);
+        setInputError(validateInput(combined));
+    };
+
     // (execution-tab step machinery removed)
 
     // Keyboard controls
@@ -153,8 +193,7 @@ const DSAImmersiveVisualizer = ({
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <polyline points="15,18 9,12 15,6" />
                         </svg>
-                        <span className="text-sm">Back</span>
-                        Back
+                        <span className="hidden md:inline text-sm">Back</span>
                     </button>
 
                     <div className="h-4 w-px bg-white/20" />
@@ -208,8 +247,9 @@ const DSAImmersiveVisualizer = ({
                         </div>
                     )}
 
+                    {/* Desktop: inline input panel or Change Input button */}
                     {showInputPanel ? (
-                        <div className="flex items-center gap-2 bg-white/5 border border-white/15 rounded-xl px-3 py-1.5 shadow-lg backdrop-blur-sm">
+                        <div className="hidden md:flex items-center gap-2 bg-white/5 border border-white/15 rounded-xl px-3 py-1.5 shadow-lg backdrop-blur-sm">
                             <span className="text-white/40 text-xs font-mono">
                                 {algorithmType === 'char-replacement' ? 's, k =' : algorithmType === 'binary-search' ? 'arr, target =' : 'arr ='}
                             </span>
@@ -241,39 +281,96 @@ const DSAImmersiveVisualizer = ({
                                 ✕
                             </button>
                         </div>
-                    ) : (
-                        onRerun && (
-                            <button
-                                onClick={() => setShowInputPanel(true)}
-                                className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-4 py-2 bg-white/8 hover:bg-white/15 border border-white/15 hover:border-white/25 text-white/70 hover:text-white rounded-xl text-sm font-medium transition-all shadow-sm"
-                            >
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-amber-400 flex-shrink-0">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                </svg>
-                                <span className="hidden md:inline">Change Input</span>
-                            </button>
-                        )
+                    ) : null}
+                    {onRerun && !showInputPanel && (
+                        <button
+                            onClick={() => setShowInputPanel(true)}
+                            className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-4 py-2 bg-white/8 hover:bg-white/15 border border-white/15 hover:border-white/25 text-white/70 hover:text-white rounded-xl text-sm font-medium transition-all shadow-sm"
+                        >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-amber-400 flex-shrink-0">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                            <span className="hidden md:inline">Change Input</span>
+                        </button>
                     )}
-                    {/* Mobile: toggle code panel */}
+                    {/* Mobile: toggle code drawer */}
                     <button
                         className="md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-white/15 text-white/60 hover:text-white hover:bg-white/10 transition-all text-xs font-medium flex-shrink-0"
-                        onClick={() => setShowCode(v => !v)}
+                        onClick={() => setDrawerState(s => s === 'peek' ? 'half' : s === 'half' ? 'full' : 'peek')}
                     >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <polyline points="16,18 22,12 16,6"/><polyline points="8,6 2,12 8,18"/>
                         </svg>
-                        {showCode ? 'Hide' : 'Code'}
+                        {drawerState === 'peek' ? 'Code' : drawerState === 'half' ? 'More' : 'Hide'}
                     </button>
                 </div>
             </header>
 
-            {/* Mobile backdrop for code panel */}
-            {showCode && (
-                <div
-                    className="md:hidden fixed inset-0 z-30 bg-black/60"
-                    onClick={closeCode}
-                />
+            {/* Mobile input panel — shown below header when open */}
+            {showInputPanel && (
+                <div className="md:hidden flex-shrink-0 flex flex-col gap-2 px-3 py-2.5 bg-slate-800 border-b border-slate-700/60">
+                    {/* Field 1: arr / s */}
+                    <div className="flex flex-col gap-1">
+                        <span className="text-white/50 text-xs font-mono">
+                            {algorithmType === 'char-replacement' ? 's =' : 'arr ='}
+                        </span>
+                        <input
+                            type="text"
+                            value={(() => {
+                                if (algorithmType === 'binary-search') {
+                                    const i = localArrayInput.lastIndexOf(',');
+                                    return i >= 0 ? localArrayInput.slice(0, i) : localArrayInput;
+                                }
+                                if (algorithmType === 'char-replacement') {
+                                    const i = localArrayInput.indexOf(',');
+                                    return i >= 0 ? localArrayInput.slice(0, i) : localArrayInput;
+                                }
+                                return localArrayInput;
+                            })()}
+                            onChange={handleMobileFirstChange}
+                            className={`w-full px-2.5 py-1.5 bg-black/30 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/60' : 'border-white/20 focus:border-indigo-400'}`}
+                            placeholder={algorithmType === 'char-replacement' ? 'AABCBA' : '[3, 12, 25, 31, 42]'}
+                        />
+                    </div>
+                    {/* Field 2: target / k — only for multi-param algorithms */}
+                    {(algorithmType === 'binary-search' || algorithmType === 'char-replacement') && (
+                        <div className="flex flex-col gap-1">
+                            <span className="text-white/50 text-xs font-mono">
+                                {algorithmType === 'char-replacement' ? 'k =' : 'target ='}
+                            </span>
+                            <input
+                                type="text"
+                                value={localSecondInput}
+                                onChange={handleMobileSecondChange}
+                                className={`w-full px-2.5 py-1.5 bg-black/30 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/60' : 'border-white/20 focus:border-indigo-400'}`}
+                                placeholder={algorithmType === 'char-replacement' ? '2' : '31'}
+                            />
+                        </div>
+                    )}
+                    {/* Run + close row */}
+                    <div className="flex items-center gap-2">
+                        {inputError && <span className="text-red-400 text-[11px] flex-1">{inputError}</span>}
+                        {!inputError && <div className="flex-1" />}
+                        <button
+                            onClick={handleRerun}
+                            disabled={!!inputError || !onRerun}
+                            className={`flex-shrink-0 px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                                inputError || !onRerun
+                                    ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                            }`}
+                        >
+                            Run
+                        </button>
+                        <button
+                            onClick={() => setShowInputPanel(false)}
+                            className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded text-white/30 hover:text-white/70 hover:bg-white/10 transition-all"
+                        >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                </div>
             )}
 
             {/* Main Content */}
@@ -282,23 +379,23 @@ const DSAImmersiveVisualizer = ({
                 <div className="flex-1 min-w-0">
                     {algorithmType === 'quick-sort' ? (
                         activeTab === 'combined' ? (
-                            <QuickSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
+                            <QuickSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                         ) : (
                             <QuickSortCoreLogicVisualizer customArray={customArray} onProgress={setProgress} seekRef={logicSeekRef} />
                         )
                     ) : algorithmType === 'bubble-sort' ? (
-                        <BubbleSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
+                        <BubbleSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'selection-sort' ? (
-                        <SelectionSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
+                        <SelectionSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'insertion-sort' ? (
-                        <InsertionSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
+                        <InsertionSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'char-replacement' ? (
-                        <CharReplacementVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
+                        <CharReplacementVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'binary-search' ? (
-                        <BinarySearchVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
+                        <BinarySearchVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : (
                         activeTab === 'combined' ? (
-                            <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} showCode={showCode} onCloseCode={closeCode} />
+                            <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                         ) : (
                             <CoreLogicVisualizer customArray={customArray} onProgress={setProgress} seekRef={logicSeekRef} />
                         )

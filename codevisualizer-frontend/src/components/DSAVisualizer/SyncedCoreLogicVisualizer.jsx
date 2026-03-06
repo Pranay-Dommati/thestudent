@@ -14,6 +14,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import VisualizerControls from './VisualizerControls';
+import MobileCodeDrawer from './MobileCodeDrawer';
 
 // ─── Layout constants (same as CoreLogicVisualizer) ─────────────────────────
 const CELL_W        = 38;
@@ -622,7 +623,7 @@ const AnnotationBadge = ({ text }) => {
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]', code = '', onProgress, seekRef, showCode = true, onCloseCode }) => {
+const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]', code = '', onProgress, seekRef, showCode = true, onCloseCode, drawerState = 'peek', setDrawerState }) => {
 
     const inputArr = useMemo(() => {
         try {
@@ -654,10 +655,19 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
 
     const scrollRef = useRef(null);
 
+    // ── Mobile detection + canvas zoom ───────────────────────────────────────
+    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+    useEffect(() => {
+        const h = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', h);
+        return () => window.removeEventListener('resize', h);
+    }, []);
+    const canvasZoom = isMobile ? 0.6 : 1;
+
     // Reset when array changes
     useEffect(() => {
         setEventIdx(-1); setPlaying(false); setFinished(false);
-        if (scrollRef.current) scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        if (scrollRef.current) scrollRef.current.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
     }, [inputArr]);
 
     // ── Timer ────────────────────────────────────────────────────────────────
@@ -669,13 +679,21 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
         return () => clearTimeout(t);
     }, [playing, eventIdx, events, finished, speed]);
 
-    // ── Auto-scroll (skip during merge detail — panel is sticky) ─────────────
+    // ── Auto-scroll: pan both X (to active node) and Y (to scrollY) ──────────
     useEffect(() => {
         const ev = events[eventIdx];
         if (!ev || !scrollRef.current || ev.type === 'merge_detail') return;
         const c = scrollRef.current;
-        c.scrollTo({ top: Math.max(0, ev.scrollY - c.clientHeight / 2 + 100), behavior: 'smooth' });
-    }, [eventIdx, events]);
+        const activeNode = allNodes.find(n => n.id === ev.nodeId);
+        const scrollLeft = activeNode
+            ? Math.max(0, activeNode.x * canvasZoom - c.clientWidth / 2)
+            : c.scrollLeft;
+        c.scrollTo({
+            top:  Math.max(0, ev.scrollY * canvasZoom - c.clientHeight / 2 + 80 * canvasZoom),
+            left: scrollLeft,
+            behavior: 'smooth',
+        });
+    }, [eventIdx, events, allNodes, canvasZoom]);
 
     const handlePlay = () => {
         if (finished) {
@@ -855,11 +873,11 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
             <div className="flex-1 flex overflow-hidden min-h-0">
 
                 {/* Tree canvas */}
-                <div className="flex-1 flex flex-col overflow-hidden relative min-w-0">
+                <div className="flex-1 flex flex-col overflow-hidden relative min-w-0 pb-[64px] md:pb-0">
 
                     {/* Scrollable tree area */}
-                    <div ref={scrollRef} className="flex-1 overflow-auto">
-                        <div className="relative mx-auto" style={{ width: canvasW, height: canvasH + 80, minHeight: '100%' }}>
+                    <div ref={scrollRef} className="flex-1 overflow-auto overscroll-contain touch-pan-y touch-pan-x">
+                        <div className="relative" style={{ width: canvasW, height: canvasH + 80, minHeight: '100%', zoom: canvasZoom, marginLeft: isMobile ? 0 : 'auto', marginRight: isMobile ? 0 : 'auto' }}>
 
                             {/* SVG lines */}
                             <svg className="absolute inset-0 pointer-events-none" width={canvasW} height={canvasH + 80} overflow="visible">
@@ -1019,43 +1037,30 @@ const SyncedCoreLogicVisualizer = ({ customArray = '[38, 27, 43, 3, 9, 82, 10]',
                         )}
                     </AnimatePresence>
 
-                    {/* Mobile-only controls bar */}
-                    <div className="md:hidden flex-shrink-0 flex items-center gap-2 px-3 py-2.5 bg-slate-800 border-t border-slate-700/50">
-                        <button onClick={handleReset} disabled={eventIdx < 0}
-                            className="flex items-center gap-1 px-3 py-2 rounded-lg bg-slate-700/80 text-slate-300 text-xs font-semibold disabled:opacity-30 active:scale-95 transition-all">
-                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5"><path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H3.989a.75.75 0 00-.75.75v4.242a.75.75 0 001.5 0v-2.43l.31.31a7 7 0 0011.712-3.138.75.75 0 00-1.449-.39zm1.23-3.723a.75.75 0 00.219-.53V2.929a.75.75 0 00-1.5 0V5.36l-.31-.31A7 7 0 003.239 8.188a.75.75 0 101.448.389A5.5 5.5 0 0113.89 6.11l.311.31h-2.432a.75.75 0 000 1.5h4.243a.75.75 0 00.53-.219z" clipRule="evenodd"/></svg>
-                            Reset
-                        </button>
-                        <button onClick={handleBack} disabled={eventIdx < 0}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-slate-700/80 text-slate-200 text-sm font-semibold disabled:opacity-30 active:scale-95 transition-all">
-                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clipRule="evenodd"/></svg>
-                            Prev
-                        </button>
-                        <span className="text-slate-500 text-xs font-mono min-w-[54px] text-center">
-                            {eventIdx < 0 ? '\u2014' : `${eventIdx + 1}/${events.length}`}
-                        </span>
-                        <button onClick={handleNext} disabled={finished}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold disabled:opacity-30 active:scale-95 transition-all shadow-md shadow-indigo-900/40">
-                            Next
-                            <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd"/></svg>
-                        </button>
-                    </div>
-
-                    {/* Status bar */}
-                    <div className="flex-shrink-0 px-3 py-2 md:px-6 md:py-3 bg-slate-900/80 border-t border-slate-700/50 text-slate-300 text-xs md:text-sm font-medium">
-                        {statusLabel}
-                    </div>
-
+                    {/* Mobile bottom-sheet code drawer */}
+                    <MobileCodeDrawer
+                        code={code}
+                        activeLine={activeLine}
+                        executedLines={executedLines}
+                        drawerState={drawerState}
+                        setDrawerState={setDrawerState}
+                    >
+                        <VisualizerControls
+                            speed={speed} setSpeed={setSpeed}
+                            eventIdx={eventIdx} playing={playing} finished={finished}
+                            onPlay={handlePlay} onPause={() => setPlaying(false)}
+                            onReset={handleReset} onBack={handleBack} onNext={handleNext}
+                        />
+                    </MobileCodeDrawer>
                 </div>
 
-                {/* Code panel + compact controls */}
-                <div className={`flex-col border-slate-700/60 bg-slate-900 overflow-hidden fixed inset-y-0 right-0 w-full max-w-[380px] z-40 shadow-2xl md:relative md:inset-auto md:z-auto md:flex-shrink-0 md:h-full md:w-[380px] md:shadow-none md:border-l ${showCode ? 'flex' : 'hidden md:flex'}`}>
+                {/* Code panel + compact controls (desktop only) */}
+                <div className="hidden md:flex flex-col border-l border-slate-700/60 bg-slate-900 overflow-hidden flex-shrink-0 h-full w-[380px]">
                     <VisualizerControls
                         speed={speed} setSpeed={setSpeed}
                         eventIdx={eventIdx} playing={playing} finished={finished}
                         onPlay={handlePlay} onPause={() => setPlaying(false)}
                         onReset={handleReset} onBack={handleBack} onNext={handleNext}
-                        onCloseCode={onCloseCode}
                     />
                     <SyncedCodePanel code={code} activeLine={activeLine} executedLines={executedLines} innerOnly />
                 </div>
