@@ -209,6 +209,28 @@ result = character_replacement(s, k)
 print(result)`;
     },
 
+    'find-peak-element': (arrString) => `def findPeakElement(nums):
+    left = 0
+    right = len(nums) - 1
+
+    while left < right:
+        mid = left + (right - left) // 2
+
+        if nums[mid] > nums[mid + 1]:
+            right = mid
+        else:
+            left = mid + 1
+
+    return left
+
+
+# Example
+nums = ${arrString}
+peak_index = findPeakElement(nums)
+
+print("Peak index:", peak_index)
+print("Peak value:", nums[peak_index])`,
+
     'binary-search': (inputStr) => {
         const commaIdx = inputStr.lastIndexOf(',');
         const arrPart = commaIdx >= 0 ? inputStr.slice(0, commaIdx).trim() : '[3, 12, 18, 25, 31, 42, 63]';
@@ -237,6 +259,17 @@ target = ${tgt}
 result = binary_search(arr, target)
 print("Index:", result)`;
     },
+
+    'remove-nth-from-end': (inputStr) => {
+        const commaIdx = inputStr.lastIndexOf(',');
+        const arrPart  = commaIdx >= 0 ? inputStr.slice(0, commaIdx).trim() : '[1, 2, 3, 4, 5]';
+        let llComment  = '#LL = [1 -> 2 -> 3 -> 4 -> 5]';
+        try {
+            const vals = JSON.parse(arrPart);
+            if (Array.isArray(vals)) llComment = `#LL = [${vals.join(' -> ')}]`;
+        } catch {}
+        return `def remove_nth_from_end(head, k):\n\n    # create dummy node before head\n    dummy = ListNode(0)\n    dummy.next = head\n\n    slow = dummy\n    fast = dummy\n\n    # move fast pointer k steps ahead\n    for _ in range(k):\n        fast = fast.next\n\n    # move both pointers until fast reaches last node\n    while fast.next:\n        slow = slow.next\n        fast = fast.next\n\n    # remove the kth node from end\n    slow.next = slow.next.next\n\n    return dummy.next\n\n${llComment}\n\n# class ListNode:\n#     def __init__(self, val=0, next=None):\n#         self.val = val\n#         self.next = next`;
+    },
 };
 
 // Default array for each problem
@@ -247,7 +280,9 @@ const DEFAULT_ARRAYS = {
     'selection-sort':    '[64, 25, 12, 22, 11]',
     'insertion-sort':    '[12, 11, 13, 5, 6]',
     'char-replacement':  'AABABBAC,2',
-    'binary-search':     '[3, 12, 18, 25, 31, 42, 63],31',
+    'binary-search':       '[3, 12, 18, 25, 31, 42, 63],31',
+    'find-peak-element':   '[1, 3, 5, 7, 6, 4, 2]',
+    'remove-nth-from-end': '[1, 2, 3, 4, 5],2',
 };
 
 // Problem metadata
@@ -357,7 +392,42 @@ const problemsData = {
             "Sorted Array Requirement"
         ]
     },
-};
+    'find-peak-element': {
+        id: 8,
+        name: "Find Peak Element",
+        difficulty: "Medium",
+        category: "Binary Search",
+        timeComplexity: "O(log n)",
+        spaceComplexity: "O(1)",
+        description: "Given an array where a peak element is one that is greater than its neighbours, find any peak element and return its index. Because the array has virtual -∞ sentinels at both ends, at least one peak always exists. The algorithm uses binary search: if nums[mid] > nums[mid+1], the peak lies in the left half (at or before mid); otherwise it lies in the right half (after mid). The search converges until a single element remains — that element is the peak.",
+        concepts: [
+            "Binary Search on Unsorted Array",
+            "Two-Pointer (L / R) Approach",
+            "Gradient / Slope Reasoning",
+            "Logarithmic Time Complexity"
+        ]
+    },    'remove-nth-from-end': {
+        id: 9,
+        name: "Remove Nth Node From End",
+        difficulty: "Medium",
+        category: "Slow & Fast Pointer",
+        timeComplexity: "O(n)",
+        spaceComplexity: "O(1)",
+        description: "Given the head of a linked list and integer n, remove the nth node from the end and return the head. A dummy sentinel node and two pointers n steps apart traverse together until the fast pointer reaches the tail \u2014 the slow pointer then sits just before the target node.",
+        concepts: [
+            "Slow & Fast Pointer Technique",
+            "Dummy / Sentinel Node",
+            "Linked List Traversal",
+            "Two-Pass Reduction to One-Pass"
+        ]
+    },};
+
+// Problems whose visualizers are fully self-contained (no backend trace needed)
+const SELF_CONTAINED_VISUALIZERS = new Set([
+    'bubble-sort', 'selection-sort', 'insertion-sort', 'merge-sort', 'quick-sort',
+    'binary-search', 'find-peak-element', 'char-replacement',
+    'remove-nth-from-end',
+]);
 
 const DSAProblemPage = () => {
     const { problemName } = useParams();
@@ -370,11 +440,13 @@ const DSAProblemPage = () => {
     const getDefaultArr = () => {
         if (problemName === 'binary-search') return '[3, 12, 18, 25, 31, 42, 63]';
         if (problemName === 'char-replacement') return 'AABABBAC';
+        if (problemName === 'remove-nth-from-end') return '[1, 2, 3, 4, 5]';
         return DEFAULT_ARRAYS[problemName] || '[38, 27, 43, 3, 9, 82, 10]';
     };
     const getDefaultTarget = () => {
         if (problemName === 'binary-search') return '31';
         if (problemName === 'char-replacement') return '2';
+        if (problemName === 'remove-nth-from-end') return '2';
         return '';
     };
 
@@ -388,8 +460,9 @@ const DSAProblemPage = () => {
 
     // Combine fields into the single string the templates expect
     const customArrayInput = (() => {
-        if (problemName === 'binary-search')   return `${arrField},${targetField}`;
-        if (problemName === 'char-replacement') return `${arrField},${targetField}`;
+        if (problemName === 'binary-search')        return `${arrField},${targetField}`;
+        if (problemName === 'char-replacement')     return `${arrField},${targetField}`;
+        if (problemName === 'remove-nth-from-end') return `${arrField},${targetField}`;
         return arrField;
     })();
 
@@ -433,8 +506,10 @@ const DSAProblemPage = () => {
         if (problemName === 'char-replacement') {
             if (!/^\d+$/.test(val.trim())) return 'Must be a number ≥ 0';
             return '';
-        }
-        return '';
+        }        if (problemName === 'remove-nth-from-end') {
+            if (!/^\d+$/.test(val.trim()) || parseInt(val.trim(), 10) < 1) return 'Must be a positive integer';
+            return '';
+        }        return '';
     };
 
     const handleArrChange = (e) => { setArrField(e.target.value); setArrError(validateArr(e.target.value)); };
@@ -455,14 +530,27 @@ const DSAProblemPage = () => {
             const parts = newArrayString.split(',');
             setArrField(parts[0]?.trim() || newArrayString);
             if (parts[1]) setTargetField(parts[1].trim());
+        } else if (problemName === 'remove-nth-from-end') {
+            const commaIdx = newArrayString.lastIndexOf(',');
+            if (commaIdx >= 0) {
+                setArrField(newArrayString.slice(0, commaIdx).trim());
+                setTargetField(newArrayString.slice(commaIdx + 1).trim());
+            } else {
+                setArrField(newArrayString);
+            }
         } else {
             setArrField(newArrayString);
         }
         setShowVisualizer(true);
-        setIsLoadingTrace(true);
+        setIsLoadingTrace(false);
         setSteps([]);
         setExecutionId(null);
         setError(null);
+
+        // Self-contained visualizers don't need a backend trace — open immediately
+        if (SELF_CONTAINED_VISUALIZERS.has(problemName)) return;
+
+        setIsLoadingTrace(true);
 
         // Generate code with the new array directly
         const newCode = PROBLEM_CODE_TEMPLATES[problemName](newArrayString);
@@ -591,13 +679,21 @@ const DSAProblemPage = () => {
         }
     }, [problemName]);
 
+    // Problems whose visualizers are fully self-contained (no backend trace needed)
+    // (constant lives at module scope — see above)
+
     // Run the trace (same logic as CodeVisualizerPage)
     const handleVisualize = useCallback(async () => {
         setShowVisualizer(true);
-        setIsLoadingTrace(true);
+        setIsLoadingTrace(false);
         setSteps([]);
         setExecutionId(null);
         setError(null);
+
+        // Self-contained visualizers don't need a backend trace — open immediately
+        if (SELF_CONTAINED_VISUALIZERS.has(problemName)) return;
+
+        setIsLoadingTrace(true);
 
         // Loading phases
         setLoadingPhase(1);
@@ -865,8 +961,8 @@ const DSAProblemPage = () => {
                                     {arrError && <p className="text-red-400/80 text-[10px] mt-1">⚠ {arrError}</p>}
                                 </div>
 
-                                {/* Secondary field: Target or k (only for binary-search & char-replacement) */}
-                                {(problemName === 'binary-search' || problemName === 'char-replacement') && (
+                                {/* Secondary field: Target / k / n */}
+                                {(problemName === 'binary-search' || problemName === 'char-replacement' || problemName === 'remove-nth-from-end') && (
                                     <div className="w-24 sm:w-28 shrink-0 text-left">
                                         <label className="block text-white/35 text-[10px] font-semibold uppercase tracking-widest mb-1.5">
                                             {problemName === 'binary-search' ? 'Target' : 'k'}

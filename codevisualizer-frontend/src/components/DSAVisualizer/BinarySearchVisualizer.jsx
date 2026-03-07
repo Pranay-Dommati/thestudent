@@ -10,17 +10,10 @@
  */
 
 import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
-import PointerBadgeRow    from './PointerBadgeRow';
 import VisualizerControls from './VisualizerControls';
 import SyncedVisualizerShell from './SyncedVisualizerShell';
-import { AnnotationCard, useVisualizerPlayback, BLINK_ANIM, BLINK_TRANS, makeGetDelay } from './visualizerShared';
-
-// ── Layout constants (match BubbleSortSyncedVisualizer exactly) ──────────────
-const CELL_W   = 40;
-const CELL_H   = 40;
-const CELL_GAP = 5;
-const STRIDE   = CELL_W + CELL_GAP;   // 45
+import SearchArrayVisual from './SearchArrayVisual';
+import { AnnotationCard, useVisualizerPlayback, makeGetDelay } from './visualizerShared';
 
 // ── Line numbers (1-indexed, matching code template in DSAProblemPage) ────────
 const LINE = {
@@ -179,118 +172,30 @@ const getCellBg = (idx, ev) => {
     return 'bg-slate-700 border-slate-500 text-slate-100';
 };
 
-// ── ArrayVisual — PointerBadgeRow + array box + index row ────────────────────
-const ArrayVisual = ({ arr, ev, n }) => {
-    if (!arr || arr.length === 0) return null;
+// ── Pointer visibility sets ──────────────────────────────────────────────────
+const BS_SHOW_L = new Set([
+    'init_left','init_right','while_check','calc_mid','check_if','compare_equal','compare_less',
+    'compare_greater','return_found','update_left','update_right',
+    'while_fail','return_not_found',
+]);
+const BS_SHOW_R = new Set([
+    'init_right','while_check','calc_mid','check_if','compare_equal','compare_less',
+    'compare_greater','return_found','update_left','update_right',
+    'while_fail','return_not_found',
+]);
 
-    const type = ev?.type ?? '';
-    const left = ev?.left ?? 0;
-    const right = ev?.right ?? n - 1;
-    const mid   = ev?.mid  ?? null;
-
-    const SHOW_L = new Set([
-        'init_left','init_right','while_check','calc_mid','check_if','compare_equal','compare_less',
-        'compare_greater','return_found','update_left','update_right',
-        'while_fail','return_not_found',
-    ]);
-    const SHOW_R = new Set([
-        'init_right','while_check','calc_mid','check_if','compare_equal','compare_less',
-        'compare_greater','return_found','update_left','update_right',
-        'while_fail','return_not_found',
-    ]);
-
-    const showLeft  = SHOW_L.has(type);
-    const showRight = SHOW_R.has(type);
-    const showMid   = mid !== null && SHOW_R.has(type);
-
-    const target      = ev?.target ?? null;
-    const isCheckIf   = type === 'check_if' || type === 'check_elif' || type === 'compare_equal' || type === 'compare_less';
-
-    const isLRSame  = type === 'while_check';
-
+// ── Target badge — rendered as topSlot above the pointer row ─────────────────
+const TargetBox = ({ target, isCheckIf }) => {
+    if (target === null) return null;
     return (
-        <div className="flex flex-col items-center gap-0">
-
-            {/* Target box — above the pointer row */}
-            {target !== null && (
-                <div
-                    className={isCheckIf ? 'shimmer-border' : ''}
-                    style={{ marginBottom: 28 }}
-                >
-                    <div
-                        className={`flex items-center gap-2 px-4 py-1.5 text-sm font-bold select-none text-slate-200 transition-colors duration-300 ${
-                            isCheckIf
-                                ? 'rounded-[8px] bg-slate-800'
-                                : 'rounded-xl border-2 border-slate-600 bg-slate-800/60'
-                        }`}
-                    >
-                        <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">target</span>
-                        <span>{target}</span>
-                    </div>
-                </div>
-            )}
-
-            {/* PointerBadgeRow — L (emerald), M (sky, j1), R (rose) */}
-            <PointerBadgeRow
-                cellW={CELL_W}
-                cellGap={CELL_GAP}
-                count={n}
-                iRel={showLeft  ? left  : null}
-                jRel={showRight ? right : null}
-                j1Rel={showMid  ? mid   : null}
-                iClass="bg-emerald-500"
-                jClass="bg-rose-500"
-                j1Class="bg-sky-500"
-                iLabel="L"
-                jLabel="R"
-                j1Label="M"
-                blink={isLRSame}
-            />
-
-            {/* Array box — same style as BubbleSortSyncedVisualizer */}
-            <div
-                className="flex flex-col rounded-xl border-2 border-slate-600 bg-slate-800/60"
-                style={{ padding: '10px 16px' }}
-            >
-                <div className="flex items-center" style={{ gap: CELL_GAP }}>
-                    {arr.map((val, idx) => {
-                        const isShimmerCell = isCheckIf && idx === mid && mid !== null;
-                        return isShimmerCell ? (
-                            <div
-                                key={idx}
-                                className="shimmer-border flex-shrink-0"
-                                style={{ width: CELL_W, height: CELL_H, minWidth: CELL_W, borderRadius: 8, padding: 2 }}
-                            >
-                                <div
-                                    className="flex items-center justify-center rounded-[6px] bg-sky-500 text-white text-sm font-bold w-full h-full"
-                                >
-                                    {val}
-                                </div>
-                            </div>
-                        ) : (
-                            <motion.div
-                                key={idx}
-                                layout
-                                className={`flex items-center justify-center rounded-lg border-2 text-sm font-bold flex-shrink-0 select-none transition-colors duration-300 ${getCellBg(idx, ev)}`}
-                                style={{ width: CELL_W, height: CELL_H, minWidth: CELL_W }}
-                                animate={{ opacity: 1 }}
-                                transition={{ duration: 0 }}
-                            >
-                                {val}
-                            </motion.div>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* Index row */}
-            <div className="flex items-center mt-1" style={{ gap: CELL_GAP }}>
-                {arr.map((_, idx) => (
-                    <div key={idx} style={{ width: CELL_W }}
-                        className="flex justify-center text-[10px] text-slate-600 font-mono select-none">
-                        {idx}
-                    </div>
-                ))}
+        <div className={isCheckIf ? 'shimmer-border' : ''} style={{ marginBottom: 28 }}>
+            <div className={`flex items-center gap-2 px-4 py-1.5 text-sm font-bold select-none text-slate-200 transition-colors duration-300 ${
+                isCheckIf
+                    ? 'rounded-[8px] bg-slate-800'
+                    : 'rounded-xl border-2 border-slate-600 bg-slate-800/60'
+            }`}>
+                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">target</span>
+                <span>{target}</span>
             </div>
         </div>
     );
@@ -381,7 +286,23 @@ const BinarySearchVisualizer = ({
             controls={controls}
         >
             <div className="scale-110 md:scale-100 origin-center">
-                <ArrayVisual arr={displayArr} ev={currentEv} n={n} />
+                <SearchArrayVisual
+                    arr={displayArr}
+                    n={n}
+                    ev={currentEv}
+                    getCellBg={getCellBg}
+                    showL={BS_SHOW_L.has(currentEv?.type ?? '')}
+                    showR={BS_SHOW_R.has(currentEv?.type ?? '')}
+                    showM={currentEv?.mid !== null && currentEv?.mid !== undefined && BS_SHOW_R.has(currentEv?.type ?? '')}
+                    blink={currentEv?.type === 'while_check'}
+                    shimmerIdx={['check_if','check_elif','compare_equal','compare_less'].includes(currentEv?.type) && currentEv?.mid !== null ? currentEv.mid : null}
+                    topSlot={
+                        <TargetBox
+                            target={currentEv?.target ?? null}
+                            isCheckIf={['check_if','check_elif','compare_equal','compare_less'].includes(currentEv?.type ?? '')}
+                        />
+                    }
+                />
             </div>
             <AnnotationCard text={currentEv?.annotation} />
         </SyncedVisualizerShell>

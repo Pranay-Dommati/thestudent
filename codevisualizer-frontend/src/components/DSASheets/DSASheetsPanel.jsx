@@ -11,7 +11,7 @@ const dsaProblems = [
     { id: 4,  name: "Merge Sort",           slug: "merge-sort",                difficulty: "Medium", category: "Sorting",         available: true  },
     { id: 5,  name: "Quick Sort",           slug: "quick-sort",                difficulty: "Medium", category: "Sorting",         available: true  },
     { id: 6,  name: "Binary Search",        slug: "binary-search",             difficulty: "Easy",   category: "Binary Search",   available: true  },
-    { id: 7,  name: "Find Peak Element",    slug: "find-peak-element",         difficulty: "Medium", category: "Binary Search",   available: false },
+    { id: 7,  name: "Find Peak Element",    slug: "find-peak-element",         difficulty: "Medium", category: "Binary Search",   available: true  },
     { id: 8,  name: "First/Last Position",  slug: "first-last-position",       difficulty: "Medium", category: "Binary Search",   available: false },
     { id: 9,  name: "Search Rotated Array", slug: "search-rotated-array",      difficulty: "Medium", category: "Binary Search",   available: false },
     { id: 10, name: "Fibonacci Tree",       slug: "fibonacci",                 difficulty: "Easy",   category: "Recursion",       available: false },
@@ -23,6 +23,9 @@ const dsaProblems = [
     { id: 16, name: "Daily Temperatures",   slug: "daily-temperatures",        difficulty: "Medium", category: "Stack",           available: false },
     { id: 17, name: "Largest Rectangle",    slug: "largest-rectangle-histogram",difficulty:"Hard",   category: "Stack",           available: false },
     { id: 18, name: "Char Replacement",     slug: "char-replacement",          difficulty: "Medium", category: "Sliding Window",  available: true  },
+    { id: 19, name: "Remove Nth From End",  slug: "remove-nth-from-end",       difficulty: "Medium", category: "Slow & Fast Pointer", available: true  },
+    { id: 20, name: "Linked List Cycle",    slug: "linked-list-cycle",         difficulty: "Easy",   category: "Slow & Fast Pointer", available: false },
+    { id: 21, name: "Middle of List",       slug: "middle-of-linked-list",     difficulty: "Easy",   category: "Slow & Fast Pointer", available: false },
 ];
 
 const DSASheetsPanel = ({ isOpen, onClose }) => {

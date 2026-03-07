@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HiChevronDown, HiChevronRight, HiArrowsUpDown, HiMagnifyingGlass } from 'react-icons/hi2';
+import { HiChevronDown, HiChevronRight, HiArrowsUpDown, HiMagnifyingGlass, HiArrowsRightLeft } from 'react-icons/hi2';
 import { TbArrowIteration, TbStack2, TbAppWindow } from 'react-icons/tb';
 
 // ── Floating code tokens shown in the hero background ────────────────────────
@@ -169,7 +169,7 @@ const PATTERNS = [
         badgeColor: 'bg-emerald-100 text-emerald-700',
         problems: [
             { id: 6,  name: 'Binary Search',        slug: 'binary-search',        difficulty: 'Easy',   available: true  },
-            { id: 7,  name: 'Find Peak Element',    slug: 'find-peak-element',    difficulty: 'Medium', available: false },
+            { id: 7,  name: 'Find Peak Element',    slug: 'find-peak-element',    difficulty: 'Medium', available: true  },
             { id: 8,  name: 'First/Last Position',  slug: 'first-last-position',  difficulty: 'Medium', available: false },
             { id: 9,  name: 'Search Rotated Array', slug: 'search-rotated-array', difficulty: 'Medium', available: false },
         ],
@@ -214,6 +214,20 @@ const PATTERNS = [
         badgeColor: 'bg-pink-100 text-pink-700',
         problems: [
             { id: 18, name: 'Char Replacement', slug: 'char-replacement', difficulty: 'Medium', available: true  },
+        ],
+    },
+    {
+        id: 'slow-fast-pointer',
+        name: 'Slow & Fast Pointer',
+        Icon: HiArrowsRightLeft,
+        description: 'Two pointers at different speeds — master linked list problems',
+        color: 'from-cyan-500 to-sky-600',
+        lightColor: 'bg-cyan-50 border-cyan-200',
+        badgeColor: 'bg-cyan-100 text-cyan-700',
+        problems: [
+            { id: 19, name: 'Remove Nth From End',    slug: 'remove-nth-from-end',    difficulty: 'Medium', available: true  },
+            { id: 20, name: 'Linked List Cycle',      slug: 'linked-list-cycle',       difficulty: 'Easy',   available: false },
+            { id: 21, name: 'Middle of Linked List',  slug: 'middle-of-linked-list',   difficulty: 'Easy',   available: false },
         ],
     },
 ];

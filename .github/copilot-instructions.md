@@ -14,6 +14,8 @@ Before writing any new component, hook, utility, or constant, search the codebas
 | Mobile detection + canvas zoom + auto-scroll (tree visualizers) | `useTreeCanvas.js` → `useTreeCanvas()` |
 | Mobile-only responsive boolean | `useTreeCanvas.js` → `useIsMobile()` |
 | Per-event animation delay function | `visualizerShared.jsx` → `makeGetDelay(DELAY, defaultMs)` |
+| Array cells + L/M/R pointer row + index row (binary-search family) | `SearchArrayVisual.jsx` → `SearchArrayVisual` (default export) |
+| Cell size constants for binary-search-style visualizers | `SearchArrayVisual.jsx` → `SEARCH_CELL_W`, `SEARCH_CELL_H`, `SEARCH_CELL_GAP` |
 | Code highlighting, annotation card, playback state machine | `visualizerShared.jsx` |
 | Playback controls UI | `VisualizerControls.jsx` |
 | Mobile bottom-sheet with code | `MobileCodeDrawer.jsx` |
@@ -21,6 +23,27 @@ Before writing any new component, hook, utility, or constant, search the codebas
 ---
 
 ## 2. DSA Visualizer Rules
+
+### Adding a new BINARY SEARCH family visualizer (Find Peak Element, First/Last Position, etc.)
+
+1. Import `SearchArrayVisual` (default) and constants from `SearchArrayVisual.jsx`:
+   ```js
+   import SearchArrayVisual, { SEARCH_CELL_W, SEARCH_CELL_H, SEARCH_CELL_GAP } from './SearchArrayVisual';
+   ```
+2. Define `getCellBg(idx, ev) → Tailwind className` for your specific highlight logic.
+3. Define module-scope `SHOW_L`, `SHOW_R`, `SHOW_M` Sets of event types where each pointer is visible.
+4. Render in the `SyncedVisualizerShell` children:
+   ```jsx
+   <SearchArrayVisual
+       arr={displayArr} n={n} ev={currentEv}
+       getCellBg={getCellBg}
+       showL={SHOW_L.has(type)} showR={SHOW_R.has(type)} showM={SHOW_M.has(type)}
+       blink={type === 'while_exit'}
+       topSlot={<TargetBox ... />}  {/* optional — only if problem has a target */}
+       shimmerIdx={null}            {/* optional — shimmer one cell (Binary Search uses this) */}
+   />
+   ```
+5. Do NOT copy `PointerBadgeRow`, manual cell rendering, or index row — `SearchArrayVisual` owns all of that.
 
 ### Adding a new LINEAR visualizer (array-based: sorts, searches, sliding window)
 
@@ -80,6 +103,8 @@ codevisualizer-frontend/src/components/DSAVisualizer/
                                  makeGetDelay
   useTreeCanvas.js            ← useIsMobile, useTreeCanvas
   SyncedVisualizerShell.jsx   ← full two-panel layout for linear visualizers
+  SearchArrayVisual.jsx       ← pointer-array canvas (L/M/R) for Binary Search family
+                                 exports: SearchArrayVisual (default), SEARCH_CELL_W/H/GAP
   MobileCodeDrawer.jsx        ← mobile bottom-sheet (used inside SyncedVisualizerShell)
   VisualizerControls.jsx      ← playback controls UI
 ```

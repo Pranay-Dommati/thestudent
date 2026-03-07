@@ -25,15 +25,16 @@ const KW = new Set([
  * coloured <span> elements. Handles keywords, numbers, strings, comments.
  */
 export const highlightSyntax = (line) => {
-    const tokens = line.split(/(\s+|[(),=\[\]#:+><!])/);
+    // Split off trailing comment so the full comment text is preserved
+    const commentIdx = line.indexOf('#');
+    const codePart    = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
+    const commentPart = commentIdx >= 0 ? line.slice(commentIdx)    : null;
+
+    const tokens = codePart.split(/(\s+|[(),=\[\]:+><!])/);
     let key = 0;
     const result = [];
     for (const tok of tokens) {
         if (!tok) continue;
-        if (tok.startsWith('#')) {
-            result.push(<span key={key++} className="text-slate-500 italic">{tok}</span>);
-            break;
-        }
         if (KW.has(tok)) {
             result.push(<span key={key++} className="text-purple-400 font-semibold">{tok}</span>);
             continue;
@@ -47,6 +48,9 @@ export const highlightSyntax = (line) => {
             continue;
         }
         result.push(<span key={key++} className="text-slate-300">{tok}</span>);
+    }
+    if (commentPart) {
+        result.push(<span key={key++} className="text-slate-500 italic">{commentPart}</span>);
     }
     return result;
 };

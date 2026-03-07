@@ -41,17 +41,20 @@ const PointerBadgeRow = ({
     iRel       = null,
     jRel       = null,
     j1Rel      = null,   // j+1 pointer (third badge)
+    j2Rel      = null,   // fourth badge (e.g. mid+1 in Find Peak Element)
     iClass     = 'bg-sky-500',
     jClass     = 'bg-pink-600',
     j1Class    = 'bg-yellow-400',
+    j2Class    = 'bg-amber-400',
     iLabel     = 'i',
     jLabel     = 'j',
     j1Label    = 'j+1',
+    j2Label    = 'M+1',
     blink      = false,
     jBlink     = false,   // blink only j badge (e.g. OOB in InsertionSort)
     extraLabel = null,   // { rel, text }
 }) => {
-    const hasPointers = iRel !== null || jRel !== null || j1Rel !== null;
+    const hasPointers = iRel !== null || jRel !== null || j1Rel !== null || j2Rel !== null;
     const hasLabel    = extraLabel !== null;
     if (!hasPointers && !hasLabel) return null;
 
@@ -61,12 +64,14 @@ const PointerBadgeRow = ({
 
     // ── Collision detection ─────────────────────────────────────────────────
     const ijSame     = iRel !== null && jRel !== null && iRel === jRel;
+    const jj1Same    = jRel !== null && j1Rel !== null && jRel === j1Rel;
     const labelHitsJ = hasLabel && jRel !== null && extraLabel.rel === jRel;
     const labelHitsI = hasLabel && iRel !== null && extraLabel.rel === iRel;
 
     // ── Badge sizes ─────────────────────────────────────────────────────────
-    const iSize = (ijSame || labelHitsI) ? BADGE_SM : BADGE;
-    const jSize = (ijSame || labelHitsJ) ? BADGE_SM : BADGE;
+    const iSize  = (ijSame || labelHitsI) ? BADGE_SM : BADGE;
+    const jSize  = (ijSame || labelHitsJ || jj1Same) ? BADGE_SM : BADGE;
+    const j1Size = jj1Same ? BADGE_SM : BADGE;
 
     // ── Badge x positions ───────────────────────────────────────────────────
     let iX = iRel !== null
@@ -81,10 +86,12 @@ const PointerBadgeRow = ({
         ? -(BADGE + cellGap + 4)                                  // off left edge
         : jRel !== null
             ? ijSame
-                ? centerX(jRel) + PAIR_GAP / 2                  // j on right when sharing
-                : labelHitsJ
-                    ? centerX(jRel) + (LABEL_SM + PAIR_GAP) / 2
-                    : centerX(jRel) - BADGE / 2                  // normal centre
+                ? centerX(jRel) + PAIR_GAP / 2                  // j on right when sharing with i
+                : jj1Same
+                    ? centerX(jRel) + PAIR_GAP / 2              // j (R) on right when sharing with j1 (M)
+                    : labelHitsJ
+                        ? centerX(jRel) + (LABEL_SM + PAIR_GAP) / 2
+                        : centerX(jRel) - BADGE / 2              // normal centre
             : null;
 
     // ── Extra label position ────────────────────────────────────────────────
@@ -118,8 +125,14 @@ const PointerBadgeRow = ({
     const jTrans  = (blink || jBlink) ? blinkT : slide;
     const j1Trans = slide;
 
-    // ── j+1 badge x position (simple: always centred on its cell) ───────────
-    const j1X = j1Rel !== null ? centerX(j1Rel) - BADGE / 2 : null;
+    // ── j+1 and j+2 badge x positions ────────────────────────────────────────
+    // j1 (M) sits LEFT of j (R) when they share a cell
+    const j1X = j1Rel !== null
+        ? jj1Same
+            ? centerX(j1Rel) - BADGE_SM - PAIR_GAP / 2
+            : centerX(j1Rel) - BADGE / 2
+        : null;
+    const j2X = j2Rel !== null ? centerX(j2Rel) - BADGE / 2 : null;
 
     return (
         <div style={{ position: 'relative', width: rowW, height: BADGE + 2, flexShrink: 0 }}>
@@ -178,14 +191,31 @@ const PointerBadgeRow = ({
                     className={`rounded-full text-slate-900 flex items-center justify-center font-bold ${j1Class}`}
                     style={{
                         position: 'absolute', bottom: 0, left: 0,
-                        width: BADGE, height: BADGE,
-                        fontSize: 8,
+                        width: j1Size, height: j1Size,
+                        fontSize: j1Size < BADGE ? 9 : 8,
                     }}
                     initial={{ x: j1X }}
                     animate={{ x: j1X, opacity: 1 }}
                     transition={j1Trans}
                 >
                     {j1Label}
+                </motion.div>
+            )}
+
+            {/* j+2 / fourth badge (e.g. mid+1 in Find Peak Element) */}
+            {j2X !== null && (
+                <motion.div
+                    className={`rounded-full text-slate-900 flex items-center justify-center font-bold ${j2Class}`}
+                    style={{
+                        position: 'absolute', bottom: 0, left: 0,
+                        width: BADGE, height: BADGE,
+                        fontSize: 8,
+                    }}
+                    initial={{ x: j2X }}
+                    animate={{ x: j2X, opacity: 1 }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+                >
+                    {j2Label}
                 </motion.div>
             )}
         </div>

@@ -5,3 +5,5 @@ export { default as BubbleSortSyncedVisualizer } from './BubbleSortSyncedVisuali
 export { default as SelectionSortSyncedVisualizer } from './SelectionSortSyncedVisualizer';
 export { default as CharReplacementVisualizer } from './CharReplacementVisualizer';
 export { default as BinarySearchVisualizer } from './BinarySearchVisualizer';
+export { default as FindPeakElementVisualizer } from './FindPeakElementVisualizer';
+export { default as RemoveNthFromEndVisualizer } from './RemoveNthFromEndVisualizer';
