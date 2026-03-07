@@ -209,6 +209,102 @@ result = character_replacement(s, k)
 print(result)`;
     },
 
+    'first-last-position': (inputStr) => {
+        const commaIdx = inputStr.lastIndexOf(',');
+        const arrPart = commaIdx >= 0 ? inputStr.slice(0, commaIdx).trim() : '[2, 4, 4, 4, 6, 8, 10]';
+        const tgt     = commaIdx >= 0 ? inputStr.slice(commaIdx + 1).trim() : '4';
+        return `def find_first(nums, target):
+    low = 0
+    high = len(nums) - 1
+    first = -1
+
+    while low <= high:
+        mid = (low + high) // 2
+
+        if nums[mid] < target:
+            low = mid + 1
+
+        else:
+            if nums[mid] == target:
+                first = mid
+            high = mid - 1
+
+    return first
+
+
+def find_last(nums, target):
+    low = 0
+    high = len(nums) - 1
+    last = -1
+
+    while low <= high:
+        mid = (low + high) // 2
+
+        if nums[mid] > target:
+            high = mid - 1
+
+        else:
+            if nums[mid] == target:
+                last = mid
+            low = mid + 1
+
+    return last
+
+
+def search_range(nums, target):
+    first = find_first(nums, target)
+    last = find_last(nums, target)
+    return [first, last]
+
+
+# Example input for visualization
+nums = ${arrPart}
+target = ${tgt}
+
+result = search_range(nums, target)
+
+print("Range:", result)`;
+    },
+
+    'search-rotated-array': (inputStr) => {
+        const commaIdx = inputStr.lastIndexOf(',');
+        const arrPart = commaIdx >= 0 ? inputStr.slice(0, commaIdx).trim() : '[4, 5, 6, 7, 0, 1, 2]';
+        const tgt     = commaIdx >= 0 ? inputStr.slice(commaIdx + 1).trim() : '0';
+        return `def search_rotated(nums, target):
+    low = 0
+    high = len(nums) - 1
+
+    while low <= high:
+        mid = low + (high - low) // 2
+
+        if nums[mid] == target:
+            return mid
+
+        # Left half is sorted
+        if nums[low] <= nums[mid]:
+
+            if nums[low] <= target < nums[mid]:
+                high = mid - 1
+            else:
+                low = mid + 1
+
+        # Right half is sorted
+        else:
+
+            if nums[mid] < target <= nums[high]:
+                low = mid + 1
+            else:
+                high = mid - 1
+
+    return -1
+
+
+nums = ${arrPart}
+target = ${tgt}
+result = search_rotated(nums, target)
+print("Target index:", result)`;
+    },
+
     'find-peak-element': (arrString) => `def findPeakElement(nums):
     left = 0
     right = len(nums) - 1
@@ -260,6 +356,49 @@ result = binary_search(arr, target)
 print("Index:", result)`;
     },
 
+    'fibonacci': (inputStr) => {
+        const n = parseInt(String(inputStr).trim(), 10) || 5;
+        return `def fibonacci(n):
+    # base cases
+    if n == 0:
+        return 0
+    if n == 1:
+        return 1
+    # recursive relation
+    return fibonacci(n - 1) + fibonacci(n - 2)
+
+n = ${n}
+print(fibonacci(n))`;
+    },
+
+    'subsets': (inputStr) => {
+        let arr;
+        try { arr = JSON.parse(inputStr.trim()); } catch { arr = [1, 2, 3]; }
+        if (!Array.isArray(arr)) arr = [1, 2, 3];
+        arr = arr.map(Number).filter(n => !isNaN(n)).slice(0, 4);
+        if (arr.length === 0) arr = [1, 2, 3];
+        return `def subsets(nums):
+
+    result = []
+    subset = []
+
+    def backtrack(index):
+
+        # store current subset
+        result.append(subset[:])
+
+        for i in range(index, len(nums)):
+            subset.append(nums[i])
+            backtrack(i + 1)
+            subset.pop()
+
+    backtrack(0)
+    return result
+
+nums = [${arr.join(', ')}]
+print(subsets(nums))`;
+    },
+
     'remove-nth-from-end': (inputStr) => {
         const commaIdx = inputStr.lastIndexOf(',');
         const arrPart  = commaIdx >= 0 ? inputStr.slice(0, commaIdx).trim() : '[1, 2, 3, 4, 5]';
@@ -280,9 +419,14 @@ const DEFAULT_ARRAYS = {
     'selection-sort':    '[64, 25, 12, 22, 11]',
     'insertion-sort':    '[12, 11, 13, 5, 6]',
     'char-replacement':  'AABABBAC,2',
-    'binary-search':       '[3, 12, 18, 25, 31, 42, 63],31',
-    'find-peak-element':   '[1, 3, 5, 7, 6, 4, 2]',
-    'remove-nth-from-end': '[1, 2, 3, 4, 5],2',
+    'binary-search':         '[3, 12, 18, 25, 31, 42, 63],31',
+    'find-peak-element':     '[1, 3, 5, 7, 6, 4, 2]',
+    'remove-nth-from-end':   '[1, 2, 3, 4, 5],2',
+    'first-last-position':   '[2, 4, 4, 4, 6, 8, 10],4',
+    'search-rotated-array':  '[4, 5, 6, 7, 0, 1, 2],0',
+    'fibonacci':             '5',
+    'factorial':             '5',
+    'subsets':               '[1, 2, 3]',
 };
 
 // Problem metadata
@@ -406,7 +550,68 @@ const problemsData = {
             "Gradient / Slope Reasoning",
             "Logarithmic Time Complexity"
         ]
-    },    'remove-nth-from-end': {
+    },
+    'first-last-position': {
+        id: 10,
+        name: "First/Last Position",
+        difficulty: "Medium",
+        category: "Binary Search",
+        timeComplexity: "O(log n)",
+        spaceComplexity: "O(1)",
+        description: "Given a sorted array and a target, return the first and last index of the target. If not found, return [-1, -1]. Two binary searches are run: find_first narrows right whenever nums[mid] ≥ target (recording a candidate when equal), and find_last narrows left whenever nums[mid] ≤ target (recording a candidate when equal). Both converge in O(log n).",
+        concepts: [
+            "Binary Search — Two Passes",
+            "Left-biased vs Right-biased Search",
+            "Candidate Recording Pattern",
+            "Logarithmic Time Complexity"
+        ]
+    },
+    'search-rotated-array': {
+        id: 11,
+        name: "Search Rotated Array",
+        difficulty: "Medium",
+        category: "Binary Search",
+        timeComplexity: "O(log n)",
+        spaceComplexity: "O(1)",
+        description: "A sorted array has been rotated at an unknown pivot. Given that array and a target, return the target\'s index or -1 if not found. At every mid-point, one half must still be sorted — identify which, check if the target falls inside it, and discard the other half. This keeps the search logarithmic despite the rotation.",
+        concepts: [
+            "Binary Search on Rotated Array",
+            "Sorted-Half Identification",
+            "Range Elimination",
+            "Logarithmic Time Complexity"
+        ]
+    },
+    'fibonacci': {
+        id: 12,
+        name: "Fibonacci Tree",
+        difficulty: "Easy",
+        category: "Recursion",
+        timeComplexity: "O(2ⁿ)",
+        spaceComplexity: "O(n)",
+        description: "Compute the nth Fibonacci number using pure recursion. fibonacci(n) calls fibonacci(n-1) and fibonacci(n-2), building a binary call tree before combining results on the way back up. Base cases n=0 and n=1 return immediately, while every other call recurses left then right and returns their sum.",
+        concepts: [
+            "Recursive Function Calls",
+            "Base Case Identification",
+            "Call Stack Depth (O(n))",
+            "Overlapping Subproblems (intro to memoisation)"
+        ]
+    },
+    'subsets': {
+        id: 12,
+        name: "Subsets",
+        difficulty: "Medium",
+        category: "Recursion",
+        timeComplexity: "O(2ⁿ)",
+        spaceComplexity: "O(n)",
+        description: "Given an integer array nums, return all possible subsets. The solution uses backtracking: at each call the current subset is immediately recorded, then each remaining element is chosen and the function recurses deeper; after returning the element is removed (backtracked). This builds a call tree where every node corresponds to a valid subset.",
+        concepts: [
+            "Backtracking Pattern",
+            "Recursive Call Tree",
+            "Subset / Power Set Enumeration",
+            "Choose → Explore → Unchoose"
+        ]
+    },
+    'remove-nth-from-end': {
         id: 9,
         name: "Remove Nth Node From End",
         difficulty: "Medium",
@@ -426,7 +631,8 @@ const problemsData = {
 const SELF_CONTAINED_VISUALIZERS = new Set([
     'bubble-sort', 'selection-sort', 'insertion-sort', 'merge-sort', 'quick-sort',
     'binary-search', 'find-peak-element', 'char-replacement',
-    'remove-nth-from-end',
+    'remove-nth-from-end', 'first-last-position', 'search-rotated-array',
+    'fibonacci', 'factorial', 'subsets',
 ]);
 
 const DSAProblemPage = () => {
@@ -439,14 +645,23 @@ const DSAProblemPage = () => {
     // For sorting: arrField=[...] only
     const getDefaultArr = () => {
         if (problemName === 'binary-search') return '[3, 12, 18, 25, 31, 42, 63]';
+        if (problemName === 'first-last-position') return '[2, 4, 4, 4, 6, 8, 10]';
+        if (problemName === 'search-rotated-array') return '[4, 5, 6, 7, 0, 1, 2]';
         if (problemName === 'char-replacement') return 'AABABBAC';
         if (problemName === 'remove-nth-from-end') return '[1, 2, 3, 4, 5]';
+        if (problemName === 'fibonacci') return '5';
+        if (problemName === 'factorial') return '5';
+        if (problemName === 'subsets') return '[1, 2, 3]';
         return DEFAULT_ARRAYS[problemName] || '[38, 27, 43, 3, 9, 82, 10]';
     };
     const getDefaultTarget = () => {
         if (problemName === 'binary-search') return '31';
+        if (problemName === 'first-last-position') return '4';
+        if (problemName === 'search-rotated-array') return '0';
         if (problemName === 'char-replacement') return '2';
         if (problemName === 'remove-nth-from-end') return '2';
+        if (problemName === 'fibonacci') return '';
+        if (problemName === 'subsets') return '';
         return '';
     };
 
@@ -461,8 +676,13 @@ const DSAProblemPage = () => {
     // Combine fields into the single string the templates expect
     const customArrayInput = (() => {
         if (problemName === 'binary-search')        return `${arrField},${targetField}`;
+        if (problemName === 'first-last-position')  return `${arrField},${targetField}`;
+        if (problemName === 'search-rotated-array') return `${arrField},${targetField}`;
         if (problemName === 'char-replacement')     return `${arrField},${targetField}`;
         if (problemName === 'remove-nth-from-end') return `${arrField},${targetField}`;
+        if (problemName === 'fibonacci')            return arrField;
+        if (problemName === 'factorial')            return arrField;
+        if (problemName === 'subsets')              return arrField;
         return arrField;
     })();
 
@@ -484,6 +704,28 @@ const DSAProblemPage = () => {
     // Validate array input (handles both numeric arrays and char-replacement 'S,k' format)
     // ── Per-field validators ─────────────────────────────────────────────────
     const validateArr = (val) => {
+        if (problemName === 'fibonacci') {
+            const v = parseInt(val.trim(), 10);
+            if (isNaN(v) || v < 1) return 'Must be a positive integer';
+            if (v > 7) return 'Max n = 7 (tree gets too large)';
+            return '';
+        }
+        if (problemName === 'factorial') {
+            const v = parseInt(val.trim(), 10);
+            if (isNaN(v) || v < 1) return 'Must be a positive integer';
+            if (v > 8) return 'Max n = 8 (chain gets too long)';
+            return '';
+        }
+        if (problemName === 'subsets') {
+            const t = val.trim();
+            if (!t.startsWith('[') || !t.endsWith(']')) return 'Must be like [1, 2, 3]';
+            const inner = t.slice(1, -1).trim();
+            if (!inner) return 'Array cannot be empty';
+            const parts = inner.split(',').map(p => p.trim());
+            for (const p of parts) { if (!/^-?\d+$/.test(p)) return `Invalid number: ${p}`; }
+            if (parts.length > 4) return 'Max 4 elements (tree gets too large)';
+            return '';
+        }
         if (problemName === 'char-replacement') {
             if (!/^[A-Za-z]+$/.test(val.trim())) return 'Letters only (e.g. AABABBAC)';
             if (val.trim().length > 20) return 'Max 20 characters';
@@ -499,7 +741,8 @@ const DSAProblemPage = () => {
         return '';
     };
     const validateTarget = (val) => {
-        if (problemName === 'binary-search') {
+        if (problemName === 'fibonacci') return '';
+        if (problemName === 'binary-search' || problemName === 'first-last-position' || problemName === 'search-rotated-array') {
             if (!/^-?\d+$/.test(val.trim())) return 'Must be an integer';
             return '';
         }
@@ -518,7 +761,9 @@ const DSAProblemPage = () => {
     // Handle rerun with a specific array (called from visualizer)
     const handleRerunWithArray = useCallback(async (newArrayString) => {
         // update arrField only (keep existing target)
-        if (problemName === 'binary-search') {
+        if (problemName === 'fibonacci' || problemName === 'factorial' || problemName === 'subsets') {
+            setArrField(newArrayString);
+        } else if (problemName === 'binary-search' || problemName === 'first-last-position' || problemName === 'search-rotated-array') {
             const commaIdx = newArrayString.lastIndexOf(',');
             if (commaIdx >= 0) {
                 setArrField(newArrayString.slice(0, commaIdx).trim());
@@ -947,13 +1192,13 @@ const DSAProblemPage = () => {
                                 {/* Primary field: Array or String */}
                                 <div className="flex-1 w-full text-left">
                                     <label className="block text-white/35 text-[10px] font-semibold uppercase tracking-widest mb-1.5">
-                                        {problemName === 'char-replacement' ? 'String' : 'Array'}
+                                        {problemName === 'char-replacement' ? 'String' : (problemName === 'fibonacci' || problemName === 'factorial') ? 'n' : 'Array'}
                                     </label>
                                     <input
                                         type="text"
                                         value={arrField}
                                         onChange={handleArrChange}
-                                        placeholder={problemName === 'char-replacement' ? 'AABABBAC' : '[5, 1, 4, 2, 8]'}
+                                        placeholder={problemName === 'char-replacement' ? 'AABABBAC' : (problemName === 'fibonacci' || problemName === 'factorial') ? '5' : '[5, 1, 4, 2, 8]'}
                                         className={`w-full px-4 py-3 bg-white/[0.06] border rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 transition-all placeholder-white/20 ${
                                             arrError ? 'border-red-500/40 focus:ring-red-500/20' : 'border-white/[0.1] focus:ring-indigo-500/30 focus:border-indigo-400/40'
                                         }`}
@@ -962,16 +1207,16 @@ const DSAProblemPage = () => {
                                 </div>
 
                                 {/* Secondary field: Target / k / n */}
-                                {(problemName === 'binary-search' || problemName === 'char-replacement' || problemName === 'remove-nth-from-end') && (
+                                {(problemName === 'binary-search' || problemName === 'first-last-position' || problemName === 'search-rotated-array' || problemName === 'char-replacement' || problemName === 'remove-nth-from-end') && (
                                     <div className="w-24 sm:w-28 shrink-0 text-left">
                                         <label className="block text-white/35 text-[10px] font-semibold uppercase tracking-widest mb-1.5">
-                                            {problemName === 'binary-search' ? 'Target' : 'k'}
+                                            {(problemName === 'binary-search' || problemName === 'first-last-position' || problemName === 'search-rotated-array') ? 'Target' : 'k'}
                                         </label>
                                         <input
                                             type="text"
                                             value={targetField}
                                             onChange={handleTargetChange}
-                                            placeholder={problemName === 'binary-search' ? '31' : '2'}
+                                            placeholder={problemName === 'binary-search' ? '31' : problemName === 'first-last-position' ? '4' : problemName === 'search-rotated-array' ? '0' : '2'}
                                             className={`w-full px-4 py-3 bg-white/[0.06] border rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 transition-all placeholder-white/20 ${
                                                 targetError ? 'border-red-500/40 focus:ring-red-500/20' : 'border-white/[0.1] focus:ring-indigo-500/30 focus:border-indigo-400/40'
                                             }`}

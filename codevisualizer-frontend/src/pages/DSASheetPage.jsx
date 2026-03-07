@@ -170,8 +170,8 @@ const PATTERNS = [
         problems: [
             { id: 6,  name: 'Binary Search',        slug: 'binary-search',        difficulty: 'Easy',   available: true  },
             { id: 7,  name: 'Find Peak Element',    slug: 'find-peak-element',    difficulty: 'Medium', available: true  },
-            { id: 8,  name: 'First/Last Position',  slug: 'first-last-position',  difficulty: 'Medium', available: false },
-            { id: 9,  name: 'Search Rotated Array', slug: 'search-rotated-array', difficulty: 'Medium', available: false },
+            { id: 8,  name: 'First/Last Position',  slug: 'first-last-position',  difficulty: 'Medium', available: true  },
+            { id: 9,  name: 'Search Rotated Array', slug: 'search-rotated-array', difficulty: 'Medium', available: true  },
         ],
     },
     {
@@ -183,9 +183,9 @@ const PATTERNS = [
         lightColor: 'bg-violet-50 border-violet-200',
         badgeColor: 'bg-violet-100 text-violet-700',
         problems: [
-            { id: 10, name: 'Fibonacci Tree',  slug: 'fibonacci',    difficulty: 'Easy',   available: false },
-            { id: 11, name: 'Factorial',        slug: 'factorial',    difficulty: 'Easy',   available: false },
-            { id: 12, name: 'Subsets',          slug: 'subsets',      difficulty: 'Medium', available: false },
+            { id: 10, name: 'Fibonacci Tree',  slug: 'fibonacci',    difficulty: 'Easy',   available: true  },
+            { id: 11, name: 'Factorial',        slug: 'factorial',    difficulty: 'Easy',   available: true  },
+            { id: 12, name: 'Subsets',          slug: 'subsets',      difficulty: 'Medium', available: true  },
             { id: 13, name: 'Permutations',     slug: 'permutations', difficulty: 'Hard',   available: false },
         ],
     },

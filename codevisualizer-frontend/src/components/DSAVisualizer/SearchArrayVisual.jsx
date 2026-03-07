@@ -37,20 +37,25 @@ export const SEARCH_CELL_GAP = 5;
  *   showM1       {boolean}              show Mid+1  (amber)   pointer badge
  *   blink        {boolean}              pulse both L/R badges together (e.g. while-check)
  *   topSlot      {ReactNode}            node rendered above the pointer row (e.g. target box)
- *   shimmerIdx   {number|null}          cell index that gets the shimmer-border CSS effect
+ *   shimmerIdx    {number|null}          cell index that gets the shimmer-border CSS effect
+ *   shimmerIdxs   {number[]|null}        multiple cell indices that each get the shimmer-border effect
+ *   shimmerColors {Object|null}          map of index→'green'|'amber' to pick shimmer colour per cell
  */
 const SearchArrayVisual = ({
     arr,
     n,
     ev,
     getCellBg,
-    showL      = false,
-    showR      = false,
-    showM      = false,
-    showM1     = false,
-    blink      = false,
-    topSlot    = null,
-    shimmerIdx = null,
+    showL        = false,
+    showR        = false,
+    showM        = false,
+    showM1       = false,
+    blink        = false,
+    topSlot      = null,
+    shimmerIdx   = null,
+    shimmerIdxs  = null,
+    shimmerColors = null,
+    rLabel       = 'R',
 }) => {
     if (!arr || arr.length === 0) return null;
 
@@ -79,7 +84,7 @@ const SearchArrayVisual = ({
                 j1Class="bg-sky-500"
                 j2Class="bg-amber-400"
                 iLabel="L"
-                jLabel="R"
+                jLabel={rLabel}
                 j1Label="M"
                 j2Label="M+1"
                 blink={blink}
@@ -92,18 +97,22 @@ const SearchArrayVisual = ({
             >
                 <div className="flex items-center" style={{ gap: SEARCH_CELL_GAP }}>
                     {arr.map((val, idx) => {
-                        const isShimmer = shimmerIdx !== null && idx === shimmerIdx;
+                        const shimmerSet = shimmerIdxs ? new Set(shimmerIdxs) : null;
+                        const isShimmer = (shimmerIdx !== null && idx === shimmerIdx) || (shimmerSet !== null && shimmerSet.has(idx));
+                        const shimmerColor = shimmerColors?.[idx] ?? 'amber';
+                        const shimmerClass = shimmerColor === 'green' ? 'shimmer-border-green' : 'shimmer-border';
+                        const innerBg = shimmerColor === 'green' ? 'bg-emerald-500' : 'bg-sky-500';
                         return isShimmer ? (
                             /* Shimmer effect — used in Binary Search at the if arr[mid]==target check */
                             <div
                                 key={idx}
-                                className="shimmer-border flex-shrink-0"
+                                className={`${shimmerClass} flex-shrink-0`}
                                 style={{
                                     width: SEARCH_CELL_W, height: SEARCH_CELL_H,
                                     minWidth: SEARCH_CELL_W, borderRadius: 8, padding: 2,
                                 }}
                             >
-                                <div className="flex items-center justify-center rounded-[6px] bg-sky-500 text-white text-sm font-bold w-full h-full">
+                                <div className={`flex items-center justify-center rounded-[6px] ${innerBg} text-white text-sm font-bold w-full h-full`}>
                                     {val}
                                 </div>
                             </div>

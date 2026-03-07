@@ -21,6 +21,11 @@ import CharReplacementVisualizer from './CharReplacementVisualizer';
 import BinarySearchVisualizer from './BinarySearchVisualizer';
 import FindPeakElementVisualizer from './FindPeakElementVisualizer';
 import RemoveNthFromEndVisualizer from './RemoveNthFromEndVisualizer';
+import FirstLastPositionVisualizer from './FirstLastPositionVisualizer';
+import SearchRotatedArrayVisualizer from './SearchRotatedArrayVisualizer';
+import FibonacciVisualizer from './FibonacciVisualizer';
+import FactorialVisualizer from './FactorialVisualizer';
+import SubsetsVisualizer from './SubsetsVisualizer';
 
 // ============ MAIN DSA IMMERSIVE VISUALIZER ============
 const DSAImmersiveVisualizer = ({
@@ -74,7 +79,7 @@ const DSAImmersiveVisualizer = ({
 
     // Second param for split mobile inputs (binary-search → target, char-replacement → k)
     const [localSecondInput, setLocalSecondInput] = useState(() => {
-        if (algorithmType === 'binary-search') {
+        if (algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array') {
             const i = (customArray || '').lastIndexOf(',');
             return i >= 0 ? (customArray || '').slice(i + 1).trim() : '';
         }
@@ -95,7 +100,7 @@ const DSAImmersiveVisualizer = ({
     // Update local input when prop changes
     useEffect(() => {
         setLocalArrayInput(customArray);
-        if (algorithmType === 'binary-search') {
+        if (algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array') {
             const i = (customArray || '').lastIndexOf(',');
             setLocalSecondInput(i >= 0 ? (customArray || '').slice(i + 1).trim() : '');
         } else if (algorithmType === 'char-replacement') {
@@ -109,6 +114,28 @@ const DSAImmersiveVisualizer = ({
 
     // Validate array input
     const validateInput = (input) => {
+        if (algorithmType === 'fibonacci') {
+            const v = parseInt(input.trim(), 10);
+            if (isNaN(v) || v < 1) return 'Must be a positive integer';
+            if (v > 7) return 'Max n = 7 (tree gets too large)';
+            return '';
+        }
+        if (algorithmType === 'factorial') {
+            const v = parseInt(input.trim(), 10);
+            if (isNaN(v) || v < 1) return 'Must be a positive integer';
+            if (v > 8) return 'Max n = 8 (chain gets too long)';
+            return '';
+        }
+        if (algorithmType === 'subsets') {
+            const t = input.trim();
+            if (!t.startsWith('[') || !t.endsWith(']')) return 'Format: [1, 2, 3]';
+            const inner = t.slice(1, -1).trim();
+            if (!inner) return 'Array cannot be empty';
+            const parts = inner.split(',').map(p => p.trim());
+            for (const p of parts) { if (!/^-?\d+$/.test(p)) return `Invalid: ${p}`; }
+            if (parts.length > 4) return 'Max 4 elements (tree gets too large)';
+            return '';
+        }
         if (algorithmType === 'char-replacement') {
             const trimmed = input.trim();
             const parts = trimmed.split(',');
@@ -120,7 +147,7 @@ const DSAImmersiveVisualizer = ({
             if (s.length > 20) return 'Max 20 chars';
             return '';
         }
-        if (algorithmType === 'binary-search') {
+        if (algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array') {
             const trimmed = input.trim();
             const commaIdx = trimmed.lastIndexOf(',');
             if (commaIdx < 0) return 'Format: [arr],target';
@@ -168,7 +195,7 @@ const DSAImmersiveVisualizer = ({
     // Mobile split-field handlers — rebuild combined string from parts
     const handleMobileFirstChange = (e) => {
         const first = e.target.value;
-        const isMulti = algorithmType === 'binary-search' || algorithmType === 'char-replacement' || algorithmType === 'remove-nth-from-end';
+        const isMulti = algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array' || algorithmType === 'char-replacement' || algorithmType === 'remove-nth-from-end';
         const combined = isMulti ? `${first},${localSecondInput}` : first;
         setLocalArrayInput(combined);
         setInputError(validateInput(combined));
@@ -177,7 +204,7 @@ const DSAImmersiveVisualizer = ({
     const handleMobileSecondChange = (e) => {
         const second = e.target.value;
         setLocalSecondInput(second);
-        const sepIdx = (algorithmType === 'binary-search' || algorithmType === 'remove-nth-from-end')
+        const sepIdx = (algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array' || algorithmType === 'remove-nth-from-end')
             ? localArrayInput.lastIndexOf(',')
             : localArrayInput.indexOf(',');
         const firstPart = sepIdx >= 0 ? localArrayInput.slice(0, sepIdx) : localArrayInput;
@@ -229,6 +256,11 @@ const DSAImmersiveVisualizer = ({
                              : algorithmType === 'binary-search' ? 'Binary Search'
                              : algorithmType === 'find-peak-element' ? 'Find Peak Element'
                              : algorithmType === 'remove-nth-from-end' ? 'Remove Nth From End'
+                             : algorithmType === 'first-last-position' ? 'First/Last Position'
+                             : algorithmType === 'search-rotated-array' ? 'Search Rotated Array'
+                             : algorithmType === 'fibonacci' ? 'Fibonacci Tree'
+                             : algorithmType === 'factorial' ? 'Factorial'
+                             : algorithmType === 'subsets' ? 'Subsets'
                              : 'Merge Sort'}
                         </span>
                     </h1>
@@ -272,14 +304,14 @@ const DSAImmersiveVisualizer = ({
                     {showInputPanel ? (
                         <div className="hidden md:flex items-center gap-2 bg-white/5 border border-white/15 rounded-xl px-3 py-1.5 shadow-lg backdrop-blur-sm">
                             <span className="text-white/40 text-xs font-mono">
-                                {algorithmType === 'char-replacement' ? 's, k =' : algorithmType === 'binary-search' ? 'arr, target =' : algorithmType === 'remove-nth-from-end' ? 'arr, n =' : 'arr ='}
+                                {algorithmType === 'char-replacement' ? 's, k =' : (algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array') ? 'arr, target =' : algorithmType === 'remove-nth-from-end' ? 'arr, n =' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? 'n =' : 'arr ='}
                             </span>
                             <input
                                 type="text"
                                 value={localArrayInput}
                                 onChange={handleInputChange}
                                 className={`w-44 px-2 py-1 bg-black/30 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/60' : 'border-white/20 focus:border-indigo-400'}`}
-                                placeholder={algorithmType === 'char-replacement' ? 'AABCBA,2' : algorithmType === 'binary-search' ? '[3,12,25,31,42],31' : algorithmType === 'remove-nth-from-end' ? '[1,2,3,4,5],2' : '[1, 2, 3]'}
+                                placeholder={algorithmType === 'char-replacement' ? 'AABCBA,2' : algorithmType === 'binary-search' ? '[3,12,25,31,42],31' : algorithmType === 'first-last-position' ? '[2,4,4,4,6,8,10],4' : algorithmType === 'search-rotated-array' ? '[4,5,6,7,0,1,2],0' : algorithmType === 'remove-nth-from-end' ? '[1,2,3,4,5],2' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? '5' : '[1, 2, 3]'}
                             />
                             {inputError && (
                                 <span className="text-red-400 text-xs">{inputError}</span>
@@ -334,7 +366,7 @@ const DSAImmersiveVisualizer = ({
                     {/* Field 1: arr / s */}
                     <div className="flex flex-col gap-1">
                         <span className="text-white/50 text-xs font-mono">
-                            {algorithmType === 'char-replacement' ? 's =' : 'arr ='}
+                            {algorithmType === 'char-replacement' ? 's =' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? 'n =' : 'arr ='}
                         </span>
                         <input
                             type="text"
@@ -355,7 +387,7 @@ const DSAImmersiveVisualizer = ({
                         />
                     </div>
                     {/* Field 2: target / k / n — only for multi-param algorithms */}
-                    {(algorithmType === 'binary-search' || algorithmType === 'char-replacement' || algorithmType === 'remove-nth-from-end') && (
+                    {(algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array' || algorithmType === 'char-replacement' || algorithmType === 'remove-nth-from-end') && (
                         <div className="flex flex-col gap-1">
                             <span className="text-white/50 text-xs font-mono">
                                 {algorithmType === 'char-replacement' ? 'k =' : algorithmType === 'remove-nth-from-end' ? 'n =' : 'target ='}
@@ -365,7 +397,7 @@ const DSAImmersiveVisualizer = ({
                                 value={localSecondInput}
                                 onChange={handleMobileSecondChange}
                                 className={`w-full px-2.5 py-1.5 bg-black/30 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/60' : 'border-white/20 focus:border-indigo-400'}`}
-                                placeholder={algorithmType === 'char-replacement' ? '2' : algorithmType === 'remove-nth-from-end' ? '2' : '31'}
+                                placeholder={algorithmType === 'char-replacement' ? '2' : algorithmType === 'remove-nth-from-end' ? '2' : algorithmType === 'first-last-position' ? '4' : algorithmType === 'search-rotated-array' ? '0' : '31'}
                             />
                         </div>
                     )}
@@ -418,6 +450,16 @@ const DSAImmersiveVisualizer = ({
                         <FindPeakElementVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'remove-nth-from-end' ? (
                         <RemoveNthFromEndVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
+                    ) : algorithmType === 'first-last-position' ? (
+                        <FirstLastPositionVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
+                    ) : algorithmType === 'search-rotated-array' ? (
+                        <SearchRotatedArrayVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
+                    ) : algorithmType === 'fibonacci' ? (
+                        <FibonacciVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
+                    ) : algorithmType === 'factorial' ? (
+                        <FactorialVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
+                    ) : algorithmType === 'subsets' ? (
+                        <SubsetsVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : (
                         activeTab === 'combined' ? (
                             <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
