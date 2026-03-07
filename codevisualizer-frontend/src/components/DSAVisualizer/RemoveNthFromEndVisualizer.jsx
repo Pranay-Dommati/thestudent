@@ -13,7 +13,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import VisualizerControls from './VisualizerControls';
 import PointerBadgeRow from './PointerBadgeRow';
 import SyncedVisualizerShell from './SyncedVisualizerShell';
@@ -83,6 +83,7 @@ const DELAY = {
     adv_fast2:    1800,
     remove:       2400,
     return_head:  2200,
+    show_result:  2400,
 };
 
 const getDelay = makeGetDelay(DELAY, 1600);
@@ -135,11 +136,11 @@ function simulate(vals, n) {
 
     let fastIdx = 0;
     for (let i = 0; i < n; i++) {
-        push('for_loop', { slowIdx: 0, fastIdx, removeIdx: null },
+        push('for_loop', { slowIdx: 0, fastIdx, removeIdx: null, forStep: i + 1, forTotal: n },
             LINE.FOR_LOOP,
             `for _ in range(${n}): step ${i + 1}/${n}  →  advancing fast ${n} steps ahead of slow`);
         fastIdx++;
-        push('adv_fast', { slowIdx: 0, fastIdx, removeIdx: null },
+        push('adv_fast', { slowIdx: 0, fastIdx, removeIdx: null, forStep: i + 1, forTotal: n },
             LINE.ADV_FAST,
             `fast = fast.next  →  fast at node ${fastIdx} (val = ${allNodes[fastIdx].val})`);
     }
@@ -172,16 +173,64 @@ function simulate(vals, n) {
         LINE.RETURN_HEAD,
         `return dummy.next  →  result = [${vals.filter((_, i) => i !== removeIdx - 1).join(' → ')}]`);
 
+    push('show_result', { slowIdx: null, fastIdx: null, removeIdx },
+        LINE.RETURN_HEAD,
+        `✓  Result: [${vals.filter((_, i) => i !== removeIdx - 1).join(' → ')}]  —  returned from dummy.next`);
+
     return { events };
 }
 
+// ── Range counter strip ───────────────────────────────────────────────────────
+const RANGE_CELL = 30;
+const RANGE_GAP  = 6;
+
+const RangeStrip = ({ step, total, isAdvancing }) => {
+    if (!step || !total) return null;
+    return (
+        <div className="flex flex-col items-center gap-1.5 mb-3">
+            <span className="text-[10px] font-mono text-slate-500 tracking-wide">
+                for _ in range({total})
+            </span>
+            <div className="flex items-center" style={{ gap: RANGE_GAP }}>
+                {Array.from({ length: total }, (_, i) => {
+                    const num        = i + 1;
+                    const isActive   = num === step && !isAdvancing;
+                    const isComplete = num < step || (num === step && isAdvancing);
+                    return (
+                        <motion.div
+                            key={num}
+                            animate={{ scale: isActive ? 1.15 : 1 }}
+                            transition={{ type: 'spring', stiffness: 320, damping: 18 }}
+                            className={`flex-shrink-0 rounded-lg flex items-center justify-center text-xs font-bold border-2 transition-colors duration-300 ${
+                                isActive
+                                    ? 'bg-amber-500/20 border-amber-400 text-amber-100 ring-2 ring-amber-400/40'
+                                    : isComplete
+                                        ? 'bg-teal-500/20 border-teal-400 text-teal-100'
+                                        : 'bg-slate-700/50 border-slate-600 text-slate-400'
+                            }`}
+                            style={{ width: RANGE_CELL, height: RANGE_CELL }}
+                        >
+                            {num}
+                        </motion.div>
+                    );
+                })}
+            </div>
+            <span className="text-[10px] font-mono text-slate-500">
+                step {step} / {total}
+            </span>
+        </div>
+    );
+};
+
 // ── Arrow SVG ─────────────────────────────────────────────────────────────────
-const Arrow = ({ color = '#475569' }) => (
-    <svg
+const Arrow = ({ color = '#475569', fadeOut = false }) => (
+    <motion.svg
         width={ARROW_W}
         height={NODE_D}
         viewBox={`0 0 ${ARROW_W} ${NODE_D}`}
         className="flex-shrink-0"
+        animate={{ opacity: fadeOut ? 0 : 1 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
     >
         <line
             x1="2" y1={NODE_D / 2}
@@ -192,7 +241,7 @@ const Arrow = ({ color = '#475569' }) => (
             points={`${ARROW_W - 12},${NODE_D / 2 - 4} ${ARROW_W - 6},${NODE_D / 2} ${ARROW_W - 12},${NODE_D / 2 + 4}`}
             fill="none" stroke={color} strokeWidth="1.5"
         />
-    </svg>
+    </motion.svg>
 );
 
 // ── Node & arrow styling ──────────────────────────────────────────────────────
@@ -241,19 +290,29 @@ const LinkedListVisual = ({ ev }) => {
     const { allNodes, slowIdx, fastIdx } = ev;
     const showDummy      = ev.showDummy      ?? true;
     const dummyConnected = ev.dummyConnected ?? true;
+    const idxOffset      = showDummy ? 0 : 1;
+    const isReturnHead   = ev.type === 'return_head';
+    const isShowResult   = ev.type === 'show_result';
 
-    // Which nodes to render; when dummy is hidden use only real nodes
-    const displayNodes = showDummy ? allNodes : allNodes.slice(1);
-    const idxOffset    = showDummy ? 0 : 1; // displayIdx + idxOffset = allNodes index
+    // Filter removed node at return_head + show_result (AnimatePresence handles exit animation)
+    const filterRemoved  = isReturnHead || isShowResult;
+    const baseNodes      = showDummy ? allNodes : allNodes.slice(1);
+    const displayEntries = baseNodes
+        .map((node, di) => ({ node, allIdx: di + idxOffset }))
+        .filter(({ allIdx }) => !(filterRemoved && allIdx === ev.removeIdx));
+
+    const dummyEntries = displayEntries.filter(e => e.node.isDummy);
+    const realEntries  = displayEntries.filter(e => !e.node.isDummy);
+    const hasDummy     = dummyEntries.length > 0;
 
     return (
         <div className="flex flex-col items-start gap-1">
-            {/* Pointer badge row: offset by border(2) + padding(12) = 14px to align with nodes */}
+            {/* Pointer badge row */}
             <div style={{ paddingLeft: 14 }}>
                 <PointerBadgeRow
                     cellW={NODE_D}
                     cellGap={ARROW_W}
-                    count={displayNodes.length}
+                    count={displayEntries.length}
                     iRel={slowIdx !== null ? slowIdx - idxOffset : null}
                     jRel={fastIdx !== null ? fastIdx - idxOffset : null}
                     iClass="bg-amber-500"
@@ -263,48 +322,98 @@ const LinkedListVisual = ({ ev }) => {
                 />
             </div>
 
-            {/* Node row with arrows */}
+            {/* Node row */}
             <div className="flex items-center rounded-xl border-2 border-slate-600 bg-slate-800/60 px-3 py-2.5">
-                {displayNodes.map((node, displayIdx) => {
-                    const allIdx = displayIdx + idxOffset;
-                    // Arrow from dummy before it's connected: show a spacer instead
-                    const isDummyGap = node.isDummy && !dummyConnected;
-                    return (
-                        <React.Fragment key={allIdx}>
+                {/* Dummy node — stays fixed, outside the sliding section */}
+                {hasDummy && dummyEntries.map(({ node, allIdx }) => (
+                    <motion.div
+                        key={allIdx}
+                        layout
+                        initial={!dummyConnected ? { scale: 0.3, opacity: 0 } : false}
+                        animate={!dummyConnected ? { scale: 1, opacity: 1 } : {}}
+                        transition={{ type: 'spring', stiffness: 280, damping: 18 }}
+                        className={`flex-shrink-0 rounded-full border-2 flex items-center justify-center text-sm font-bold transition-colors duration-300 ${getNodeStyle(node, allIdx, ev)}`}
+                        style={{ width: NODE_D, height: NODE_D }}
+                    >
+                        0
+                    </motion.div>
+                ))}
+
+                {/* Arrow from dummy + real nodes + null — all slide down at show_result */}
+                <motion.div
+                    className="flex items-center"
+                    animate={isShowResult ? { y: 60, opacity: 0 } : { y: 0, opacity: 1 }}
+                    transition={isShowResult
+                        ? { duration: 0.55, ease: 'easeIn' }
+                        : { duration: 0.2 }}
+                >
+                    {/* Arrow connecting dummy → head */}
+                    {hasDummy && (
+                        dummyConnected
+                            ? <Arrow color={isShowResult ? '#0d9488' : '#475569'} />
+                            : <div className="flex-shrink-0" style={{ width: ARROW_W }} />
+                    )}
+
+                    {/* Real nodes — AnimatePresence handles remove-step exit */}
+                    <AnimatePresence mode="popLayout" initial={false}>
+                        {realEntries.map(({ node, allIdx }, di) => (
                             <motion.div
+                                key={allIdx}
                                 layout
-                                initial={node.isDummy && !dummyConnected ? { scale: 0.3, opacity: 0 } : false}
-                                animate={node.isDummy && !dummyConnected ? { scale: 1, opacity: 1 } : {}}
-                                transition={{ type: 'spring', stiffness: 280, damping: 18 }}
-                                className={`flex-shrink-0 rounded-full border-2 flex items-center justify-center text-sm font-bold transition-colors duration-300 ${getNodeStyle(node, allIdx, ev)}`}
-                                style={{ width: NODE_D, height: NODE_D }}
+                                exit={{ scale: 0, opacity: 0 }}
+                                transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+                                className="flex items-center flex-shrink-0"
                             >
-                                {node.isDummy ? '0' : node.val}
+                                <motion.div
+                                    className={`flex-shrink-0 rounded-full border-2 flex items-center justify-center text-sm font-bold transition-colors duration-300 ${getNodeStyle(node, allIdx, ev)}`}
+                                    style={{ width: NODE_D, height: NODE_D }}
+                                >
+                                    {node.val}
+                                </motion.div>
+                                {di < realEntries.length - 1 && (
+                                    <Arrow color={getArrowColor(allIdx, ev)} />
+                                )}
                             </motion.div>
-                            {displayIdx < displayNodes.length - 1 && (
-                                isDummyGap
-                                    ? <div className="flex-shrink-0" style={{ width: ARROW_W }} />
-                                    : <Arrow color={getArrowColor(allIdx, ev)} />
-                            )}
-                        </React.Fragment>
-                    );
-                })}
-                {/* Null tail indicator */}
-                <Arrow color="#334155" />
-                <span className="text-slate-600 text-[11px] font-mono flex-shrink-0">null</span>
+                        ))}
+                    </AnimatePresence>
+
+                    {/* Null tail — blink at while_check false, teal at show_result */}
+                    {(() => {
+                        const blinkNull = ev?.type === 'while_check' &&
+                            fastIdx !== null && fastIdx === (allNodes?.length ?? 0) - 1;
+                        return (
+                            <>
+                                <Arrow color={isShowResult ? '#0d9488' : blinkNull ? '#0d9488' : '#334155'} />
+                                <motion.span
+                                    className="text-[11px] font-mono flex-shrink-0"
+                                    animate={blinkNull
+                                        ? { opacity: [1, 0.15, 1], color: ['#0d9488', '#0d9488', '#0d9488'] }
+                                        : isShowResult
+                                            ? { opacity: 1, color: '#0d9488' }
+                                            : { opacity: 1, color: '#475569' }}
+                                    transition={blinkNull
+                                        ? { repeat: Infinity, duration: 0.7, ease: 'easeInOut' }
+                                        : { duration: 0.3 }}
+                                >
+                                    null
+                                </motion.span>
+                            </>
+                        );
+                    })()}
+                </motion.div>
             </div>
 
-            {/* Label row: same offset as badge row */}
+            {/* Label row */}
             <div className="flex items-center" style={{ gap: 0, paddingLeft: 14 }}>
-                {displayNodes.map((node, displayIdx) => (
-                    <React.Fragment key={displayIdx}>
+                {displayEntries.map(({ node, allIdx }, displayIdx) => (
+                    <React.Fragment key={allIdx}>
                         <div
                             style={{ width: NODE_D }}
                             className="flex justify-center text-[9px] font-mono select-none text-slate-500"
                         >
                             {node.isDummy ? 'dummy' : ''}
                         </div>
-                        {displayIdx < displayNodes.length - 1 && <div style={{ width: ARROW_W }} />}
+                        {displayIdx < displayEntries.length - 1 && <div style={{ width: ARROW_W }} />}
                     </React.Fragment>
                 ))}
             </div>
@@ -348,7 +457,14 @@ const RemoveNthFromEndVisualizer = ({
             setDrawerState={setDrawerState}
             controls={controls}
         >
-            <div className="scale-90 md:scale-100 origin-center">
+            <div className="scale-90 md:scale-100 origin-center flex flex-col items-center">
+                {(currentEv?.type === 'for_loop' || currentEv?.type === 'adv_fast') && (
+                    <RangeStrip
+                        step={currentEv.forStep}
+                        total={currentEv.forTotal}
+                        isAdvancing={currentEv.type === 'adv_fast'}
+                    />
+                )}
                 <LinkedListVisual ev={currentEv} />
             </div>
             <AnnotationCard text={currentEv?.annotation} />
