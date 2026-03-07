@@ -339,15 +339,11 @@ const LinkedListVisual = ({ ev }) => {
                     </motion.div>
                 ))}
 
-                {/* Arrow from dummy + real nodes + null — all slide down at show_result */}
+                {/* Arrow from dummy + real nodes + null */}
                 <motion.div
                     className="flex items-center"
-                    animate={isShowResult ? { y: 60, opacity: 0 } : { y: 0, opacity: 1 }}
-                    transition={isShowResult
-                        ? { duration: 0.55, ease: 'easeIn' }
-                        : { duration: 0.2 }}
                 >
-                    {/* Arrow connecting dummy → head */}
+                    {/* Arrow connecting dummy → head — teal at show_result */}
                     {hasDummy && (
                         dummyConnected
                             ? <Arrow color={isShowResult ? '#0d9488' : '#475569'} />
@@ -365,31 +361,37 @@ const LinkedListVisual = ({ ev }) => {
                                 className="flex items-center flex-shrink-0"
                             >
                                 <motion.div
-                                    className={`flex-shrink-0 rounded-full border-2 flex items-center justify-center text-sm font-bold transition-colors duration-300 ${getNodeStyle(node, allIdx, ev)}`}
+                                    animate={isShowResult ? { scale: 1.08 } : { scale: 1 }}
+                                    transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                                    className={`flex-shrink-0 rounded-full border-2 flex items-center justify-center text-sm font-bold transition-colors duration-300 ${
+                                        isShowResult
+                                            ? 'bg-emerald-500/20 border-emerald-400 text-emerald-100 ring-2 ring-emerald-400/40'
+                                            : getNodeStyle(node, allIdx, ev)
+                                    }`}
                                     style={{ width: NODE_D, height: NODE_D }}
                                 >
                                     {node.val}
                                 </motion.div>
                                 {di < realEntries.length - 1 && (
-                                    <Arrow color={getArrowColor(allIdx, ev)} />
+                                    <Arrow color={isShowResult ? '#10b981' : getArrowColor(allIdx, ev)} />
                                 )}
                             </motion.div>
                         ))}
                     </AnimatePresence>
 
-                    {/* Null tail — blink at while_check false, teal at show_result */}
+                    {/* Null tail */}
                     {(() => {
                         const blinkNull = ev?.type === 'while_check' &&
                             fastIdx !== null && fastIdx === (allNodes?.length ?? 0) - 1;
                         return (
                             <>
-                                <Arrow color={isShowResult ? '#0d9488' : blinkNull ? '#0d9488' : '#334155'} />
+                                <Arrow color={isShowResult ? '#10b981' : blinkNull ? '#0d9488' : '#334155'} />
                                 <motion.span
                                     className="text-[11px] font-mono flex-shrink-0"
                                     animate={blinkNull
                                         ? { opacity: [1, 0.15, 1], color: ['#0d9488', '#0d9488', '#0d9488'] }
                                         : isShowResult
-                                            ? { opacity: 1, color: '#0d9488' }
+                                            ? { opacity: 1, color: '#10b981' }
                                             : { opacity: 1, color: '#475569' }}
                                     transition={blinkNull
                                         ? { repeat: Infinity, duration: 0.7, ease: 'easeInOut' }
@@ -418,6 +420,50 @@ const LinkedListVisual = ({ ev }) => {
                 ))}
             </div>
         </div>
+    );
+};
+
+// ── Result Box ────────────────────────────────────────────────────────────────
+const ResultBox = ({ ev }) => {
+    const show = ev?.type === 'show_result';
+    if (!ev?.allNodes) return null;
+    const resultNodes = ev.allNodes.filter((n, i) => i > 0 && i !== ev.removeIdx);
+    return (
+        <AnimatePresence>
+            {show && (
+                <motion.div
+                    initial={{ opacity: 0, y: 24 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 24 }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+                    className="mt-4 flex flex-col items-center gap-2"
+                >
+                    <span className="text-[10px] font-mono font-semibold tracking-widest text-emerald-400 uppercase">
+                        returned
+                    </span>
+                    <div className="flex items-center gap-0 rounded-xl border-2 border-emerald-500/60 bg-emerald-900/20 px-4 py-2.5 shadow-lg shadow-emerald-900/30">
+                        {resultNodes.map((node, i) => (
+                            <React.Fragment key={i}>
+                                <motion.div
+                                    initial={{ scale: 0.5, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{ type: 'spring', stiffness: 320, damping: 20, delay: i * 0.07 }}
+                                    className="flex-shrink-0 rounded-full border-2 border-emerald-400 bg-emerald-500/20 text-emerald-100 flex items-center justify-center text-sm font-bold"
+                                    style={{ width: NODE_D, height: NODE_D }}
+                                >
+                                    {node.val}
+                                </motion.div>
+                                {i < resultNodes.length - 1 && (
+                                    <Arrow color="#10b981" />
+                                )}
+                            </React.Fragment>
+                        ))}
+                        <Arrow color="#10b981" />
+                        <span className="text-[11px] font-mono text-emerald-400">null</span>
+                    </div>
+                </motion.div>
+            )}
+        </AnimatePresence>
     );
 };
 
@@ -466,6 +512,7 @@ const RemoveNthFromEndVisualizer = ({
                     />
                 )}
                 <LinkedListVisual ev={currentEv} />
+                <ResultBox ev={currentEv} />
             </div>
             <AnnotationCard text={currentEv?.annotation} />
         </SyncedVisualizerShell>

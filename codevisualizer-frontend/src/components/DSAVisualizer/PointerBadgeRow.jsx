@@ -65,21 +65,26 @@ const PointerBadgeRow = ({
     // ── Collision detection ─────────────────────────────────────────────────
     const ijSame     = iRel !== null && jRel !== null && iRel === jRel;
     const jj1Same    = jRel !== null && j1Rel !== null && jRel === j1Rel;
+    const ij1Same    = iRel !== null && j1Rel !== null && iRel === j1Rel;  // L ≡ M
+    const jj2Same    = jRel !== null && j2Rel !== null && jRel === j2Rel;  // R ≡ M+1
     const labelHitsJ = hasLabel && jRel !== null && extraLabel.rel === jRel;
     const labelHitsI = hasLabel && iRel !== null && extraLabel.rel === iRel;
 
     // ── Badge sizes ─────────────────────────────────────────────────────────
-    const iSize  = (ijSame || labelHitsI) ? BADGE_SM : BADGE;
-    const jSize  = (ijSame || labelHitsJ || jj1Same) ? BADGE_SM : BADGE;
-    const j1Size = jj1Same ? BADGE_SM : BADGE;
+    const iSize  = (ijSame || labelHitsI || ij1Same) ? BADGE_SM : BADGE;
+    const jSize  = (ijSame || labelHitsJ || jj1Same || jj2Same) ? BADGE_SM : BADGE;
+    const j1Size = (jj1Same || ij1Same) ? BADGE_SM : BADGE;
+    const j2Size = jj2Same ? BADGE_SM : BADGE;
 
     // ── Badge x positions ───────────────────────────────────────────────────
     let iX = iRel !== null
         ? ijSame
-            ? centerX(iRel) - BADGE_SM - PAIR_GAP / 2           // i on left when sharing
-            : labelHitsI
-                ? centerX(iRel) - (BADGE_SM + PAIR_GAP + LABEL_SM) / 2
-                : centerX(iRel) - BADGE / 2                      // normal centre
+            ? centerX(iRel) - BADGE_SM - PAIR_GAP / 2           // i on left when sharing with j
+            : ij1Same
+                ? centerX(iRel) - BADGE_SM - PAIR_GAP / 2       // i on left when sharing with j1 (M)
+                : labelHitsI
+                    ? centerX(iRel) - (BADGE_SM + PAIR_GAP + LABEL_SM) / 2
+                    : centerX(iRel) - BADGE / 2                  // normal centre
         : null;
 
     let jX = jRel === -1
@@ -89,9 +94,11 @@ const PointerBadgeRow = ({
                 ? centerX(jRel) + PAIR_GAP / 2                  // j on right when sharing with i
                 : jj1Same
                     ? centerX(jRel) + PAIR_GAP / 2              // j (R) on right when sharing with j1 (M)
-                    : labelHitsJ
-                        ? centerX(jRel) + (LABEL_SM + PAIR_GAP) / 2
-                        : centerX(jRel) - BADGE / 2              // normal centre
+                    : jj2Same
+                        ? centerX(jRel) + PAIR_GAP / 2          // j (R) on right when sharing with j2 (M+1)
+                        : labelHitsJ
+                            ? centerX(jRel) + (LABEL_SM + PAIR_GAP) / 2
+                            : centerX(jRel) - BADGE / 2          // normal centre
             : null;
 
     // ── Extra label position ────────────────────────────────────────────────
@@ -127,12 +134,21 @@ const PointerBadgeRow = ({
 
     // ── j+1 and j+2 badge x positions ────────────────────────────────────────
     // j1 (M) sits LEFT of j (R) when they share a cell
+    // j1 (M) sits RIGHT of i (L) when they share a cell
     const j1X = j1Rel !== null
         ? jj1Same
             ? centerX(j1Rel) - BADGE_SM - PAIR_GAP / 2
-            : centerX(j1Rel) - BADGE / 2
+            : ij1Same
+                ? centerX(j1Rel) + PAIR_GAP / 2                 // M on right when sharing with L
+                : centerX(j1Rel) - BADGE / 2
         : null;
-    const j2X = j2Rel !== null ? centerX(j2Rel) - BADGE / 2 : null;
+    // j2 (M+1) pill is 28px wide — centre it, or shift left of j (R) when sharing
+    const J2_W = 28;
+    const j2X = j2Rel !== null
+        ? jj2Same
+            ? centerX(j2Rel) - BADGE_SM - PAIR_GAP / 2 - (J2_W - BADGE_SM) / 2  // M+1 left of R, pill-centred
+            : centerX(j2Rel) - J2_W / 2                                           // normal centre
+        : null;
 
     return (
         <div style={{ position: 'relative', width: rowW, height: BADGE + 2, flexShrink: 0 }}>
@@ -202,14 +218,16 @@ const PointerBadgeRow = ({
                 </motion.div>
             )}
 
-            {/* j+2 / fourth badge (e.g. mid+1 in Find Peak Element) */}
+            {/* j+2 / fourth badge (e.g. mid+1 in Find Peak Element) — pill shape to fit "M+1" */}
             {j2X !== null && (
                 <motion.div
-                    className={`rounded-full text-slate-900 flex items-center justify-center font-bold ${j2Class}`}
+                    className={`text-slate-900 flex items-center justify-center font-bold ${j2Class}`}
                     style={{
                         position: 'absolute', bottom: 0, left: 0,
-                        width: BADGE, height: BADGE,
-                        fontSize: 8,
+                        width: 28, height: j2Size,
+                        borderRadius: 8,
+                        fontSize: 9,
+                        paddingLeft: 1, paddingRight: 1,
                     }}
                     initial={{ x: j2X }}
                     animate={{ x: j2X, opacity: 1 }}
