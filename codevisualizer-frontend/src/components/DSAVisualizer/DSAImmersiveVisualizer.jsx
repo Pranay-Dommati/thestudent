@@ -22,6 +22,7 @@ import BinarySearchVisualizer from './BinarySearchVisualizer';
 import FindPeakElementVisualizer from './FindPeakElementVisualizer';
 import RemoveNthFromEndVisualizer from './RemoveNthFromEndVisualizer';
 import LinkedListCycleVisualizer from './LinkedListCycleVisualizer';
+import MiddleOfLinkedListVisualizer from './MiddleOfLinkedListVisualizer';
 import FirstLastPositionVisualizer from './FirstLastPositionVisualizer';
 import SearchRotatedArrayVisualizer from './SearchRotatedArrayVisualizer';
 import FibonacciVisualizer from './FibonacciVisualizer';
@@ -258,6 +259,7 @@ const DSAImmersiveVisualizer = ({
                              : algorithmType === 'find-peak-element' ? 'Find Peak Element'
                              : algorithmType === 'remove-nth-from-end' ? 'Remove Nth From End'
                              : algorithmType === 'linked-list-cycle' ? 'Linked List Cycle'
+                             : algorithmType === 'middle-of-linked-list' ? 'Middle of Linked List'
                              : algorithmType === 'first-last-position' ? 'First/Last Position'
                              : algorithmType === 'search-rotated-array' ? 'Search Rotated Array'
                              : algorithmType === 'fibonacci' ? 'Fibonacci Tree'
@@ -454,6 +456,8 @@ const DSAImmersiveVisualizer = ({
                         <RemoveNthFromEndVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'linked-list-cycle' ? (
                         <LinkedListCycleVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
+                    ) : algorithmType === 'middle-of-linked-list' ? (
+                        <MiddleOfLinkedListVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'first-last-position' ? (
                         <FirstLastPositionVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'search-rotated-array' ? (

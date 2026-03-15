@@ -227,7 +227,7 @@ const PATTERNS = [
         problems: [
             { id: 19, name: 'Remove Nth From End',    slug: 'remove-nth-from-end',    difficulty: 'Medium', available: true  },
             { id: 20, name: 'Linked List Cycle',      slug: 'linked-list-cycle',       difficulty: 'Easy',   available: true  },
-            { id: 21, name: 'Middle of Linked List',  slug: 'middle-of-linked-list',   difficulty: 'Easy',   available: false },
+            { id: 21, name: 'Middle of Linked List',  slug: 'middle-of-linked-list',   difficulty: 'Easy',   available: true  },
         ],
     },
 ];

@@ -25,7 +25,7 @@ const dsaProblems = [
     { id: 18, name: "Char Replacement",     slug: "char-replacement",          difficulty: "Medium", category: "Sliding Window",  available: true  },
     { id: 19, name: "Remove Nth From End",  slug: "remove-nth-from-end",       difficulty: "Medium", category: "Slow & Fast Pointer", available: true  },
     { id: 20, name: "Linked List Cycle",    slug: "linked-list-cycle",         difficulty: "Easy",   category: "Slow & Fast Pointer", available: true  },
-    { id: 21, name: "Middle of List",       slug: "middle-of-linked-list",     difficulty: "Easy",   category: "Slow & Fast Pointer", available: false },
+    { id: 21, name: "Middle of Linked List",slug: "middle-of-linked-list",     difficulty: "Easy",   category: "Slow & Fast Pointer", available: true  },
 ];
 
 const DSASheetsPanel = ({ isOpen, onClose }) => {

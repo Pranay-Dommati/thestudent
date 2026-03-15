@@ -454,6 +454,36 @@ ${llComment}
 #         self.val = val
 #         self.next = next`;
     },
+    'middle-of-linked-list': (inputStr) => {
+        const arrPart = (inputStr || '').trim() || '[1, 2, 3, 4, 5]';
+        let llComment = '# LL = [1 -> 2 -> 3 -> 4 -> 5]';
+        try {
+            const vals = JSON.parse(arrPart);
+            if (Array.isArray(vals) && vals.length > 0) {
+                llComment = `# LL = [${vals.join(' -> ')}]`;
+            }
+        } catch {
+            // Keep default linked-list comment when parsing fails.
+        }
+        return `def middle_node(head):
+    slow = head
+    fast = head
+
+    # move slow by 1 and fast by 2
+    while fast and fast.next:
+        slow = slow.next
+        fast = fast.next.next
+
+    # slow will be at the middle node
+    return slow
+
+${llComment}
+
+# class ListNode:
+#     def __init__(self, val=0, next=None):
+#         self.val = val
+#         self.next = next`;
+    },
 };
 // Default array for each problem
 const DEFAULT_ARRAYS = {
@@ -467,6 +497,7 @@ const DEFAULT_ARRAYS = {
     'find-peak-element':     '[1, 3, 5, 7, 6, 4, 2]',
     'remove-nth-from-end':   '[1, 2, 3, 4, 5],2',
     'linked-list-cycle':     '[1, 2, 3, 4, 5],2',
+    'middle-of-linked-list': '[1, 2, 3, 4, 5]',
     'first-last-position':   '[2, 4, 4, 4, 6, 8, 10],4',
     'search-rotated-array':  '[4, 5, 6, 7, 0, 1, 2],0',
     'fibonacci':             '5',
@@ -685,14 +716,30 @@ const problemsData = {
             "Cycle Detection",
             "Constant Extra Space"
         ]
-    },};
+    },
+    'middle-of-linked-list': {
+        id: 21,
+        name: "Middle of Linked List",
+        difficulty: "Easy",
+        category: "Slow & Fast Pointer",
+        timeComplexity: "O(n)",
+        spaceComplexity: "O(1)",
+        description: "Given the head of a singly linked list, return the middle node. Slow moves one step while fast moves two; when fast reaches the end, slow is at the middle. For even length, the second middle is returned.",
+        concepts: [
+            "Slow & Fast Pointer Technique",
+            "Single Pass Linked List Traversal",
+            "Middle Node Detection",
+            "Constant Extra Space"
+        ]
+    },
+};
 
 // Problems whose visualizers are fully self-contained (no backend trace needed)
 const SELF_CONTAINED_VISUALIZERS = new Set([
     'bubble-sort', 'selection-sort', 'insertion-sort', 'merge-sort', 'quick-sort',
     'binary-search', 'find-peak-element', 'char-replacement',
     'remove-nth-from-end', 'first-last-position', 'search-rotated-array',
-    'linked-list-cycle',
+    'linked-list-cycle', 'middle-of-linked-list',
     'fibonacci', 'factorial', 'subsets',
 ]);
 
@@ -711,6 +758,7 @@ const DSAProblemPage = () => {
         if (problemName === 'char-replacement') return 'AABABBAC';
         if (problemName === 'remove-nth-from-end') return '[1, 2, 3, 4, 5]';
         if (problemName === 'linked-list-cycle') return '[1, 2, 3, 4, 5]';
+        if (problemName === 'middle-of-linked-list') return '[1, 2, 3, 4, 5]';
         if (problemName === 'fibonacci') return '5';
         if (problemName === 'factorial') return '5';
         if (problemName === 'subsets') return '[1, 2, 3]';
