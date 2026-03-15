@@ -13,8 +13,9 @@
 
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useVisualizerPlayback, makeGetDelay } from './visualizerShared';
+import { useVisualizerPlayback, makeGetDelay, TreeAnnotationStrip } from './visualizerShared';
 import { useTreeCanvas } from './useTreeCanvas';
+import TreeCanvas from './TreeCanvas';
 import SyncedVisualizerShell from './SyncedVisualizerShell';
 import VisualizerControls from './VisualizerControls';
 
@@ -289,23 +290,7 @@ const SubsetsVisualizer = ({
             controls={controls}
             scrollClass="flex-1 flex flex-col overflow-hidden"
         >
-            {/* Annotation strip — fixed height */}
-            <div className="flex-shrink-0 h-10 flex items-center justify-center px-4">
-                <AnimatePresence mode="wait">
-                    {annotation && (
-                        <motion.div
-                            key={annotation}
-                            initial={{ opacity: 0, y: -6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 4 }}
-                            transition={{ duration: 0.16 }}
-                            className="px-4 py-1.5 rounded-xl border border-amber-600/50 bg-amber-900/40 text-amber-200 text-xs font-medium whitespace-nowrap max-w-full overflow-hidden text-ellipsis"
-                        >
-                            {annotation}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
+            <TreeAnnotationStrip annotation={annotation} />
 
             {/* Result chips — grows as subsets are stored */}
             {storedSoFar.length > 0 && (
@@ -327,63 +312,34 @@ const SubsetsVisualizer = ({
                 </div>
             )}
 
-            {/* Scrollable tree canvas */}
-            <div ref={scrollRef} className="flex-1 overflow-auto">
-                <div
-                    style={{
-                        transform: `scale(${canvasZoom})`,
-                        transformOrigin: 'top center',
-                        width: canvasW,
-                        height: canvasH,
-                        position: 'relative',
-                    }}
-                >
-                    {/* SVG layer: edges + element labels */}
-                    <svg
-                        style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}
-                        width={canvasW}
-                        height={canvasH}
-                    >
-                        {/* Edge lines */}
-                        <AnimatePresence>
-                            {edgeList.map(e => (
-                                <motion.line
-                                    key={e.key}
-                                    x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
-                                    stroke={e.done ? '#10b981' : '#6366f1'}
-                                    strokeWidth={1.8}
-                                    initial={{ pathLength: 0, opacity: 0 }}
-                                    animate={{ pathLength: 1, opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.25, ease: 'easeOut' }}
-                                />
-                            ))}
-                        </AnimatePresence>
-
-                        {/* Edge element labels */}
-                        <AnimatePresence>
-                            {edgeList.map(e => (
-                                <motion.text
-                                    key={`lbl-${e.key}`}
-                                    x={e.mx + 5}
-                                    y={e.my + 4}
-                                    fill={e.done ? '#6ee7b7' : '#a5b4fc'}
-                                    fontSize="10"
-                                    fontFamily="monospace"
-                                    fontWeight="600"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.2, delay: 0.15 }}
-                                >
-                                    +{e.element}
-                                </motion.text>
-                            ))}
-                        </AnimatePresence>
-                    </svg>
-
-                    {/* HTML layer: animated pill nodes */}
+            <TreeCanvas
+                scrollRef={scrollRef}
+                canvasW={canvasW} canvasH={canvasH} canvasZoom={canvasZoom}
+                edgeList={edgeList}
+                svgExtras={
                     <AnimatePresence>
+                        {edgeList.map(e => (
+                            <motion.text
+                                key={`lbl-${e.key}`}
+                                x={e.mx + 5}
+                                y={e.my + 4}
+                                fill={e.done ? '#6ee7b7' : '#a5b4fc'}
+                                fontSize="10"
+                                fontFamily="monospace"
+                                fontWeight="600"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2, delay: 0.15 }}
+                            >
+                                +{e.element}
+                            </motion.text>
+                        ))}
+                    </AnimatePresence>
+                }
+            >
+                {/* HTML layer: animated pill nodes */}
+                <AnimatePresence>
                         {[...visibleIds].map(id => {
                             const node     = nodeMap[id];
                             const state    = nodeStates[id] ?? 'active';
@@ -424,9 +380,8 @@ const SubsetsVisualizer = ({
                                 </motion.div>
                             );
                         })}
-                    </AnimatePresence>
-                </div>
-            </div>
+                </AnimatePresence>
+            </TreeCanvas>
         </SyncedVisualizerShell>
     );
 };

@@ -48,6 +48,7 @@ const PointerBadgeRow = ({
     j2Class    = 'bg-amber-400',
     iLabel     = 'i',
     jLabel     = 'j',
+    hideJ      = false,
     j1Label    = 'j+1',
     j2Label    = 'M+1',
     blink      = false,
@@ -185,7 +186,7 @@ const PointerBadgeRow = ({
             )}
 
             {/* j badge */}
-            {jX !== null && (
+            {jX !== null && !hideJ && (
                 <motion.div
                     className={`rounded-full text-white flex items-center justify-center font-bold ${jClass}`}
                     style={{

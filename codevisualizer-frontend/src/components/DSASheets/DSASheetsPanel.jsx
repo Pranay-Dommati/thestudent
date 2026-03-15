@@ -24,7 +24,7 @@ const dsaProblems = [
     { id: 17, name: "Largest Rectangle",    slug: "largest-rectangle-histogram",difficulty:"Hard",   category: "Stack",           available: false },
     { id: 18, name: "Char Replacement",     slug: "char-replacement",          difficulty: "Medium", category: "Sliding Window",  available: true  },
     { id: 19, name: "Remove Nth From End",  slug: "remove-nth-from-end",       difficulty: "Medium", category: "Slow & Fast Pointer", available: true  },
-    { id: 20, name: "Linked List Cycle",    slug: "linked-list-cycle",         difficulty: "Easy",   category: "Slow & Fast Pointer", available: false },
+    { id: 20, name: "Linked List Cycle",    slug: "linked-list-cycle",         difficulty: "Easy",   category: "Slow & Fast Pointer", available: true  },
     { id: 21, name: "Middle of List",       slug: "middle-of-linked-list",     difficulty: "Easy",   category: "Slow & Fast Pointer", available: false },
 ];
 

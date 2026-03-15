@@ -21,6 +21,7 @@ import CharReplacementVisualizer from './CharReplacementVisualizer';
 import BinarySearchVisualizer from './BinarySearchVisualizer';
 import FindPeakElementVisualizer from './FindPeakElementVisualizer';
 import RemoveNthFromEndVisualizer from './RemoveNthFromEndVisualizer';
+import LinkedListCycleVisualizer from './LinkedListCycleVisualizer';
 import FirstLastPositionVisualizer from './FirstLastPositionVisualizer';
 import SearchRotatedArrayVisualizer from './SearchRotatedArrayVisualizer';
 import FibonacciVisualizer from './FibonacciVisualizer';
@@ -87,7 +88,7 @@ const DSAImmersiveVisualizer = ({
             const i = (customArray || '').indexOf(',');
             return i >= 0 ? (customArray || '').slice(i + 1).trim() : '';
         }
-        if (algorithmType === 'remove-nth-from-end') {
+        if (algorithmType === 'remove-nth-from-end' || algorithmType === 'linked-list-cycle') {
             const i = (customArray || '').lastIndexOf(',');
             return i >= 0 ? (customArray || '').slice(i + 1).trim() : '';
         }
@@ -106,7 +107,7 @@ const DSAImmersiveVisualizer = ({
         } else if (algorithmType === 'char-replacement') {
             const i = (customArray || '').indexOf(',');
             setLocalSecondInput(i >= 0 ? (customArray || '').slice(i + 1).trim() : '');
-        } else if (algorithmType === 'remove-nth-from-end') {
+        } else if (algorithmType === 'remove-nth-from-end' || algorithmType === 'linked-list-cycle') {
             const i = (customArray || '').lastIndexOf(',');
             setLocalSecondInput(i >= 0 ? (customArray || '').slice(i + 1).trim() : '');
         }
@@ -157,14 +158,14 @@ const DSAImmersiveVisualizer = ({
             if (!/^-?\d+$/.test(tgtPart)) return 'Target must be a number';
             return '';
         }
-        if (algorithmType === 'remove-nth-from-end') {
+        if (algorithmType === 'remove-nth-from-end' || algorithmType === 'linked-list-cycle') {
             const trimmed = input.trim();
             const commaIdx = trimmed.lastIndexOf(',');
-            if (commaIdx < 0) return 'Format: [arr],n';
+            if (commaIdx < 0) return 'Format: [arr],pos';
             const arrPart = trimmed.slice(0, commaIdx).trim();
-            const nPart   = trimmed.slice(commaIdx + 1).trim();
+            const posPart = trimmed.slice(commaIdx + 1).trim();
             if (!arrPart.startsWith('[') || !arrPart.endsWith(']')) return 'Array must be in []';
-            if (!/^\d+$/.test(nPart) || parseInt(nPart, 10) < 1) return 'n must be a positive integer';
+            if (!/^-?\d+$/.test(posPart)) return 'pos must be -1 or a valid index';
             return '';
         }
         const trimmed = input.trim();
@@ -195,7 +196,7 @@ const DSAImmersiveVisualizer = ({
     // Mobile split-field handlers — rebuild combined string from parts
     const handleMobileFirstChange = (e) => {
         const first = e.target.value;
-        const isMulti = algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array' || algorithmType === 'char-replacement' || algorithmType === 'remove-nth-from-end';
+        const isMulti = algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array' || algorithmType === 'char-replacement' || algorithmType === 'remove-nth-from-end' || algorithmType === 'linked-list-cycle';
         const combined = isMulti ? `${first},${localSecondInput}` : first;
         setLocalArrayInput(combined);
         setInputError(validateInput(combined));
@@ -204,7 +205,7 @@ const DSAImmersiveVisualizer = ({
     const handleMobileSecondChange = (e) => {
         const second = e.target.value;
         setLocalSecondInput(second);
-        const sepIdx = (algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array' || algorithmType === 'remove-nth-from-end')
+        const sepIdx = (algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array' || algorithmType === 'remove-nth-from-end' || algorithmType === 'linked-list-cycle')
             ? localArrayInput.lastIndexOf(',')
             : localArrayInput.indexOf(',');
         const firstPart = sepIdx >= 0 ? localArrayInput.slice(0, sepIdx) : localArrayInput;
@@ -256,6 +257,7 @@ const DSAImmersiveVisualizer = ({
                              : algorithmType === 'binary-search' ? 'Binary Search'
                              : algorithmType === 'find-peak-element' ? 'Find Peak Element'
                              : algorithmType === 'remove-nth-from-end' ? 'Remove Nth From End'
+                             : algorithmType === 'linked-list-cycle' ? 'Linked List Cycle'
                              : algorithmType === 'first-last-position' ? 'First/Last Position'
                              : algorithmType === 'search-rotated-array' ? 'Search Rotated Array'
                              : algorithmType === 'fibonacci' ? 'Fibonacci Tree'
@@ -304,14 +306,14 @@ const DSAImmersiveVisualizer = ({
                     {showInputPanel ? (
                         <div className="hidden md:flex items-center gap-2 bg-white/5 border border-white/15 rounded-xl px-3 py-1.5 shadow-lg backdrop-blur-sm">
                             <span className="text-white/40 text-xs font-mono">
-                                {algorithmType === 'char-replacement' ? 's, k =' : (algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array') ? 'arr, target =' : algorithmType === 'remove-nth-from-end' ? 'arr, n =' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? 'n =' : 'arr ='}
+                                {algorithmType === 'char-replacement' ? 's, k =' : (algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array') ? 'arr, target =' : algorithmType === 'remove-nth-from-end' ? 'arr, n =' : algorithmType === 'linked-list-cycle' ? 'arr, pos =' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? 'n =' : 'arr ='}
                             </span>
                             <input
                                 type="text"
                                 value={localArrayInput}
                                 onChange={handleInputChange}
                                 className={`w-44 px-2 py-1 bg-black/30 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/60' : 'border-white/20 focus:border-indigo-400'}`}
-                                placeholder={algorithmType === 'char-replacement' ? 'AABCBA,2' : algorithmType === 'binary-search' ? '[3,12,25,31,42],31' : algorithmType === 'first-last-position' ? '[2,4,4,4,6,8,10],4' : algorithmType === 'search-rotated-array' ? '[4,5,6,7,0,1,2],0' : algorithmType === 'remove-nth-from-end' ? '[1,2,3,4,5],2' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? '5' : '[1, 2, 3]'}
+                                placeholder={algorithmType === 'char-replacement' ? 'AABCBA,2' : algorithmType === 'binary-search' ? '[3,12,25,31,42],31' : algorithmType === 'first-last-position' ? '[2,4,4,4,6,8,10],4' : algorithmType === 'search-rotated-array' ? '[4,5,6,7,0,1,2],0' : algorithmType === 'remove-nth-from-end' ? '[1,2,3,4,5],2' : algorithmType === 'linked-list-cycle' ? '[1,2,3,4,5],2' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? '5' : '[1, 2, 3]'}
                             />
                             {inputError && (
                                 <span className="text-red-400 text-xs">{inputError}</span>
@@ -371,7 +373,7 @@ const DSAImmersiveVisualizer = ({
                         <input
                             type="text"
                             value={(() => {
-                                if (algorithmType === 'binary-search' || algorithmType === 'remove-nth-from-end') {
+                                if (algorithmType === 'binary-search' || algorithmType === 'remove-nth-from-end' || algorithmType === 'linked-list-cycle') {
                                     const i = localArrayInput.lastIndexOf(',');
                                     return i >= 0 ? localArrayInput.slice(0, i) : localArrayInput;
                                 }
@@ -387,17 +389,17 @@ const DSAImmersiveVisualizer = ({
                         />
                     </div>
                     {/* Field 2: target / k / n — only for multi-param algorithms */}
-                    {(algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array' || algorithmType === 'char-replacement' || algorithmType === 'remove-nth-from-end') && (
+                    {(algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array' || algorithmType === 'char-replacement' || algorithmType === 'remove-nth-from-end' || algorithmType === 'linked-list-cycle') && (
                         <div className="flex flex-col gap-1">
                             <span className="text-white/50 text-xs font-mono">
-                                {algorithmType === 'char-replacement' ? 'k =' : algorithmType === 'remove-nth-from-end' ? 'n =' : 'target ='}
+                                {algorithmType === 'char-replacement' ? 'k =' : algorithmType === 'remove-nth-from-end' ? 'n =' : algorithmType === 'linked-list-cycle' ? 'pos =' : 'target ='}
                             </span>
                             <input
                                 type="text"
                                 value={localSecondInput}
                                 onChange={handleMobileSecondChange}
                                 className={`w-full px-2.5 py-1.5 bg-black/30 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/60' : 'border-white/20 focus:border-indigo-400'}`}
-                                placeholder={algorithmType === 'char-replacement' ? '2' : algorithmType === 'remove-nth-from-end' ? '2' : algorithmType === 'first-last-position' ? '4' : algorithmType === 'search-rotated-array' ? '0' : '31'}
+                                placeholder={algorithmType === 'char-replacement' ? '2' : algorithmType === 'remove-nth-from-end' ? '2' : algorithmType === 'linked-list-cycle' ? '2' : algorithmType === 'first-last-position' ? '4' : algorithmType === 'search-rotated-array' ? '0' : '31'}
                             />
                         </div>
                     )}
@@ -450,6 +452,8 @@ const DSAImmersiveVisualizer = ({
                         <FindPeakElementVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'remove-nth-from-end' ? (
                         <RemoveNthFromEndVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
+                    ) : algorithmType === 'linked-list-cycle' ? (
+                        <LinkedListCycleVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'first-last-position' ? (
                         <FirstLastPositionVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'search-rotated-array' ? (

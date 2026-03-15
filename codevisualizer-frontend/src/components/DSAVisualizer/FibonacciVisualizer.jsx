@@ -12,8 +12,9 @@
 
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useVisualizerPlayback, makeGetDelay } from './visualizerShared';
+import { useVisualizerPlayback, makeGetDelay, TreeAnnotationStrip } from './visualizerShared';
 import { useTreeCanvas } from './useTreeCanvas';
+import TreeCanvas from './TreeCanvas';
 import SyncedVisualizerShell from './SyncedVisualizerShell';
 import VisualizerControls from './VisualizerControls';
 
@@ -60,6 +61,15 @@ const simulateFib = (n) => {
     };
     computeSubW(root);
 
+    // Phase 2b: equalize only the root's two direct children so the top-level
+    // split is visually symmetric, without cascading and blowing up the canvas.
+    if (!root.isBase && root.left && root.right) {
+        const maxW = Math.max(root.left._subW, root.right._subW);
+        root.left._subW  = maxW;
+        root.right._subW = maxW;
+        root._subW = maxW * 2;
+    }
+
     const assignPos = (node, cx) => {
         if (!node) return;
         node.x = cx + SIDE_PAD;
@@ -73,8 +83,8 @@ const simulateFib = (n) => {
 
     // Phase 3: DFS event generation (mirrors code execution order)
     const events = [];
-    events.push({ type: 'n_assign',   codeLine: 10, annotation: `n = ${n}  — assign input` });
-    events.push({ type: 'print_call', codeLine: 11, annotation: `print(fibonacci(${n}))  — start computation` });
+    events.push({ type: 'n_assign',   codeLine: 14, annotation: `n = ${n}  — assign input` });
+    events.push({ type: 'print_call', codeLine: 15, annotation: `print(fibonacci(${n}))  — start computation` });
 
     const dfs = (node) => {
         events.push({
@@ -104,13 +114,13 @@ const simulateFib = (n) => {
             return 1;
         }
         events.push({
-            type: 'recurse_left', nodeId: node.id, codeLine: 8, scrollY: node.y,
+            type: 'recurse_left', nodeId: node.id, codeLine: 9, scrollY: node.y,
             annotation: `call fibonacci(${node.n - 1})  — recurse left branch`,
         });
         const lr = dfs(node.left);
 
         events.push({
-            type: 'recurse_right', nodeId: node.id, codeLine: 8, scrollY: node.y,
+            type: 'recurse_right', nodeId: node.id, codeLine: 10, scrollY: node.y,
             annotation: `call fibonacci(${node.n - 2})  — recurse right branch`,
         });
         const rr = dfs(node.right);
@@ -118,7 +128,7 @@ const simulateFib = (n) => {
         const res = lr + rr;
         node.result = res;
         events.push({
-            type: 'combine', nodeId: node.id, codeLine: 8, scrollY: node.y, result: res,
+            type: 'combine', nodeId: node.id, codeLine: 12, scrollY: node.y, result: res,
             annotation: `${lr} + ${rr} = ${res}  — return combined result`,
         });
         return res;
@@ -126,7 +136,7 @@ const simulateFib = (n) => {
 
     const finalResult = dfs(root);
     events.push({
-        type: 'done', codeLine: 11, result: finalResult,
+        type: 'done', codeLine: 15, result: finalResult,
         annotation: `fibonacci(${n}) = ${finalResult}  ✓  complete!`,
     });
 
@@ -249,6 +259,22 @@ const FibonacciVisualizer = ({
         return list;
     }, [allNodes, visibleIds, nodeMap, edgeStates]);
 
+    // ── Call / Return edge pulse animation ─────────────────────────────────────
+    // On 'call' → bright indigo line draws DOWN (parent → child) — forward call
+    // On return events → bright emerald line draws UP (child → parent) — backtrack
+    const edgeAnim = useMemo(() => {
+        if (!currentEv?.nodeId) return null;
+        const node = nodeMap[currentEv.nodeId];
+        if (!node?.parentId) return null;
+        const edge = edgeList.find(e => e.key === `${node.parentId}->${currentEv.nodeId}`);
+        if (!edge) return null;
+        if (currentEv.type === 'call')
+            return { ...edge, dir: 'call' };
+        if (['return_zero', 'return_one', 'combine'].includes(currentEv.type))
+            return { ...edge, dir: 'return' };
+        return null;
+    }, [currentEv, nodeMap, edgeList]);
+
     const annotation = currentEv?.annotation ?? null;
     const activeId   = currentEv?.nodeId ?? null;
 
@@ -271,59 +297,33 @@ const FibonacciVisualizer = ({
             controls={controls}
             scrollClass="flex-1 flex flex-col overflow-hidden"
         >
-            {/* Annotation strip — fixed height, does not scroll */}
-            <div className="flex-shrink-0 h-10 flex items-center justify-center px-4">
-                <AnimatePresence mode="wait">
-                    {annotation && (
-                        <motion.div
-                            key={annotation}
-                            initial={{ opacity: 0, y: -6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 4 }}
-                            transition={{ duration: 0.16 }}
-                            className="px-4 py-1.5 rounded-xl border border-amber-600/50 bg-amber-900/40 text-amber-200 text-xs font-medium whitespace-nowrap max-w-full overflow-hidden text-ellipsis"
-                        >
-                            {annotation}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
+            <TreeAnnotationStrip annotation={annotation} />
 
-            {/* Scrollable tree canvas */}
-            <div ref={scrollRef} className="flex-1 overflow-auto">
-                <div
-                    style={{
-                        transform: `scale(${canvasZoom})`,
-                        transformOrigin: 'top center',
-                        width: canvasW,
-                        height: canvasH,
-                        position: 'relative',
-                    }}
-                >
-                    {/* SVG layer: animated edges */}
-                    <svg
-                        style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}
-                        width={canvasW}
-                        height={canvasH}
-                    >
-                        <AnimatePresence>
-                            {edgeList.map(e => (
-                                <motion.line
-                                    key={e.key}
-                                    x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
-                                    stroke={e.done ? '#10b981' : '#6366f1'}
-                                    strokeWidth={1.8}
-                                    initial={{ pathLength: 0, opacity: 0 }}
-                                    animate={{ pathLength: 1, opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.3, ease: 'easeOut' }}
-                                />
-                            ))}
-                        </AnimatePresence>
-                    </svg>
-
-                    {/* HTML layer: animated circle nodes */}
-                    <AnimatePresence>
+            <TreeCanvas
+                scrollRef={scrollRef}
+                canvasW={canvasW} canvasH={canvasH} canvasZoom={canvasZoom}
+                edgeList={edgeList}
+                centered
+                svgExtras={
+                    edgeAnim && (
+                        <motion.path
+                            key={`edgeanim-${eventIdx}`}
+                            d={edgeAnim.dir === 'return'
+                                ? `M ${edgeAnim.x2},${edgeAnim.y2} L ${edgeAnim.x1},${edgeAnim.y1}`
+                                : `M ${edgeAnim.x1},${edgeAnim.y1} L ${edgeAnim.x2},${edgeAnim.y2}`}
+                            stroke={edgeAnim.dir === 'return' ? '#34d399' : '#818cf8'}
+                            strokeWidth={3}
+                            fill="none"
+                            strokeLinecap="round"
+                            initial={{ pathLength: 0, opacity: 1 }}
+                            animate={{ pathLength: 1, opacity: 0 }}
+                            transition={{ duration: edgeAnim.dir === 'return' ? 0.5 : 0.3, ease: 'easeOut' }}
+                        />
+                    )
+                }
+            >
+                {/* HTML layer: animated circle nodes */}
+                <AnimatePresence>
                         {[...visibleIds].map(id => {
                             const node    = nodeMap[id];
                             const state   = nodeStates[id] ?? 'active';
@@ -364,9 +364,8 @@ const FibonacciVisualizer = ({
                                 </motion.div>
                             );
                         })}
-                    </AnimatePresence>
-                </div>
-            </div>
+                </AnimatePresence>
+            </TreeCanvas>
         </SyncedVisualizerShell>
     );
 };

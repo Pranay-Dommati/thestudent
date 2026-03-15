@@ -7,6 +7,7 @@ export { default as CharReplacementVisualizer } from './CharReplacementVisualize
 export { default as BinarySearchVisualizer } from './BinarySearchVisualizer';
 export { default as FindPeakElementVisualizer } from './FindPeakElementVisualizer';
 export { default as RemoveNthFromEndVisualizer } from './RemoveNthFromEndVisualizer';
+export { default as LinkedListCycleVisualizer } from './LinkedListCycleVisualizer';
 export { default as FirstLastPositionVisualizer } from './FirstLastPositionVisualizer';
 export { default as SearchRotatedArrayVisualizer } from './SearchRotatedArrayVisualizer';
 export { default as FibonacciVisualizer } from './FibonacciVisualizer';

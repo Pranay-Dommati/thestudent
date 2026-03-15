@@ -364,8 +364,12 @@ print("Index:", result)`;
         return 0
     if n == 1:
         return 1
-    # recursive relation
-    return fibonacci(n - 1) + fibonacci(n - 2)
+
+    # recursive calls stored in variables
+    first = fibonacci(n - 1)
+    second = fibonacci(n - 2)
+
+    return first + second
 
 n = ${n}
 print(fibonacci(n))`;
@@ -406,11 +410,51 @@ print(subsets(nums))`;
         try {
             const vals = JSON.parse(arrPart);
             if (Array.isArray(vals)) llComment = `#LL = [${vals.join(' -> ')}]`;
-        } catch {}
+        } catch {
+            // Keep default linked-list comment when parsing fails.
+        }
         return `def remove_nth_from_end(head, k):\n\n    # create dummy node before head\n    dummy = ListNode(0)\n    dummy.next = head\n\n    slow = dummy\n    fast = dummy\n\n    # move fast pointer k steps ahead\n    for _ in range(k):\n        fast = fast.next\n\n    # move both pointers until fast reaches last node\n    while fast.next:\n        slow = slow.next\n        fast = fast.next\n\n    # remove the kth node from end\n    slow.next = slow.next.next\n\n    return dummy.next\n\n${llComment}\n\n# class ListNode:\n#     def __init__(self, val=0, next=None):\n#         self.val = val\n#         self.next = next`;
     },
-};
+    'linked-list-cycle': (inputStr) => {
+        const commaIdx = inputStr.lastIndexOf(',');
+        const arrPart  = commaIdx >= 0 ? inputStr.slice(0, commaIdx).trim() : '[1, 2, 3, 4, 5]';
+        const posPart  = commaIdx >= 0 ? inputStr.slice(commaIdx + 1).trim() : '2';
+        let llComment  = '# LL = [1 -> 2 -> 3 -> 4 -> 5]';
+        try {
+            const vals = JSON.parse(arrPart);
+            if (Array.isArray(vals) && vals.length > 0) {
+                llComment = `# LL = [${vals.join(' -> ')}]`;
+            }
+        } catch {
+            // Keep default linked-list comment when parsing fails.
+        }
+        return `def has_cycle(head: Optional[ListNode]):
 
+    slow = head
+    fast = head
+
+    # move slow by 1 and fast by 2
+    while fast and fast.next:
+        slow = slow.next
+        fast = fast.next.next
+
+        # if both pointers meet → cycle exists
+        if slow == fast:
+            return True
+
+    # fast reached null → no cycle
+    return False
+
+${llComment}
+# pos = ${posPart}
+# pos represents the index where the tail connects to form a cycle
+
+# class ListNode:
+#     def __init__(self, val=0, next=None):
+#         self.val = val
+#         self.next = next`;
+    },
+};
 // Default array for each problem
 const DEFAULT_ARRAYS = {
     'merge-sort':        '[38, 27, 43, 3, 9, 82, 10]',
@@ -422,6 +466,7 @@ const DEFAULT_ARRAYS = {
     'binary-search':         '[3, 12, 18, 25, 31, 42, 63],31',
     'find-peak-element':     '[1, 3, 5, 7, 6, 4, 2]',
     'remove-nth-from-end':   '[1, 2, 3, 4, 5],2',
+    'linked-list-cycle':     '[1, 2, 3, 4, 5],2',
     'first-last-position':   '[2, 4, 4, 4, 6, 8, 10],4',
     'search-rotated-array':  '[4, 5, 6, 7, 0, 1, 2],0',
     'fibonacci':             '5',
@@ -625,6 +670,21 @@ const problemsData = {
             "Linked List Traversal",
             "Two-Pass Reduction to One-Pass"
         ]
+    },
+    'linked-list-cycle': {
+        id: 20,
+        name: "Linked List Cycle",
+        difficulty: "Easy",
+        category: "Slow & Fast Pointer",
+        timeComplexity: "O(n)",
+        spaceComplexity: "O(1)",
+        description: "Given head of a linked list, determine whether the list has a cycle. Floyd's slow and fast pointers move at different speeds; if they ever meet, a cycle exists. If fast reaches null, the list is acyclic.",
+        concepts: [
+            "Floyd's Tortoise & Hare",
+            "Slow & Fast Pointer Technique",
+            "Cycle Detection",
+            "Constant Extra Space"
+        ]
     },};
 
 // Problems whose visualizers are fully self-contained (no backend trace needed)
@@ -632,6 +692,7 @@ const SELF_CONTAINED_VISUALIZERS = new Set([
     'bubble-sort', 'selection-sort', 'insertion-sort', 'merge-sort', 'quick-sort',
     'binary-search', 'find-peak-element', 'char-replacement',
     'remove-nth-from-end', 'first-last-position', 'search-rotated-array',
+    'linked-list-cycle',
     'fibonacci', 'factorial', 'subsets',
 ]);
 
@@ -649,6 +710,7 @@ const DSAProblemPage = () => {
         if (problemName === 'search-rotated-array') return '[4, 5, 6, 7, 0, 1, 2]';
         if (problemName === 'char-replacement') return 'AABABBAC';
         if (problemName === 'remove-nth-from-end') return '[1, 2, 3, 4, 5]';
+        if (problemName === 'linked-list-cycle') return '[1, 2, 3, 4, 5]';
         if (problemName === 'fibonacci') return '5';
         if (problemName === 'factorial') return '5';
         if (problemName === 'subsets') return '[1, 2, 3]';
@@ -660,6 +722,7 @@ const DSAProblemPage = () => {
         if (problemName === 'search-rotated-array') return '0';
         if (problemName === 'char-replacement') return '2';
         if (problemName === 'remove-nth-from-end') return '2';
+        if (problemName === 'linked-list-cycle') return '2';
         if (problemName === 'fibonacci') return '';
         if (problemName === 'subsets') return '';
         return '';
@@ -680,6 +743,7 @@ const DSAProblemPage = () => {
         if (problemName === 'search-rotated-array') return `${arrField},${targetField}`;
         if (problemName === 'char-replacement')     return `${arrField},${targetField}`;
         if (problemName === 'remove-nth-from-end') return `${arrField},${targetField}`;
+        if (problemName === 'linked-list-cycle') return `${arrField},${targetField}`;
         if (problemName === 'fibonacci')            return arrField;
         if (problemName === 'factorial')            return arrField;
         if (problemName === 'subsets')              return arrField;
@@ -749,10 +813,16 @@ const DSAProblemPage = () => {
         if (problemName === 'char-replacement') {
             if (!/^\d+$/.test(val.trim())) return 'Must be a number ≥ 0';
             return '';
-        }        if (problemName === 'remove-nth-from-end') {
+        }
+        if (problemName === 'remove-nth-from-end') {
             if (!/^\d+$/.test(val.trim()) || parseInt(val.trim(), 10) < 1) return 'Must be a positive integer';
             return '';
-        }        return '';
+        }
+        if (problemName === 'linked-list-cycle') {
+            if (!/^-?\d+$/.test(val.trim())) return 'Must be -1 or an index (0-based)';
+            return '';
+        }
+        return '';
     };
 
     const handleArrChange = (e) => { setArrField(e.target.value); setArrError(validateArr(e.target.value)); };
@@ -776,6 +846,14 @@ const DSAProblemPage = () => {
             setArrField(parts[0]?.trim() || newArrayString);
             if (parts[1]) setTargetField(parts[1].trim());
         } else if (problemName === 'remove-nth-from-end') {
+            const commaIdx = newArrayString.lastIndexOf(',');
+            if (commaIdx >= 0) {
+                setArrField(newArrayString.slice(0, commaIdx).trim());
+                setTargetField(newArrayString.slice(commaIdx + 1).trim());
+            } else {
+                setArrField(newArrayString);
+            }
+        } else if (problemName === 'linked-list-cycle') {
             const commaIdx = newArrayString.lastIndexOf(',');
             if (commaIdx >= 0) {
                 setArrField(newArrayString.slice(0, commaIdx).trim());
@@ -1207,16 +1285,16 @@ const DSAProblemPage = () => {
                                 </div>
 
                                 {/* Secondary field: Target / k / n */}
-                                {(problemName === 'binary-search' || problemName === 'first-last-position' || problemName === 'search-rotated-array' || problemName === 'char-replacement' || problemName === 'remove-nth-from-end') && (
+                                {(problemName === 'binary-search' || problemName === 'first-last-position' || problemName === 'search-rotated-array' || problemName === 'char-replacement' || problemName === 'remove-nth-from-end' || problemName === 'linked-list-cycle') && (
                                     <div className="w-24 sm:w-28 shrink-0 text-left">
                                         <label className="block text-white/35 text-[10px] font-semibold uppercase tracking-widest mb-1.5">
-                                            {(problemName === 'binary-search' || problemName === 'first-last-position' || problemName === 'search-rotated-array') ? 'Target' : 'k'}
+                                            {(problemName === 'binary-search' || problemName === 'first-last-position' || problemName === 'search-rotated-array') ? 'Target' : problemName === 'linked-list-cycle' ? 'Pos' : problemName === 'remove-nth-from-end' ? 'n' : 'k'}
                                         </label>
                                         <input
                                             type="text"
                                             value={targetField}
                                             onChange={handleTargetChange}
-                                            placeholder={problemName === 'binary-search' ? '31' : problemName === 'first-last-position' ? '4' : problemName === 'search-rotated-array' ? '0' : '2'}
+                                            placeholder={problemName === 'binary-search' ? '31' : problemName === 'first-last-position' ? '4' : problemName === 'search-rotated-array' ? '0' : problemName === 'linked-list-cycle' ? '2' : '2'}
                                             className={`w-full px-4 py-3 bg-white/[0.06] border rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 transition-all placeholder-white/20 ${
                                                 targetError ? 'border-red-500/40 focus:ring-red-500/20' : 'border-white/[0.1] focus:ring-indigo-500/30 focus:border-indigo-400/40'
                                             }`}

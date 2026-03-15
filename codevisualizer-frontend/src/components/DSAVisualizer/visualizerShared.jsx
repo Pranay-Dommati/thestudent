@@ -139,6 +139,32 @@ export const AnnotationCard = ({ text }) => (
 );
 
 /**
+ * TreeAnnotationStrip — compact single-line annotation bar for tree visualizers.
+ * Fades + slides on change. Truncated with ellipsis if too long.
+ *
+ * Props:
+ *  annotation {string|null} — step description text; renders nothing when null/empty
+ */
+export const TreeAnnotationStrip = ({ annotation }) => (
+    <div className="flex-shrink-0 h-10 flex items-center justify-center px-4">
+        <AnimatePresence mode="wait">
+            {annotation && (
+                <motion.div
+                    key={annotation}
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.16 }}
+                    className="px-4 py-1.5 rounded-xl border border-amber-600/50 bg-amber-900/40 text-amber-200 text-xs font-medium whitespace-nowrap max-w-full overflow-hidden text-ellipsis"
+                >
+                    {annotation}
+                </motion.div>
+            )}
+        </AnimatePresence>
+    </div>
+);
+
+/**
  * BLINK_ANIM / BLINK_TRANS — shared Framer Motion values for cell blink
  * (used when two elements are being compared / swapped).
  *

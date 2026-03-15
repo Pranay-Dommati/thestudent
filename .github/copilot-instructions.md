@@ -17,6 +17,8 @@ Before writing any new component, hook, utility, or constant, search the codebas
 | Array cells + L/M/R pointer row + index row (binary-search family) | `SearchArrayVisual.jsx` → `SearchArrayVisual` (default export) |
 | Cell size constants for binary-search-style visualizers | `SearchArrayVisual.jsx` → `SEARCH_CELL_W`, `SEARCH_CELL_H`, `SEARCH_CELL_GAP` |
 | Code highlighting, annotation card, playback state machine | `visualizerShared.jsx` |
+| Compact annotation strip for tree visualizers | `visualizerShared.jsx` → `TreeAnnotationStrip` |
+| Scrollable SVG+HTML canvas with animated edges (tree visualizers) | `TreeCanvas.jsx` → `TreeCanvas` (default export) |
 | Playback controls UI | `VisualizerControls.jsx` |
 | Mobile bottom-sheet with code | `MobileCodeDrawer.jsx` |
 
@@ -72,15 +74,35 @@ Before writing any new component, hook, utility, or constant, search the codebas
    ```js
    import { useTreeCanvas } from './useTreeCanvas';
    ```
-2. Replace the manual `scrollRef + isMobile useState + resize useEffect + canvasZoom + auto-scroll useEffect` block with:
+2. Import `TreeCanvas` (default) from `TreeCanvas.jsx` and `TreeAnnotationStrip` from `visualizerShared.jsx`:
+   ```js
+   import TreeCanvas from './TreeCanvas';
+   import { ..., TreeAnnotationStrip } from './visualizerShared';
+   ```
+3. Replace the manual `scrollRef + isMobile useState + resize useEffect + canvasZoom + auto-scroll useEffect` block with:
    ```js
    const { scrollRef, isMobile, canvasZoom } = useTreeCanvas({
        events, allNodes, eventIdx, inputArr,
        ignoreTypes: ['event_types_that_should_not_trigger_scroll'],
    });
    ```
-3. Keep only a single `useEffect(() => { setEventIdx(-1)... }, [inputArr])` reset — the scroll-to-top on reset is handled inside `useTreeCanvas`.
-4. Do NOT copy the `isMobile` useState + resize listener pattern inline — it lives in `useTreeCanvas.js`.
+4. In the render, use `TreeAnnotationStrip` for the annotation bar and `TreeCanvas` for the canvas:
+   ```jsx
+   <TreeAnnotationStrip annotation={annotation} />
+   <TreeCanvas
+       scrollRef={scrollRef}
+       canvasW={canvasW} canvasH={canvasH} canvasZoom={canvasZoom}
+       edgeList={edgeList}          {/* [{ key, x1,y1, x2,y2, done }] */}
+       strokeWidth={1.8}            {/* optional, default 1.8 */}
+       centered={false}             {/* true for linear chains (Factorial) */}
+       svgExtras={null}             {/* optional SVG JSX rendered after edges (e.g. text labels) */}
+   >
+       {/* HTML node layer only — AnimatePresence + motion.divs */}
+   </TreeCanvas>
+   ```
+5. Keep only a single `useEffect(() => { setEventIdx(-1)... }, [inputArr])` reset — the scroll-to-top on reset is handled inside `useTreeCanvas`.
+6. Do NOT copy the `isMobile` useState + resize listener pattern inline — it lives in `useTreeCanvas.js`.
+7. Do NOT inline the annotation strip div or the canvas scroll/SVG structure — they live in `TreeAnnotationStrip` and `TreeCanvas`.
 
 ---
 
@@ -100,8 +122,11 @@ Before writing any new component, hook, utility, or constant, search the codebas
 codevisualizer-frontend/src/components/DSAVisualizer/
   visualizerShared.jsx        ← highlightSyntax, SyncedCodePanel, AnnotationCard,
                                  BLINK_ANIM/TRANS, parseInputArray, useVisualizerPlayback,
-                                 makeGetDelay
+                                 makeGetDelay, TreeAnnotationStrip
   useTreeCanvas.js            ← useIsMobile, useTreeCanvas
+  TreeCanvas.jsx              ← scrollable SVG+HTML canvas for tree visualizers
+                                 props: scrollRef, canvasW/H, canvasZoom, edgeList,
+                                        strokeWidth, svgExtras, centered, children
   SyncedVisualizerShell.jsx   ← full two-panel layout for linear visualizers
   SearchArrayVisual.jsx       ← pointer-array canvas (L/M/R) for Binary Search family
                                  exports: SearchArrayVisual (default), SEARCH_CELL_W/H/GAP

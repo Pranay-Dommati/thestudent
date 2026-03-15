@@ -9,8 +9,9 @@
 
 import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useVisualizerPlayback, makeGetDelay } from './visualizerShared';
+import { useVisualizerPlayback, makeGetDelay, TreeAnnotationStrip } from './visualizerShared';
 import { useTreeCanvas } from './useTreeCanvas';
+import TreeCanvas from './TreeCanvas';
 import SyncedVisualizerShell from './SyncedVisualizerShell';
 import VisualizerControls from './VisualizerControls';
 
@@ -234,82 +235,38 @@ const FactorialVisualizer = ({
             controls={controls}
             scrollClass="flex-1 flex flex-col overflow-hidden"
         >
-            {/* Annotation strip */}
-            <div className="flex-shrink-0 h-10 flex items-center justify-center px-4">
-                <AnimatePresence mode="wait">
-                    {annotation && (
-                        <motion.div
-                            key={annotation}
-                            initial={{ opacity: 0, y: -6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 4 }}
-                            transition={{ duration: 0.16 }}
-                            className="px-4 py-1.5 rounded-xl border border-amber-600/50 bg-amber-900/40 text-amber-200 text-xs font-medium whitespace-nowrap max-w-full overflow-hidden text-ellipsis"
-                        >
-                            {annotation}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
+            <TreeAnnotationStrip annotation={annotation} />
 
-            {/* Scrollable chain canvas — flex-centred horizontally */}
-            <div ref={scrollRef} className="flex-1 overflow-auto">
-                <div className="flex justify-center">
-                    <div
-                        style={{
-                            transform: `scale(${canvasZoom})`,
-                            transformOrigin: 'top center',
-                            width: CANVAS_W,
-                            height: canvasH,
-                            position: 'relative',
-                            flexShrink: 0,
-                        }}
-                    >
-                        {/* SVG: edges + multiply label */}
-                        <svg
-                            style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}
-                            width={CANVAS_W}
-                            height={canvasH}
-                        >
-                            <AnimatePresence>
-                                {edgeList.map(e => (
-                                    <motion.line
-                                        key={e.key}
-                                        x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
-                                        stroke={e.done ? '#10b981' : '#6366f1'}
-                                        strokeWidth={2}
-                                        initial={{ pathLength: 0, opacity: 0 }}
-                                        animate={{ pathLength: 1, opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.3, ease: 'easeOut' }}
-                                    />
-                                ))}
-                            </AnimatePresence>
-
-                            {/* Multiplication annotation beside the returning edge */}
-                            <AnimatePresence>
-                                {multiplyLabel && (
-                                    <motion.text
-                                        key={`mul-${multiplyLabel.id}`}
-                                        x={multiplyLabel.x}
-                                        y={multiplyLabel.y + 10}
-                                        fill="#6ee7b7"
-                                        fontSize="11"
-                                        fontFamily="monospace"
-                                        fontWeight="600"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                    >
-                                        {multiplyLabel.text}
-                                    </motion.text>
-                                )}
-                            </AnimatePresence>
-                        </svg>
-
-                        {/* HTML layer: animated circle nodes */}
-                        <AnimatePresence>
+            <TreeCanvas
+                scrollRef={scrollRef}
+                canvasW={CANVAS_W} canvasH={canvasH} canvasZoom={canvasZoom}
+                edgeList={edgeList}
+                strokeWidth={2}
+                centered
+                svgExtras={
+                    <AnimatePresence>
+                        {multiplyLabel && (
+                            <motion.text
+                                key={`mul-${multiplyLabel.id}`}
+                                x={multiplyLabel.x}
+                                y={multiplyLabel.y + 10}
+                                fill="#6ee7b7"
+                                fontSize="11"
+                                fontFamily="monospace"
+                                fontWeight="600"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                {multiplyLabel.text}
+                            </motion.text>
+                        )}
+                    </AnimatePresence>
+                }
+            >
+                {/* HTML layer: animated circle nodes */}
+                <AnimatePresence>
                             {[...visibleIds].map(id => {
                                 const node     = nodeMap[id];
                                 const state    = nodeStates[id] ?? 'active';
@@ -354,10 +311,8 @@ const FactorialVisualizer = ({
                                     </motion.div>
                                 );
                             })}
-                        </AnimatePresence>
-                    </div>
-                </div>
-            </div>
+                </AnimatePresence>
+            </TreeCanvas>
         </SyncedVisualizerShell>
     );
 };
