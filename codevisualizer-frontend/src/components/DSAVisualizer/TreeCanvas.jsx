@@ -57,8 +57,9 @@ const TreeCanvas = ({
                         <motion.line
                             key={e.key}
                             x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
-                            stroke={e.done ? '#10b981' : '#6366f1'}
-                            strokeWidth={strokeWidth}
+                            stroke={e.stroke ?? (e.done ? '#10b981' : '#6366f1')}
+                            strokeWidth={e.strokeWidth ?? strokeWidth}
+                            markerEnd={e.markerEnd}
                             initial={{ pathLength: 0, opacity: 0 }}
                             animate={{ pathLength: 1, opacity: 1 }}
                             exit={{ opacity: 0 }}

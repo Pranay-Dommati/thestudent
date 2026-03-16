@@ -403,6 +403,41 @@ nums = [${arr.join(', ')}]
 print(subsets(nums))`;
     },
 
+    'subsets-2': (inputStr) => {
+        let arr;
+        try { arr = JSON.parse(inputStr.trim()); } catch { arr = [1, 2, 3, 4]; }
+        if (!Array.isArray(arr)) arr = [1, 2, 3, 4];
+        arr = arr.map(Number).filter(n => !isNaN(n)).slice(0, 4);
+        if (arr.length === 0) arr = [1, 2, 3, 4];
+        return `def visualize_subsets(nums):
+
+    result = []
+    subset = []
+
+    def dfs(index):
+
+        # record current subset
+        result.append(subset.copy())
+
+        for i in range(index, len(nums)):
+
+            # choose
+            subset.append(nums[i])
+
+            # explore
+            dfs(i + 1)
+
+            # unchoose (backtrack)
+            subset.pop()
+
+    dfs(0)
+    return result
+
+
+nums = [${arr.join(', ')}]
+print(visualize_subsets(nums))`;
+    },
+
     'remove-nth-from-end': (inputStr) => {
         const commaIdx = inputStr.lastIndexOf(',');
         const arrPart  = commaIdx >= 0 ? inputStr.slice(0, commaIdx).trim() : '[1, 2, 3, 4, 5]';
@@ -503,6 +538,7 @@ const DEFAULT_ARRAYS = {
     'fibonacci':             '5',
     'factorial':             '5',
     'subsets':               '[1, 2, 3]',
+    'subsets-2':             '[1, 2, 3, 4]',
 };
 
 // Problem metadata
@@ -687,6 +723,21 @@ const problemsData = {
             "Choose → Explore → Unchoose"
         ]
     },
+    'subsets-2': {
+        id: 13,
+        name: "Subsets 2",
+        difficulty: "Medium",
+        category: "Recursion",
+        timeComplexity: "O(2ⁿ)",
+        spaceComplexity: "O(n)",
+        description: "Generate all subsets with a DFS/backtracking traversal. At each call, record the current subset, then iterate remaining positions, choose an element, recurse, and unchoose to backtrack.",
+        concepts: [
+            "Backtracking Pattern",
+            "Depth-First Search",
+            "Subset Enumeration",
+            "Choose → Explore → Unchoose"
+        ]
+    },
     'remove-nth-from-end': {
         id: 9,
         name: "Remove Nth Node From End",
@@ -740,7 +791,7 @@ const SELF_CONTAINED_VISUALIZERS = new Set([
     'binary-search', 'find-peak-element', 'char-replacement',
     'remove-nth-from-end', 'first-last-position', 'search-rotated-array',
     'linked-list-cycle', 'middle-of-linked-list',
-    'fibonacci', 'factorial', 'subsets',
+    'fibonacci', 'factorial', 'subsets', 'subsets-2',
 ]);
 
 const DSAProblemPage = () => {
@@ -762,6 +813,7 @@ const DSAProblemPage = () => {
         if (problemName === 'fibonacci') return '5';
         if (problemName === 'factorial') return '5';
         if (problemName === 'subsets') return '[1, 2, 3]';
+        if (problemName === 'subsets-2') return '[1, 2, 3, 4]';
         return DEFAULT_ARRAYS[problemName] || '[38, 27, 43, 3, 9, 82, 10]';
     };
     const getDefaultTarget = () => {
@@ -773,6 +825,7 @@ const DSAProblemPage = () => {
         if (problemName === 'linked-list-cycle') return '2';
         if (problemName === 'fibonacci') return '';
         if (problemName === 'subsets') return '';
+        if (problemName === 'subsets-2') return '';
         return '';
     };
 
@@ -795,6 +848,7 @@ const DSAProblemPage = () => {
         if (problemName === 'fibonacci')            return arrField;
         if (problemName === 'factorial')            return arrField;
         if (problemName === 'subsets')              return arrField;
+        if (problemName === 'subsets-2')            return arrField;
         return arrField;
     })();
 
@@ -828,7 +882,7 @@ const DSAProblemPage = () => {
             if (v > 8) return 'Max n = 8 (chain gets too long)';
             return '';
         }
-        if (problemName === 'subsets') {
+        if (problemName === 'subsets' || problemName === 'subsets-2') {
             const t = val.trim();
             if (!t.startsWith('[') || !t.endsWith(']')) return 'Must be like [1, 2, 3]';
             const inner = t.slice(1, -1).trim();
@@ -879,7 +933,7 @@ const DSAProblemPage = () => {
     // Handle rerun with a specific array (called from visualizer)
     const handleRerunWithArray = useCallback(async (newArrayString) => {
         // update arrField only (keep existing target)
-        if (problemName === 'fibonacci' || problemName === 'factorial' || problemName === 'subsets') {
+        if (problemName === 'fibonacci' || problemName === 'factorial' || problemName === 'subsets' || problemName === 'subsets-2') {
             setArrField(newArrayString);
         } else if (problemName === 'binary-search' || problemName === 'first-last-position' || problemName === 'search-rotated-array') {
             const commaIdx = newArrayString.lastIndexOf(',');

@@ -186,7 +186,7 @@ const PATTERNS = [
             { id: 10, name: 'Fibonacci Tree',  slug: 'fibonacci',    difficulty: 'Easy',   available: true  },
             { id: 11, name: 'Factorial',        slug: 'factorial',    difficulty: 'Easy',   available: true  },
             { id: 12, name: 'Subsets',          slug: 'subsets',      difficulty: 'Medium', available: true  },
-            { id: 13, name: 'Permutations',     slug: 'permutations', difficulty: 'Hard',   available: false },
+            { id: 13, name: 'Subsets 2',        slug: 'subsets-2',    difficulty: 'Medium', available: true  },
         ],
     },
     {

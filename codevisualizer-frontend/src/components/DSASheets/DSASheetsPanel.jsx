@@ -17,7 +17,7 @@ const dsaProblems = [
     { id: 10, name: "Fibonacci Tree",       slug: "fibonacci",                 difficulty: "Easy",   category: "Recursion",       available: true  },
     { id: 11, name: "Factorial",            slug: "factorial",                 difficulty: "Easy",   category: "Recursion",       available: true  },
     { id: 12, name: "Subsets",              slug: "subsets",                   difficulty: "Medium", category: "Recursion",       available: true  },
-    { id: 13, name: "Permutations",         slug: "permutations",              difficulty: "Hard",   category: "Recursion",       available: false },
+    { id: 13, name: "Subsets 2",            slug: "subsets-2",                 difficulty: "Medium", category: "Recursion",       available: true  },
     { id: 14, name: "Valid Parentheses",    slug: "valid-parentheses",         difficulty: "Easy",   category: "Stack",           available: false },
     { id: 15, name: "Next Greater Element", slug: "next-greater-element",      difficulty: "Medium", category: "Stack",           available: false },
     { id: 16, name: "Daily Temperatures",   slug: "daily-temperatures",        difficulty: "Medium", category: "Stack",           available: false },

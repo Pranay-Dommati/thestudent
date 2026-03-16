@@ -128,7 +128,7 @@ const DSAImmersiveVisualizer = ({
             if (v > 8) return 'Max n = 8 (chain gets too long)';
             return '';
         }
-        if (algorithmType === 'subsets') {
+        if (algorithmType === 'subsets' || algorithmType === 'subsets-2') {
             const t = input.trim();
             if (!t.startsWith('[') || !t.endsWith(']')) return 'Format: [1, 2, 3]';
             const inner = t.slice(1, -1).trim();
@@ -265,6 +265,7 @@ const DSAImmersiveVisualizer = ({
                              : algorithmType === 'fibonacci' ? 'Fibonacci Tree'
                              : algorithmType === 'factorial' ? 'Factorial'
                              : algorithmType === 'subsets' ? 'Subsets'
+                             : algorithmType === 'subsets-2' ? 'Subsets 2'
                              : 'Merge Sort'}
                         </span>
                     </h1>
@@ -467,6 +468,8 @@ const DSAImmersiveVisualizer = ({
                     ) : algorithmType === 'factorial' ? (
                         <FactorialVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'subsets' ? (
+                        <SubsetsVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
+                    ) : algorithmType === 'subsets-2' ? (
                         <SubsetsVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : (
                         activeTab === 'combined' ? (
