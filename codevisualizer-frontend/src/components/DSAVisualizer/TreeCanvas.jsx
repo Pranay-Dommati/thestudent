@@ -39,7 +39,7 @@ const TreeCanvas = ({
         <div
             style={{
                 transform: `scale(${canvasZoom})`,
-                transformOrigin: 'top center',
+                transformOrigin: centered ? 'top center' : 'top left',
                 width: canvasW,
                 height: canvasH,
                 position: 'relative',

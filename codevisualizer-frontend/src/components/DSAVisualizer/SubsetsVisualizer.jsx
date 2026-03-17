@@ -31,8 +31,21 @@ const SUBSETS2_LINE_MAP = {
     pop: 20, initialCall: 22, returnResult: 23, done: 27,
 };
 
+const SUBSETS_VARIANTS = {
+    subsets: {
+        lineMap: SUBSETS_LINE_MAP,
+        defaultInput: [1, 2, 3],
+        fnName: 'subsets',
+    },
+    'subsets-2': {
+        lineMap: SUBSETS2_LINE_MAP,
+        defaultInput: [1, 2, 3, 4],
+        fnName: 'visualize_subsets',
+    },
+};
+
 // ── Build call tree + events ──────────────────────────────────────────────────
-const simulateSubsets = (nums, lineMap) => {
+const simulateSubsets = (nums, lineMap, fnName = 'subsets') => {
     let counter = 0;
     const nodeMap = {};
 
@@ -166,7 +179,7 @@ const simulateSubsets = (nums, lineMap) => {
     });
     events.push({
         type: 'done', codeLine: lineMap.done,
-        annotation: `subsets([${nums.join(', ')}]) → ${allStoredSubsets.length} subsets  ✓  complete!`,
+        annotation: `${fnName}([${nums.join(', ')}]) → ${allStoredSubsets.length} subsets  ✓  complete!`,
         result: allStoredSubsets,
         currentSubset: [],
         iVal: null,
@@ -191,25 +204,33 @@ const getDelay = makeGetDelay(DELAY, 850);
 
 // ── Main component ───────────────────────────────────────────────────────────
 const SubsetsVisualizer = ({
-    customArray = '[1, 2, 3]', code = '', onProgress, seekRef, drawerState, setDrawerState,
+    customArray = '[1, 2, 3]',
+    code = '',
+    variant = 'subsets',
+    onProgress,
+    seekRef,
+    drawerState,
+    setDrawerState,
 }) => {
-    const isSubsets2Template = (code || '').includes('def visualize_subsets(');
-    const lineMap = isSubsets2Template ? SUBSETS2_LINE_MAP : SUBSETS_LINE_MAP;
+    const normalizedVariant = variant === 'subsets-2' || (code || '').includes('def visualize_subsets(')
+        ? 'subsets-2'
+        : 'subsets';
+    const { lineMap, defaultInput, fnName } = SUBSETS_VARIANTS[normalizedVariant];
 
     const inputNums = useMemo(() => {
         let arr;
-        try { arr = JSON.parse(String(customArray).trim()); } catch { arr = [1, 2, 3]; }
-        if (!Array.isArray(arr)) arr = [1, 2, 3];
+        try { arr = JSON.parse(String(customArray).trim()); } catch { arr = [...defaultInput]; }
+        if (!Array.isArray(arr)) arr = [...defaultInput];
         arr = arr.map(Number).filter(n => !isNaN(n));
-        if (arr.length === 0) arr = [1, 2, 3];
+        if (arr.length === 0) arr = [...defaultInput];
         return arr.slice(0, 4);
-    }, [customArray]);
+    }, [customArray, defaultInput]);
 
     const inputKey = useMemo(() => inputNums, [inputNums]);
 
     const { events, nodeMap, allNodes, canvasW, canvasH } = useMemo(
-        () => simulateSubsets(inputNums, lineMap),
-        [inputNums, lineMap]
+        () => simulateSubsets(inputNums, lineMap, fnName),
+        [inputNums, lineMap, fnName]
     );
 
     const {
@@ -325,13 +346,28 @@ const SubsetsVisualizer = ({
         if (!anchorNode) return null;
 
         const displayArr = inputNums.slice(anchorNode.index);
-        const bCount = Math.max(1, displayArr.length);
+        const historyArr = displayArr.length === 0 ? inputNums.slice(0, anchorNode.index) : [];
+        const renderCells = displayArr.length === 0 ? [...historyArr, null] : displayArr;
+        const bCount = Math.max(1, renderCells.length);
         const nodeW = PILL_P * 2 + bCount * BOX_S + (bCount - 1) * GAP;
         const nodeH = PILL_P * 2 + BOX_S;
         const subsetArr = Array.isArray(currentEv?.currentSubset) ? currentEv.currentSubset : anchorNode.subset;
+        const subsetCount = Math.max(1, subsetArr.length);
+        const subsetCellsW = subsetCount * BOX_S + Math.max(0, subsetCount - 1) * GAP;
+        const panelW = subsetArr.length === 0
+            ? 100
+            : 24 + 18 + subsetCellsW + 18 + 10; // left pad + '[' + cells + ']' + right pad
 
-        return { node: anchorNode, nodeW, nodeH, subsetArr };
-    }, [allNodes, currentEv, inputNums, nodeMap]);
+        const preferredLeft = anchorNode.x + nodeW / 2 + SIDE_PAD;
+        const minLeft = 12;
+        const maxLeft = Math.max(minLeft, canvasW - panelW - 12);
+        const needsFlipLeft = preferredLeft > maxLeft;
+        const panelLeft = needsFlipLeft
+            ? Math.max(minLeft, anchorNode.x - nodeW / 2 - SIDE_PAD - panelW)
+            : preferredLeft;
+
+        return { node: anchorNode, nodeW, nodeH, subsetArr, panelLeft };
+    }, [allNodes, currentEv, inputNums, nodeMap, canvasW]);
     const popHighlightIdx = isPopStep && activeSubsetPanel
         ? activeSubsetPanel.subsetArr.lastIndexOf(currentEv?.element)
         : -1;
@@ -399,7 +435,7 @@ const SubsetsVisualizer = ({
                 scrollRef={scrollRef}
                 canvasW={canvasW} canvasH={canvasH} canvasZoom={canvasZoom}
                 edgeList={edgeList}
-                centered
+                centered={false}
                 svgExtras={
                     <AnimatePresence>
                         {/* Static Edges Background */}
@@ -624,7 +660,7 @@ const SubsetsVisualizer = ({
                     key={`subset-panel-${activeSubsetPanel.node.id}`}
                     className="absolute flex items-center px-3 py-2 rounded-2xl border-2 bg-slate-900/90 border-slate-600 shadow-[0_10px_24px_rgba(2,6,23,0.45)] backdrop-blur-sm"
                     style={{
-                        left: activeSubsetPanel.node.x + activeSubsetPanel.nodeW / 2 + SIDE_PAD,
+                        left: activeSubsetPanel.panelLeft,
                         top: activeSubsetPanel.node.y,
                         height: activeSubsetPanel.nodeH,
                         zIndex: 8,

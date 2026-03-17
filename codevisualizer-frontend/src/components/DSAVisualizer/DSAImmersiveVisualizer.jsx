@@ -468,9 +468,9 @@ const DSAImmersiveVisualizer = ({
                     ) : algorithmType === 'factorial' ? (
                         <FactorialVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'subsets' ? (
-                        <SubsetsVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
+                        <SubsetsVisualizer customArray={customArray} code={code} variant="subsets" onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'subsets-2' ? (
-                        <SubsetsVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
+                        <SubsetsVisualizer customArray={customArray} code={code} variant="subsets-2" onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : (
                         activeTab === 'combined' ? (
                             <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
