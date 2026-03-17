@@ -120,14 +120,14 @@ const simulateSubsets = (nums, lineMap) => {
         for (const { childId, element } of node.childEntries) {
             const child = nodeMap[childId];
             const loopI = child.index - 1;
-            
-            currentSubsetState.push(element);
+
             events.push({
                 type: 'choose', nodeId: node.id, childId, element, codeLine: lineMap.choose, scrollY: node.y,
                 annotation: `subset.append(${element})  — choose ${element}`,
                 iVal: loopI,
                 currentSubset: [...currentSubsetState],
             });
+            currentSubsetState.push(element);
             events.push({
                 type: 'recurse', nodeId: node.id, childId, codeLine: lineMap.recurse, scrollY: node.y,
                 loopI,
@@ -138,14 +138,14 @@ const simulateSubsets = (nums, lineMap) => {
                 iVal: loopI,
             });
             dfs(child, loopI);
-            
-            currentSubsetState.pop();
+
             events.push({
                 type: 'pop', nodeId: node.id, childId, element, codeLine: lineMap.pop, scrollY: node.y,
                 annotation: `subset.pop()  — backtrack, remove ${element}`,
                 currentSubset: [...currentSubsetState],
                 iVal: loopI,
             });
+            currentSubsetState.pop();
         }
 
         events.push({
@@ -315,13 +315,26 @@ const SubsetsVisualizer = ({
         return null;
     }, [currentEv, edgeList]);
 
-    const arrayIPointerIdx = useMemo(() => {
-        if (!currentEv) return null;
-        return Number.isInteger(currentEv.iVal) ? currentEv.iVal : null;
-    }, [currentEv]);
-
     const isStoreStep = currentEv?.type === 'store_subset';
+    const isPopStep = currentEv?.type === 'pop';
     const highlightedResultIdx = isStoreStep ? storedSoFar.length - 1 : -1;
+    const isFinalResultStep = currentEv?.type === 'return_result' || currentEv?.type === 'done';
+    const activeSubsetPanel = useMemo(() => {
+        const rootNode = allNodes.find(n => n.parentId === null) ?? null;
+        const anchorNode = (currentEv?.nodeId && nodeMap[currentEv.nodeId]) ? nodeMap[currentEv.nodeId] : rootNode;
+        if (!anchorNode) return null;
+
+        const displayArr = inputNums.slice(anchorNode.index);
+        const bCount = Math.max(1, displayArr.length);
+        const nodeW = PILL_P * 2 + bCount * BOX_S + (bCount - 1) * GAP;
+        const nodeH = PILL_P * 2 + BOX_S;
+        const subsetArr = Array.isArray(currentEv?.currentSubset) ? currentEv.currentSubset : anchorNode.subset;
+
+        return { node: anchorNode, nodeW, nodeH, subsetArr };
+    }, [allNodes, currentEv, inputNums, nodeMap]);
+    const popHighlightIdx = isPopStep && activeSubsetPanel
+        ? activeSubsetPanel.subsetArr.lastIndexOf(currentEv?.element)
+        : -1;
 
     const controls = (
         <VisualizerControls
@@ -354,21 +367,23 @@ const SubsetsVisualizer = ({
                                 key={i}
                                 initial={{ opacity: 0, scale: 0.6, x: -10 }}
                                 animate={
-                                    i === highlightedResultIdx
-                                        ? { opacity: [1, 0.35, 1], scale: [1, 1.06, 1], x: 0 }
+                                    isFinalResultStep
+                                        ? { opacity: 1, scale: 1, x: 0 }
+                                        : i === highlightedResultIdx
+                                        ? { opacity: 1, scale: 1, x: 0 }
                                         : { opacity: 1, scale: 1, x: 0 }
                                 }
                                 transition={
-                                    i === highlightedResultIdx
-                                        ? {
-                                            opacity: { duration: 0.55, repeat: Infinity, ease: 'easeInOut' },
-                                            scale: { duration: 0.55, repeat: Infinity, ease: 'easeInOut' },
-                                            x: { type: 'spring', stiffness: 300, damping: 20 },
-                                        }
+                                    isFinalResultStep
+                                        ? { type: 'spring', stiffness: 300, damping: 20 }
+                                        : i === highlightedResultIdx
+                                        ? { type: 'spring', stiffness: 300, damping: 20 }
                                         : { type: 'spring', stiffness: 300, damping: 20 }
                                 }
                                 className={`flex-shrink-0 px-2 py-1 rounded border-2 text-xs font-mono shadow-lg transition-all duration-300 ${
-                                    i === highlightedResultIdx
+                                    isFinalResultStep
+                                        ? 'bg-emerald-500 border-emerald-300 text-white shadow-[0_0_14px_rgba(16,185,129,0.6)]'
+                                        : i === highlightedResultIdx
                                         ? 'bg-emerald-500 border-emerald-300 text-white shadow-[0_0_14px_rgba(16,185,129,0.6)]'
                                         : 'bg-slate-800 border-emerald-500/40 text-emerald-400'
                                 }`}
@@ -435,12 +450,29 @@ const SubsetsVisualizer = ({
                         const state    = nodeStates[id] || 'active';
                         const isActive = id === currentEv?.nodeId;
                         
-                        // Width calculation
+                        // Width calculation: each node shows remaining candidates from current index.
                         const isRootNode = node.parentId === null;
-                        const displayArr = isRootNode ? inputNums : node.subset;
-                        const bCount = Math.max(1, displayArr.length);
+                        const displayArr = inputNums.slice(node.index);
+                        const historyArr = displayArr.length === 0 ? inputNums.slice(0, node.index) : [];
+                        const renderCells = displayArr.length === 0
+                            ? [...historyArr, null]
+                            : displayArr;
+                        const bCount = Math.max(1, renderCells.length);
                         const nodeW = PILL_P * 2 + bCount * BOX_S + (bCount - 1) * GAP;
                         const nodeH = PILL_P * 2 + BOX_S;
+                        const activeChoiceRel = Number.isInteger(currentEv?.iVal) ? currentEv.iVal - node.index : null;
+                        const recurseStartRel = currentEv?.type === 'recurse' && Number.isInteger(currentEv?.availableSliceStart)
+                            ? currentEv.availableSliceStart - node.index
+                            : null;
+                        const localIPointerRel = Number.isInteger(currentEv?.iVal)
+                            && currentEv.iVal >= node.index
+                            && currentEv.iVal < inputNums.length
+                            ? currentEv.iVal - node.index
+                            : null;
+                        const pointerIRel = displayArr.length === 0 ? (bCount - 1) : localIPointerRel;
+                        const pointerIPlusOneRel = currentEv?.type === 'recurse' && recurseStartRel !== null
+                            ? recurseStartRel
+                            : null;
 
                         return (
                             <React.Fragment key={id}>
@@ -466,24 +498,45 @@ const SubsetsVisualizer = ({
                                     transition-all duration-300
                                 `}
                             >
-                                {displayArr.length === 0 ? (
-                                    <div className={`w-[32px] h-[32px] rounded border-2 border-dashed flex items-center justify-center font-bold text-sm
-                                        ${isActive ? 'border-indigo-400 text-indigo-300' : 
-                                          state === 'done' ? 'border-emerald-700/50 text-emerald-700/50' :
-                                          'border-slate-500 text-slate-500'}
-                                    `}>
-                                        ∅
-                                    </div>
-                                ) : (
-                                    displayArr.map((val, i) => {
-                                        const isLast = i === displayArr.length - 1 && !isRootNode;
+                                {renderCells.map((val, i) => {
+                                        const isNullCell = val === null;
+                                        const isHistoryCell = displayArr.length === 0 && !isNullCell;
+                                        const isChosenAtI = isActive
+                                            && currentEv?.type !== 'recurse'
+                                            && Number.isInteger(activeChoiceRel)
+                                            && i === activeChoiceRel;
+                                        const isChooseBlinkCell = isActive && currentEv?.type === 'choose' && isChosenAtI;
+                                        const isRecurseWindowCell = isActive
+                                            && currentEv?.type === 'recurse'
+                                            && recurseStartRel !== null
+                                            && i >= recurseStartRel;
                                         
                                         // Colors mapping matches QuickSort/MergeSort styles
                                         let boxCls = 'bg-slate-700 border-slate-500 text-slate-200';
+
+                                        if (isHistoryCell) {
+                                            boxCls = state === 'done'
+                                                ? 'bg-emerald-950/20 border-emerald-700/40 text-emerald-700/55'
+                                                : 'bg-emerald-950/35 border-emerald-700/55 text-emerald-500/70';
+                                        }
+
+                                        if (isNullCell) {
+                                            if (isActive) boxCls = 'bg-indigo-500/20 border-indigo-300 text-indigo-200 shadow-[0_0_10px_rgba(99,102,241,0.4)] border-dashed';
+                                            else if (state === 'done') boxCls = 'bg-emerald-900/20 border-emerald-700/40 text-emerald-700/60 border-dashed';
+                                            else boxCls = 'bg-slate-900/70 border-slate-500 text-slate-400 border-dashed';
+                                        }
                                         
-                                        if (isRootNode) {
+                                        if (isHistoryCell) {
+                                            // Keep pre-null trail muted even on active steps.
+                                        } else if (isRootNode) {
                                             if (state === 'done') {
                                                 boxCls = 'bg-slate-700/50 border-emerald-700/40 text-emerald-600/50';
+                                            } else if (isActive && isRecurseWindowCell) {
+                                                boxCls = 'bg-cyan-500 border-cyan-300 text-white shadow-[0_0_12px_rgba(34,211,238,0.45)]';
+                                            } else if (isActive && state === 'choosing' && isChosenAtI) {
+                                                boxCls = 'bg-amber-500 border-amber-300 text-white shadow-[0_0_12px_rgba(245,158,11,0.5)]';
+                                            } else if (isActive && state === 'popping' && isChosenAtI) {
+                                                boxCls = 'bg-rose-500 border-rose-300 text-white shadow-[0_0_12px_rgba(244,63,94,0.5)]';
                                             } else {
                                                 boxCls = 'bg-slate-700 border-slate-500 text-slate-200';
                                             }
@@ -491,26 +544,28 @@ const SubsetsVisualizer = ({
                                             boxCls = 'bg-slate-700/50 border-emerald-700/40 text-emerald-600/50';
                                         } else if (isActive) {
                                             if (state === 'storing') boxCls = 'bg-emerald-500 border-emerald-300 text-white shadow-[0_0_12px_rgba(16,185,129,0.5)]';
-                                            else if (state === 'choosing' && isLast) boxCls = 'bg-amber-500 border-amber-300 text-white shadow-[0_0_12px_rgba(245,158,11,0.5)]';
-                                            else if (state === 'popping' && isLast) boxCls = 'bg-rose-500 border-rose-300 text-white';
+                                            else if (isRecurseWindowCell) boxCls = 'bg-cyan-500 border-cyan-300 text-white shadow-[0_0_12px_rgba(34,211,238,0.45)]';
+                                            else if (state === 'choosing' && isChosenAtI) boxCls = 'bg-amber-500 border-amber-300 text-white shadow-[0_0_12px_rgba(245,158,11,0.5)]';
+                                            else if (state === 'popping' && isChosenAtI) boxCls = 'bg-rose-500 border-rose-300 text-white';
                                             else boxCls = 'bg-indigo-500 border-indigo-300 text-white shadow-[0_0_8px_rgba(99,102,241,0.3)]';
                                         }
 
                                         return (
                                             <motion.div
-                                                key={i}
+                                                key={`${i}-${isChooseBlinkCell ? 'blink' : 'steady'}`}
+                                                animate={isChooseBlinkCell ? { opacity: [1, 0.35, 1], scale: [1, 1.06, 1] } : { opacity: 1, scale: 1 }}
+                                                transition={isChooseBlinkCell ? { duration: 0.55, repeat: Infinity, ease: 'easeInOut' } : { duration: 0 }}
                                                 className={`w-[32px] h-[32px] rounded flex items-center justify-center font-bold text-[15px] border-2 transition-colors duration-300 ${boxCls}`}
                                                 layout
                                             >
-                                                {val}
+                                                {isNullCell ? '∅' : val}
                                             </motion.div>
                                         );
-                                    })
-                                )}
+                                    })}
                             </motion.div>
                             
-                            {/* Render indices and 'i' pointer only under the root node */}
-                            {isRootNode && (
+                            {/* Render indices under every node's current-array view */}
+                            {renderCells.length > 0 && (
                                 <>
                                     <motion.div
                                         className="absolute flex items-center pointer-events-none"
@@ -522,89 +577,106 @@ const SubsetsVisualizer = ({
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                     >
-                                        {displayArr.map((_, i) => (
+                                        {renderCells.map((cellVal, i) => (
                                             <div key={i} className="flex justify-center w-[32px]">
                                                 <span className="text-[11px] font-mono select-none text-slate-400">
-                                                    {i}
+                                                    {cellVal === null ? node.index : node.index + i}
                                                 </span>
                                             </div>
                                         ))}
                                     </motion.div>
-
-                                    <motion.div
-                                        className="absolute pointer-events-none"
-                                        style={{
-                                            left: node.x - nodeW / 2 + PILL_P,
-                                            top: node.y - 28,
-                                        }}
-                                        initial={{ opacity: 0, y: -4 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                    >
-                                        <PointerBadgeRow
-                                            cellW={BOX_S}
-                                            cellGap={GAP}
-                                            count={displayArr.length}
-                                            iRel={arrayIPointerIdx}
-                                            iClass="bg-amber-500"
-                                            iLabel="i"
-                                            jRel={null}
-                                        />
-                                    </motion.div>
                                 </>
                             )}
 
-                            {/* Render active subset array next to the root node */}
-                            {isRootNode && currentEv?.currentSubset && (
+                            {/* Show i pointer on the active recursion node's current array */}
+                            {isActive && pointerIRel !== null && (
                                 <motion.div
-                                    className="absolute flex items-center gap-[4px] px-[6px] py-[6px] rounded-xl border-2 bg-slate-800 border-slate-600 shadow-lg"
+                                    className="absolute pointer-events-none"
                                     style={{
-                                        left: node.x + nodeW / 2 + SIDE_PAD,
-                                        top: node.y,
-                                        height: nodeH,
+                                        left: node.x - nodeW / 2 + PILL_P,
+                                        top: node.y - 28,
                                     }}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
+                                    initial={{ opacity: 0, y: -4 }}
+                                    animate={{ opacity: 1, y: 0 }}
                                 >
-                                    <div className="absolute -top-7 text-indigo-400 font-mono text-sm font-bold tracking-wider whitespace-nowrap">
-                                        subset =
-                                    </div>
-                                    {currentEv.currentSubset.length === 0 ? (
-                                        <motion.div
-                                            animate={isStoreStep ? { opacity: [1, 0.35, 1] } : { opacity: 1 }}
-                                            transition={isStoreStep ? { duration: 0.55, repeat: Infinity, ease: 'easeInOut' } : { duration: 0 }}
-                                            className={`w-[32px] h-[32px] rounded border-2 border-dashed flex items-center justify-center font-bold text-sm transition-colors duration-300 ${
-                                                isStoreStep ? 'border-emerald-300 text-emerald-100 bg-emerald-500/20' : 'border-slate-500 text-slate-500'
-                                            }`}
-                                        >
-                                            ∅
-                                        </motion.div>
-                                    ) : (
-                                        currentEv.currentSubset.map((val, i) => (
-                                            <motion.div
-                                                key={`sub-${i}`}
-                                                animate={isStoreStep ? { opacity: [1, 0.35, 1], scale: [1, 1.06, 1] } : { opacity: 1, scale: 1 }}
-                                                transition={
-                                                    isStoreStep
-                                                        ? { duration: 0.55, repeat: Infinity, ease: 'easeInOut' }
-                                                        : { duration: 0 }
-                                                }
-                                                className={`w-[32px] h-[32px] rounded flex items-center justify-center font-bold text-[15px] border-2 transition-colors duration-300 ${
-                                                    isStoreStep
-                                                        ? 'bg-emerald-500 border-emerald-300 text-white shadow-[0_0_14px_rgba(16,185,129,0.6)]'
-                                                        : 'bg-indigo-500 border-indigo-300 text-white shadow-[0_0_8px_rgba(99,102,241,0.3)]'
-                                                }`}
-                                                layout
-                                            >
-                                                {val}
-                                            </motion.div>
-                                        ))
-                                    )}
+                                    <PointerBadgeRow
+                                        cellW={BOX_S}
+                                        cellGap={GAP}
+                                        count={bCount}
+                                        iRel={pointerIRel}
+                                        iClass="bg-amber-500"
+                                        iLabel="i"
+                                        j1Rel={pointerIPlusOneRel}
+                                        j1Class="bg-cyan-400"
+                                        j1Label="i+1"
+                                        jRel={null}
+                                    />
                                 </motion.div>
                             )}
+
                             </React.Fragment>
                         );
                     })}
             </AnimatePresence>
+
+            {activeSubsetPanel && (
+                <motion.div
+                    key={`subset-panel-${activeSubsetPanel.node.id}`}
+                    className="absolute flex items-center px-3 py-2 rounded-2xl border-2 bg-slate-900/90 border-slate-600 shadow-[0_10px_24px_rgba(2,6,23,0.45)] backdrop-blur-sm"
+                    style={{
+                        left: activeSubsetPanel.node.x + activeSubsetPanel.nodeW / 2 + SIDE_PAD,
+                        top: activeSubsetPanel.node.y,
+                        height: activeSubsetPanel.nodeH,
+                        zIndex: 8,
+                    }}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+                >
+                    <div className="absolute -top-7 text-indigo-300 font-mono text-xs font-bold tracking-[0.16em] whitespace-nowrap uppercase">
+                        subset
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-indigo-300/85 font-mono font-bold text-lg leading-none">[</span>
+                        {activeSubsetPanel.subsetArr.length === 0 ? (
+                            <motion.div
+                                animate={isStoreStep ? { opacity: [1, 0.35, 1] } : { opacity: 1 }}
+                                transition={isStoreStep ? { duration: 0.55, repeat: Infinity, ease: 'easeInOut' } : { duration: 0 }}
+                                className={`min-w-[32px] h-[32px] rounded border-2 border-dashed flex items-center justify-center px-2 font-bold text-sm transition-colors duration-300 ${
+                                    isStoreStep ? 'border-emerald-300 text-emerald-100 bg-emerald-500/20' : 'border-slate-500 text-slate-500'
+                                }`}
+                            >
+                                ∅
+                            </motion.div>
+                        ) : (
+                            <div className="flex items-center gap-1">
+                                {activeSubsetPanel.subsetArr.map((val, i) => (
+                                    <motion.div
+                                        key={`sub-${i}`}
+                                        animate={isStoreStep ? { opacity: [1, 0.35, 1], scale: [1, 1.06, 1] } : { opacity: 1, scale: 1 }}
+                                        transition={
+                                            isStoreStep
+                                                ? { duration: 0.55, repeat: Infinity, ease: 'easeInOut' }
+                                                : { duration: 0 }
+                                        }
+                                        className={`w-[32px] h-[32px] rounded-md flex items-center justify-center font-bold text-[15px] border-2 transition-colors duration-300 ${
+                                            isStoreStep
+                                                ? 'bg-emerald-500 border-emerald-300 text-white shadow-[0_0_14px_rgba(16,185,129,0.6)]'
+                                                : isPopStep && i === popHighlightIdx
+                                                    ? 'bg-rose-500 border-rose-300 text-white shadow-[0_0_12px_rgba(244,63,94,0.5)]'
+                                                : 'bg-indigo-500 border-indigo-300 text-white shadow-[0_0_8px_rgba(99,102,241,0.3)]'
+                                        }`}
+                                        layout
+                                    >
+                                        {val}
+                                    </motion.div>
+                                ))}
+                            </div>
+                        )}
+                        <span className="text-indigo-300/85 font-mono font-bold text-lg leading-none">]</span>
+                    </div>
+                </motion.div>
+            )}
             </TreeCanvas>
         </SyncedVisualizerShell>
     );

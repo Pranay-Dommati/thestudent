@@ -140,3 +140,12 @@ codevisualizer-frontend/src/components/DSAVisualizer/
 
 Ask: *"Does this logic already exist somewhere in the codebase?"*  
 Search `visualizerShared.jsx`, `useTreeCanvas.js`, and `SyncedVisualizerShell.jsx` before writing new code.
+
+---
+
+## 6. Validation and Build Policy
+
+- Do NOT run a full build for every small fix.
+- Prefer targeted validation first (lint only for touched files, focused tests, or type-check for changed scope).
+- Run a full build only when changes affect build configuration, shared foundations, or release-critical flows.
+- If full validation is skipped for speed, clearly state what was run and what was not run.
