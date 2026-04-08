@@ -28,6 +28,7 @@ import SearchRotatedArrayVisualizer from './SearchRotatedArrayVisualizer';
 import FibonacciVisualizer from './FibonacciVisualizer';
 import FactorialVisualizer from './FactorialVisualizer';
 import SubsetsVisualizer from './SubsetsVisualizer';
+import ValidParenthesesVisualizer from './ValidParenthesesVisualizer';
 
 // ============ MAIN DSA IMMERSIVE VISUALIZER ============
 const DSAImmersiveVisualizer = ({
@@ -149,6 +150,13 @@ const DSAImmersiveVisualizer = ({
             if (s.length > 20) return 'Max 20 chars';
             return '';
         }
+        if (algorithmType === 'valid-parentheses') {
+            const compact = input.trim().replace(/\s+/g, '').replace(/^['"]|['"]$/g, '');
+            if (!compact) return 'Input cannot be empty';
+            if (!/^[()[\]{}]+$/.test(compact)) return 'Use brackets only: () {} []';
+            if (compact.length > 40) return 'Max 40 characters';
+            return '';
+        }
         if (algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array') {
             const trimmed = input.trim();
             const commaIdx = trimmed.lastIndexOf(',');
@@ -266,6 +274,7 @@ const DSAImmersiveVisualizer = ({
                              : algorithmType === 'factorial' ? 'Factorial'
                              : algorithmType === 'subsets' ? 'Subsets'
                              : algorithmType === 'subsets-2' ? 'Subsets 2'
+                             : algorithmType === 'valid-parentheses' ? 'Valid Parentheses'
                              : 'Merge Sort'}
                         </span>
                     </h1>
@@ -309,14 +318,14 @@ const DSAImmersiveVisualizer = ({
                     {showInputPanel ? (
                         <div className="hidden md:flex items-center gap-2 bg-white/5 border border-white/15 rounded-xl px-3 py-1.5 shadow-lg backdrop-blur-sm">
                             <span className="text-white/40 text-xs font-mono">
-                                {algorithmType === 'char-replacement' ? 's, k =' : (algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array') ? 'arr, target =' : algorithmType === 'remove-nth-from-end' ? 'arr, n =' : algorithmType === 'linked-list-cycle' ? 'arr, pos =' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? 'n =' : 'arr ='}
+                                {algorithmType === 'char-replacement' ? 's, k =' : algorithmType === 'valid-parentheses' ? 's =' : (algorithmType === 'binary-search' || algorithmType === 'first-last-position' || algorithmType === 'search-rotated-array') ? 'arr, target =' : algorithmType === 'remove-nth-from-end' ? 'arr, n =' : algorithmType === 'linked-list-cycle' ? 'arr, pos =' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? 'n =' : 'arr ='}
                             </span>
                             <input
                                 type="text"
                                 value={localArrayInput}
                                 onChange={handleInputChange}
                                 className={`w-44 px-2 py-1 bg-black/30 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/60' : 'border-white/20 focus:border-indigo-400'}`}
-                                placeholder={algorithmType === 'char-replacement' ? 'AABCBA,2' : algorithmType === 'binary-search' ? '[3,12,25,31,42],31' : algorithmType === 'first-last-position' ? '[2,4,4,4,6,8,10],4' : algorithmType === 'search-rotated-array' ? '[4,5,6,7,0,1,2],0' : algorithmType === 'remove-nth-from-end' ? '[1,2,3,4,5],2' : algorithmType === 'linked-list-cycle' ? '[1,2,3,4,5],2' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? '5' : '[1, 2, 3]'}
+                                placeholder={algorithmType === 'char-replacement' ? 'AABCBA,2' : algorithmType === 'valid-parentheses' ? '({[()]})[]' : algorithmType === 'binary-search' ? '[3,12,25,31,42],31' : algorithmType === 'first-last-position' ? '[2,4,4,4,6,8,10],4' : algorithmType === 'search-rotated-array' ? '[4,5,6,7,0,1,2],0' : algorithmType === 'remove-nth-from-end' ? '[1,2,3,4,5],2' : algorithmType === 'linked-list-cycle' ? '[1,2,3,4,5],2' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? '5' : '[1, 2, 3]'}
                             />
                             {inputError && (
                                 <span className="text-red-400 text-xs">{inputError}</span>
@@ -371,7 +380,7 @@ const DSAImmersiveVisualizer = ({
                     {/* Field 1: arr / s */}
                     <div className="flex flex-col gap-1">
                         <span className="text-white/50 text-xs font-mono">
-                            {algorithmType === 'char-replacement' ? 's =' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? 'n =' : 'arr ='}
+                            {algorithmType === 'char-replacement' ? 's =' : algorithmType === 'valid-parentheses' ? 's =' : (algorithmType === 'fibonacci' || algorithmType === 'factorial') ? 'n =' : 'arr ='}
                         </span>
                         <input
                             type="text"
@@ -388,7 +397,7 @@ const DSAImmersiveVisualizer = ({
                             })()}
                             onChange={handleMobileFirstChange}
                             className={`w-full px-2.5 py-1.5 bg-black/30 border rounded-lg font-mono text-sm text-white focus:outline-none transition-all ${inputError ? 'border-red-500/60' : 'border-white/20 focus:border-indigo-400'}`}
-                            placeholder={algorithmType === 'char-replacement' ? 'AABCBA' : '[3, 12, 25, 31, 42]'}
+                            placeholder={algorithmType === 'char-replacement' ? 'AABCBA' : algorithmType === 'valid-parentheses' ? '({[()]})[]' : '[3, 12, 25, 31, 42]'}
                         />
                     </div>
                     {/* Field 2: target / k / n — only for multi-param algorithms */}
@@ -471,6 +480,8 @@ const DSAImmersiveVisualizer = ({
                         <SubsetsVisualizer customArray={customArray} code={code} variant="subsets" onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : algorithmType === 'subsets-2' ? (
                         <SubsetsVisualizer customArray={customArray} code={code} variant="subsets-2" onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
+                    ) : algorithmType === 'valid-parentheses' ? (
+                        <ValidParenthesesVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                     ) : (
                         activeTab === 'combined' ? (
                             <SyncedCoreLogicVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />

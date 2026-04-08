@@ -198,7 +198,7 @@ const PATTERNS = [
         lightColor: 'bg-orange-50 border-orange-200',
         badgeColor: 'bg-orange-100 text-orange-700',
         problems: [
-            { id: 14, name: 'Valid Parentheses',          slug: 'valid-parentheses',          difficulty: 'Easy',   available: false },
+            { id: 14, name: 'Valid Parentheses',          slug: 'valid-parentheses',          difficulty: 'Easy',   available: true  },
             { id: 15, name: 'Next Greater Element',       slug: 'next-greater-element',       difficulty: 'Medium', available: false },
             { id: 16, name: 'Daily Temperatures',         slug: 'daily-temperatures',         difficulty: 'Medium', available: false },
             { id: 17, name: 'Largest Rectangle Histogram',slug: 'largest-rectangle-histogram',difficulty: 'Hard',   available: false },

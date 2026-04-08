@@ -18,7 +18,7 @@ const dsaProblems = [
     { id: 11, name: "Factorial",            slug: "factorial",                 difficulty: "Easy",   category: "Recursion",       available: true  },
     { id: 12, name: "Subsets",              slug: "subsets",                   difficulty: "Medium", category: "Recursion",       available: true  },
     { id: 13, name: "Subsets 2",            slug: "subsets-2",                 difficulty: "Medium", category: "Recursion",       available: true  },
-    { id: 14, name: "Valid Parentheses",    slug: "valid-parentheses",         difficulty: "Easy",   category: "Stack",           available: false },
+    { id: 14, name: "Valid Parentheses",    slug: "valid-parentheses",         difficulty: "Easy",   category: "Stack",           available: true  },
     { id: 15, name: "Next Greater Element", slug: "next-greater-element",      difficulty: "Medium", category: "Stack",           available: false },
     { id: 16, name: "Daily Temperatures",   slug: "daily-temperatures",        difficulty: "Medium", category: "Stack",           available: false },
     { id: 17, name: "Largest Rectangle",    slug: "largest-rectangle-histogram",difficulty:"Hard",   category: "Stack",           available: false },

@@ -209,6 +209,31 @@ result = character_replacement(s, k)
 print(result)`;
     },
 
+    'valid-parentheses': (inputStr) => {
+        const raw = String(inputStr ?? '').trim();
+        const stripped = ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")))
+            ? raw.slice(1, -1)
+            : raw;
+        const s = stripped.replace(/\s+/g, '') || '({[()]})[]';
+        return `def is_valid(s):
+    stack = []
+    mapping = {')': '(', '}': '{', ']': '['}
+
+    for char in s:
+        if char in mapping.values():
+            stack.append(char)
+        else:
+            if not stack or stack[-1] != mapping[char]:
+                return False
+            stack.pop()
+
+    return len(stack) == 0
+
+
+s = "${s}"
+print(is_valid(s))`;
+    },
+
     'first-last-position': (inputStr) => {
         const commaIdx = inputStr.lastIndexOf(',');
         const arrPart = commaIdx >= 0 ? inputStr.slice(0, commaIdx).trim() : '[2, 4, 4, 4, 6, 8, 10]';
@@ -539,6 +564,7 @@ const DEFAULT_ARRAYS = {
     'factorial':             '5',
     'subsets':               '[1, 2, 3]',
     'subsets-2':             '[1, 2, 3, 4]',
+    'valid-parentheses':     '({[()]})[]',
 };
 
 // Problem metadata
@@ -738,6 +764,21 @@ const problemsData = {
             "Choose → Explore → Unchoose"
         ]
     },
+    'valid-parentheses': {
+        id: 14,
+        name: "Valid Parentheses",
+        difficulty: "Easy",
+        category: "Stack",
+        timeComplexity: "O(n)",
+        spaceComplexity: "O(n)",
+        description: "Given a string of brackets, determine if it is valid. Use a stack to push opening brackets and for every closing bracket verify it matches the most recent opening bracket. If a mismatch occurs or the stack is not empty at the end, the string is invalid.",
+        concepts: [
+            "Stack (LIFO)",
+            "Bracket Matching",
+            "Push / Pop Operations",
+            "Early Mismatch Detection"
+        ]
+    },
     'remove-nth-from-end': {
         id: 9,
         name: "Remove Nth Node From End",
@@ -791,7 +832,7 @@ const SELF_CONTAINED_VISUALIZERS = new Set([
     'binary-search', 'find-peak-element', 'char-replacement',
     'remove-nth-from-end', 'first-last-position', 'search-rotated-array',
     'linked-list-cycle', 'middle-of-linked-list',
-    'fibonacci', 'factorial', 'subsets', 'subsets-2',
+    'fibonacci', 'factorial', 'subsets', 'subsets-2', 'valid-parentheses',
 ]);
 
 const DSAProblemPage = () => {
@@ -814,6 +855,7 @@ const DSAProblemPage = () => {
         if (problemName === 'factorial') return '5';
         if (problemName === 'subsets') return '[1, 2, 3]';
         if (problemName === 'subsets-2') return '[1, 2, 3, 4]';
+        if (problemName === 'valid-parentheses') return '({[()]})[]';
         return DEFAULT_ARRAYS[problemName] || '[38, 27, 43, 3, 9, 82, 10]';
     };
     const getDefaultTarget = () => {
@@ -826,6 +868,7 @@ const DSAProblemPage = () => {
         if (problemName === 'fibonacci') return '';
         if (problemName === 'subsets') return '';
         if (problemName === 'subsets-2') return '';
+        if (problemName === 'valid-parentheses') return '';
         return '';
     };
 
@@ -849,6 +892,7 @@ const DSAProblemPage = () => {
         if (problemName === 'factorial')            return arrField;
         if (problemName === 'subsets')              return arrField;
         if (problemName === 'subsets-2')            return arrField;
+        if (problemName === 'valid-parentheses')    return arrField;
         return arrField;
     })();
 
@@ -890,6 +934,15 @@ const DSAProblemPage = () => {
             const parts = inner.split(',').map(p => p.trim());
             for (const p of parts) { if (!/^-?\d+$/.test(p)) return `Invalid number: ${p}`; }
             if (parts.length > 4) return 'Max 4 elements (tree gets too large)';
+            return '';
+        }
+        if (problemName === 'valid-parentheses') {
+            const t = val.trim();
+            if (!t) return 'Input cannot be empty';
+            const compact = t.replace(/\s+/g, '').replace(/^['"]|['"]$/g, '');
+            if (!compact) return 'Input cannot be empty';
+            if (!/^[()[\]{}]+$/.test(compact)) return 'Use brackets only: () {} []';
+            if (compact.length > 40) return 'Max 40 characters';
             return '';
         }
         if (problemName === 'char-replacement') {
@@ -1372,13 +1425,13 @@ const DSAProblemPage = () => {
                                 {/* Primary field: Array or String */}
                                 <div className="flex-1 w-full text-left">
                                     <label className="block text-white/35 text-[10px] font-semibold uppercase tracking-widest mb-1.5">
-                                        {problemName === 'char-replacement' ? 'String' : (problemName === 'fibonacci' || problemName === 'factorial') ? 'n' : 'Array'}
+                                        {(problemName === 'char-replacement' || problemName === 'valid-parentheses') ? 'String' : (problemName === 'fibonacci' || problemName === 'factorial') ? 'n' : 'Array'}
                                     </label>
                                     <input
                                         type="text"
                                         value={arrField}
                                         onChange={handleArrChange}
-                                        placeholder={problemName === 'char-replacement' ? 'AABABBAC' : (problemName === 'fibonacci' || problemName === 'factorial') ? '5' : '[5, 1, 4, 2, 8]'}
+                                        placeholder={problemName === 'char-replacement' ? 'AABABBAC' : problemName === 'valid-parentheses' ? '({[()]})[]' : (problemName === 'fibonacci' || problemName === 'factorial') ? '5' : '[5, 1, 4, 2, 8]'}
                                         className={`w-full px-4 py-3 bg-white/[0.06] border rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 transition-all placeholder-white/20 ${
                                             arrError ? 'border-red-500/40 focus:ring-red-500/20' : 'border-white/[0.1] focus:ring-indigo-500/30 focus:border-indigo-400/40'
                                         }`}

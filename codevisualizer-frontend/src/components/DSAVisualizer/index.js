@@ -14,3 +14,4 @@ export { default as SearchRotatedArrayVisualizer } from './SearchRotatedArrayVis
 export { default as FibonacciVisualizer } from './FibonacciVisualizer';
 export { default as FactorialVisualizer } from './FactorialVisualizer';
 export { default as SubsetsVisualizer } from './SubsetsVisualizer';
+export { default as ValidParenthesesVisualizer } from './ValidParenthesesVisualizer';
