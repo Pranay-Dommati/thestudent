@@ -180,6 +180,7 @@ INSTALLED_APPS = [
     'code_visualizer',  # Code execution visualizer
     'corsheaders',  # Add this
     'courses',
+    'scrib',
     'feedback',  # Add feedback app
     'newsletter',  # Add newsletter app
     'rest_framework',
@@ -602,6 +603,14 @@ YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', '')
 
 # Gemini API key for AI services (from env only)
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+
+# Scrib AI and storage settings
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+OPENAI_IMAGE_MODEL = os.environ.get('OPENAI_IMAGE_MODEL', 'gpt-image-2')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
+AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', os.environ.get('AWS_REGION', 'ap-south-1'))
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
 
 # Google Programmable Search API for Resources
 GOOGLE_SEARCH_API_KEY = os.environ.get('GOOGLE_SEARCH_API_KEY', '')

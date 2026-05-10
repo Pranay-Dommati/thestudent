@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" fill="none">
+  <rect width="800" height="1000" rx="36" fill="#fdf8f2"/>
+  <rect x="40" y="40" width="720" height="920" rx="28" fill="#fffaf5" stroke="#e9ddcd" stroke-width="2"/>
+  <circle cx="110" cy="120" r="10" fill="#d65f4b"/>
+  <circle cx="150" cy="120" r="10" fill="#f6c15c"/>
+  <circle cx="190" cy="120" r="10" fill="#0f766e"/>
+  <text x="80" y="200" font-family="Arial" font-size="34" fill="#1f2a2f">Scrib preview notes</text>
+  <text x="80" y="240" font-family="Arial" font-size="18" fill="#607179">Handwritten style page</text>
+  <line x1="80" y1="300" x2="720" y2="300" stroke="#e2d5c4" stroke-width="2"/>
+  <line x1="80" y1="350" x2="720" y2="350" stroke="#e2d5c4" stroke-width="2"/>
+  <line x1="80" y1="400" x2="720" y2="400" stroke="#e2d5c4" stroke-width="2"/>
+  <line x1="80" y1="450" x2="720" y2="450" stroke="#e2d5c4" stroke-width="2"/>
+  <line x1="80" y1="500" x2="720" y2="500" stroke="#e2d5c4" stroke-width="2"/>
+  <line x1="80" y1="550" x2="720" y2="550" stroke="#e2d5c4" stroke-width="2"/>
+  <line x1="80" y1="600" x2="720" y2="600" stroke="#e2d5c4" stroke-width="2"/>
+  <line x1="80" y1="650" x2="720" y2="650" stroke="#e2d5c4" stroke-width="2"/>
+  <line x1="80" y1="700" x2="720" y2="700" stroke="#e2d5c4" stroke-width="2"/>
+  <line x1="80" y1="750" x2="720" y2="750" stroke="#e2d5c4" stroke-width="2"/>
+  <path d="M110 330c70 20 140 20 210 0" stroke="#1f2a2f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M110 380c90 20 170 20 260 0" stroke="#1f2a2f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M110 430c80 20 160 20 240 0" stroke="#1f2a2f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M110 480c120 20 220 20 320 0" stroke="#1f2a2f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M110 530c90 20 170 20 260 0" stroke="#1f2a2f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M110 580c60 20 120 20 180 0" stroke="#1f2a2f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M110 630c100 20 190 20 280 0" stroke="#1f2a2f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M110 680c80 20 160 20 240 0" stroke="#1f2a2f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M110 730c120 20 230 20 340 0" stroke="#1f2a2f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M110 780c80 20 150 20 230 0" stroke="#1f2a2f" stroke-width="3" stroke-linecap="round"/>
+  <path d="M100 870c40 40 120 40 160 0" stroke="#d65f4b" stroke-width="4" stroke-linecap="round"/>
+  <text x="110" y="860" font-family="Arial" font-size="18" fill="#607179">Scrib by EasyLearnova</text>
+</svg>
