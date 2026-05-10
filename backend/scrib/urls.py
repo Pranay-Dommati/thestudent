@@ -8,6 +8,7 @@ urlpatterns = [
     path('previews/<slug:slug>/', views.PreviewDetailView.as_view(), name='preview-detail'),
     path('generate-note/', views.GenerateNoteView.as_view(), name='generate-note'),
     path('generate-study-pack/', views.GenerateStudyPackView.as_view(), name='generate-study-pack'),
+    path('organize-topics/', views.OrganizeTopicsView.as_view(), name='organize-topics'),
     path('payments/create-order/', views.CreateOrderView.as_view(), name='payments-create-order'),
     path('payments/verify/', views.VerifyPaymentView.as_view(), name='payments-verify'),
     path('me/', views.MeView.as_view(), name='me'),

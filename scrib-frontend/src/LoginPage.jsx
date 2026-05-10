@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { useGoogleAuth } from './hooks/useGoogleAuth'
+import universalToast from './utils/universalToast'
 
 const LoginPage = () => {
   const navigate = useNavigate()
   const { login, googleLogin, isLoggedIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [formErrors, setFormErrors] = useState({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -15,10 +18,36 @@ const LoginPage = () => {
     }
   }, [isLoggedIn, navigate])
 
+  const validateForm = () => {
+    const errors = {}
+    if (!email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errors.email = 'Invalid email format'
+    }
+    if (!password) {
+      errors.password = 'Password is required'
+    } else if (password.length < 6) {
+      errors.password = 'Password must be at least 6 characters'
+    }
+    return errors
+  }
+
   const handleLogin = async () => {
-    const result = await login(email, password)
+    const errors = validateForm()
+    setFormErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      return
+    }
+
+    setIsSubmitting(true)
+    const result = await login(email.trim(), password)
+    setIsSubmitting(false)
     if (result?.success) {
       navigate('/dashboard')
+    } else if (result?.suggestSignup) {
+      universalToast.error('No account found with this email. Please sign up to continue.')
+      navigate('/signup')
     }
   }
 
@@ -68,6 +97,9 @@ const LoginPage = () => {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />
+            {formErrors.email ? (
+              <p className="text-xs text-[#c05c5c]">{formErrors.email}</p>
+            ) : null}
             <input
               className="w-full rounded-lg border border-[#e0d9ce] px-3 py-2 text-sm"
               placeholder="Password"
@@ -75,6 +107,9 @@ const LoginPage = () => {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
+            {formErrors.password ? (
+              <p className="text-xs text-[#c05c5c]">{formErrors.password}</p>
+            ) : null}
           </div>
 
           <div className="mt-3 text-right">
@@ -83,9 +118,10 @@ const LoginPage = () => {
 
           <button
             onClick={handleLogin}
+            disabled={isSubmitting}
             className="mt-4 w-full rounded-lg border border-[#1f1f1f] bg-[#1f1f1f] px-4 py-2 text-sm font-semibold text-white"
           >
-            Log in
+            {isSubmitting ? 'Logging in...' : 'Log in'}
           </button>
 
           <p className="mt-4 text-xs text-[#7b756d]">

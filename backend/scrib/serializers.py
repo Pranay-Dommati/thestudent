@@ -87,6 +87,13 @@ class GenerateStudyPackRequestSerializer(serializers.Serializer):
     )
 
 
+class OrganizeTopicsRequestSerializer(serializers.Serializer):
+    topics = serializers.ListField(
+        child=serializers.CharField(max_length=255),
+        min_length=1,
+    )
+
+
 class ScribMeSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     email = serializers.EmailField()

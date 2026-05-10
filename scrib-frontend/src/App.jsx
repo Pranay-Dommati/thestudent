@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import axiosInstance from './utils/axios'
 import { getInitials } from './utils/user'
@@ -40,6 +40,8 @@ const topicChips = ['Cloud Computing', 'Photosynthesis', "Ohm's Law", 'Recursion
 const App = () => {
   const { user, logout, isLoggedIn } = useAuth()
   const [previewStrip, setPreviewStrip] = useState(fallbackPreviewStrip)
+  const [topicInput, setTopicInput] = useState('')
+  const navigate = useNavigate()
 
   useEffect(() => {
     let isMounted = true
@@ -141,7 +143,10 @@ const App = () => {
               >
                 Browse free previews
               </Link>
-              <button className="rounded-full border border-[#d9d1c7] bg-[#f1eee7] px-5 py-2 text-sm font-semibold text-[#1f1f1f]">
+              <button
+                onClick={() => navigate('/generate')}
+                className="rounded-full border border-[#d9d1c7] bg-[#f1eee7] px-5 py-2 text-sm font-semibold text-[#1f1f1f]"
+              >
                 Generate custom notes
               </button>
             </div>
@@ -208,24 +213,42 @@ const App = () => {
                     Enter any topic - we will create handwritten notes just for it. 1 credit per page.
                   </p>
                 </div>
-                <Link to="/generate" className="rounded-lg bg-[#1b1b1b] px-5 py-2 text-sm font-semibold text-white">
+                <button
+                  onClick={() => {
+                    const encoded = encodeURIComponent(topicInput.trim())
+                    navigate(encoded ? `/generate?topic=${encoded}` : '/generate')
+                  }}
+                  className="rounded-lg bg-[#1b1b1b] px-5 py-2 text-sm font-semibold text-white"
+                  type="button"
+                >
                   Generate
-                </Link>
+                </button>
               </div>
               <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <input
                   className="w-full flex-1 rounded-lg border border-[#e0d9ce] bg-white px-3 py-2 text-sm"
                   placeholder="e.g. Dijkstra's Algorithm, Dopamine, Keynesian Economics"
+                  value={topicInput}
+                  onChange={(event) => setTopicInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      const encoded = encodeURIComponent(topicInput.trim())
+                      navigate(encoded ? `/generate?topic=${encoded}` : '/generate')
+                    }
+                  }}
                 />
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {topicChips.map((topic) => (
-                  <span
+                  <button
                     key={topic}
+                    onClick={() => setTopicInput(topic)}
                     className="rounded-full border border-[#e0d9ce] bg-white px-3 py-1 text-xs text-[#4b4742]"
+                    type="button"
                   >
                     {topic}
-                  </span>
+                  </button>
                 ))}
               </div>
               <p className="mt-3 text-xs text-[#8a847c]">10 credits = Rs 49. Sign in to generate.</p>

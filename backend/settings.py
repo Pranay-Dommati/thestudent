@@ -3,6 +3,9 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+_root_env = Path(__file__).resolve().parent.parent.parent / '.env'
+if _root_env.exists():
+    load_dotenv(dotenv_path=_root_env, override=True)
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -144,6 +147,11 @@ SIMPLE_JWT = {
 # Social Auth
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv('GOOGLE_OAUTH2_CLIENT_ID')
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv('GOOGLE_OAUTH2_CLIENT_SECRET')
+
+# Scrib AI settings
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+OPENAI_IMAGE_MODEL = os.getenv('OPENAI_IMAGE_MODEL', 'gpt-image-2')
 
 # Email Configuration
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
