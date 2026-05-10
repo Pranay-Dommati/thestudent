@@ -1,9 +1,13 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
+import axiosInstance from './utils/axios'
+import { getInitials } from './utils/user'
 
-const previewStrip = [
-  { id: 'osi-model', title: 'OSI Model', tone: 'gold' },
-  { id: 'linked-lists', title: 'Linked Lists', tone: 'sand' },
-  { id: 'dbms-normalization', title: 'DBMS Normalization', tone: 'rose' },
+const fallbackPreviewStrip = [
+  { id: 'osi-model', title: 'OSI Model', imageUrl: '' },
+  { id: 'linked-lists', title: 'Linked Lists', imageUrl: '' },
+  { id: 'dbms-normalization', title: 'DBMS Normalization', imageUrl: '' },
 ]
 
 const pricingTiers = [
@@ -32,13 +36,41 @@ const pricingTiers = [
 
 const topicChips = ['Cloud Computing', 'Photosynthesis', "Ohm's Law", 'Recursion', 'French Revolution']
 
-const toneColors = {
-  gold: 'bg-[#d1b98a]',
-  sand: 'bg-[#cbb58e]',
-  rose: 'bg-[#c48e9a]',
-}
 
 const App = () => {
+  const { user, logout, isLoggedIn } = useAuth()
+  const [previewStrip, setPreviewStrip] = useState(fallbackPreviewStrip)
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadPreviews = async () => {
+      try {
+        const response = await axiosInstance.get('/scrib/previews/')
+        const data = response.data
+        if (!isMounted || !Array.isArray(data)) {
+          return
+        }
+        const mapped = data.slice(0, 3).map((item) => ({
+          id: item.id ?? item.slug ?? item.title,
+          title: item.title,
+          imageUrl: item.image_url,
+        }))
+        if (mapped.length) {
+          setPreviewStrip(mapped)
+        }
+      } catch {
+        // Keep fallback previews if API is unavailable.
+      }
+    }
+
+    loadPreviews()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-white text-[#1f1f1f]">
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
@@ -53,10 +85,40 @@ const App = () => {
             </div>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
-            <a href="#landing-previews" className="hover:text-[#1f1f1f]">Previews</a>
-            <a href="#landing-pricing" className="hover:text-[#1f1f1f]">Pricing</a>
+            <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
+            <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
           </nav>
-          <button className="rounded-full bg-[#1f3a5f] px-4 py-2 text-xs font-semibold text-white">Get started free</button>
+          {isLoggedIn ? (
+            <div className="flex items-center gap-3">
+              <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
+                Dashboard
+              </Link>
+              <Link to="/profile" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
+                Profile
+              </Link>
+              <button
+                onClick={logout}
+                className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold"
+              >
+                Log out
+              </button>
+              <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
+                {user?.credit_balance ?? 0} credits
+              </span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e2dbd2] bg-white text-xs font-semibold">
+                {getInitials(user?.full_name)}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
+                Log in
+              </Link>
+              <Link to="/signup" className="rounded-full bg-[#1f3a5f] px-4 py-2 text-xs font-semibold text-white">
+                Get started free
+              </Link>
+            </div>
+          )}
         </div>
       </header>
 
@@ -106,10 +168,19 @@ const App = () => {
               <div className="mt-4 grid gap-4 md:grid-cols-4">
                 {previewStrip.map((note) => (
                   <div key={note.id} className="rounded-xl border border-[#e2dbd2] bg-[#f7f4ee] p-3">
-                    <div className="rounded-lg border border-[#e7dfd4] bg-white p-3">
-                      <div className={`h-1.5 w-4/5 rounded-full ${toneColors[note.tone]}`} />
-                      <div className={`mt-2 h-1.5 w-3/4 rounded-full ${toneColors[note.tone]}`} />
-                      <div className={`mt-2 h-1.5 w-2/3 rounded-full ${toneColors[note.tone]}`} />
+                    <div className="rounded-lg border border-[#e7dfd4] bg-white p-2">
+                      {note.imageUrl ? (
+                        <img
+                          src={note.imageUrl}
+                          alt={note.title}
+                          className="h-24 w-full rounded-md object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-24 w-full items-center justify-center rounded-md border border-dashed border-[#e0d9ce] text-[11px] text-[#9a9289]">
+                          Preview image
+                        </div>
+                      )}
                     </div>
                     <p className="mt-3 text-sm font-semibold">{note.title}</p>
                   </div>

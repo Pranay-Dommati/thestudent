@@ -1,11 +1,15 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
+import { getInitials } from './utils/user'
+import axiosInstance from './utils/axios'
 
-const previewCards = [
-  { id: 'osi-model', title: 'OSI Model', subject: 'Computer Networks', tone: 'gold' },
-  { id: 'newtons-laws', title: "Newton's Laws", subject: 'Physics', tone: 'mint' },
-  { id: 'krebs-cycle', title: 'Krebs Cycle', subject: 'Biology', tone: 'rose' },
-  { id: 'sql-joins', title: 'SQL Joins', subject: 'DBMS', tone: 'sand' },
-  { id: 'thermodynamics', title: 'Thermodynamics', subject: 'Physics', tone: 'blue' },
+const fallbackPreviewCards = [
+  { id: 'osi-model', title: 'OSI Model', subject: 'Computer Networks', imageUrl: '' },
+  { id: 'newtons-laws', title: "Newton's Laws", subject: 'Physics', imageUrl: '' },
+  { id: 'krebs-cycle', title: 'Krebs Cycle', subject: 'Biology', imageUrl: '' },
+  { id: 'sql-joins', title: 'SQL Joins', subject: 'DBMS', imageUrl: '' },
+  { id: 'thermodynamics', title: 'Thermodynamics', subject: 'Physics', imageUrl: '' },
 ]
 
 const subjectChips = [
@@ -18,15 +22,42 @@ const subjectChips = [
   'History',
 ]
 
-const toneColors = {
-  gold: 'bg-[#d1b98a]',
-  sand: 'bg-[#cbb58e]',
-  rose: 'bg-[#c48e9a]',
-  blue: 'bg-[#8aa7d9]',
-  mint: 'bg-[#86c4b5]',
-}
 
 const PreviewsPage = () => {
+  const { user, logout, isLoggedIn } = useAuth()
+  const [previewCards, setPreviewCards] = useState(fallbackPreviewCards)
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadPreviews = async () => {
+      try {
+        const response = await axiosInstance.get('/scrib/previews/')
+        const data = response.data
+        if (!isMounted || !Array.isArray(data)) {
+          return
+        }
+        const mapped = data.map((item) => ({
+          id: item.id ?? item.slug ?? item.title,
+          title: item.title,
+          subject: item.tags?.[0] || 'Preview',
+          imageUrl: item.image_url,
+        }))
+        if (mapped.length) {
+          setPreviewCards(mapped)
+        }
+      } catch {
+        // Keep fallback cards if API is unavailable.
+      }
+    }
+
+    loadPreviews()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-[#f8f7f3] text-[#1f1f1f]">
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
@@ -40,14 +71,34 @@ const PreviewsPage = () => {
               <p className="text-xs text-[#7b756d]">Free previews</p>
             </div>
           </Link>
-          <div className="flex items-center gap-3">
-            <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-              20 credits
-            </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e2dbd2] bg-white text-xs font-semibold">
-              S
+          {isLoggedIn ? (
+            <div className="flex items-center gap-3">
+              <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
+                Dashboard
+              </Link>
+              <button
+                onClick={logout}
+                className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold"
+              >
+                Log out
+              </button>
+              <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
+                {user?.credit_balance ?? 0} credits
+              </span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e2dbd2] bg-white text-xs font-semibold">
+                {getInitials(user?.full_name)}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
+                Log in
+              </Link>
+              <Link to="/signup" className="rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white">
+                Get started free
+              </Link>
+            </div>
+          )}
         </div>
       </header>
 
@@ -88,19 +139,28 @@ const PreviewsPage = () => {
             <p className="text-sm font-semibold">
               Don't see your topic? Generate custom handwritten notes for any topic in seconds.
             </p>
-            <button className="rounded-full bg-[#1b1b1b] px-4 py-2 text-xs font-semibold text-white">
+            <Link to="/generate" className="rounded-full bg-[#1b1b1b] px-4 py-2 text-xs font-semibold text-white">
               Generate now
-            </button>
+            </Link>
           </div>
         </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           {previewCards.map((note) => (
             <div key={note.id} className="rounded-2xl border border-[#e2dbd2] bg-white p-4">
-              <div className="rounded-xl border border-[#ece5db] bg-[#fbfaf7] p-4">
-                <div className={`h-1.5 w-4/5 rounded-full ${toneColors[note.tone]}`} />
-                <div className={`mt-2 h-1.5 w-3/4 rounded-full ${toneColors[note.tone]}`} />
-                <div className={`mt-2 h-1.5 w-2/3 rounded-full ${toneColors[note.tone]}`} />
+              <div className="rounded-xl border border-[#ece5db] bg-[#fbfaf7] p-3">
+                {note.imageUrl ? (
+                  <img
+                    src={note.imageUrl}
+                    alt={note.title}
+                    className="h-40 w-full rounded-lg object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex h-40 w-full items-center justify-center rounded-lg border border-dashed border-[#e0d9ce] bg-white text-xs text-[#9a9289]">
+                    Preview image
+                  </div>
+                )}
               </div>
               <div className="mt-4 flex items-center justify-between">
                 <div>

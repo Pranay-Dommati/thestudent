@@ -1,6 +1,36 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
+import { useGoogleAuth } from './hooks/useGoogleAuth'
 
 const LoginPage = () => {
+  const navigate = useNavigate()
+  const { login, googleLogin, isLoggedIn } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [isLoggedIn, navigate])
+
+  const handleLogin = async () => {
+    const result = await login(email, password)
+    if (result?.success) {
+      navigate('/dashboard')
+    }
+  }
+
+  const { signInWithGoogle } = useGoogleAuth(
+    async (credential) => {
+      const success = await googleLogin(credential)
+      if (success) {
+        navigate('/dashboard')
+      }
+    },
+  )
+
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-[#1f1f1f]">
       <header className="border-b border-[#e4ddd4] bg-white/90">
@@ -20,7 +50,10 @@ const LoginPage = () => {
           <h1 className="mt-3 text-2xl font-semibold">Welcome back</h1>
           <p className="mt-1 text-sm text-[#7b756d]">Log in to access your notes and credits.</p>
 
-          <button className="mt-6 flex w-full items-center justify-center gap-3 rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-sm font-semibold">
+          <button
+            onClick={signInWithGoogle}
+            className="mt-6 flex w-full items-center justify-center gap-3 rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-sm font-semibold"
+          >
             <span className="text-base">G</span> Continue with Google
           </button>
 
@@ -32,11 +65,15 @@ const LoginPage = () => {
             <input
               className="w-full rounded-lg border border-[#e0d9ce] px-3 py-2 text-sm"
               placeholder="Email address"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
             <input
               className="w-full rounded-lg border border-[#e0d9ce] px-3 py-2 text-sm"
               placeholder="Password"
               type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
             />
           </div>
 
@@ -44,7 +81,10 @@ const LoginPage = () => {
             <button className="text-xs font-semibold text-[#7b756d]">Forgot password?</button>
           </div>
 
-          <button className="mt-4 w-full rounded-lg border border-[#1f1f1f] bg-[#1f1f1f] px-4 py-2 text-sm font-semibold text-white">
+          <button
+            onClick={handleLogin}
+            className="mt-4 w-full rounded-lg border border-[#1f1f1f] bg-[#1f1f1f] px-4 py-2 text-sm font-semibold text-white"
+          >
             Log in
           </button>
 

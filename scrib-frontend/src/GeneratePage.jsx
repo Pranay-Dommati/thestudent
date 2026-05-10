@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
+import { getInitials } from './utils/user'
 
 const parseTopics = (text) => {
   if (!text) return []
@@ -18,6 +20,7 @@ const chunkTopics = (items, size) => {
 }
 
 const GeneratePage = () => {
+  const { user, logout, isLoggedIn } = useAuth()
   const [mode, setMode] = useState('manual')
   const [topics, setTopics] = useState(["Dijkstra's Algorithm"])
   const [newTopic, setNewTopic] = useState('')
@@ -73,9 +76,34 @@ const GeneratePage = () => {
               <p className="text-xs text-[#7b756d]">Generate</p>
             </div>
           </Link>
-          <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-            20 credits
-          </span>
+          {isLoggedIn ? (
+            <div className="flex items-center gap-3">
+              <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
+                Dashboard
+              </Link>
+              <button
+                onClick={logout}
+                className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold"
+              >
+                Log out
+              </button>
+              <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
+                {user?.credit_balance ?? 0} credits
+              </span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e2dbd2] bg-white text-xs font-semibold">
+                {getInitials(user?.full_name)}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
+                Log in
+              </Link>
+              <Link to="/signup" className="rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white">
+                Get started free
+              </Link>
+            </div>
+          )}
         </div>
       </header>
 

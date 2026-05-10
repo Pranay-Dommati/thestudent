@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
+import { getInitials } from './utils/user'
 
 const tiers = [
   {
@@ -44,6 +46,8 @@ const faqs = [
 ]
 
 const PricingPage = () => {
+  const { user, logout, isLoggedIn } = useAuth()
+
   return (
     <div className="min-h-screen bg-white text-[#1f1f1f]">
       <header className="border-b border-[#e4ddd4] bg-white/90">
@@ -53,14 +57,37 @@ const PricingPage = () => {
             <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
             <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
           </nav>
-          <div className="flex items-center gap-3">
-            <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
-              Log in
-            </Link>
-            <Link to="/signup" className="rounded-full border border-[#1f1f1f] bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white">
-              Get started free
-            </Link>
-          </div>
+          {isLoggedIn ? (
+            <div className="flex items-center gap-3">
+              <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
+                Dashboard
+              </Link>
+              <Link to="/profile" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
+                Profile
+              </Link>
+              <button
+                onClick={logout}
+                className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold"
+              >
+                Log out
+              </button>
+              <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
+                {user?.credit_balance ?? 0} credits
+              </span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e2dbd2] bg-white text-xs font-semibold">
+                {getInitials(user?.full_name)}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
+                Log in
+              </Link>
+              <Link to="/signup" className="rounded-full border border-[#1f1f1f] bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white">
+                Get started free
+              </Link>
+            </div>
+          )}
         </div>
       </header>
 

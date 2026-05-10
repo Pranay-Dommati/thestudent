@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'courses',
     'feedback',
     'newsletter',
+    'scrib',
     'rest_framework',
     'social_django',
 ]

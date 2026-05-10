@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
+import { getInitials } from './utils/user'
 
 const sections = [
   { id: 'profile', label: 'Profile' },
@@ -36,6 +38,7 @@ const toneColors = {
 
 const ProfilePage = () => {
   const [activeSection, setActiveSection] = useState('profile')
+  const { user, logout, isLoggedIn } = useAuth()
 
   const activeLabel = useMemo(
     () => sections.find((section) => section.id === activeSection)?.label || 'Profile',
@@ -56,9 +59,34 @@ const ProfilePage = () => {
             <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
             <Link to="/generate" className="hover:text-[#1f1f1f]">Generate</Link>
           </nav>
-          <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-            4 credits
-          </span>
+          {isLoggedIn ? (
+            <div className="flex items-center gap-3">
+              <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
+                Dashboard
+              </Link>
+              <button
+                onClick={logout}
+                className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold"
+              >
+                Log out
+              </button>
+              <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
+                {user?.credit_balance ?? 0} credits
+              </span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e2dbd2] bg-white text-xs font-semibold">
+                {getInitials(user?.full_name)}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
+                Log in
+              </Link>
+              <Link to="/signup" className="rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white">
+                Get started free
+              </Link>
+            </div>
+          )}
         </div>
       </header>
 
@@ -109,14 +137,14 @@ const ProfilePage = () => {
                     <p className="text-xs text-[#7b756d]">Full name</p>
                     <input
                       className="mt-2 w-full rounded-lg border border-[#e0d9ce] px-3 py-2 text-sm"
-                      defaultValue="Arjun Sharma"
+                      defaultValue={user?.full_name ?? 'Arjun Sharma'}
                     />
                   </div>
                   <div>
                     <p className="text-xs text-[#7b756d]">Email address</p>
                     <input
                       className="mt-2 w-full rounded-lg border border-[#e0d9ce] px-3 py-2 text-sm"
-                      defaultValue="arjun@college.edu"
+                      defaultValue={user?.email ?? 'arjun@college.edu'}
                     />
                   </div>
                   <div>
@@ -154,7 +182,7 @@ const ProfilePage = () => {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-sm font-semibold">Credits</h2>
-                    <p className="text-xs text-[#7b756d]">Current balance: 4 credits</p>
+                    <p className="text-xs text-[#7b756d]">Current balance: {user?.credit_balance ?? 0} credits</p>
                   </div>
                   <button className="rounded-lg border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
                     Buy credits

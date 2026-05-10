@@ -1,0 +1,299 @@
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import axios from 'axios'
+import axiosInstance from '../utils/axios'
+import customToast from '../utils/customToast'
+import storage from '../utils/storage'
+
+const AuthContext = createContext(null)
+const IS_DEV = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV
+
+const TOKEN_REFRESH_INTERVAL = 1000 * 60 * 4
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [lastChecked, setLastChecked] = useState(0)
+
+  const isValidatingRef = useRef(false)
+  const lastValidationTimeRef = useRef(0)
+
+  const handleAuthFailure = () => {
+    storage.clearAuthTokens()
+    setUser(null)
+    setIsLoggedIn(false)
+    setLastChecked(0)
+  }
+
+  const refreshAccessToken = async () => {
+    try {
+      const refreshToken = storage.getItem('refreshToken')
+      if (!refreshToken) {
+        if (IS_DEV) console.error('No refresh token found')
+        handleAuthFailure()
+        throw new Error('No refresh token')
+      }
+
+      const refreshUrl = `${axiosInstance.defaults.baseURL}/auth/token/refresh/`
+      const response = await axios.post(
+        refreshUrl,
+        { refresh: refreshToken },
+        { headers: { 'Content-Type': 'application/json' } },
+      )
+
+      if (response.data.access) {
+        storage.setItem('accessToken', response.data.access)
+        if (response.data.refresh) {
+          storage.setItem('refreshToken', response.data.refresh)
+        }
+        return true
+      }
+      return false
+    } catch (error) {
+      if (IS_DEV) console.error('Token refresh failed:', error)
+      const status = error.response?.status
+      if (status === 400 || status === 401 || (typeof status === 'number' && status >= 500)) {
+        handleAuthFailure()
+      }
+      throw error
+    }
+  }
+
+  const validateAuth = useCallback(async () => {
+    const now = Date.now()
+    if (isValidatingRef.current || (now - lastValidationTimeRef.current < 2000)) {
+      return isLoggedIn
+    }
+
+    const token = storage.getItem('accessToken')
+    const refreshToken = storage.getItem('refreshToken')
+
+    if (now - lastChecked < 60000 && isLoggedIn) {
+      return true
+    }
+
+    if (!token || !refreshToken) {
+      handleAuthFailure()
+      return false
+    }
+
+    isValidatingRef.current = true
+    lastValidationTimeRef.current = now
+
+    try {
+      try {
+        const profileUrl = `${axiosInstance.defaults.baseURL}/auth/profile/`
+        const response = await axios.get(profileUrl, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+        setUser(response.data)
+        setIsLoggedIn(true)
+        setLastChecked(now)
+        return true
+      } catch (error) {
+        if (error.response?.status === 401) {
+          await refreshAccessToken()
+          const newToken = storage.getItem('accessToken')
+          const profileUrl = `${axiosInstance.defaults.baseURL}/auth/profile/`
+          const retryResponse = await axios.get(profileUrl, {
+            headers: { 'Authorization': `Bearer ${newToken}` },
+          })
+          setUser(retryResponse.data)
+          setIsLoggedIn(true)
+          setLastChecked(now)
+          return true
+        }
+        throw error
+      }
+    } catch (error) {
+      if (IS_DEV) console.error('Auth validation failed:', error)
+      const status = error.response?.status
+      if (status === 401) {
+        handleAuthFailure()
+        return false
+      }
+      setIsLoggedIn(true)
+      setLastChecked(now)
+      return true
+    } finally {
+      isValidatingRef.current = false
+    }
+  }, [isLoggedIn, lastChecked])
+
+  useEffect(() => {
+    validateAuth().finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      const interval = setInterval(refreshAccessToken, TOKEN_REFRESH_INTERVAL)
+      return () => clearInterval(interval)
+    }
+  }, [isLoggedIn])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        validateAuth()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', validateAuth)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', validateAuth)
+    }
+  }, [validateAuth])
+
+  const register = async (registrationData) => {
+    try {
+      const response = await axiosInstance.post('/auth/register/', registrationData)
+      const { user: createdUser, tokens } = response.data
+
+      storage.setItem('accessToken', tokens.access)
+      storage.setItem('refreshToken', tokens.refresh)
+
+      setUser(createdUser)
+      setIsLoggedIn(true)
+      setLastChecked(Date.now())
+
+      customToast.success('Account created successfully!')
+      return true
+    } catch (error) {
+      if (IS_DEV) console.error('Registration error:', error.response?.data)
+      const errorData = error.response?.data
+      if (errorData) {
+        if (errorData.password) {
+          customToast.error(errorData.password[0])
+        } else if (errorData.email) {
+          customToast.error(errorData.email[0])
+        } else if (errorData.full_name) {
+          customToast.error(errorData.full_name[0])
+        } else if (errorData.non_field_errors) {
+          customToast.error(errorData.non_field_errors[0])
+        } else {
+          customToast.error('Registration failed. Please check your input.')
+        }
+      }
+      return false
+    }
+  }
+
+  const login = async (email, password) => {
+    try {
+      const response = await axiosInstance.post('/auth/login/', { email, password })
+      const { user: loggedInUser, access, refresh } = response.data
+
+      if (!access || !refresh) {
+        throw new Error('Invalid response: missing tokens')
+      }
+
+      storage.setItem('accessToken', access)
+      storage.setItem('refreshToken', refresh)
+
+      setUser(loggedInUser)
+      setIsLoggedIn(true)
+      setLastChecked(Date.now())
+
+      customToast.success('Login successful!', { id: 'auth-login' })
+      return { success: true }
+    } catch (error) {
+      if (IS_DEV) console.error('Login error:', error.response?.data)
+      if (error.response?.status === 404) {
+        const errorData = error.response.data
+        if (errorData.suggest_signup) {
+          return { success: false, suggestSignup: true }
+        }
+      } else if (error.response?.status === 400) {
+        const errorData = error.response.data
+        if (errorData.email) {
+          customToast.error(errorData.email[0], { id: 'auth-login' })
+        } else if (errorData.password) {
+          customToast.error(errorData.password[0], { id: 'auth-login' })
+        } else if (errorData.non_field_errors) {
+          customToast.error(errorData.non_field_errors[0], { id: 'auth-login' })
+        } else {
+          customToast.error('Invalid email or password', { id: 'auth-login' })
+        }
+      } else if (error.response?.status === 401) {
+        customToast.error('Invalid email or password', { id: 'auth-login' })
+      } else if (error.response?.status === 500) {
+        customToast.error('Server error. Please try again later.', { id: 'auth-login' })
+      } else {
+        customToast.error('Login failed. Please try again.', { id: 'auth-login' })
+      }
+      return { success: false }
+    }
+  }
+
+  const googleLogin = async (googleToken) => {
+    try {
+      const response = await axiosInstance.post('/auth/google/token/', {
+        id_token: googleToken,
+      })
+
+      const { user: loggedInUser, access, refresh } = response.data
+
+      storage.setItem('accessToken', access)
+      storage.setItem('refreshToken', refresh)
+
+      setUser(loggedInUser)
+      setIsLoggedIn(true)
+      setLastChecked(Date.now())
+
+      customToast.success('Login successful!', { id: 'auth-login' })
+      return true
+    } catch (error) {
+      const status = error.response?.status
+      const detail = error.response?.data || error.message || 'Unknown error'
+      if (IS_DEV) console.error('Google login error:', { status, detail })
+
+      if (error.response?.status === 400) {
+        customToast.error('Google authentication failed. Please try again.', { id: 'auth-login' })
+      } else if (error.response?.status === 500) {
+        customToast.error('Server error. Please try again later.', { id: 'auth-login' })
+      } else {
+        customToast.error('Google login failed. Please try again.', { id: 'auth-login' })
+      }
+      return false
+    }
+  }
+
+  const logout = () => {
+    handleAuthFailure()
+    customToast.success('Logged out successfully', { id: 'auth-logout' })
+  }
+
+  const setAuthSession = ({ user: sessionUser, access, refresh }) => {
+    if (access) storage.setItem('accessToken', access)
+    if (refresh) storage.setItem('refreshToken', refresh)
+    if (sessionUser) setUser(sessionUser)
+    setIsLoggedIn(true)
+    setLastChecked(Date.now())
+  }
+
+  const isAuthenticated = () => isLoggedIn && !!storage.getItem('accessToken')
+
+  return (
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      isLoggedIn,
+      isAuthenticated,
+      register,
+      login,
+      googleLogin,
+      logout,
+      setAuthSession,
+      validateAuth,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+export const useAuth = () => useContext(AuthContext)
+
+export default AuthContext
