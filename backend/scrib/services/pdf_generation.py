@@ -1,42 +1,113 @@
+import logging
 import uuid
 from io import BytesIO
 
 from django.conf import settings
-from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
 from PIL import Image
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 from .image_generation import generate_handwritten_image_bytes, ImageGenerationError
 
+logger = logging.getLogger(__name__)
+
 
 class PdfGenerationError(Exception):
     pass
 
 
-def _save_pdf_bytes(pdf_bytes):
-    """Save PDF to local filesystem, bypassing Cloudinary/default_storage.
+# ──────────────────────────────────────────────
+# S3 upload
+# ──────────────────────────────────────────────
 
-    Cloudinary returns 401 for private resources when accessed directly by the browser.
-    Saving locally lets Django serve it via /media/ which has no auth requirements.
+def _upload_to_s3(pdf_bytes, user_id):
+    """Upload PDF bytes to S3 under generated/{user_id}/{uuid}.pdf
+
+    Uses SCRIB_S3_ACCESS_KEY_ID / SCRIB_S3_SECRET_ACCESS_KEY from settings
+    (separate from the SES keys so permissions can be scoped to the scrib bucket).
+
+    Returns the public-facing HTTPS URL of the uploaded object.
     """
-    import os
-    from django.conf import settings as _settings
+    import boto3
+    from botocore.exceptions import BotoCoreError, ClientError
 
-    filename = f"{uuid.uuid4().hex}.pdf"
+    bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
+    region = getattr(settings, 'AWS_S3_REGION_NAME', 'ap-south-1')
+    access_key = getattr(settings, 'SCRIB_S3_ACCESS_KEY_ID', '')
+    secret_key = getattr(settings, 'SCRIB_S3_SECRET_ACCESS_KEY', '')
+
+    if not bucket or not access_key or not secret_key:
+        raise PdfGenerationError(
+            'S3 credentials are not configured. '
+            'Set SCRIB_S3_ACCESS_KEY_ID, SCRIB_S3_SECRET_ACCESS_KEY, '
+            'and AWS_STORAGE_BUCKET_NAME in your .env file.'
+        )
+
+    file_uuid = uuid.uuid4()
+    s3_key = f'generated/{user_id}/{file_uuid}.pdf'
+
+    try:
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name=region,
+        )
+        s3.put_object(
+            Bucket=bucket,
+            Key=s3_key,
+            Body=pdf_bytes,
+            ContentType='application/pdf',
+        )
+    except (BotoCoreError, ClientError) as exc:
+        logger.error('[scrib] S3 upload failed: %s', exc)
+        raise PdfGenerationError(f'Failed to upload PDF to S3: {exc}') from exc
+
+    pdf_url = f'https://{bucket}.s3.{region}.amazonaws.com/{s3_key}'
+    logger.info('[scrib] PDF saved to S3: %s', pdf_url)
+    return pdf_url
+
+
+# ──────────────────────────────────────────────
+# Fallback: local filesystem (development only)
+# ──────────────────────────────────────────────
+
+def _save_pdf_locally(pdf_bytes):
+    """Save PDF to local /media/ for development when S3 is not configured."""
+    import os
+
+    filename = f'{uuid.uuid4().hex}.pdf'
     rel_path = os.path.join('scrib', 'packs', filename)
-    abs_dir = os.path.join(_settings.MEDIA_ROOT, 'scrib', 'packs')
+    abs_dir = os.path.join(settings.MEDIA_ROOT, 'scrib', 'packs')
     os.makedirs(abs_dir, exist_ok=True)
     abs_path = os.path.join(abs_dir, filename)
 
     with open(abs_path, 'wb') as f:
         f.write(pdf_bytes)
 
-    # Return a relative media URL — the view calls ensure_absolute_url() to prefix the host
-    media_url = _settings.MEDIA_URL.rstrip('/')
+    media_url = settings.MEDIA_URL.rstrip('/')
     return f"{media_url}/{rel_path.replace(os.sep, '/')}"
 
+
+def _save_pdf_bytes(pdf_bytes, user_id=None):
+    """Save PDF — prefers S3, falls back to local filesystem."""
+    bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
+    access_key = getattr(settings, 'SCRIB_S3_ACCESS_KEY_ID', '')
+    secret_key = getattr(settings, 'SCRIB_S3_SECRET_ACCESS_KEY', '')
+
+    if bucket and access_key and secret_key and user_id is not None:
+        return _upload_to_s3(pdf_bytes, user_id)
+
+    logger.warning(
+        '[scrib] S3 not configured or user_id missing — saving PDF locally. '
+        'Set SCRIB_S3_ACCESS_KEY_ID, SCRIB_S3_SECRET_ACCESS_KEY, AWS_STORAGE_BUCKET_NAME.'
+    )
+    return _save_pdf_locally(pdf_bytes)
+
+
+# ──────────────────────────────────────────────
+# PDF assembly
+# ──────────────────────────────────────────────
 
 def _topics_to_prompt(topics):
     clean = [str(item).strip() for item in topics if str(item).strip()]
@@ -73,7 +144,22 @@ def _images_to_pdf(images):
     return buffer.getvalue()
 
 
-def generate_study_pack_pdf(pages, title):
+# ──────────────────────────────────────────────
+# Public entry point
+# ──────────────────────────────────────────────
+
+def generate_study_pack_pdf(pages, title, user_id=None):
+    """Generate a multi-page PDF study pack.
+
+    Args:
+        pages: List of page-topic lists, e.g. [['Recursion'], ['BFS & DFS']]
+        title: Human-readable title (used for logging only)
+        user_id: Authenticated user's primary key — used to scope the S3 path
+                 to generated/{user_id}/{uuid}.pdf
+
+    Returns:
+        dict with 'pdf_url' (str) and 'total_pages' (int)
+    """
     if not pages:
         raise PdfGenerationError('No pages provided')
 
@@ -83,8 +169,6 @@ def generate_study_pack_pdf(pages, title):
 
     # Generate all page images in PARALLEL — each page calls OpenAI independently,
     # so there is no reason to wait for page N before starting page N+1.
-    # max_workers=5 caps concurrent OpenAI connections to avoid rate-limit issues.
-    # executor.map preserves submission order so page sequence is guaranteed.
     from concurrent.futures import ThreadPoolExecutor
 
     def _generate_page(args):
@@ -96,12 +180,10 @@ def generate_study_pack_pdf(pages, title):
     try:
         with ThreadPoolExecutor(max_workers=min(len(pages), 5)) as executor:
             results = list(executor.map(_generate_page, enumerate(pages)))
-        # executor.map already preserves order, so results[0] = page 0, etc.
         images = [img for _, img in results]
     except ImageGenerationError as exc:
         raise PdfGenerationError(str(exc)) from exc
 
     pdf_bytes = _images_to_pdf(images)
-    pdf_url = _save_pdf_bytes(pdf_bytes)
+    pdf_url = _save_pdf_bytes(pdf_bytes, user_id=user_id)
     return {'pdf_url': pdf_url, 'total_pages': len(pages)}
-

@@ -490,7 +490,7 @@ class GenerateStudyPackView(APIView):
 
         # --- Phase 2: Generate PDF OUTSIDE any transaction ---
         try:
-            pdf_result = generate_study_pack_pdf(pages, title=title)
+            pdf_result = generate_study_pack_pdf(pages, title=title, user_id=request.user.id)
             pdf_url = pdf_result.get('pdf_url')
         except PdfGenerationError as exc:
             return error_response(str(exc), status_code=503, code='generation_unavailable')
