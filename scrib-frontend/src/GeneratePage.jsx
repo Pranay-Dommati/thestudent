@@ -36,8 +36,10 @@ const GeneratePage = () => {
   const [generatedNote, setGeneratedNote] = useState(null)
   const [generatedPack, setGeneratedPack] = useState(null)
   const [generationNotice, setGenerationNotice] = useState('')
-  const [dragIndex, setDragIndex] = useState(null)
   const [dragGroup, setDragGroup] = useState(null)
+  const [editingIndex, setEditingIndex] = useState(null)
+  const [addingToGroupIndex, setAddingToGroupIndex] = useState(null)
+  const [newGroupTopic, setNewGroupTopic] = useState('')
   const location = useLocation()
 
   const detectedTopics = useMemo(() => parseTopics(pasteText), [pasteText])
@@ -93,38 +95,26 @@ const GeneratePage = () => {
     setTopics((prev) => prev.map((item, idx) => (idx === index ? value : item)))
   }
 
-  const handleDragStart = (index) => (event) => {
-    setDragIndex(index)
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', String(index))
+  const handleRemoveTopic = (index) => {
+    setTopics((prev) => prev.filter((_, idx) => idx !== index))
   }
 
-  const handleDragOver = (event) => {
+  const handleEditTopic = (event) => {
+    const row = event.currentTarget.closest('[data-topic-row]')
+    const input = row ? row.querySelector('input') : null
+    const index = row ? Number.parseInt(row.dataset.topicIndex, 10) : null
+    if (Number.isInteger(index)) {
+      setEditingIndex(index)
+    }
+    if (input) {
+      input.focus()
+      input.select()
+    }
+  }
+
+  const handleGroupDragOver = (event) => {
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
-  }
-
-  const handleDragEnter = (event) => {
-    event.preventDefault()
-  }
-
-  const handleTopicDrop = (event) => {
-    event.preventDefault()
-    const data = event.dataTransfer.getData('text/plain')
-    const fromIndex = Number.parseInt(data, 10)
-    const row = event.target.closest('[data-topic-index]')
-    const toIndex = row ? Number.parseInt(row.dataset.topicIndex, 10) : null
-    if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) || fromIndex === toIndex) {
-      setDragIndex(null)
-      return
-    }
-    setTopics((prev) => {
-      const next = [...prev]
-      const [moved] = next.splice(fromIndex, 1)
-      next.splice(toIndex, 0, moved)
-      return next
-    })
-    setDragIndex(null)
   }
 
   const handleGroupDragStart = (groupIndex, topicIndex) => (event) => {
@@ -143,33 +133,86 @@ const GeneratePage = () => {
     const [fromGroupRaw, fromIndexRaw] = data.split(':')
     const fromGroup = Number.parseInt(fromGroupRaw, 10)
     const fromIndex = Number.parseInt(fromIndexRaw, 10)
-    const target = event.target.closest('[data-group-index][data-tag-index]')
-    if (!target) {
+    const groupTarget = event.target.closest('[data-group-index]')
+    if (!groupTarget) {
       setDragGroup(null)
       return
     }
-    const toGroup = Number.parseInt(target.dataset.groupIndex, 10)
-    const toIndex = Number.parseInt(target.dataset.tagIndex, 10)
-    if (!Number.isInteger(fromGroup) || !Number.isInteger(fromIndex) || !Number.isInteger(toGroup) || !Number.isInteger(toIndex)) {
+    const toGroup = Number.parseInt(groupTarget.dataset.groupIndex, 10)
+    const tagTarget = event.target.closest('[data-tag-index]')
+    const toIndex = tagTarget ? Number.parseInt(tagTarget.dataset.tagIndex, 10) : null
+    if (!Number.isInteger(fromGroup) || !Number.isInteger(fromIndex) || !Number.isInteger(toGroup)) {
       setDragGroup(null)
       return
     }
-    if (fromGroup !== toGroup || fromIndex === toIndex) {
+
+    if (fromGroup === toGroup && Number.isInteger(toIndex) && fromIndex === toIndex) {
       setDragGroup(null)
       return
     }
 
     setAiGroups((prev) => {
       const next = [...prev]
-      const group = { ...next[toGroup] }
-      const topics = [...(group.topics || [])]
-      const [moved] = topics.splice(fromIndex, 1)
-      topics.splice(toIndex, 0, moved)
-      group.topics = topics
-      next[toGroup] = group
+      const fromGroupData = { ...next[fromGroup] }
+      const fromTopics = [...(fromGroupData.topics || [])]
+      if (fromIndex < 0 || fromIndex >= fromTopics.length) {
+        return prev
+      }
+      const [moved] = fromTopics.splice(fromIndex, 1)
+
+      if (fromGroup === toGroup) {
+        let insertIndex = Number.isInteger(toIndex) ? toIndex : fromTopics.length
+        if (insertIndex > fromIndex) insertIndex -= 1
+        if (insertIndex < 0) insertIndex = 0
+        if (insertIndex > fromTopics.length) insertIndex = fromTopics.length
+        fromTopics.splice(insertIndex, 0, moved)
+        next[fromGroup] = { ...fromGroupData, topics: fromTopics }
+        return next
+      }
+
+      const targetGroupData = { ...next[toGroup] }
+      const targetTopics = [...(targetGroupData.topics || [])]
+      let insertIndex = Number.isInteger(toIndex) ? toIndex : targetTopics.length
+      if (insertIndex < 0) insertIndex = 0
+      if (insertIndex > targetTopics.length) insertIndex = targetTopics.length
+      targetTopics.splice(insertIndex, 0, moved)
+
+      next[toGroup] = { ...targetGroupData, topics: targetTopics }
+
+      if (fromTopics.length === 0) {
+        next.splice(fromGroup, 1)
+      } else {
+        next[fromGroup] = { ...fromGroupData, topics: fromTopics }
+      }
       return next
     })
     setDragGroup(null)
+  }
+
+  const handleAddTopicToGroup = (groupIndex) => {
+    const trimmed = newGroupTopic.trim()
+    if (!trimmed) {
+      setAddingToGroupIndex(null)
+      setNewGroupTopic('')
+      return
+    }
+    setAiGroups((prev) => {
+      const next = [...prev]
+      const groupData = { ...next[groupIndex] }
+      const currentTopics = [...(groupData.topics || [])]
+      currentTopics.push(trimmed)
+      next[groupIndex] = { ...groupData, topics: currentTopics }
+      return next
+    })
+    setAddingToGroupIndex(null)
+    setNewGroupTopic('')
+    
+    // Also push completely new tags to the global 'topics' layout 
+    // so they trigger total pdf credit increase if they didn't exist before.
+    setTopics((prev) => {
+        if (!prev.includes(trimmed)) return [...prev, trimmed]
+        return prev
+    })
   }
 
   const handleOrganize = async () => {
@@ -209,16 +252,6 @@ const GeneratePage = () => {
     [mode, detectedTopics, topics],
   )
   const isMultiTopic = baseTopics.length > 1
-
-  useEffect(() => {
-    if (!isMultiTopic) return
-    const timeout = setTimeout(() => {
-      if (!isOrganizing) {
-        handleOrganize()
-      }
-    }, 400)
-    return () => clearTimeout(timeout)
-  }, [isMultiTopic, baseTopics, mode])
 
   const handleGenerate = async () => {
     if (!isLoggedIn) {
@@ -367,31 +400,74 @@ const GeneratePage = () => {
             </div>
 
             {mode === 'manual' ? (
-              <div className="mt-4 rounded-xl border border-[#ded6cc]" onDragOver={handleDragOver} onDrop={handleTopicDrop}>
+              <div className="mt-4 rounded-xl border border-[#ded6cc]">
                 {topics.map((topic, index) => (
                   <div
-                    key={`${topic}-${index}`}
+                    key={`topic-${index}`}
                     className="flex items-center gap-3 border-b border-[#efe7dd] px-4 py-3 last:border-b-0"
-                    onDragEnter={handleDragEnter}
+                    data-topic-row
                     data-topic-index={index}
-                    draggable
-                    onDragStart={handleDragStart(index)}
-                    onDragEnd={() => setDragIndex(null)}
                   >
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#d9d1c7] text-xs text-[#6b655d]">
                       {index + 1}
                     </span>
                     <input
-                      className="w-full border-none bg-transparent text-sm outline-none"
+                      className={`w-full text-sm outline-none ${
+                        editingIndex === index
+                          ? 'rounded-md border border-[#e0d9ce] bg-white px-2 py-1 text-[#1f1f1f]'
+                          : 'border-none bg-transparent text-[#6b655d]'
+                      }`}
                       value={topic}
                       onChange={(event) => handleTopicChange(event.target.value, index)}
+                      readOnly={editingIndex !== index}
+                      onBlur={() => setEditingIndex(null)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          setEditingIndex(null)
+                        }
+                      }}
                     />
-                    <span className="grid grid-cols-2 gap-0.5 text-[#b9b1a7] cursor-grab">
-                      <span className="h-1 w-1 rounded-full bg-current" />
-                      <span className="h-1 w-1 rounded-full bg-current" />
-                      <span className="h-1 w-1 rounded-full bg-current" />
-                      <span className="h-1 w-1 rounded-full bg-current" />
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {editingIndex === index ? (
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault() // prevent onBlur from firing first
+                            setEditingIndex(null)
+                          }}
+                          className="rounded-full border border-[#1f1f1f] bg-[#1f1f1f] p-1 text-white"
+                          aria-label="Save topic"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleEditTopic}
+                          className="rounded-full border border-[#e0d9ce] bg-white p-1 text-[#a39b92] transition-colors hover:text-[#1f1f1f]"
+                          aria-label="Edit topic"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTopic(index)}
+                        className="rounded-full border border-[#e0d9ce] bg-white p-1 text-[#a39b92] transition-colors hover:text-[#dc2626]"
+                        aria-label="Remove topic"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="9" />
+                          <line x1="8" y1="12" x2="16" y2="12" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 ))}
                 <div className="flex flex-wrap items-center gap-3 border-t border-[#efe7dd] px-4 py-3">
@@ -479,16 +555,6 @@ const GeneratePage = () => {
                     {baseTopics.length} topics organized into {pageGroups.length} pages
                     <span className="ml-2 rounded-full bg-[#eef1ff] px-2 py-0.5 text-[10px] font-semibold text-[#4c5ea5]">AI</span>
                   </div>
-                  <button
-                    onClick={() => {
-                      setIsOrganized(false)
-                      setAiGroups([])
-                      setAiMeta(null)
-                    }}
-                    className="text-xs font-semibold text-[#4a6aa6]"
-                  >
-                    Edit
-                  </button>
                 </div>
                 <div className="px-4 py-3">
                   <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.2em] text-[#9a9289]">
@@ -502,30 +568,82 @@ const GeneratePage = () => {
                             <span className="rounded-full bg-[#e8eefb] px-2 py-1 text-[10px] font-semibold text-[#4a6aa6]">
                               Page {index + 1}
                             </span>
-                            {page.title}
                           </span>
                         </div>
                         <div className="px-4 py-3">
-                          <div className="flex flex-wrap gap-2" onDragOver={handleDragOver} onDrop={handleGroupDrop}>
+                          <div
+                            className="flex min-h-[32px] flex-wrap gap-2"
+                            data-group-index={index}
+                            onDragOver={handleGroupDragOver}
+                            onDrop={handleGroupDrop}
+                          >
                             {page.tags.map((tag, tagIndex) => (
                               <span
                                 key={`${tag}-${tagIndex}`}
-                                className="inline-flex items-center gap-2 rounded-full border border-[#e0d9ce] bg-white px-3 py-1 text-[11px] text-[#5a554f]"
+                                className="inline-flex cursor-grab items-center gap-2 rounded-full border border-[#e0d9ce] bg-white px-3 py-1.5 text-[11px] text-[#5a554f] shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
                                 data-group-index={index}
                                 data-tag-index={tagIndex}
                                 draggable
                                 onDragStart={handleGroupDragStart(index, tagIndex)}
                                 onDragEnd={() => setDragGroup(null)}
                               >
-                                <span className="grid grid-cols-2 gap-0.5 text-[#c3bbb1]">
-                                  <span className="h-1 w-1 rounded-full bg-current" />
-                                  <span className="h-1 w-1 rounded-full bg-current" />
-                                  <span className="h-1 w-1 rounded-full bg-current" />
-                                  <span className="h-1 w-1 rounded-full bg-current" />
-                                </span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#a39b92]">
+                                  <circle cx="9" cy="5" r="1" />
+                                  <circle cx="9" cy="12" r="1" />
+                                  <circle cx="9" cy="19" r="1" />
+                                  <circle cx="15" cy="5" r="1" />
+                                  <circle cx="15" cy="12" r="1" />
+                                  <circle cx="15" cy="19" r="1" />
+                                </svg>
                                 {tag}
                               </span>
                             ))}
+                            
+                            {addingToGroupIndex === index ? (
+                                <div className="inline-flex items-center gap-1 rounded-full border border-[#1f1f1f] bg-white pl-3 text-[11px]">
+                                    <input
+                                      autoFocus
+                                      className="w-24 bg-transparent outline-none"
+                                      placeholder="Topic name..."
+                                      value={newGroupTopic}
+                                      onChange={(e) => setNewGroupTopic(e.target.value)}
+                                      onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                              handleAddTopicToGroup(index)
+                                          } else if (e.key === 'Escape') {
+                                              setAddingToGroupIndex(null)
+                                              setNewGroupTopic('')
+                                          }
+                                      }}
+                                      onBlur={() => handleAddTopicToGroup(index)}
+                                    />
+                                    <button 
+                                      className="rounded-full bg-[#1f1f1f] p-1 text-white m-0.5"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault()
+                                        handleAddTopicToGroup(index)
+                                      }}
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                  onClick={() => {
+                                      setAddingToGroupIndex(index)
+                                      setNewGroupTopic('')
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#cfc7be] bg-transparent px-3 py-1.5 text-[11px] text-[#7b756d] transition-colors hover:border-[#a39b92] hover:text-[#5a554f]"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                  </svg>
+                                  Add
+                                </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -557,19 +675,23 @@ const GeneratePage = () => {
               </p>
             </div>
             <button
-              onClick={handleGenerate}
-              disabled={isGenerating || !isLoggedIn || (isMultiTopic && !isOrganized)}
+              onClick={isMultiTopic && !isOrganized ? handleOrganize : handleGenerate}
+              disabled={isOrganizing || isGenerating || (!isLoggedIn && (isOrganized || !isMultiTopic))}
               className={`rounded-xl px-5 py-2 text-xs font-semibold ${
-                isGenerating || !isLoggedIn || (isMultiTopic && !isOrganized)
+                isOrganizing || isGenerating || (!isLoggedIn && (isOrganized || !isMultiTopic))
                   ? 'bg-[#e7e2db] text-[#b1aaa0]'
                   : 'bg-[#1b1b1b] text-white'
               }`}
             >
-              {isGenerating
-                ? 'Generating...'
-                : isMultiTopic
-                  ? 'Generate PDF'
-                  : 'Generate note'}
+              {isOrganizing
+                ? 'Organizing...'
+                : isGenerating
+                  ? 'Generating...'
+                  : isMultiTopic && !isOrganized
+                    ? 'Organize with AI'
+                    : isMultiTopic
+                      ? 'Generate PDF'
+                      : 'Generate note'}
             </button>
           </div>
         </div>
