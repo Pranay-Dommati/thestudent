@@ -4,10 +4,15 @@ from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransa
 
 @admin.register(PreviewNote)
 class PreviewNoteAdmin(admin.ModelAdmin):
-    list_display = ('title', 'slug', 'page_count', 'is_active', 'created_at')
+    list_display = ('title', 'slug', 'page_count', 'has_pdf', 'is_active', 'created_at')
     list_filter = ('is_active',)
     search_fields = ('title', 'slug')
     prepopulated_fields = {'slug': ('title',)}
+    fields = ('title', 'slug', 'tags', 'pdf_url', 'image_url', 'page_count', 'is_active')
+
+    @admin.display(boolean=True, description='PDF set')
+    def has_pdf(self, obj):
+        return bool(obj.pdf_url)
 
 
 @admin.register(GeneratedNote)

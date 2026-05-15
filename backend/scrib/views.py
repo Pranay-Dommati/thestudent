@@ -465,29 +465,46 @@ class GenerateStudyPackView(APIView):
         required_credits = len(pages)
         page_count = len(pages)
 
+        # --- Phase 1: Quick DB check (credits), then release connection ---
+        from django.db import close_old_connections
+        close_old_connections()
+
+        user_model = get_user_model()
+        user = user_model.objects.get(pk=request.user.pk)
+        is_admin = is_admin_user(user)
+        credits_used = 0 if is_admin else required_credits
+        balance = get_credit_balance(user)
+        if not is_admin and balance < required_credits:
+            return error_response(
+                'Not enough credits',
+                status_code=402,
+                code='insufficient_credits',
+                details={'balance': balance, 'required': required_credits},
+            )
+
+        # Explicitly close DB connection before the long PDF generation.
+        # PDF generation calls OpenAI per page and can take 30–120s per page,
+        # which would cause MySQL to drop the idle connection.
+        from django.db import connection as _db_conn
+        _db_conn.close()
+
+        # --- Phase 2: Generate PDF OUTSIDE any transaction ---
+        try:
+            pdf_result = generate_study_pack_pdf(pages, title=title)
+            pdf_url = pdf_result.get('pdf_url')
+        except PdfGenerationError as exc:
+            return error_response(str(exc), status_code=503, code='generation_unavailable')
+
+        if not pdf_url:
+            return error_response('PDF generation failed', status_code=502, code='generation_failed')
+
+        pdf_url = ensure_absolute_url(request, pdf_url)
+
+        # --- Phase 3: Fresh DB connection, save in a short transaction ---
+        close_old_connections()
+
         with transaction.atomic():
-            user = get_user_model().objects.select_for_update().get(pk=request.user.pk)
-            is_admin = is_admin_user(user)
-            credits_used = 0 if is_admin else required_credits
-            balance = get_credit_balance(user)
-            if not is_admin and balance < required_credits:
-                return error_response(
-                    'Not enough credits',
-                    status_code=402,
-                    code='insufficient_credits',
-                    details={'balance': balance, 'required': required_credits},
-                )
-
-            try:
-                pdf_result = generate_study_pack_pdf(pages, title=title)
-                pdf_url = pdf_result.get('pdf_url')
-            except PdfGenerationError as exc:
-                return error_response(str(exc), status_code=503, code='generation_unavailable')
-
-            if not pdf_url:
-                return error_response('PDF generation failed', status_code=502, code='generation_failed')
-
-            pdf_url = ensure_absolute_url(request, pdf_url)
+            user = user_model.objects.select_for_update().get(pk=request.user.pk)
 
             pack = StudyPack.objects.create(
                 user=user,

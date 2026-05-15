@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
 import axiosInstance from './utils/axios'
@@ -24,6 +24,7 @@ const chunkTopics = (items, size) => {
 
 const GeneratePage = () => {
   const { user, logout, isLoggedIn } = useAuth()
+  const navigate = useNavigate()
   const [mode, setMode] = useState('manual')
   const [topics, setTopics] = useState([])
   const [newTopic, setNewTopic] = useState('')
@@ -578,9 +579,25 @@ const GeneratePage = () => {
                 const titleStr = isPack ? `${item.name} — ${pages} pages` : item.name
                 const dateStr = item._displayDate || new Date(item.created_at).toLocaleDateString()
 
+                const openViewer = () => {
+                  if (!url || item._isPending) return
+                  const topicsArr = Array.isArray(item.topics_json)
+                    ? item.topics_json.map(t => Array.isArray(t) ? t.join(', ') : t)
+                    : Array.from({ length: pages }, (_, i) => `Page ${i + 1}`)
+                  navigate('/view', {
+                    state: {
+                      pdfUrl: url,
+                      title: item.name || titleStr,
+                      topics: topicsArr,
+                      totalPages: pages,
+                      isPack: true,
+                    }
+                  })
+                }
+
                 return (
                   <div key={id} className="flex items-center justify-between rounded-xl border border-[#e2dbd2] bg-[#fbfaf7] px-4 py-3">
-                    <div className="flex items-center gap-4 cursor-pointer" onClick={() => !item._isPending && url && window.open(url, '_blank')}>
+                    <div className="flex items-center gap-4 cursor-pointer" onClick={openViewer}>
                       <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white shadow-sm">
                         {item._isPending ? (
                            <svg className="animate-spin text-[#a39b92]" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -617,7 +634,7 @@ const GeneratePage = () => {
                         <div className="text-xs font-medium text-[#7b756d] italic px-2">Generating...</div>
                       ) : (
                         <>
-                          <button onClick={() => url && window.open(url, '_blank')} className="flex items-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee]">
+                          <button onClick={openViewer} className="flex items-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee]">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                             Open
                           </button>

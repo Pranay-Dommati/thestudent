@@ -5,7 +5,6 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from PIL import Image
-from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
@@ -17,10 +16,26 @@ class PdfGenerationError(Exception):
 
 
 def _save_pdf_bytes(pdf_bytes):
-    filename = f"scrib/packs/{uuid.uuid4().hex}.pdf"
-    content = ContentFile(pdf_bytes)
-    saved_path = default_storage.save(filename, content)
-    return default_storage.url(saved_path)
+    """Save PDF to local filesystem, bypassing Cloudinary/default_storage.
+
+    Cloudinary returns 401 for private resources when accessed directly by the browser.
+    Saving locally lets Django serve it via /media/ which has no auth requirements.
+    """
+    import os
+    from django.conf import settings as _settings
+
+    filename = f"{uuid.uuid4().hex}.pdf"
+    rel_path = os.path.join('scrib', 'packs', filename)
+    abs_dir = os.path.join(_settings.MEDIA_ROOT, 'scrib', 'packs')
+    os.makedirs(abs_dir, exist_ok=True)
+    abs_path = os.path.join(abs_dir, filename)
+
+    with open(abs_path, 'wb') as f:
+        f.write(pdf_bytes)
+
+    # Return a relative media URL — the view calls ensure_absolute_url() to prefix the host
+    media_url = _settings.MEDIA_URL.rstrip('/')
+    return f"{media_url}/{rel_path.replace(os.sep, '/')}"
 
 
 def _topics_to_prompt(topics):
@@ -32,22 +47,27 @@ def _topics_to_prompt(topics):
 
 def _images_to_pdf(images):
     buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=letter)
-    page_width, page_height = letter
-    margin = 36
+    pdf = None
 
     for image_bytes in images:
         image = Image.open(BytesIO(image_bytes)).convert('RGB')
-        image_width, image_height = image.size
-        max_width = page_width - margin * 2
-        max_height = page_height - margin * 2
-        scale = min(max_width / image_width, max_height / image_height)
-        draw_width = image_width * scale
-        draw_height = image_height * scale
-        x = (page_width - draw_width) / 2
-        y = (page_height - draw_height) / 2
-        pdf.drawImage(ImageReader(image), x, y, draw_width, draw_height)
+        img_width, img_height = image.size
+
+        # Use image pixel dimensions as the PDF page size (1pt = 1px at 72 DPI).
+        # This makes the PDF page exactly match the image — no white border, no scaling.
+        page_size = (img_width, img_height)
+
+        if pdf is None:
+            pdf = canvas.Canvas(buffer, pagesize=page_size)
+        else:
+            pdf.setPageSize(page_size)
+
+        # Draw image edge-to-edge from bottom-left (0, 0)
+        pdf.drawImage(ImageReader(image), 0, 0, img_width, img_height)
         pdf.showPage()
+
+    if pdf is None:
+        raise PdfGenerationError('No images to convert to PDF')
 
     pdf.save()
     return buffer.getvalue()
@@ -61,14 +81,27 @@ def generate_study_pack_pdf(pages, title):
     if placeholder_url:
         return {'pdf_url': placeholder_url, 'total_pages': len(pages)}
 
+    # Generate all page images in PARALLEL — each page calls OpenAI independently,
+    # so there is no reason to wait for page N before starting page N+1.
+    # max_workers=5 caps concurrent OpenAI connections to avoid rate-limit issues.
+    # executor.map preserves submission order so page sequence is guaranteed.
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _generate_page(args):
+        index, page_topics = args
+        prompt = _topics_to_prompt(page_topics)
+        image_bytes = generate_handwritten_image_bytes(prompt)
+        return index, image_bytes
+
     try:
-        images = []
-        for page_topics in pages:
-            prompt = _topics_to_prompt(page_topics)
-            images.append(generate_handwritten_image_bytes(prompt))
+        with ThreadPoolExecutor(max_workers=min(len(pages), 5)) as executor:
+            results = list(executor.map(_generate_page, enumerate(pages)))
+        # executor.map already preserves order, so results[0] = page 0, etc.
+        images = [img for _, img in results]
     except ImageGenerationError as exc:
         raise PdfGenerationError(str(exc)) from exc
 
     pdf_bytes = _images_to_pdf(images)
     pdf_url = _save_pdf_bytes(pdf_bytes)
     return {'pdf_url': pdf_url, 'total_pages': len(pages)}
+

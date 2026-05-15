@@ -7,11 +7,17 @@ class PreviewNote(models.Model):
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True)
     tags = models.JSONField(default=list, blank=True)
-    image_url = models.URLField()
+    image_url = models.URLField(blank=True, default='')  # legacy thumbnail / preview image
+    pdf_url = models.URLField(blank=True, null=True)      # PDF stored in S3 — primary download URL
     page_count = models.PositiveIntegerField(default=1)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def resolved_pdf_url(self):
+        """Return pdf_url if set. Empty string = not available yet."""
+        return self.pdf_url or ''
 
     class Meta:
         ordering = ['title']

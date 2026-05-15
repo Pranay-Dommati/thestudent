@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
 import axiosInstance from './utils/axios'
 
 const fallbackPreviewCards = [
-  { id: 'osi-model', title: 'OSI Model', subject: 'Computer Networks', imageUrl: '' },
-  { id: 'newtons-laws', title: "Newton's Laws", subject: 'Physics', imageUrl: '' },
-  { id: 'krebs-cycle', title: 'Krebs Cycle', subject: 'Biology', imageUrl: '' },
-  { id: 'sql-joins', title: 'SQL Joins', subject: 'DBMS', imageUrl: '' },
-  { id: 'thermodynamics', title: 'Thermodynamics', subject: 'Physics', imageUrl: '' },
+  { id: 'osi-model', title: 'OSI Model', subject: 'Computer Networks', pdfUrl: null, pageCount: 1 },
+  { id: 'newtons-laws', title: "Newton's Laws", subject: 'Physics', pdfUrl: null, pageCount: 1 },
+  { id: 'krebs-cycle', title: 'Krebs Cycle', subject: 'Biology', pdfUrl: null, pageCount: 1 },
+  { id: 'sql-joins', title: 'SQL Joins', subject: 'DBMS', pdfUrl: null, pageCount: 1 },
+  { id: 'thermodynamics', title: 'Thermodynamics', subject: 'Physics', pdfUrl: null, pageCount: 1 },
 ]
 
 const subjectChips = [
@@ -25,6 +25,7 @@ const subjectChips = [
 
 const PreviewsPage = () => {
   const { user, logout, isLoggedIn } = useAuth()
+  const navigate = useNavigate()
   const [previewCards, setPreviewCards] = useState(fallbackPreviewCards)
 
   useEffect(() => {
@@ -41,7 +42,8 @@ const PreviewsPage = () => {
           id: item.id ?? item.slug ?? item.title,
           title: item.title,
           subject: item.tags?.[0] || 'Preview',
-          imageUrl: item.image_url,
+          pdfUrl: item.pdf_url || null,
+          pageCount: item.page_count || 1,
         }))
         if (mapped.length) {
           setPreviewCards(mapped)
@@ -147,19 +149,38 @@ const PreviewsPage = () => {
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           {previewCards.map((note) => (
-            <div key={note.id} className="rounded-2xl border border-[#e2dbd2] bg-white p-4">
-              <div className="rounded-xl border border-[#ece5db] bg-[#fbfaf7] p-3">
-                {note.imageUrl ? (
-                  <img
-                    src={note.imageUrl}
-                    alt={note.title}
-                    className="h-40 w-full rounded-lg object-cover"
-                    loading="lazy"
-                  />
+            <div
+              key={note.id}
+              className={`rounded-2xl border border-[#e2dbd2] bg-white p-4 transition-shadow ${note.pdfUrl ? 'cursor-pointer hover:shadow-md' : 'opacity-60'}`}
+              onClick={() => {
+                if (!note.pdfUrl) return
+                navigate('/view', {
+                  state: {
+                    pdfUrl: note.pdfUrl,
+                    title: note.title,
+                    topics: [note.subject || note.title],
+                    totalPages: note.pageCount || 1,
+                    isPack: true,
+                  }
+                })
+              }}
+            >
+              {/* PDF preview placeholder — shows PDF icon + page count */}
+              <div className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border border-[#ece5db] bg-[#fbfaf7]">
+                {note.pdfUrl ? (
+                  <>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="8" y1="13" x2="16" y2="13" />
+                      <line x1="8" y1="17" x2="16" y2="17" />
+                    </svg>
+                    <span className="rounded-full bg-[#f0f0ff] px-2 py-0.5 text-[10px] font-semibold text-[#6366f1]">
+                      PDF · {note.pageCount || 1} page
+                    </span>
+                  </>
                 ) : (
-                  <div className="flex h-40 w-full items-center justify-center rounded-lg border border-dashed border-[#e0d9ce] bg-white text-xs text-[#9a9289]">
-                    Preview image
-                  </div>
+                  <span className="text-xs text-[#9a9289]">Coming soon</span>
                 )}
               </div>
               <div className="mt-4 flex items-center justify-between">

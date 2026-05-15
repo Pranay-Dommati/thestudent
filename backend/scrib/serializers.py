@@ -3,6 +3,12 @@ from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransa
 
 
 class PreviewNoteSerializer(serializers.ModelSerializer):
+    # Always expose pdf_url — falls back to image_url for legacy rows
+    pdf_url = serializers.SerializerMethodField()
+
+    def get_pdf_url(self, obj):
+        return obj.resolved_pdf_url
+
     class Meta:
         model = PreviewNote
         fields = [
@@ -10,7 +16,8 @@ class PreviewNoteSerializer(serializers.ModelSerializer):
             'title',
             'slug',
             'tags',
-            'image_url',
+            'pdf_url',     # primary: PDF URL
+            'image_url',   # kept for backward-compat thumbnail usage
             'page_count',
         ]
 

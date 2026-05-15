@@ -16,8 +16,11 @@ class ImageGenerationError(Exception):
 
 def _build_handwritten_prompt(topic):
     return (
-        "Create a clean handwritten study note page on lined paper. "
-        "Use headings, bullet points, and short formulas if needed. "
+        "Create a detailed handwritten study note page on a plain white background (no lines, no grid, no ruled paper). "
+        "The writing should look like neat handwriting in blue or black ink on a blank white page. "
+        "Include a large clear title at the top, numbered sections with headings, bullet points, "
+        "diagrams or simple illustrations where relevant, short formulas if needed, and a clean layout. "
+        "The background must be pure white with no horizontal lines or notebook texture. "
         f"Topic: {topic}."
     )
 
