@@ -24,7 +24,7 @@ const chunkTopics = (items, size) => {
 const GeneratePage = () => {
   const { user, logout, isLoggedIn } = useAuth()
   const [mode, setMode] = useState('manual')
-  const [topics, setTopics] = useState(["Dijkstra's Algorithm"])
+  const [topics, setTopics] = useState([])
   const [newTopic, setNewTopic] = useState('')
   const [pasteText, setPasteText] = useState('')
   const [isOrganizing, setIsOrganizing] = useState(false)
@@ -40,38 +40,68 @@ const GeneratePage = () => {
   const [editingIndex, setEditingIndex] = useState(null)
   const [addingToGroupIndex, setAddingToGroupIndex] = useState(null)
   const [newGroupTopic, setNewGroupTopic] = useState('')
+  const [aiGeneratedWarning, setAiGeneratedWarning] = useState(false)
   const location = useLocation()
 
   const detectedTopics = useMemo(() => parseTopics(pasteText), [pasteText])
-  const pageGroups = useMemo(() => {
-    if (isOrganized && aiGroups.length) {
-      return aiGroups.map((group, index) => ({
-        id: `page-${index + 1}`,
-        title: group.title || `Page ${index + 1}`,
-        tags: group.topics || [],
-      }))
+
+  const handleOrganizeTopics = async () => {
+    const trimmed = pasteText.trim()
+    if (!trimmed) {
+      customToast.error('Please paste some syllabus text first.')
+      return
     }
-    const source = mode === 'paste' ? detectedTopics : topics
-    return chunkTopics(source, 3).map((group, index) => ({
-      id: `page-${index + 1}`,
-      title: group[0] || `Page ${index + 1}`,
-      tags: group,
-    }))
-  }, [mode, detectedTopics, topics, isOrganized, aiGroups])
 
-  useEffect(() => {
-    setIsOrganized(false)
-    setIsOrganizing(false)
-    setAiGroups([])
-    setAiMeta(null)
-  }, [pasteText, mode])
+    setIsOrganizing(true)
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+      if (!apiKey) throw new Error('Gemini API key not found in environment variables')
 
-  useEffect(() => {
-    if (mode !== 'manual') return
-    setIsOrganized(false)
-    setAiGroups([])
-    setAiMeta(null)
-  }, [topics, mode])
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Extract all specific study topics from the following syllabus. Rules:\n1. Make each topic standalone and understandable out of context. If it's a sub-topic, prepend its parent category (e.g., 'Testing Strategies: Strategic issues', 'Testing: Testing Concepts').\n2. Do NOT exclude sub-topics. For example, in 'Testing Strategies: A Strategic approach to software testing', the topic is 'Testing Strategies: A Strategic approach to software testing'.\n3. Return ONLY a valid JSON array of strings, and nothing else. No markdown or code block tags.\n\nSyllabus:\n${trimmed}`
+            }]
+          }]
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Gemini API Error Response:', response.status, errorData)
+        throw new Error('Failed to parse syllabus with AI')
+      }
+      
+      const data = await response.json()
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
+      const jsonMatch = content.match(/\[.*\]/s)
+      let parsedTopics = []
+      
+      try {
+        parsedTopics = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content)
+      } catch (err) {
+        throw new Error('AI did not return valid JSON')
+      }
+
+      if (!Array.isArray(parsedTopics) || !parsedTopics.length) {
+         throw new Error('AI returned an empty or invalid array')
+      }
+
+      setTopics(parsedTopics)
+      setMode('manual')
+      setPasteText('')
+      setAiGeneratedWarning(true)
+      customToast.success('Topics organized successfully!')
+    } catch (error) {
+      console.error(error)
+      customToast.error('Failed to organize topics using AI. Please try again.')
+    } finally {
+      setIsOrganizing(false)
+    }
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -112,141 +142,6 @@ const GeneratePage = () => {
     }
   }
 
-  const handleGroupDragOver = (event) => {
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
-  }
-
-  const handleGroupDragStart = (groupIndex, topicIndex) => (event) => {
-    setDragGroup({ groupIndex, topicIndex })
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', `${groupIndex}:${topicIndex}`)
-  }
-
-  const handleGroupDrop = (event) => {
-    event.preventDefault()
-    const data = event.dataTransfer.getData('text/plain')
-    if (!data || !data.includes(':')) {
-      setDragGroup(null)
-      return
-    }
-    const [fromGroupRaw, fromIndexRaw] = data.split(':')
-    const fromGroup = Number.parseInt(fromGroupRaw, 10)
-    const fromIndex = Number.parseInt(fromIndexRaw, 10)
-    const groupTarget = event.target.closest('[data-group-index]')
-    if (!groupTarget) {
-      setDragGroup(null)
-      return
-    }
-    const toGroup = Number.parseInt(groupTarget.dataset.groupIndex, 10)
-    const tagTarget = event.target.closest('[data-tag-index]')
-    const toIndex = tagTarget ? Number.parseInt(tagTarget.dataset.tagIndex, 10) : null
-    if (!Number.isInteger(fromGroup) || !Number.isInteger(fromIndex) || !Number.isInteger(toGroup)) {
-      setDragGroup(null)
-      return
-    }
-
-    if (fromGroup === toGroup && Number.isInteger(toIndex) && fromIndex === toIndex) {
-      setDragGroup(null)
-      return
-    }
-
-    setAiGroups((prev) => {
-      const next = [...prev]
-      const fromGroupData = { ...next[fromGroup] }
-      const fromTopics = [...(fromGroupData.topics || [])]
-      if (fromIndex < 0 || fromIndex >= fromTopics.length) {
-        return prev
-      }
-      const [moved] = fromTopics.splice(fromIndex, 1)
-
-      if (fromGroup === toGroup) {
-        let insertIndex = Number.isInteger(toIndex) ? toIndex : fromTopics.length
-        if (insertIndex > fromIndex) insertIndex -= 1
-        if (insertIndex < 0) insertIndex = 0
-        if (insertIndex > fromTopics.length) insertIndex = fromTopics.length
-        fromTopics.splice(insertIndex, 0, moved)
-        next[fromGroup] = { ...fromGroupData, topics: fromTopics }
-        return next
-      }
-
-      const targetGroupData = { ...next[toGroup] }
-      const targetTopics = [...(targetGroupData.topics || [])]
-      let insertIndex = Number.isInteger(toIndex) ? toIndex : targetTopics.length
-      if (insertIndex < 0) insertIndex = 0
-      if (insertIndex > targetTopics.length) insertIndex = targetTopics.length
-      targetTopics.splice(insertIndex, 0, moved)
-
-      next[toGroup] = { ...targetGroupData, topics: targetTopics }
-
-      if (fromTopics.length === 0) {
-        next.splice(fromGroup, 1)
-      } else {
-        next[fromGroup] = { ...fromGroupData, topics: fromTopics }
-      }
-      return next
-    })
-    setDragGroup(null)
-  }
-
-  const handleAddTopicToGroup = (groupIndex) => {
-    const trimmed = newGroupTopic.trim()
-    if (!trimmed) {
-      setAddingToGroupIndex(null)
-      setNewGroupTopic('')
-      return
-    }
-    setAiGroups((prev) => {
-      const next = [...prev]
-      const groupData = { ...next[groupIndex] }
-      const currentTopics = [...(groupData.topics || [])]
-      currentTopics.push(trimmed)
-      next[groupIndex] = { ...groupData, topics: currentTopics }
-      return next
-    })
-    setAddingToGroupIndex(null)
-    setNewGroupTopic('')
-    
-    // Also push completely new tags to the global 'topics' layout 
-    // so they trigger total pdf credit increase if they didn't exist before.
-    setTopics((prev) => {
-        if (!prev.includes(trimmed)) return [...prev, trimmed]
-        return prev
-    })
-  }
-
-  const handleOrganize = async () => {
-    const source = mode === 'paste' ? detectedTopics : topics
-    const cleaned = source.map((item) => item.trim()).filter(Boolean)
-    if (cleaned.length < 2) {
-      customToast.error('Add at least two topics to organize.')
-      return
-    }
-
-    setIsOrganizing(true)
-    setIsOrganized(false)
-    setAiGroups([])
-    setAiMeta(null)
-
-    try {
-      const response = await axiosInstance.post('/scrib/organize-topics/', { topics: cleaned })
-      const data = response.data || {}
-      const groups = Array.isArray(data.groups) ? data.groups : []
-      if (!groups.length) {
-        throw new Error('AI grouping returned no pages')
-      }
-      setAiGroups(groups)
-      setAiMeta(data.credit_savings || null)
-      setIsOrganized(true)
-      customToast.success('Topics organized into pages!')
-    } catch (error) {
-      const message = error?.response?.data?.message || 'Unable to organize topics right now.'
-      customToast.error(message, { id: 'organize-error' })
-    } finally {
-      setIsOrganizing(false)
-    }
-  }
-
   const baseTopics = useMemo(
     () => (mode === 'paste' ? detectedTopics : topics).map((item) => item.trim()).filter(Boolean),
     [mode, detectedTopics, topics],
@@ -270,11 +165,6 @@ const GeneratePage = () => {
       return
     }
 
-    if (isPdfMode && !isOrganized) {
-      customToast.error('Organise your topics before generating.')
-      return
-    }
-
     setIsGenerating(true)
     setGeneratedNote(null)
     setGeneratedPack(null)
@@ -282,7 +172,9 @@ const GeneratePage = () => {
 
     try {
       if (isPdfMode) {
-        const payload = { title: 'Study Pack', pages: pageGroups.map((group) => group.tags) }
+        // One topic per page
+        const pages = cleanedTopics.map(topic => [topic])
+        const payload = { title: 'Study Pack', pages }
 
         const response = await axiosInstance.post('/scrib/generate-study-pack/', payload)
         const data = response.data || {}
@@ -400,10 +292,11 @@ const GeneratePage = () => {
             </div>
 
             {mode === 'manual' ? (
-              <div className="mt-4 rounded-xl border border-[#ded6cc]">
-                {topics.map((topic, index) => (
-                  <div
-                    key={`topic-${index}`}
+              <>
+                <div className="mt-4 rounded-xl border border-[#ded6cc]">
+                  {topics.map((topic, index) => (
+                    <div
+                      key={`topic-${index}`}
                     className="flex items-center gap-3 border-b border-[#efe7dd] px-4 py-3 last:border-b-0"
                     data-topic-row
                     data-topic-index={index}
@@ -492,6 +385,10 @@ const GeneratePage = () => {
                   </button>
                 </div>
               </div>
+              {aiGeneratedWarning && (
+                <p className="mt-2 text-xs text-[#8a847c]">AI makes mistakes so recheck once.</p>
+              )}
+            </>
             ) : (
               <div className="mt-4 rounded-xl border border-[#ded6cc] bg-[#faf8f3] p-4">
                 <textarea
@@ -510,7 +407,17 @@ const GeneratePage = () => {
                       <li>Or just a messy list - AI will figure it out</li>
                     </ul>
                   </div>
-                ) : null}
+                ) : (
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={handleOrganizeTopics}
+                      disabled={isOrganizing}
+                      className="rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                    >
+                      {isOrganizing ? 'Organizing...' : 'Organize topics'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -522,142 +429,21 @@ const GeneratePage = () => {
                       <span className="h-2 w-2 rounded-full bg-[#6db05d]" />
                       Output:{' '}
                       <span className="font-semibold text-[#1f1f1f]">
-                        {isMultiTopic ? `PDF - ${pageGroups.length} pages` : '1 image'}
+                        {isMultiTopic ? `PDF - ${baseTopics.length} pages` : '1 image'}
                       </span>
                       {isMultiTopic ? null : ' - PNG - 1 credit'}
                     </span>
-                    {isMultiTopic ? (
-                      <span className="text-[#7b756d]">AI will group topics into pages</span>
-                    ) : null}
                   </div>
                 </div>
               </>
-            ) : (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-                <span className="text-[#2b7a4b]">
-                  {detectedTopics.length ? `${detectedTopics.length} topics detected` : 'Paste topics to see cost'}
-                  {detectedTopics.length ? ' across units' : ''}
-                </span>
-              </div>
-            )}
-
-            {isOrganizing ? (
-              <div className="mt-4 flex items-center gap-2 text-xs text-[#7b756d]">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#cfc7bd] border-t-[#6f6a63]" />
-                AI is reading your syllabus...
-              </div>
             ) : null}
 
-            {isOrganized ? (
-              <div className="mt-6 rounded-xl border border-[#e8e0d6] bg-[#fbfaf7]">
-                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#efe7dd] px-4 py-3 text-xs">
-                  <div className="text-[#2b7a4b]">
-                    {baseTopics.length} topics organized into {pageGroups.length} pages
-                    <span className="ml-2 rounded-full bg-[#eef1ff] px-2 py-0.5 text-[10px] font-semibold text-[#4c5ea5]">AI</span>
-                  </div>
-                </div>
-                <div className="px-4 py-3">
-                  <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.2em] text-[#9a9289]">
-                    <span>AI page grouping</span>
-                  </div>
-                  <div className="mt-4 space-y-3">
-                    {pageGroups.map((page, index) => (
-                      <div key={page.id} className="rounded-xl border border-[#e8e0d6] bg-white">
-                        <div className="flex items-center justify-between border-b border-[#f1e9df] px-4 py-2 text-sm font-semibold">
-                          <span className="flex items-center gap-2">
-                            <span className="rounded-full bg-[#e8eefb] px-2 py-1 text-[10px] font-semibold text-[#4a6aa6]">
-                              Page {index + 1}
-                            </span>
-                          </span>
-                        </div>
-                        <div className="px-4 py-3">
-                          <div
-                            className="flex min-h-[32px] flex-wrap gap-2"
-                            data-group-index={index}
-                            onDragOver={handleGroupDragOver}
-                            onDrop={handleGroupDrop}
-                          >
-                            {page.tags.map((tag, tagIndex) => (
-                              <span
-                                key={`${tag}-${tagIndex}`}
-                                className="inline-flex cursor-grab items-center gap-2 rounded-full border border-[#e0d9ce] bg-white px-3 py-1.5 text-[11px] text-[#5a554f] shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
-                                data-group-index={index}
-                                data-tag-index={tagIndex}
-                                draggable
-                                onDragStart={handleGroupDragStart(index, tagIndex)}
-                                onDragEnd={() => setDragGroup(null)}
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#a39b92]">
-                                  <circle cx="9" cy="5" r="1" />
-                                  <circle cx="9" cy="12" r="1" />
-                                  <circle cx="9" cy="19" r="1" />
-                                  <circle cx="15" cy="5" r="1" />
-                                  <circle cx="15" cy="12" r="1" />
-                                  <circle cx="15" cy="19" r="1" />
-                                </svg>
-                                {tag}
-                              </span>
-                            ))}
-                            
-                            {addingToGroupIndex === index ? (
-                                <div className="inline-flex items-center gap-1 rounded-full border border-[#1f1f1f] bg-white pl-3 text-[11px]">
-                                    <input
-                                      autoFocus
-                                      className="w-24 bg-transparent outline-none"
-                                      placeholder="Topic name..."
-                                      value={newGroupTopic}
-                                      onChange={(e) => setNewGroupTopic(e.target.value)}
-                                      onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                              handleAddTopicToGroup(index)
-                                          } else if (e.key === 'Escape') {
-                                              setAddingToGroupIndex(null)
-                                              setNewGroupTopic('')
-                                          }
-                                      }}
-                                      onBlur={() => handleAddTopicToGroup(index)}
-                                    />
-                                    <button 
-                                      className="rounded-full bg-[#1f1f1f] p-1 text-white m-0.5"
-                                      onMouseDown={(e) => {
-                                        e.preventDefault()
-                                        handleAddTopicToGroup(index)
-                                      }}
-                                    >
-                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="20 6 9 17 4 12" />
-                                      </svg>
-                                    </button>
-                                </div>
-                            ) : (
-                                <button
-                                  onClick={() => {
-                                      setAddingToGroupIndex(index)
-                                      setNewGroupTopic('')
-                                  }}
-                                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#cfc7be] bg-transparent px-3 py-1.5 text-[11px] text-[#7b756d] transition-colors hover:border-[#a39b92] hover:text-[#5a554f]"
-                                >
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="12" y1="5" x2="12" y2="19" />
-                                    <line x1="5" y1="12" x2="19" y2="12" />
-                                  </svg>
-                                  Add
-                                </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#eee6dc] bg-[#f7f4ee] px-6 py-4">
             <div>
               <p className="text-sm font-semibold">
-                {isMultiTopic ? `${pageGroups.length} credits` : '1 credit'}
+                {isMultiTopic ? `${baseTopics.length} credits` : '1 credit'}
               </p>
               <p className="text-xs text-[#7b756d]">
                 {isLoggedIn ? (
@@ -665,7 +451,7 @@ const GeneratePage = () => {
                     {creditBalance} credits remaining{' '}
                     <span className="ml-2 rounded-full bg-[#f2e6c9] px-2 py-0.5 text-[10px] font-semibold text-[#7a5a26]">
                       {isMultiTopic
-                        ? `${Math.max(creditBalance - pageGroups.length, 0)} after`
+                        ? `${Math.max(creditBalance - baseTopics.length, 0)} after`
                         : `${Math.max(creditBalance - 1, 0)} after`}
                     </span>
                   </>
@@ -675,20 +461,18 @@ const GeneratePage = () => {
               </p>
             </div>
             <button
-              onClick={isMultiTopic && !isOrganized ? handleOrganize : handleGenerate}
-              disabled={isOrganizing || isGenerating || (!isLoggedIn && (isOrganized || !isMultiTopic))}
+              onClick={handleGenerate}
+              disabled={isGenerating || !isLoggedIn || mode === 'paste' || isOrganizing}
               className={`rounded-xl px-5 py-2 text-xs font-semibold ${
-                isOrganizing || isGenerating || (!isLoggedIn && (isOrganized || !isMultiTopic))
+                isGenerating || !isLoggedIn || mode === 'paste' || isOrganizing
                   ? 'bg-[#e7e2db] text-[#b1aaa0]'
                   : 'bg-[#1b1b1b] text-white'
               }`}
             >
-              {isOrganizing
-                ? 'Organizing...'
-                : isGenerating
+              {isGenerating
                   ? 'Generating...'
-                  : isMultiTopic && !isOrganized
-                    ? 'Organize with AI'
+                  : mode === 'paste'
+                    ? 'Organize topics first'
                     : isMultiTopic
                       ? 'Generate PDF'
                       : 'Generate note'}

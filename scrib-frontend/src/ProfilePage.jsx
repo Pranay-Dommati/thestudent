@@ -38,6 +38,7 @@ const toneColors = {
 
 const ProfilePage = () => {
   const [activeSection, setActiveSection] = useState('profile')
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
   const { user, logout, isLoggedIn } = useAuth()
 
   const activeLabel = useMemo(
@@ -120,8 +121,13 @@ const ProfilePage = () => {
                 <h1 className="mt-2 text-xl font-semibold">{activeLabel}</h1>
               </div>
               {activeSection === 'profile' ? (
-                <button className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
-                  Save changes
+                <button
+                  onClick={() => setIsEditingProfile(!isEditingProfile)}
+                  className={`rounded-full border border-[#d9d1c7] px-4 py-2 text-xs font-semibold ${
+                    isEditingProfile ? 'bg-[#1f1f1f] text-white border-[#1f1f1f]' : 'bg-white'
+                  }`}
+                >
+                  {isEditingProfile ? 'Save changes' : 'Edit profile'}
                 </button>
               ) : null}
             </div>
@@ -136,29 +142,49 @@ const ProfilePage = () => {
                   <div>
                     <p className="text-xs text-[#7b756d]">Full name</p>
                     <input
-                      className="mt-2 w-full rounded-lg border border-[#e0d9ce] px-3 py-2 text-sm"
+                      className={`mt-2 w-full rounded-lg px-3 py-2 text-sm outline-none ${
+                        isEditingProfile
+                          ? 'border border-[#e0d9ce] bg-white text-[#1f1f1f]'
+                          : 'border-transparent bg-[#faf8f3] text-[#7b756d] hover:bg-[#f3f0e8]'
+                      }`}
                       defaultValue={user?.full_name ?? 'Arjun Sharma'}
+                      readOnly={!isEditingProfile}
                     />
                   </div>
                   <div>
                     <p className="text-xs text-[#7b756d]">Email address</p>
                     <input
-                      className="mt-2 w-full rounded-lg border border-[#e0d9ce] px-3 py-2 text-sm"
+                      className={`mt-2 w-full rounded-lg px-3 py-2 text-sm outline-none ${
+                        isEditingProfile
+                          ? 'border border-[#e0d9ce] bg-white text-[#1f1f1f]'
+                          : 'border-transparent bg-[#faf8f3] text-[#7b756d] hover:bg-[#f3f0e8]'
+                      }`}
                       defaultValue={user?.email ?? 'arjun@college.edu'}
+                      readOnly={!isEditingProfile}
                     />
                   </div>
                   <div>
                     <p className="text-xs text-[#7b756d]">Phone</p>
                     <input
-                      className="mt-2 w-full rounded-lg border border-[#e0d9ce] px-3 py-2 text-sm"
+                      className={`mt-2 w-full rounded-lg px-3 py-2 text-sm outline-none ${
+                        isEditingProfile
+                          ? 'border border-[#e0d9ce] bg-white text-[#1f1f1f]'
+                          : 'border-transparent bg-[#faf8f3] text-[#7b756d] hover:bg-[#f3f0e8]'
+                      }`}
                       defaultValue="+91 98765 43210"
+                      readOnly={!isEditingProfile}
                     />
                   </div>
                   <div>
                     <p className="text-xs text-[#7b756d]">Timezone</p>
                     <input
-                      className="mt-2 w-full rounded-lg border border-[#e0d9ce] px-3 py-2 text-sm"
+                      className={`mt-2 w-full rounded-lg px-3 py-2 text-sm outline-none ${
+                        isEditingProfile
+                          ? 'border border-[#e0d9ce] bg-white text-[#1f1f1f]'
+                          : 'border-transparent bg-[#faf8f3] text-[#7b756d] hover:bg-[#f3f0e8]'
+                      }`}
                       defaultValue="Asia/Kolkata"
+                      readOnly={!isEditingProfile}
                     />
                   </div>
                 </div>
