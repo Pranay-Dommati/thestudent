@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
 import axiosInstance from './utils/axios'
 import customToast from './utils/customToast'
+import { forceDownload } from './utils/download'
 
 const parseTopics = (text) => {
   if (!text) return []
@@ -41,7 +42,65 @@ const GeneratePage = () => {
   const [addingToGroupIndex, setAddingToGroupIndex] = useState(null)
   const [newGroupTopic, setNewGroupTopic] = useState('')
   const [aiGeneratedWarning, setAiGeneratedWarning] = useState(false)
+  const [activeTab, setActiveTab] = useState('generate')
+  const [historyItems, setHistoryItems] = useState([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [openDropdownId, setOpenDropdownId] = useState(null)
+  const [imageLoaded, setImageLoaded] = useState(false)
   const location = useLocation()
+
+  const loadHistory = async () => {
+    if (!isLoggedIn) return
+    setIsLoadingHistory(true)
+    try {
+      const [notesRes, packsRes] = await Promise.all([
+        axiosInstance.get('/scrib/my-notes/'),
+        axiosInstance.get('/scrib/my-study-packs/')
+      ])
+      
+      const notes = (notesRes.data || []).map(item => ({
+        ...item,
+        type: 'note',
+        name: item.prompt || 'Note'
+      }))
+      const packs = (packsRes.data || []).map(item => ({
+        ...item,
+        type: 'pack',
+        name: item.title || 'Study Pack'
+      }))
+      
+      const combined = [...notes, ...packs].sort(
+        (a, b) => new Date(b.created_at) - new Date(a.created_at)
+      )
+
+      setHistoryItems(prev => {
+        const pendingItems = prev.filter(item => item._isPending)
+        return [...pendingItems, ...combined]
+      })
+    } catch (err) {
+      console.error(err)
+      customToast.error('Failed to load history')
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadHistory()
+    }
+  }, [activeTab, isLoggedIn])
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.dropdown-container')) {
+        setOpenDropdownId(null)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
+
 
   const detectedTopics = useMemo(() => parseTopics(pasteText), [pasteText])
 
@@ -146,7 +205,6 @@ const GeneratePage = () => {
     () => (mode === 'paste' ? detectedTopics : topics).map((item) => item.trim()).filter(Boolean),
     [mode, detectedTopics, topics],
   )
-  const isMultiTopic = baseTopics.length > 1
 
   const handleGenerate = async () => {
     if (!isLoggedIn) {
@@ -158,7 +216,6 @@ const GeneratePage = () => {
 
     const sourceTopics = mode === 'paste' ? detectedTopics : topics
     const cleanedTopics = sourceTopics.map((item) => item.trim()).filter(Boolean)
-    const isPdfMode = cleanedTopics.length > 1
 
     if (!cleanedTopics.length) {
       customToast.error('Add at least one topic to generate a note.')
@@ -169,42 +226,45 @@ const GeneratePage = () => {
     setGeneratedNote(null)
     setGeneratedPack(null)
     setGenerationNotice('')
+    setImageLoaded(false)
+
+    // Switch to history tab immediately and add a pending item
+    setActiveTab('history')
+    const tempId = `pending-${Date.now()}`
+    const tempItem = {
+      id: tempId,
+      type: 'pack',
+      name: cleanedTopics.length === 1 ? cleanedTopics[0] : 'Study Pack',
+      created_at: new Date().toISOString(),
+      status: 'pending',
+      total_pages: cleanedTopics.length,
+      credits_used: cleanedTopics.length,
+      _displayDate: 'Generating...',
+      _isPending: true
+    }
+    setHistoryItems((prev) => [tempItem, ...prev])
 
     try {
-      if (isPdfMode) {
-        // One topic per page
-        const pages = cleanedTopics.map(topic => [topic])
-        const payload = { title: 'Study Pack', pages }
+      // One topic per page
+      const pages = cleanedTopics.map(topic => [topic])
+      const payload = { title: cleanedTopics.length === 1 ? cleanedTopics[0] : 'Study Pack', pages }
 
-        const response = await axiosInstance.post('/scrib/generate-study-pack/', payload)
-        const data = response.data || {}
-        setGeneratedPack({
-          title: data.title || 'Study Pack',
-          pdfUrl: data.pdf_url,
-          totalPages: data.total_pages ?? cleanedTopics.length,
-        })
-        if (typeof data.credit_balance === 'number') {
-          setLatestCreditBalance(data.credit_balance)
-        }
-        customToast.success('Study pack ready!')
-      } else {
-        const response = await axiosInstance.post('/scrib/generate-note/', {
-          topic: cleanedTopics[0],
-        })
-        const data = response.data || {}
-        setGeneratedNote({
-          title: cleanedTopics[0],
-          imageUrl: data.image_url,
-        })
-        if (typeof data.credit_balance === 'number') {
-          setLatestCreditBalance(data.credit_balance)
-        }
-        if (data.cache_hit) {
-          setGenerationNotice('We found a matching note in the cache, so it was delivered faster.')
-        }
-        customToast.success('Note generated successfully!')
+      const response = await axiosInstance.post('/scrib/generate-study-pack/', payload)
+      const data = response.data || {}
+      setGeneratedPack({
+        title: data.title || payload.title,
+        pdfUrl: data.pdf_url,
+        totalPages: data.total_pages ?? cleanedTopics.length,
+      })
+      if (typeof data.credit_balance === 'number') {
+        setLatestCreditBalance(data.credit_balance)
       }
+      customToast.success(cleanedTopics.length === 1 ? 'PDF generated successfully!' : 'Study pack ready!')
+      setHistoryItems(prev => prev.filter(item => item.id !== tempId))
+      loadHistory() // Refresh history to get the real item
     } catch (error) {
+      // Remove the pending item if request fails
+      setHistoryItems(prev => prev.filter(item => item.id !== tempId))
       const message = error?.response?.data?.message || 'Generation failed. Please try again.'
       customToast.error(message, { id: 'gen-error' })
     } finally {
@@ -259,9 +319,34 @@ const GeneratePage = () => {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-10">
-        <div className="rounded-2xl border border-[#e2dbd2] bg-white">
-          <div className="border-b border-[#eee6dc] px-6 py-4">
-            <h1 className="text-lg font-semibold">Generate handwritten notes</h1>
+        <div className="mb-6 flex space-x-6 border-b border-[#e2dbd2]">
+          <button
+            onClick={() => setActiveTab('generate')}
+            className={`pb-2 text-sm font-semibold transition-colors ${
+              activeTab === 'generate'
+                ? 'border-b-2 border-[#1f1f1f] text-[#1f1f1f]'
+                : 'text-[#8c857e] hover:text-[#1f1f1f]'
+            }`}
+          >
+            Generate
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`pb-2 text-sm font-semibold transition-colors ${
+              activeTab === 'history'
+                ? 'border-b-2 border-[#1f1f1f] text-[#1f1f1f]'
+                : 'text-[#8c857e] hover:text-[#1f1f1f]'
+            }`}
+          >
+            History
+          </button>
+        </div>
+
+        {activeTab === 'generate' && (
+          <>
+            <div className="rounded-2xl border border-[#e2dbd2] bg-white">
+              <div className="border-b border-[#eee6dc] px-6 py-4">
+                <h1 className="text-lg font-semibold">Generate handwritten notes</h1>
             <p className="text-sm text-[#7b756d]">
               Type topics one by one, or paste your full syllabus - AI will organise it.
             </p>
@@ -429,9 +514,8 @@ const GeneratePage = () => {
                       <span className="h-2 w-2 rounded-full bg-[#6db05d]" />
                       Output:{' '}
                       <span className="font-semibold text-[#1f1f1f]">
-                        {isMultiTopic ? `PDF - ${baseTopics.length} pages` : '1 image'}
+                        PDF - {baseTopics.length} page{baseTopics.length !== 1 ? 's' : ''}
                       </span>
-                      {isMultiTopic ? null : ' - PNG - 1 credit'}
                     </span>
                   </div>
                 </div>
@@ -443,16 +527,14 @@ const GeneratePage = () => {
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#eee6dc] bg-[#f7f4ee] px-6 py-4">
             <div>
               <p className="text-sm font-semibold">
-                {isMultiTopic ? `${baseTopics.length} credits` : '1 credit'}
+                {baseTopics.length} credit{baseTopics.length !== 1 ? 's' : ''}
               </p>
               <p className="text-xs text-[#7b756d]">
                 {isLoggedIn ? (
                   <>
                     {creditBalance} credits remaining{' '}
                     <span className="ml-2 rounded-full bg-[#f2e6c9] px-2 py-0.5 text-[10px] font-semibold text-[#7a5a26]">
-                      {isMultiTopic
-                        ? `${Math.max(creditBalance - baseTopics.length, 0)} after`
-                        : `${Math.max(creditBalance - 1, 0)} after`}
+                      {Math.max(creditBalance - baseTopics.length, 0)} after
                     </span>
                   </>
                 ) : (
@@ -473,78 +555,87 @@ const GeneratePage = () => {
                   ? 'Generating...'
                   : mode === 'paste'
                     ? 'Organize topics first'
-                    : isMultiTopic
-                      ? 'Generate PDF'
-                      : 'Generate note'}
+                    : 'Generate PDF'}
             </button>
           </div>
         </div>
+        </>
+        )}
 
-        {generationNotice ? (
-          <div className="mt-4 rounded-xl border border-[#e8e0d6] bg-[#fbfaf7] px-5 py-3 text-xs text-[#6f6a63]">
-            {generationNotice}
-          </div>
-        ) : null}
+        {activeTab === 'history' && (
+          <div className="space-y-4">
+            {isLoadingHistory && historyItems.filter(i => i._isPending).length === 0 ? (
+              <p className="text-sm text-[#7b756d]">Loading history...</p>
+            ) : historyItems.length === 0 ? (
+              <p className="text-sm text-[#7b756d]">No history yet. Generate some notes first!</p>
+            ) : (
+              historyItems.map((item) => {
+                const isPack = item.type === 'pack'
+                const url = isPack ? item.pdfUrl || item.pdf_url : item.imageUrl || item.image_url
+                const id = `${item.type}-${item.id}`
+                const pages = item.total_pages || item.page_count || (isPack ? 3 : 1)
+                const credits = item.credits_used || pages
+                const titleStr = isPack ? `${item.name} — ${pages} pages` : item.name
+                const dateStr = item._displayDate || new Date(item.created_at).toLocaleDateString()
 
-        {generatedNote ? (
-          <div className="mt-6 rounded-2xl border border-[#e2dbd2] bg-white p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold">Generated note</p>
-                <p className="text-xs text-[#7b756d]">{generatedNote.title}</p>
-              </div>
-              {generatedNote.imageUrl ? (
-                <a
-                  href={generatedNote.imageUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold"
-                >
-                  Open image
-                </a>
-              ) : null}
-            </div>
-            <div className="mt-4 rounded-xl border border-[#ece5db] bg-[#fbfaf7] p-3">
-              {generatedNote.imageUrl ? (
-                <img
-                  src={generatedNote.imageUrl}
-                  alt={generatedNote.title}
-                  className="w-full rounded-lg object-cover"
-                />
-              ) : (
-                <div className="flex h-48 w-full items-center justify-center rounded-lg border border-dashed border-[#e0d9ce] bg-white text-xs text-[#9a9289]">
-                  Image will appear here
-                </div>
-              )}
-            </div>
+                return (
+                  <div key={id} className="flex items-center justify-between rounded-xl border border-[#e2dbd2] bg-[#fbfaf7] px-4 py-3">
+                    <div className="flex items-center gap-4 cursor-pointer" onClick={() => !item._isPending && url && window.open(url, '_blank')}>
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white shadow-sm">
+                        {item._isPending ? (
+                           <svg className="animate-spin text-[#a39b92]" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                           </svg>
+                        ) : isPack ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="8" y1="13" x2="16" y2="13"></line>
+                            <line x1="8" y1="17" x2="16" y2="17"></line>
+                          </svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="8" y1="13" x2="16" y2="13"></line>
+                            <line x1="8" y1="17" x2="16" y2="17"></line>
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-[#1f1f1f]">{titleStr}</h3>
+                        <p className="mt-0.5 text-xs text-[#7b756d]">
+                          {dateStr} • {isPack ? 'PDF' : 'Image'} • {credits} credit{credits > 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${isPack ? 'bg-[#f0f0ff] text-[#6366f1]' : 'bg-[#ecfdf5] text-[#10b981]'}`}>
+                        {isPack ? 'PDF' : 'Image'}
+                      </span>
+                      {item._isPending ? (
+                        <div className="text-xs font-medium text-[#7b756d] italic px-2">Generating...</div>
+                      ) : (
+                        <>
+                          <button onClick={() => url && window.open(url, '_blank')} className="flex items-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee]">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            Open
+                          </button>
+                          <button onClick={(e) => forceDownload(url, titleStr, isPack)} className={`flex h-7 w-7 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] ${!url && 'pointer-events-none opacity-50'}`}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                          </button>
+                          <button onClick={() => { if(url) { navigator.clipboard.writeText(url); customToast.success('Link copied to clipboard!'); } }} disabled={!url} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })
+            )}
           </div>
-        ) : null}
-
-        {generatedPack ? (
-          <div className="mt-6 rounded-2xl border border-[#e2dbd2] bg-white p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold">Study pack ready</p>
-                <p className="text-xs text-[#7b756d]">{generatedPack.totalPages} pages</p>
-              </div>
-              {generatedPack.pdfUrl ? (
-                <a
-                  href={generatedPack.pdfUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold"
-                >
-                  Download PDF
-                </a>
-              ) : null}
-            </div>
-            <div className="mt-4 rounded-xl border border-[#ece5db] bg-[#fbfaf7] p-4 text-xs text-[#7b756d]">
-              {generatedPack.pdfUrl
-                ? 'Your study pack is ready to download.'
-                : 'PDF link will appear here when ready.'}
-            </div>
-          </div>
-        ) : null}
+        )}
       </main>
     </div>
   )

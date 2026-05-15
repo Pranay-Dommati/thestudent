@@ -7,22 +7,22 @@ const tiers = [
     id: 'starter',
     price: 'Rs 49',
     credits: '10 credits',
-    helper: '10 note images or 10 PDF pages',
+    helper: '10 PDF pages',
     highlight: false,
   },
   {
     id: 'standard',
     price: 'Rs 99',
     credits: '20 credits',
-    helper: '20 note images or 20 PDF pages',
-    tag: 'Best value - Rs 4.95/note',
+    helper: '20 PDF pages',
+    tag: 'Best value - Rs 4.95/page',
     highlight: true,
   },
   {
     id: 'power',
     price: 'Rs 199',
     credits: '40 credits',
-    helper: '40 note images or 40 PDF pages',
+    helper: '40 PDF pages',
     highlight: false,
   },
 ]
@@ -36,7 +36,7 @@ const faqs = [
   {
     id: 'count',
     question: 'What counts as 1 credit?',
-    answer: 'One note image (PNG) or one page inside a PDF. A 3-page PDF costs 3 credits.',
+    answer: 'One page inside a PDF. A 3-page PDF costs 3 credits.',
   },
   {
     id: 'redownload',

@@ -369,37 +369,57 @@ class GenerateNoteView(APIView):
 
         required_credits = 1
 
+        # --- Phase 1: Quick DB check (credits + cache), then release connection ---
+        from django.db import close_old_connections
+        close_old_connections()
+
+        user_model = get_user_model()
+        user = user_model.objects.get(pk=request.user.pk)
+        is_admin = is_admin_user(user)
+        required_credits = 0 if is_admin else required_credits
+        balance = get_credit_balance(user)
+        if not is_admin and balance < required_credits:
+            return error_response(
+                'Not enough credits',
+                status_code=402,
+                code='insufficient_credits',
+                details={'balance': balance, 'required': required_credits},
+            )
+
+        cache_hit = find_cached_note(normalized)
+        source = GeneratedNote.SOURCE_GENERATED
+        image_url = None
+
+        if cache_hit:
+            image_url = cache_hit['image_url']
+            source = cache_hit['source']
+
+        # Explicitly close DB connection before the long OpenAI call.
+        # This prevents MySQL "server has gone away" — the connection would
+        # time out anyway during the 30–120s generation wait.
+        from django.db import connection as _db_conn
+        _db_conn.close()
+
+        # --- Phase 2: Generate image OUTSIDE any transaction (can take 30–120s) ---
+        if not image_url:
+            try:
+                generation = generate_handwritten_note(topic)
+                image_url = generation.get('image_url')
+            except ImageGenerationError as exc:
+                return error_response(str(exc), status_code=503, code='generation_unavailable')
+
+        if not image_url:
+            return error_response('Image generation failed', status_code=502, code='generation_failed')
+
+        image_url = ensure_absolute_url(request, image_url)
+
+        # --- Phase 3: Fresh DB connection, save result in a short transaction ---
+        # close_old_connections() ensures any stale connection is discarded and
+        # Django opens a brand-new connection for the transaction below.
+        close_old_connections()
+
         with transaction.atomic():
-            user = get_user_model().objects.select_for_update().get(pk=request.user.pk)
-            is_admin = is_admin_user(user)
-            required_credits = 0 if is_admin else required_credits
-            balance = get_credit_balance(user)
-            if not is_admin and balance < required_credits:
-                return error_response(
-                    'Not enough credits',
-                    status_code=402,
-                    code='insufficient_credits',
-                    details={'balance': balance, 'required': required_credits},
-                )
-
-            cache_hit = find_cached_note(normalized)
-            source = GeneratedNote.SOURCE_GENERATED
-            image_url = None
-
-            if cache_hit:
-                image_url = cache_hit['image_url']
-                source = cache_hit['source']
-            else:
-                try:
-                    generation = generate_handwritten_note(topic)
-                    image_url = generation.get('image_url')
-                except ImageGenerationError as exc:
-                    return error_response(str(exc), status_code=503, code='generation_unavailable')
-
-            if not image_url:
-                return error_response('Image generation failed', status_code=502, code='generation_failed')
-
-            image_url = ensure_absolute_url(request, image_url)
+            user = user_model.objects.select_for_update().get(pk=request.user.pk)
 
             note = GeneratedNote.objects.create(
                 user=user,
@@ -424,6 +444,7 @@ class GenerateNoteView(APIView):
         response_data['credit_balance'] = get_credit_balance(user)
         response_data['cache_hit'] = source != GeneratedNote.SOURCE_GENERATED
         return Response(response_data, status=201)
+
 
 
 class GenerateStudyPackView(APIView):

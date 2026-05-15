@@ -607,6 +607,9 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 # Scrib AI and storage settings
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 OPENAI_IMAGE_MODEL = os.environ.get('OPENAI_IMAGE_MODEL', 'gpt-image-2')
+# Dedicated S3 credentials for Scrib image uploads (SCRIB_S3_* in .env)
+SCRIB_S3_ACCESS_KEY_ID = os.environ.get('SCRIB_S3_ACCESS_KEY_ID', '')
+SCRIB_S3_SECRET_ACCESS_KEY = os.environ.get('SCRIB_S3_SECRET_ACCESS_KEY', '')
 AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
 AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', os.environ.get('AWS_REGION', 'ap-south-1'))
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
@@ -762,9 +765,9 @@ LOGGING = {
 X_FRAME_OPTIONS = 'SAMEORIGIN'  # Allow framing from same origin (localhost:8000)
 
 # AWS SES Configuration (API-based, not SMTP - works on Render free tier)
-# Configure via environment variables
-AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID', '')
-AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY', '')
+# Configure via environment variables (SES_AWS_* in .env to avoid collision with S3 keys)
+AWS_ACCESS_KEY_ID = os.environ.get('SES_AWS_ACCESS_KEY_ID', '')
+AWS_SECRET_ACCESS_KEY = os.environ.get('SES_AWS_SECRET_ACCESS_KEY', '')
 AWS_REGION = os.environ.get('AWS_REGION', 'ap-south-1')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'info@easylearnova.com')
 
