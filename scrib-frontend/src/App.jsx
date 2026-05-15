@@ -96,21 +96,22 @@ const App = () => {
               <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
                 Dashboard
               </Link>
-              <Link to="/profile" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
-                Profile
-              </Link>
               <button
                 onClick={logout}
-                className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold"
+                className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold hover:bg-[#faf8f3]"
               >
                 Log out
               </button>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
                 {user?.credit_balance ?? 0} credits
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e2dbd2] bg-white text-xs font-semibold">
+              <Link
+                to="/profile"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e2dbd2] bg-white text-xs font-semibold transition-colors hover:bg-[#f5f2ec]"
+                title="Profile"
+              >
                 {getInitials(user?.full_name)}
-              </div>
+              </Link>
             </div>
           ) : (
             <div className="flex items-center gap-3">

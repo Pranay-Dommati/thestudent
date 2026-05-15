@@ -102,6 +102,12 @@ const GeneratePage = () => {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    if (location.state?.tab) {
+      setActiveTab(location.state.tab)
+    }
+  }, [location.state])
+
 
   const detectedTopics = useMemo(() => parseTopics(pasteText), [pasteText])
 
@@ -229,13 +235,17 @@ const GeneratePage = () => {
     setGenerationNotice('')
     setImageLoaded(false)
 
+    const packTitle = cleanedTopics.length === 1 
+      ? cleanedTopics[0] 
+      : `${cleanedTopics[0]} +${cleanedTopics.length - 1}`
+
     // Switch to history tab immediately and add a pending item
     setActiveTab('history')
     const tempId = `pending-${Date.now()}`
     const tempItem = {
       id: tempId,
       type: 'pack',
-      name: cleanedTopics.length === 1 ? cleanedTopics[0] : 'Study Pack',
+      name: packTitle,
       created_at: new Date().toISOString(),
       status: 'pending',
       total_pages: cleanedTopics.length,
@@ -248,7 +258,7 @@ const GeneratePage = () => {
     try {
       // One topic per page
       const pages = cleanedTopics.map(topic => [topic])
-      const payload = { title: cleanedTopics.length === 1 ? cleanedTopics[0] : 'Study Pack', pages }
+      const payload = { title: packTitle, pages }
 
       const response = await axiosInstance.post('/scrib/generate-study-pack/', payload)
       const data = response.data || {}
@@ -290,21 +300,25 @@ const GeneratePage = () => {
           </Link>
           {isLoggedIn ? (
             <div className="flex items-center gap-3">
-              <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
+              <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3]">
                 Dashboard
               </Link>
               <button
                 onClick={logout}
-                className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold"
+                className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3]"
               >
                 Log out
               </button>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
                 {creditBalance} credits
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e2dbd2] bg-white text-xs font-semibold">
+              <Link
+                to="/profile"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e2dbd2] bg-white text-xs font-semibold transition-colors hover:bg-[#f5f2ec]"
+                title="Profile"
+              >
                 {getInitials(user?.full_name)}
-              </div>
+              </Link>
             </div>
           ) : (
             <div className="flex items-center gap-3">
