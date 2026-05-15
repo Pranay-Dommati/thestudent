@@ -174,7 +174,7 @@ const PreviewsPage = () => {
             >
               {/* PDF thumbnail — renders actual page 1 content */}
               {note.pdfUrl ? (
-                <PDFThumbnail pdfUrl={note.pdfUrl} title={note.title} className="h-40" />
+                <PDFThumbnail pdfUrl={note.pdfUrl} title={note.title} className="h-40 rounded-xl border border-[#ece5db] bg-[#fbfaf7]" />
               ) : (
                 <div className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border border-[#ece5db] bg-[#fbfaf7]">
                   <span className="text-xs text-[#9a9289]">Coming soon</span>

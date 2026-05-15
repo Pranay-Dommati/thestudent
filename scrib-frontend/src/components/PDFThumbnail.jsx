@@ -90,7 +90,7 @@ const PDFThumbnail = ({ pdfUrl, title = 'PDF preview', className = '' }) => {
   return (
     <div
       ref={containerRef}
-      className={`relative w-full overflow-hidden rounded-xl border border-[#ece5db] bg-[#fbfaf7] ${className}`}
+      className={`relative w-full overflow-hidden ${className}`}
       style={{ minHeight: '160px' }}
     >
       {/* Loading shimmer */}

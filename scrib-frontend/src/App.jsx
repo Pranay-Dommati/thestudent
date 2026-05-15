@@ -3,11 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import axiosInstance from './utils/axios'
 import { getInitials } from './utils/user'
+import PDFThumbnail from './components/PDFThumbnail'
 
 const fallbackPreviewStrip = [
-  { id: 'osi-model', title: 'OSI Model', imageUrl: '' },
-  { id: 'linked-lists', title: 'Linked Lists', imageUrl: '' },
-  { id: 'dbms-normalization', title: 'DBMS Normalization', imageUrl: '' },
+  { id: 'osi-model', title: 'OSI Model', pdfUrl: null },
+  { id: 'linked-lists', title: 'Linked Lists', pdfUrl: null },
+  { id: 'dbms-normalization', title: 'DBMS Normalization', pdfUrl: null },
 ]
 
 const pricingTiers = [
@@ -56,7 +57,7 @@ const App = () => {
         const mapped = data.slice(0, 3).map((item) => ({
           id: item.id ?? item.slug ?? item.title,
           title: item.title,
-          imageUrl: item.image_url,
+          pdfUrl: item.pdf_url || null,
         }))
         if (mapped.length) {
           setPreviewStrip(mapped)
@@ -166,40 +167,58 @@ const App = () => {
 
         <section id="landing-previews" className="py-10">
           <div className="mx-auto max-w-6xl px-6">
-            <Link to="/previews" className="block">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7b756d]">
-                Free previews - browse and download
-              </p>
+            <div>
+              <Link to="/previews" className="inline-block hover:opacity-80">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7b756d]">
+                  Free previews - browse and download &rarr;
+                </p>
+              </Link>
               <div className="mt-4 grid gap-4 md:grid-cols-4">
                 {previewStrip.map((note) => (
-                  <div key={note.id} className="rounded-xl border border-[#e2dbd2] bg-[#f7f4ee] p-3">
+                  <div
+                    key={note.id}
+                    className={`rounded-xl border border-[#e2dbd2] bg-[#f7f4ee] p-3 transition-shadow ${note.pdfUrl ? 'cursor-pointer hover:shadow-md' : 'opacity-60'}`}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      if (!note.pdfUrl) return
+                      navigate('/view', {
+                        state: {
+                          pdfUrl: note.pdfUrl,
+                          title: note.title,
+                          topics: [note.title],
+                          totalPages: 1,
+                          isPack: true,
+                        }
+                      })
+                    }}
+                  >
                     <div className="rounded-lg border border-[#e7dfd4] bg-white p-2">
-                      {note.imageUrl ? (
-                        <img
-                          src={note.imageUrl}
-                          alt={note.title}
-                          className="h-24 w-full rounded-md object-cover"
-                          loading="lazy"
-                        />
+                      {note.pdfUrl ? (
+                        <PDFThumbnail pdfUrl={note.pdfUrl} title={note.title} className="h-24 rounded-md bg-[#fbfaf7]" />
                       ) : (
-                        <div className="flex h-24 w-full items-center justify-center rounded-md border border-dashed border-[#e0d9ce] text-[11px] text-[#9a9289]">
-                          Preview image
+                        <div className="flex h-24 w-full items-center justify-center rounded-md border border-dashed border-[#e0d9ce] bg-[#fbfaf7] text-[11px] text-[#9a9289]">
+                          Coming soon
                         </div>
                       )}
                     </div>
-                    <p className="mt-3 text-sm font-semibold">{note.title}</p>
+                    <div className="mt-3 flex items-center justify-between">
+                      <p className="text-sm font-semibold">{note.title}</p>
+                      <span className="rounded-full border border-[#e2dbd2] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#6b655d]">
+                        Free
+                      </span>
+                    </div>
                   </div>
                 ))}
-                <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#d6cfc6] bg-[#f4f1ea] p-3">
+                <Link to="/previews" className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#d6cfc6] bg-[#f4f1ea] p-4 transition-colors hover:bg-[#f0ece5]">
                   <div className="grid grid-cols-3 gap-1">
                     {Array.from({ length: 9 }).map((_, index) => (
                       <span key={index} className="h-1 w-1 rounded-full bg-[#cfc7bd]" />
                     ))}
                   </div>
-                  <p className="text-sm text-[#8a847c]">500+ more</p>
-                </div>
+                  <p className="text-sm font-medium text-[#8a847c]">500+ more</p>
+                </Link>
               </div>
-            </Link>
+            </div>
           </div>
         </section>
 
