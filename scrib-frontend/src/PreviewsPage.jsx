@@ -33,6 +33,7 @@ const PreviewsPage = () => {
           title: item.title,
           subject: item.tags?.[0] || 'Preview',
           pdfUrl: item.pdf_url || null,
+          imageUrl: item.image_url || null,
           pageCount: item.page_count || 1,
         }))
         if (mapped.length) setPreviewCards(mapped)
@@ -180,7 +181,7 @@ const PreviewsPage = () => {
                 })
               }}
             >
-              {!note.pdfUrl ? (
+              {!note.pdfUrl && !note.imageUrl ? (
                 <div className="animate-pulse">
                   <div className="h-40 w-full rounded-xl bg-[#e8e2d9]"></div>
                   <div className="mt-4 flex items-center justify-between">
@@ -193,7 +194,11 @@ const PreviewsPage = () => {
                 </div>
               ) : (
                 <>
-                  <PDFThumbnail pdfUrl={note.pdfUrl} title={note.title} className="h-40 rounded-xl border border-[#ece5db] bg-[#fbfaf7]" />
+                  {note.imageUrl ? (
+                    <img src={note.imageUrl} alt={note.title} className="h-40 w-full rounded-xl border border-[#ece5db] bg-[#fbfaf7] object-cover" />
+                  ) : (
+                    <PDFThumbnail pdfUrl={note.pdfUrl} title={note.title} className="h-40 rounded-xl border border-[#ece5db] bg-[#fbfaf7]" />
+                  )}
                   <div className="mt-4 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold">{note.title}</p>

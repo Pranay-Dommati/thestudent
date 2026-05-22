@@ -59,6 +59,7 @@ const App = () => {
           id: item.id ?? item.slug ?? item.title,
           title: item.title,
           pdfUrl: item.pdf_url || null,
+          imageUrl: item.image_url || null,
         }))
         if (mapped.length) {
           setPreviewStrip(mapped)
@@ -201,7 +202,7 @@ const App = () => {
                       })
                     }}
                   >
-                    {!note.pdfUrl ? (
+                    {!note.pdfUrl && !note.imageUrl ? (
                       <div className="animate-pulse">
                         <div className="h-28 w-full rounded-lg bg-[#e8e2d9]"></div>
                         <div className="mt-3 flex items-center justify-between">
@@ -212,7 +213,11 @@ const App = () => {
                     ) : (
                       <>
                         <div className="rounded-lg border border-[#e7dfd4] bg-white p-2">
-                          <PDFThumbnail pdfUrl={note.pdfUrl} title={note.title} className="h-24 rounded-md bg-[#fbfaf7]" />
+                          {note.imageUrl ? (
+                            <img src={note.imageUrl} alt={note.title} className="h-24 w-full rounded-md bg-[#fbfaf7] object-cover" />
+                          ) : (
+                            <PDFThumbnail pdfUrl={note.pdfUrl} title={note.title} className="h-24 rounded-md bg-[#fbfaf7]" />
+                          )}
                         </div>
                         <div className="mt-3 flex items-center justify-between">
                           <p className="text-sm font-semibold">{note.title}</p>
