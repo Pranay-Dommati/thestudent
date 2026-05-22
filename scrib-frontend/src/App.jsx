@@ -193,21 +193,27 @@ const App = () => {
                       })
                     }}
                   >
-                    <div className="rounded-lg border border-[#e7dfd4] bg-white p-2">
-                      {note.pdfUrl ? (
-                        <PDFThumbnail pdfUrl={note.pdfUrl} title={note.title} className="h-24 rounded-md bg-[#fbfaf7]" />
-                      ) : (
-                        <div className="flex h-24 w-full items-center justify-center rounded-md border border-dashed border-[#e0d9ce] bg-[#fbfaf7] text-[11px] text-[#9a9289]">
-                          Coming soon
+                    {!note.pdfUrl ? (
+                      <div className="animate-pulse">
+                        <div className="h-28 w-full rounded-lg bg-[#e8e2d9]"></div>
+                        <div className="mt-3 flex items-center justify-between">
+                          <div className="h-4 w-2/3 rounded bg-[#e8e2d9]"></div>
+                          <div className="h-4 w-8 rounded-full bg-[#e8e2d9]"></div>
                         </div>
-                      )}
-                    </div>
-                    <div className="mt-3 flex items-center justify-between">
-                      <p className="text-sm font-semibold">{note.title}</p>
-                      <span className="rounded-full border border-[#e2dbd2] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#6b655d]">
-                        Free
-                      </span>
-                    </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="rounded-lg border border-[#e7dfd4] bg-white p-2">
+                          <PDFThumbnail pdfUrl={note.pdfUrl} title={note.title} className="h-24 rounded-md bg-[#fbfaf7]" />
+                        </div>
+                        <div className="mt-3 flex items-center justify-between">
+                          <p className="text-sm font-semibold">{note.title}</p>
+                          <span className="rounded-full border border-[#e2dbd2] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#6b655d]">
+                            Free
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
                 <Link to="/previews" className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#d6cfc6] bg-[#f4f1ea] p-4 transition-colors hover:bg-[#f0ece5]">

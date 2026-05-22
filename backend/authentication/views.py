@@ -22,10 +22,12 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import socket
 
+# pyrefly: ignore [missing-import]
 from .serializers import (
     UserSerializer, RegisterSerializer, LoginSerializer,
     OTPSignupSerializer, OTPVerifySerializer, OTPResendSerializer,
 )
+# pyrefly: ignore [missing-import]
 from .models import User, EmailOTP
 
 # Import database retry utilities for handling remote MySQL (Hostinger) connection issues
@@ -505,9 +507,15 @@ def smtp_test(request):
         logger.debug(f"SMTP diagnostics results: {results}; sent_mode={sent_mode}")
     return Response({'results': results, 'sent_mode': sent_mode}, status=status.HTTP_200_OK)
 
-@api_view(['GET'])
+@api_view(['GET', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def user_profile(request):
+    if request.method == 'DELETE':
+        user = request.user
+        logger.info(f"User {user.email} is closing their account.")
+        user.delete()
+        return Response({'message': 'Account closed successfully.'}, status=status.HTTP_200_OK)
+
     serializer = UserSerializer(request.user)
     return Response(serializer.data)
 

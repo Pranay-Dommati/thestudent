@@ -14,6 +14,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [lastChecked, setLastChecked] = useState(0)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   const isValidatingRef = useRef(false)
   const lastValidationTimeRef = useRef(0)
@@ -262,8 +263,17 @@ export const AuthProvider = ({ children }) => {
   }
 
   const logout = () => {
+    setShowLogoutModal(true)
+  }
+
+  const confirmLogout = () => {
+    setShowLogoutModal(false)
     handleAuthFailure()
     customToast.success('Logged out successfully', { id: 'auth-logout' })
+  }
+
+  const cancelLogout = () => {
+    setShowLogoutModal(false)
   }
 
   const setAuthSession = ({ user: sessionUser, access, refresh }) => {
@@ -290,6 +300,28 @@ export const AuthProvider = ({ children }) => {
       validateAuth,
     }}>
       {children}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-[#e2dbd2] bg-white p-6 shadow-xl">
+            <h3 className="text-xl font-semibold text-[#1f1f1f]">Log out</h3>
+            <p className="mt-2 text-sm text-[#7b756d]">Are you sure you want to log out of your account?</p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button 
+                onClick={cancelLogout} 
+                className="rounded-lg px-4 py-2 text-sm font-semibold text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmLogout} 
+                className="rounded-lg bg-[#c05c5c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a74c4c] transition-colors"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AuthContext.Provider>
   )
 }

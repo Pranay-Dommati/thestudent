@@ -165,7 +165,7 @@ const PreviewsPage = () => {
           {filtered.map((note) => (
             <div
               key={note.id}
-              className={`rounded-2xl border border-[#e2dbd2] bg-white p-4 transition-shadow ${note.pdfUrl ? 'cursor-pointer hover:shadow-md' : 'opacity-60'}`}
+              className={`rounded-2xl border border-[#e2dbd2] bg-white p-4 transition-shadow ${note.pdfUrl ? 'cursor-pointer hover:shadow-md' : ''}`}
               onClick={() => {
                 if (!note.pdfUrl) return
                 navigate('/view', {
@@ -179,23 +179,31 @@ const PreviewsPage = () => {
                 })
               }}
             >
-              {/* PDF thumbnail — renders actual page 1 content */}
-              {note.pdfUrl ? (
-                <PDFThumbnail pdfUrl={note.pdfUrl} title={note.title} className="h-40 rounded-xl border border-[#ece5db] bg-[#fbfaf7]" />
+              {!note.pdfUrl ? (
+                <div className="animate-pulse">
+                  <div className="h-40 w-full rounded-xl bg-[#e8e2d9]"></div>
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="w-2/3">
+                      <div className="mb-2 h-4 w-3/4 rounded bg-[#e8e2d9]"></div>
+                      <div className="h-3 w-1/2 rounded bg-[#e8e2d9]"></div>
+                    </div>
+                    <div className="h-6 w-10 rounded-full bg-[#e8e2d9]"></div>
+                  </div>
+                </div>
               ) : (
-                <div className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border border-[#ece5db] bg-[#fbfaf7]">
-                  <span className="text-xs text-[#9a9289]">Coming soon</span>
-                </div>
+                <>
+                  <PDFThumbnail pdfUrl={note.pdfUrl} title={note.title} className="h-40 rounded-xl border border-[#ece5db] bg-[#fbfaf7]" />
+                  <div className="mt-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">{note.title}</p>
+                      <p className="text-xs text-[#7b756d]">{note.subject}</p>
+                    </div>
+                    <span className="rounded-full border border-[#e2dbd2] bg-[#f5f2ec] px-3 py-1 text-[10px] font-semibold text-[#6b655d]">
+                      Free
+                    </span>
+                  </div>
+                </>
               )}
-              <div className="mt-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold">{note.title}</p>
-                  <p className="text-xs text-[#7b756d]">{note.subject}</p>
-                </div>
-                <span className="rounded-full border border-[#e2dbd2] bg-[#f5f2ec] px-3 py-1 text-[10px] font-semibold text-[#6b655d]">
-                  Free
-                </span>
-              </div>
             </div>
           ))}
 
