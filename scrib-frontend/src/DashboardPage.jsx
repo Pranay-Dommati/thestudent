@@ -5,6 +5,7 @@ import { getInitials } from './utils/user'
 import axiosInstance from './utils/axios'
 import { forceDownload } from './utils/download'
 import customToast from './utils/customToast'
+import Breadcrumb from './components/Breadcrumb'
 
 const toneColors = {
   blue: 'bg-[#7ba7ff]',
@@ -115,27 +116,30 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-[#1f1f1f]">
       <header className="border-b border-[#e4ddd4] bg-white/90">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
+          <div className="flex items-center gap-3">
+            <Link to="/" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
               <img src="/scrib-favicon.svg" alt="Scrib" className="h-4 w-4" />
-            </div>
-            <span className="text-sm font-semibold">Scrib</span>
-          </Link>
+            </Link>
+            <Breadcrumb crumbs={[
+              { label: 'Home', to: '/' },
+              { label: 'Dashboard' },
+            ]} />
+          </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
             <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
             <Link to="/generate" className="hover:text-[#1f1f1f]">Generate</Link>
           </nav>
           {isLoggedIn ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={logout}
-                className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3]"
+                className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex"
               >
                 Log out
               </button>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-                {user?.credit_balance ?? 0} credits
+                {user?.credit_balance ?? 0} cr
               </span>
               <Link
                 to="/profile"
@@ -146,7 +150,7 @@ const DashboardPage = () => {
               </Link>
             </div>
           ) : (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
                 Log in
               </Link>
@@ -158,7 +162,7 @@ const DashboardPage = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 py-10">
+      <main className="mx-auto max-w-5xl px-4 py-8 md:px-6 md:py-10">
         <div>
           <h1 className="text-xl font-semibold">Good afternoon, {user?.full_name ?? 'friend'}</h1>
           <p className="text-sm text-[#7b756d]">
@@ -208,21 +212,21 @@ const DashboardPage = () => {
                 const tone = toneKeys[index % toneKeys.length]
                 
                 return (
-                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-3">
+                  <div key={item.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="rounded-lg border border-[#e2dbd2] bg-[#faf8f3] p-2">
+                      <div className="flex-shrink-0 rounded-lg border border-[#e2dbd2] bg-[#faf8f3] p-2">
                         <div className={`h-1.5 w-10 rounded-full ${toneColors[tone]}`} />
                         <div className={`mt-2 h-1.5 w-8 rounded-full ${toneColors[tone]}`} />
                         <div className={`mt-2 h-1.5 w-6 rounded-full ${toneColors[tone]}`} />
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold">{item.name}</p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold leading-tight">{item.name}</p>
                         <p className="text-xs text-[#7b756d]">
-                          {formatDate(item.created_at)} - {item.credits_used} credit{item.credits_used !== 1 ? 's' : ''}
+                          {formatDate(item.created_at)} · {item.credits_used} credit{item.credits_used !== 1 ? 's' : ''}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0">
                       {item.status === 'pending' || item.status === 'generating' ? (
                         <span className="rounded-full border border-[#e2dbd2] bg-[#f5f2ec] px-3 py-1 text-[10px] font-semibold text-[#6b655d] uppercase tracking-wider">
                           Generating...

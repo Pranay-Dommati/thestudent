@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
+import Breadcrumb from './components/Breadcrumb'
 
 const tiers = [
   {
@@ -51,25 +52,33 @@ const PricingPage = () => {
   return (
     <div className="min-h-screen bg-white text-[#1f1f1f]">
       <header className="border-b border-[#e4ddd4] bg-white/90">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link to="/" className="text-sm font-semibold">Scrib</Link>
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
+          <div className="flex items-center gap-3">
+            <Link to="/" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
+              <img src="/scrib-favicon.svg" alt="Scrib" className="h-4 w-4" />
+            </Link>
+            <Breadcrumb crumbs={[
+              { label: 'Home', to: '/' },
+              { label: 'Pricing' },
+            ]} />
+          </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
             <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
             <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
           </nav>
           {isLoggedIn ? (
-            <div className="flex items-center gap-3">
-              <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3]">
+            <div className="flex items-center gap-2">
+              <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex">
                 Dashboard
               </Link>
               <button
                 onClick={logout}
-                className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3]"
+                className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex"
               >
                 Log out
               </button>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-                {user?.credit_balance ?? 0} credits
+                {user?.credit_balance ?? 0} cr
               </span>
               <Link
                 to="/profile"
@@ -80,7 +89,7 @@ const PricingPage = () => {
               </Link>
             </div>
           ) : (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
                 Log in
               </Link>
@@ -93,36 +102,43 @@ const PricingPage = () => {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-12">
-        <div className="text-center">
-          <h1 className="text-3xl font-semibold md:text-4xl">Simple, pay-as-you-go pricing</h1>
+        <div className="text-center px-4">
+          <h1 className="text-2xl font-semibold md:text-3xl lg:text-4xl">Simple, pay-as-you-go pricing</h1>
           <p className="mt-3 text-sm text-[#7b756d]">
             No subscriptions. Buy credits once, use whenever. Credits never expire.
           </p>
         </div>
 
-        <div className="mt-10 grid gap-4 md:grid-cols-3">
+        <div className="mt-8 grid gap-3 grid-cols-1 sm:grid-cols-3 md:grid-cols-3">
           {tiers.map((tier) => (
             <div
               key={tier.id}
-              className={`relative rounded-2xl border bg-white p-6 ${
-                tier.highlight ? 'border-[#1f1f1f]' : 'border-[#e2dbd2]'
+              className={`relative rounded-xl border px-5 py-4 ${
+                tier.highlight
+                  ? 'border-[#b8c9f0] bg-[#f5f8ff]'
+                  : 'border-[#e8e3da] bg-[#faf8f3]'
               }`}
             >
               {tier.highlight ? (
-                <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1f1f1f] px-3 py-1 text-[10px] font-semibold text-white">
+                <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#4a6aa6] px-3 py-0.5 text-[10px] font-semibold text-white">
                   Most popular
                 </span>
               ) : null}
-              <div className="text-2xl font-semibold">{tier.price}</div>
-              <p className="text-xs text-[#7b756d]">/ pack</p>
-              <p className="mt-4 text-sm font-semibold">{tier.credits}</p>
+              <div className="text-xl font-semibold">{tier.price} <span className="text-xs font-normal text-[#9a9289]">/ pack</span></div>
+              <p className="mt-2 text-sm font-semibold text-[#1f1f1f]">{tier.credits}</p>
               {tier.tag ? (
-                <span className="mt-2 inline-flex rounded-full bg-[#e9f1dc] px-3 py-1 text-[11px] font-semibold text-[#56733a]">
+                <span className="mt-1 inline-flex rounded-full bg-[#e3edcc] px-2 py-0.5 text-[10px] font-semibold text-[#4a6a28]">
                   {tier.tag}
                 </span>
               ) : null}
-              <p className="mt-3 text-xs text-[#7b756d]">{tier.helper}</p>
-              <button className="mt-6 w-full rounded-lg border border-[#d9d1c7] bg-white px-4 py-2 text-sm font-semibold">
+              <p className="mt-1 text-xs text-[#9a9289]">{tier.helper}</p>
+              <button
+                className={`mt-4 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors ${
+                  tier.highlight
+                    ? 'bg-[#1f1f1f] text-white hover:bg-[#333]'
+                    : 'border border-[#d9d1c7] bg-white text-[#1f1f1f] hover:bg-[#f5f2ec]'
+                }`}
+              >
                 Buy pack
               </button>
             </div>

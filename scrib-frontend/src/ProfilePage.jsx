@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
+import Breadcrumb from './components/Breadcrumb'
 
 const sections = [
   { id: 'profile', label: 'Profile' },
@@ -92,30 +93,33 @@ const ProfilePage = () => {
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-[#1f1f1f]">
       <header className="border-b border-[#e4ddd4] bg-white/90">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
+          <div className="flex items-center gap-3">
+            <Link to="/" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
               <img src="/scrib-favicon.svg" alt="Scrib" className="h-4 w-4" />
-            </div>
-            <span className="text-sm font-semibold">Scrib</span>
-          </Link>
+            </Link>
+            <Breadcrumb crumbs={[
+              { label: 'Home', to: '/' },
+              { label: 'Profile' },
+            ]} />
+          </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
             <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
             <Link to="/generate" className="hover:text-[#1f1f1f]">Generate</Link>
           </nav>
           {isLoggedIn ? (
-            <div className="flex items-center gap-3">
-              <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3]">
+            <div className="flex items-center gap-2">
+              <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex">
                 Dashboard
               </Link>
               <button
                 onClick={logout}
-                className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3]"
+                className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex"
               >
                 Log out
               </button>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-                {user?.credit_balance ?? 0} credits
+                {user?.credit_balance ?? 0} cr
               </span>
               <Link
                 to="/profile"
@@ -126,7 +130,7 @@ const ProfilePage = () => {
               </Link>
             </div>
           ) : (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
                 Log in
               </Link>
@@ -138,16 +142,16 @@ const ProfilePage = () => {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8 md:flex-row">
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 md:flex-row md:px-6 md:py-8">
         <aside className="w-full md:w-56">
           <div className="rounded-2xl border border-[#e2dbd2] bg-white p-3">
             <p className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#9a9289]">Account</p>
-            <div className="mt-2 flex flex-col gap-1">
+            <div className="mt-1 flex flex-row gap-1 md:mt-2 md:flex-col">
               {sections.map((section) => (
                 <button
                   key={section.id}
                   onClick={() => setActiveSection(section.id)}
-                  className={`rounded-lg px-3 py-2 text-left text-sm font-semibold ${
+                  className={`flex-1 rounded-lg px-3 py-2 text-center text-sm font-semibold md:text-left ${
                     activeSection === section.id
                       ? 'bg-[#1f1f1f] text-white'
                       : 'text-[#6f6a63] hover:bg-[#f7f4ee]'

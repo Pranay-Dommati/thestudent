@@ -77,7 +77,7 @@ const App = () => {
   return (
     <div className="min-h-screen bg-white text-[#1f1f1f]">
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
               <img src="/scrib-favicon.svg" alt="Scrib" className="h-5 w-5" />
@@ -92,18 +92,18 @@ const App = () => {
             <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
           </nav>
           {isLoggedIn ? (
-            <div className="flex items-center gap-3">
-              <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
+            <div className="flex items-center gap-2">
+              <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold sm:inline-flex">
                 Dashboard
               </Link>
               <button
                 onClick={logout}
-                className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold hover:bg-[#faf8f3]"
+                className="hidden rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex"
               >
                 Log out
               </button>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-                {user?.credit_balance ?? 0} credits
+                {user?.credit_balance ?? 0} cr
               </span>
               <Link
                 to="/profile"
@@ -114,12 +114,12 @@ const App = () => {
               </Link>
             </div>
           ) : (
-            <div className="flex items-center gap-3">
-              <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
+            <div className="flex items-center gap-2">
+              <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1.5 text-xs font-semibold md:px-4 md:py-2">
                 Log in
               </Link>
-              <Link to="/signup" className="rounded-full bg-[#1f3a5f] px-4 py-2 text-xs font-semibold text-white">
-                Get started free
+              <Link to="/signup" className="rounded-full bg-[#1f3a5f] px-3 py-1.5 text-xs font-semibold text-white md:px-4 md:py-2">
+                Get started
               </Link>
             </div>
           )}
@@ -138,29 +138,29 @@ const App = () => {
             <p className="mx-auto mt-4 max-w-2xl text-base text-[#6f6a63] md:text-lg">
               Search 500+ free previews or generate your own custom handwritten notes for any topic - in seconds.
             </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
               <Link
                 to="/previews"
-                className="rounded-full border border-[#d9d1c7] bg-white px-5 py-2 text-sm font-semibold text-[#1f1f1f]"
+                className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold text-[#1f1f1f] hover:bg-[#faf8f3] transition-colors"
               >
                 Browse free previews
               </Link>
               <button
                 onClick={() => navigate('/generate')}
-                className="rounded-full border border-[#d9d1c7] bg-[#f1eee7] px-5 py-2 text-sm font-semibold text-[#1f1f1f]"
+                className="rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity"
               >
                 Generate custom notes
               </button>
             </div>
-            <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs text-[#7b756d]">
-              <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-[#6db05d]" /> No signup needed to browse
+            <div className="mt-4 flex flex-wrap justify-center gap-3 text-xs text-[#9a9289]">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#6db05d]" /> No signup to browse
               </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-[#6db05d]" /> UPI / Razorpay
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#6db05d]" /> UPI / Razorpay
               </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-[#6db05d]" /> Instant PDF download
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#6db05d]" /> Instant PDF
               </span>
             </div>
           </div>

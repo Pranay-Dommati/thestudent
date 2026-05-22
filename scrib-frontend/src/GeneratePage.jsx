@@ -5,6 +5,7 @@ import { getInitials } from './utils/user'
 import axiosInstance from './utils/axios'
 import customToast from './utils/customToast'
 import { forceDownload } from './utils/download'
+import Breadcrumb from './components/Breadcrumb'
 
 const parseTopics = (text) => {
   if (!text) return []
@@ -342,29 +343,29 @@ const GeneratePage = () => {
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-[#1f1f1f]">
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
+          <div className="flex items-center gap-3">
+            <Link to="/" className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white flex-shrink-0">
               <img src="/scrib-favicon.svg" alt="Scrib" className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold">Scrib</p>
-              <p className="text-xs text-[#7b756d]">Generate</p>
-            </div>
-          </Link>
+            </Link>
+            <Breadcrumb crumbs={[
+              { label: 'Home', to: '/' },
+              { label: 'Generate' },
+            ]} />
+          </div>
           {isLoggedIn ? (
-            <div className="flex items-center gap-3">
-              <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3]">
+            <div className="flex items-center gap-2">
+              <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex">
                 Dashboard
               </Link>
               <button
                 onClick={logout}
-                className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3]"
+                className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex"
               >
                 Log out
               </button>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-                {creditBalance} credits
+                {creditBalance} cr
               </span>
               <Link
                 to="/profile"
@@ -375,7 +376,7 @@ const GeneratePage = () => {
               </Link>
             </div>
           ) : (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
                 Log in
               </Link>

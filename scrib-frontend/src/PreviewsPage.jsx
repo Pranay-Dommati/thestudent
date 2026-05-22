@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
 import axiosInstance from './utils/axios'
 import PDFThumbnail from './components/PDFThumbnail'
+import Breadcrumb from './components/Breadcrumb'
 
 const fallbackPreviewCards = [
   { id: 'osi-model', title: 'OSI Model', subject: 'Computer Networks', pdfUrl: null, pageCount: 1 },
@@ -58,29 +59,29 @@ const PreviewsPage = () => {
   return (
     <div className="min-h-screen bg-[#f8f7f3] text-[#1f1f1f]">
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
+          <div className="flex items-center gap-3">
+            <Link to="/" className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
               <img src="/scrib-favicon.svg" alt="Scrib" className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold">Scrib</p>
-              <p className="text-xs text-[#7b756d]">Free previews</p>
-            </div>
-          </Link>
+            </Link>
+            <Breadcrumb crumbs={[
+              { label: 'Home', to: '/' },
+              { label: 'Previews' },
+            ]} />
+          </div>
           {isLoggedIn ? (
-            <div className="flex items-center gap-3">
-              <Link to="/dashboard" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3]">
+            <div className="flex items-center gap-2">
+              <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex">
                 Dashboard
               </Link>
               <button
                 onClick={logout}
-                className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3]"
+                className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex"
               >
                 Log out
               </button>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-                {user?.credit_balance ?? 0} credits
+                {user?.credit_balance ?? 0} cr
               </span>
               <Link
                 to="/profile"
@@ -91,7 +92,7 @@ const PreviewsPage = () => {
               </Link>
             </div>
           ) : (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
                 Log in
               </Link>
@@ -103,7 +104,7 @@ const PreviewsPage = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-10">
         {/* Search bar — no filter button, no subject chips */}
         <div className="flex min-w-0 items-center gap-3 rounded-xl border border-[#d9d1c7] bg-white px-4 py-3 shadow-sm focus-within:border-[#1f1f1f] transition-colors">
           {/* Clean search icon */}
@@ -155,7 +156,7 @@ const PreviewsPage = () => {
         </div>
 
         {/* Preview cards grid */}
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
+        <div className="mt-8 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
           {filtered.length === 0 && (
             <div className="col-span-3 py-16 text-center text-sm text-[#9a9289]">
               No notes match &quot;{query}&quot;
