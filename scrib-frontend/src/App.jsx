@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext'
 import axiosInstance from './utils/axios'
 import { getInitials } from './utils/user'
 import PDFThumbnail from './components/PDFThumbnail'
+import MobileMenu from './components/MobileMenu'
 
 const fallbackPreviewStrip = [
   { id: 'osi-model', title: 'OSI Model', pdfUrl: null },
@@ -79,9 +80,7 @@ const App = () => {
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
-              <img src="/scrib-favicon.svg" alt="Scrib" className="h-5 w-5" />
-            </div>
+            <img src="/scrib_favicon.svg" alt="Scrib" className="h-9 w-9 rounded-lg border border-[#e2dbd2] shadow-sm object-cover" />
             <div>
               <p className="text-sm font-semibold">Scrib</p>
               <p className="text-xs text-[#7b756d]">by EasyLearnova</p>
@@ -112,6 +111,7 @@ const App = () => {
               >
                 {getInitials(user?.full_name)}
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -121,6 +121,7 @@ const App = () => {
               <Link to="/signup" className="rounded-full bg-[#1f3a5f] px-3 py-1.5 text-xs font-semibold text-white md:px-4 md:py-2">
                 Get started
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           )}
         </div>
@@ -142,7 +143,7 @@ const App = () => {
               </span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-base text-[#6f6a63] md:text-xl leading-relaxed">
-              Search 500+ free previews or generate your own custom <br className="hidden sm:block" />
+              Search 50+ free previews or generate your own custom <br className="hidden sm:block" />
               handwritten notes for any topic — in seconds.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -229,7 +230,7 @@ const App = () => {
                       <span key={index} className="h-1 w-1 rounded-full bg-[#cfc7bd]" />
                     ))}
                   </div>
-                  <p className="text-sm font-medium text-[#8a847c]">500+ more</p>
+                  <p className="text-sm font-medium text-[#8a847c]">50+ more</p>
                 </Link>
               </div>
             </div>
@@ -398,6 +399,13 @@ const App = () => {
           </div>
         </section>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-[#e4ddd4] bg-white py-8">
+        <div className="mx-auto max-w-6xl px-6 text-center text-sm text-[#7b756d]">
+          &copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.
+        </div>
+      </footer>
     </div>
   )
 }

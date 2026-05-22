@@ -95,8 +95,8 @@ const ProfilePage = () => {
       <header className="border-b border-[#e4ddd4] bg-white/90">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
-            <Link to="/" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
-              <img src="/scrib-favicon.svg" alt="Scrib" className="h-4 w-4" />
+            <Link to="/" className="flex-shrink-0 hover:opacity-90 transition-opacity">
+              <img src="/scrib_favicon.svg" alt="Scrib" className="h-8 w-8 rounded-lg border border-[#e2dbd2] shadow-sm object-cover" />
             </Link>
             <Breadcrumb crumbs={[
               { label: 'Home', to: '/' },

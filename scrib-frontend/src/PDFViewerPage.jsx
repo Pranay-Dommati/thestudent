@@ -115,8 +115,8 @@ const PDFViewerPage = () => {
           </button>
 
           <span className="hidden text-[#e0d9ce] md:inline">|</span>
-          <Link to="/" className="hidden flex-shrink-0 md:flex">
-            <img src="/scrib-favicon.svg" alt="Scrib" className="h-5 w-5" />
+          <Link to="/" className="hidden flex-shrink-0 md:flex hover:opacity-90 transition-opacity">
+            <img src="/scrib_favicon.svg" alt="Scrib" className="h-8 w-8 rounded-lg border border-[#e2dbd2] shadow-sm object-cover" />
           </Link>
           <div className="hidden md:block">
             <Breadcrumb crumbs={[

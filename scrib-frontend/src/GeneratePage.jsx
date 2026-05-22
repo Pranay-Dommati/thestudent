@@ -6,6 +6,7 @@ import axiosInstance from './utils/axios'
 import customToast from './utils/customToast'
 import { forceDownload } from './utils/download'
 import Breadcrumb from './components/Breadcrumb'
+import MobileMenu from './components/MobileMenu'
 
 const parseTopics = (text) => {
   if (!text) return []
@@ -345,8 +346,8 @@ const GeneratePage = () => {
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
-            <Link to="/" className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white flex-shrink-0">
-              <img src="/scrib-favicon.svg" alt="Scrib" className="h-5 w-5" />
+            <Link to="/" className="flex-shrink-0 hover:opacity-90 transition-opacity">
+              <img src="/scrib_favicon.svg" alt="Scrib" className="h-9 w-9 rounded-lg border border-[#e2dbd2] shadow-sm object-cover" />
             </Link>
             <Breadcrumb crumbs={[
               { label: 'Home', to: '/' },
@@ -374,15 +375,17 @@ const GeneratePage = () => {
               >
                 {getInitials(user?.full_name)}
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
+              <Link to="/login" className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold md:inline-block">
                 Log in
               </Link>
-              <Link to="/signup" className="rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white">
+              <Link to="/signup" className="hidden rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white md:inline-block">
                 Get started free
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           )}
         </div>
@@ -614,14 +617,16 @@ const GeneratePage = () => {
             </div>
             <button
               onClick={handleGenerate}
-              disabled={isGenerating || !isLoggedIn || mode === 'paste' || isOrganizing}
+              disabled={!import.meta.env.DEV || isGenerating || !isLoggedIn || mode === 'paste' || isOrganizing}
               className={`rounded-xl px-5 py-2 text-xs font-semibold ${
-                isGenerating || !isLoggedIn || mode === 'paste' || isOrganizing
+                !import.meta.env.DEV || isGenerating || !isLoggedIn || mode === 'paste' || isOrganizing
                   ? 'bg-[#e7e2db] text-[#b1aaa0]'
                   : 'bg-[#1b1b1b] text-white'
               }`}
             >
-              {isGenerating
+              {!import.meta.env.DEV
+                  ? 'Disabled in Prod'
+                  : isGenerating
                   ? 'Generating...'
                   : mode === 'paste'
                     ? 'Organize topics first'
@@ -686,9 +691,9 @@ const GeneratePage = () => {
                 }
 
                 return (
-                  <div key={id} className="flex items-center justify-between rounded-xl border border-[#e2dbd2] bg-[#fbfaf7] px-4 py-3">
-                    <div className="flex items-center gap-4 cursor-pointer" onClick={openViewer}>
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white shadow-sm">
+                  <div key={id} className="flex flex-col gap-3 rounded-xl border border-[#e2dbd2] bg-[#fbfaf7] p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-1 items-start gap-3 overflow-hidden cursor-pointer" onClick={openViewer}>
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white shadow-sm mt-0.5">
                         {item._isPending ? (
                            <svg className="animate-spin text-[#a39b92]" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
@@ -709,26 +714,29 @@ const GeneratePage = () => {
                           </svg>
                         )}
                       </div>
-                      <div>
-                        <h3 className="text-sm font-semibold text-[#1f1f1f]">{titleStr}</h3>
-                        <p className="mt-0.5 text-xs text-[#7b756d]">
-                          {dateStr} • {isPack ? 'PDF' : 'Image'} • {credits} credit{credits > 1 ? 's' : ''}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-semibold text-[#1f1f1f] line-clamp-1 break-words">{titleStr}</h3>
+                          <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase ${isPack ? 'bg-[#f0f0ff] text-[#6366f1]' : 'bg-[#ecfdf5] text-[#10b981]'}`}>
+                            {isPack ? 'PDF' : 'Image'}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-[#7b756d]">
+                          {dateStr} • {credits} credit{credits > 1 ? 's' : ''}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${isPack ? 'bg-[#f0f0ff] text-[#6366f1]' : 'bg-[#ecfdf5] text-[#10b981]'}`}>
-                        {isPack ? 'PDF' : 'Image'}
-                      </span>
+
+                    <div className="flex w-full flex-shrink-0 items-center justify-end gap-2 sm:w-auto">
                       {item._isPending ? (
                         <div className="text-xs font-medium text-[#7b756d] italic px-2">Generating...</div>
                       ) : (
                         <>
-                          <button onClick={openViewer} className="flex items-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee]">
+                          <button onClick={openViewer} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] sm:flex-none">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                             Open
                           </button>
-                          <button onClick={(e) => forceDownload(url, titleStr, isPack)} className={`flex h-7 w-7 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] ${!url && 'pointer-events-none opacity-50'}`}>
+                          <button onClick={(e) => forceDownload(url, titleStr, isPack)} className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] ${!url && 'pointer-events-none opacity-50'}`}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                           </button>
                           <div className="relative dropdown-container">
@@ -736,7 +744,7 @@ const GeneratePage = () => {
                               onClick={() => setOpenDropdownId(openDropdownId === `share-${id}` ? null : `share-${id}`)}
                               disabled={!url}
                               title="Share options"
-                              className={`flex h-7 w-7 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50`}
+                              className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50`}
                             >
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
                             </button>

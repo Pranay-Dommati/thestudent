@@ -53,10 +53,8 @@ const ForgotPasswordPage = () => {
     <div className="min-h-screen bg-[#f7f4ee] text-[#1f1f1f]">
       <header className="border-b border-[#e4ddd4] bg-white/90">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
-              <img src="/scrib-favicon.svg" alt="Scrib" className="h-4 w-4" />
-            </div>
+          <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+            <img src="/scrib_favicon.svg" alt="Scrib" className="h-8 w-8 rounded-lg border border-[#e2dbd2] shadow-sm object-cover" />
             <span className="text-sm font-semibold">Scrib</span>
           </Link>
         </div>

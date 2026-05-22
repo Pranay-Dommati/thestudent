@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
 import Breadcrumb from './components/Breadcrumb'
+import MobileMenu from './components/MobileMenu'
 
 const tiers = [
   {
@@ -54,8 +55,8 @@ const PricingPage = () => {
       <header className="border-b border-[#e4ddd4] bg-white/90">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
-            <Link to="/" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white">
-              <img src="/scrib-favicon.svg" alt="Scrib" className="h-4 w-4" />
+            <Link to="/" className="flex-shrink-0 hover:opacity-90 transition-opacity">
+              <img src="/scrib_favicon.svg" alt="Scrib" className="h-8 w-8 rounded-lg border border-[#e2dbd2] shadow-sm object-cover" />
             </Link>
             <Breadcrumb crumbs={[
               { label: 'Home', to: '/' },
@@ -87,15 +88,17 @@ const PricingPage = () => {
               >
                 {getInitials(user?.full_name)}
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
+              <Link to="/login" className="hidden rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold md:inline-block">
                 Log in
               </Link>
-              <Link to="/signup" className="rounded-full border border-[#1f1f1f] bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white">
+              <Link to="/signup" className="hidden rounded-full border border-[#1f1f1f] bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white md:inline-block">
                 Get started free
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           )}
         </div>
@@ -175,6 +178,13 @@ const PricingPage = () => {
           </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-[#e4ddd4] bg-white py-8">
+        <div className="mx-auto max-w-6xl px-6 text-center text-sm text-[#7b756d]">
+          &copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.
+        </div>
+      </footer>
     </div>
   )
 }
