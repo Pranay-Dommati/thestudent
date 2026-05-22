@@ -200,8 +200,7 @@ const PDFViewerPage = () => {
           {/* Footer — desktop only */}
           <div className="hidden flex-shrink-0 items-center justify-center border-t border-[#e0d9ce] bg-white py-2 md:flex">
             <p className="text-[11px] text-[#a39b92]">
-              Scroll or use sidebar to navigate pages · Re-download anytime from{' '}
-              <Link to="/generate" className="underline hover:text-[#1f1f1f]">My notes</Link>
+              AI may make mistakes. Verify important information.
             </p>
           </div>
         </main>

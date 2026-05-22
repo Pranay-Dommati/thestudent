@@ -129,14 +129,21 @@ const App = () => {
       <main>
         <section className="border-b border-[#e4ddd4]">
           <div className="mx-auto max-w-5xl px-6 py-16 text-center">
-            <span className="inline-flex items-center rounded-full bg-[#e8eefb] px-4 py-1 text-xs font-semibold text-[#4a6aa6]">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e8eefb] px-4 py-1.5 text-sm font-medium text-[#4a6aa6]">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+              </svg>
               Free previews available now
             </span>
-            <h1 className="mt-4 text-4xl font-semibold leading-tight md:text-5xl">
-              Turn any topic into <span className="border-b-4 border-[#f0c06a]">handwritten exam notes</span>
+            <h1 className="mt-6 text-4xl font-semibold leading-tight md:text-5xl lg:text-6xl">
+              Turn any topic into <br className="hidden sm:block" />
+              <span className="inline-block border-b-[4px] border-[#f0c06a] pb-1 mt-2">
+                handwritten exam notes
+              </span>
             </h1>
-            <p className="mx-auto mt-4 max-w-2xl text-base text-[#6f6a63] md:text-lg">
-              Search 500+ free previews or generate your own custom handwritten notes for any topic - in seconds.
+            <p className="mx-auto mt-6 max-w-2xl text-base text-[#6f6a63] md:text-xl leading-relaxed">
+              Search 500+ free previews or generate your own custom <br className="hidden sm:block" />
+              handwritten notes for any topic — in seconds.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <Link
@@ -283,39 +290,103 @@ const App = () => {
         </section>
 
         <section id="landing-pricing" className="py-10">
-          <div className="mx-auto max-w-6xl px-6">
-            <p className="text-sm font-semibold">Credit packs</p>
-            <p className="text-sm text-[#7b756d]">Pay only for what you generate. Credits never expire.</p>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {pricingTiers.map((tier) => (
-                <div
-                  key={tier.id}
-                  className={`relative rounded-2xl border bg-[#f7f4ee] p-5 text-center ${
-                    tier.highlight ? 'border-[#8fb0ff] ring-1 ring-[#8fb0ff]/50' : 'border-[#e2dbd2]'
-                  }`}
-                >
-                  {tier.highlight ? (
-                    <span className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-[#e8eefb] px-3 py-1 text-[10px] font-semibold text-[#4a6aa6]">
-                      Most popular
-                    </span>
-                  ) : null}
-                  <div className="mt-6 text-2xl font-semibold">
-                    {tier.label} <span className="text-sm font-normal">/ pack</span>
-                  </div>
-                  <p className="mt-2 text-sm text-[#5f5a54]">{tier.note}</p>
-                  <p className="mt-2 text-xs text-[#8a847c]">{tier.helper}</p>
-                  <button
-                    className={`mt-5 w-full rounded-lg px-4 py-2 text-sm font-semibold ${
-                      tier.highlight
-                        ? 'bg-[#1b1b1b] text-white'
-                        : 'border border-[#d9d1c7] bg-white text-[#1f1f1f]'
+          <div className="mx-auto max-w-6xl px-4 md:px-6">
+            
+            {/* --- Mobile View (Compact Horizontal Cards) --- */}
+            <div className="md:hidden rounded-[24px] border border-[#e2dbd2] bg-white p-5 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a847c]">Pricing</p>
+              <h2 className="mt-1 text-2xl font-semibold text-[#1f1f1f]">Credit packs</h2>
+              <p className="mt-1 text-sm text-[#5f5a54]">Pay only for what you generate. Credits never expire.</p>
+              
+              <div className="mt-8 flex flex-col gap-4">
+                {pricingTiers.map((tier) => (
+                  <div
+                    key={`mobile-${tier.id}`}
+                    className={`relative flex items-center justify-between rounded-xl p-3 ${
+                      tier.highlight ? 'border-2 border-[#6246ea] bg-white shadow-sm' : 'border border-[#e2dbd2] bg-white'
                     }`}
                   >
-                    Buy pack
-                  </button>
-                </div>
-              ))}
+                    {tier.highlight && (
+                      <span className="absolute -top-[14px] left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-[#efedfc] border-4 border-white px-2 py-0.5 text-[10px] font-bold text-[#6246ea] shadow-sm">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.6H22l-6.1 4.5 2.3 7.5-6.2-4.6-6.2 4.6 2.3-7.5L2 9.6h7.6z"/></svg>
+                        Most popular
+                      </span>
+                    )}
+                    
+                    {/* Left: Price */}
+                    <div className="flex w-20 flex-col justify-center">
+                      <span className={`text-2xl font-bold leading-none tracking-tight ${tier.highlight ? 'text-[#6246ea]' : 'text-[#1f1f1f]'}`}>
+                        {tier.label.replace('Rs ', '₹')}
+                      </span>
+                      <span className="mt-1 text-[11px] leading-none text-[#8a847c]">/ pack</span>
+                    </div>
+
+                    {/* Middle: Details */}
+                    <div className="flex flex-1 flex-col items-start px-2">
+                      <span className="text-sm font-bold text-[#1f1f1f]">{tier.note.split(' ')[0]} credits</span>
+                      <span className="text-[11px] text-[#8a847c]">{tier.helper.split(' ')[0]} PDF pages</span>
+                    </div>
+
+                    {/* Right: Button */}
+                    <div className="flex-shrink-0">
+                      <button
+                        className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors ${
+                          tier.highlight
+                            ? 'bg-[#1b1b1b] text-white'
+                            : 'bg-[#f7f4ee] text-[#1f1f1f] hover:bg-[#ede9e1]'
+                        }`}
+                      >
+                        Buy
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 flex items-center justify-center gap-1.5 text-[11px] text-[#8a847c]">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+                Secured by Razorpay · UPI, cards accepted
+              </div>
             </div>
+
+            {/* --- Desktop View (Original Grid Cards) --- */}
+            <div className="hidden md:block">
+              <p className="text-sm font-semibold">Credit packs</p>
+              <p className="text-sm text-[#7b756d]">Pay only for what you generate. Credits never expire.</p>
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                {pricingTiers.map((tier) => (
+                  <div
+                    key={`desktop-${tier.id}`}
+                    className={`relative rounded-2xl border bg-[#f7f4ee] p-5 text-center ${
+                      tier.highlight ? 'border-[#8fb0ff] ring-1 ring-[#8fb0ff]/50' : 'border-[#e2dbd2]'
+                    }`}
+                  >
+                    {tier.highlight ? (
+                      <span className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-[#e8eefb] px-3 py-1 text-[10px] font-semibold text-[#4a6aa6]">
+                        Most popular
+                      </span>
+                    ) : null}
+                    <div className="mt-6 text-2xl font-semibold">
+                      {tier.label} <span className="text-sm font-normal">/ pack</span>
+                    </div>
+                    <p className="mt-2 text-sm text-[#5f5a54]">{tier.note}</p>
+                    <p className="mt-2 text-xs text-[#8a847c]">{tier.helper}</p>
+                    <button
+                      className={`mt-5 w-full rounded-lg px-4 py-2 text-sm font-semibold ${
+                        tier.highlight
+                          ? 'bg-[#1b1b1b] text-white'
+                          : 'border border-[#d9d1c7] bg-white text-[#1f1f1f]'
+                      }`}
+                    >
+                      Buy pack
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
         </section>
       </main>
