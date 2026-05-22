@@ -66,13 +66,24 @@ export const useGoogleAuth = (onSuccess, onError) => {
     init()
   }, [clientId, onSuccess, onError])
 
-  const signInWithGoogle = () => {
-    if (!isReady) {
+  const renderGoogleButton = (elementId) => {
+    if (!isReady || !window.google) {
       customToast.error('Google Sign-In not ready. Please refresh the page.')
       return
     }
-    window.google.accounts.id.prompt()
+    const element = document.getElementById(elementId)
+    if (element) {
+      window.google.accounts.id.renderButton(element, {
+        theme: 'outline',
+        size: 'large',
+        type: 'standard',
+        text: 'continue_with',
+        shape: 'pill',
+        logo_alignment: 'center',
+        width: element.parentElement?.offsetWidth || 300
+      })
+    }
   }
 
-  return { signInWithGoogle, isReady, isLoading }
+  return { renderGoogleButton, isReady, isLoading }
 }

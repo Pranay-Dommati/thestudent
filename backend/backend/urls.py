@@ -31,6 +31,7 @@ urlpatterns = [
     path('api/analytics/', include('tracking.urls')),  # Analytics/tracking endpoints
     path('api/visualizer/', include('code_visualizer.urls')),  # Code visualizer API
     path('api/scrib/', include('scrib.urls')),
+    path('api/payments/', include('payments.urls')),
 ] + (static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) if settings.DEBUG else [])
 
 urlpatterns += [

@@ -86,6 +86,60 @@ const GeneratePage = () => {
     }
   }
 
+  // ── Share helper ────────────────────────────────────────────────────────
+  const handleShareOption = async (option, item, isPack, url, titleStr) => {
+    setOpenDropdownId(null)
+
+    // Always get a fresh presigned URL for packs so links don't expire
+    let freshUrl = url
+    if (isPack && item.id && !String(item.id).startsWith('pending-')) {
+      try {
+        const res = await axiosInstance.get(`/scrib/packs/${item.id}/pdf/`, {
+          maxRedirects: 0,
+          validateStatus: (s) => s < 400,
+        })
+        freshUrl = res.request?.responseURL || url
+      } catch (err) {
+        console.error('Failed to get fresh PDF URL for share', err)
+      }
+    }
+
+    if (option === 'copy') {
+      if (!freshUrl) return
+      try {
+        await navigator.clipboard.writeText(freshUrl)
+        customToast.success('Link copied to clipboard!')
+      } catch {
+        customToast.error('Failed to copy link')
+      }
+    } else if (option === 'share') {
+      if (!freshUrl) return
+      if (navigator.share) {
+        try {
+          // Prefer sharing the actual PDF file so recipient can open it in any app
+          const response = await fetch(freshUrl)
+          const blob = await response.blob()
+          const file = new File([blob], `${titleStr}.pdf`, { type: 'application/pdf' })
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: titleStr })
+          } else {
+            await navigator.share({ url: freshUrl, title: titleStr })
+          }
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            // Fallback: copy link
+            await navigator.clipboard.writeText(freshUrl)
+            customToast.success('Link copied! Share it manually.')
+          }
+        }
+      } else {
+        // Desktop browsers without Web Share API — just copy
+        await navigator.clipboard.writeText(freshUrl)
+        customToast.success('Link copied to clipboard!')
+      }
+    }
+  }
+
   useEffect(() => {
     if (activeTab === 'history') {
       loadHistory()
@@ -593,14 +647,35 @@ const GeneratePage = () => {
                 const titleStr = isPack ? `${item.name} — ${pages} pages` : item.name
                 const dateStr = item._displayDate || new Date(item.created_at).toLocaleDateString()
 
-                const openViewer = () => {
-                  if (!url || item._isPending) return
+                const openViewer = async () => {
+                  if (item._isPending) return
+
+                  let resolvedUrl = url
+
+                  // For packs: always fetch a fresh presigned URL from the backend
+                  // so it never expires, regardless of when the pack was created.
+                  if (isPack && item.id && !String(item.id).startsWith('pending-')) {
+                    try {
+                      const res = await axiosInstance.get(`/scrib/packs/${item.id}/pdf/`, {
+                        maxRedirects: 0,
+                        validateStatus: (s) => s < 400,
+                      })
+                      // The view returns a 302 redirect; axios follows it by default and
+                      // ends up at the presigned URL. We use the final URL via res.request.
+                      resolvedUrl = res.request?.responseURL || url
+                    } catch (err) {
+                      console.error('Failed to get fresh PDF URL', err)
+                      // fall back to stored url
+                    }
+                  }
+
+                  if (!resolvedUrl) return
                   const topicsArr = Array.isArray(item.topics_json)
                     ? item.topics_json.map(t => Array.isArray(t) ? t.join(', ') : t)
                     : Array.from({ length: pages }, (_, i) => `Page ${i + 1}`)
                   navigate('/view', {
                     state: {
-                      pdfUrl: url,
+                      pdfUrl: resolvedUrl,
                       title: item.name || titleStr,
                       topics: topicsArr,
                       totalPages: pages,
@@ -655,9 +730,35 @@ const GeneratePage = () => {
                           <button onClick={(e) => forceDownload(url, titleStr, isPack)} className={`flex h-7 w-7 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] ${!url && 'pointer-events-none opacity-50'}`}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                           </button>
-                          <button onClick={() => { if(url) { navigator.clipboard.writeText(url); customToast.success('Link copied to clipboard!'); } }} disabled={!url} className="flex h-7 w-7 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-                          </button>
+                          <div className="relative dropdown-container">
+                            <button
+                              onClick={() => setOpenDropdownId(openDropdownId === `share-${id}` ? null : `share-${id}`)}
+                              disabled={!url}
+                              title="Share options"
+                              className={`flex h-7 w-7 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50`}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                            </button>
+                            {openDropdownId === `share-${id}` && (
+                              <div className="absolute bottom-full right-0 mb-2 z-50 min-w-[168px] rounded-xl border border-[#e2dbd2] bg-white shadow-xl overflow-hidden">
+                                <p className="px-3.5 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest text-[#a39b92]">Share options</p>
+                                <button
+                                  onClick={() => handleShareOption('copy', item, isPack, url, titleStr)}
+                                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-left text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors"
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                  Copy link
+                                </button>
+                                <button
+                                  onClick={() => handleShareOption('share', item, isPack, url, titleStr)}
+                                  className="flex w-full items-center gap-2.5 px-3.5 py-2 pb-2.5 text-xs font-medium text-left text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors border-t border-[#f0ede7]"
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                                  Share file
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </>
                       )}
                     </div>

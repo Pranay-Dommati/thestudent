@@ -17,6 +17,59 @@ const DashboardPage = () => {
   const navigate = useNavigate()
   const [historyItems, setHistoryItems] = useState([])
   const [statsData, setStatsData] = useState({ pdfs: 0, creditsUsed: 0 })
+  const [openShareId, setOpenShareId] = useState(null)
+
+  // Close share dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (!e.target.closest('.share-dropdown-container')) setOpenShareId(null)
+    }
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  }, [])
+
+  const handleShareOption = async (option, item, isPack, fileUrl, titleStr) => {
+    setOpenShareId(null)
+    let freshUrl = fileUrl
+    if (isPack && item.id) {
+      try {
+        const res = await axiosInstance.get(`/scrib/packs/${item.id}/pdf/`, {
+          maxRedirects: 0,
+          validateStatus: (s) => s < 400,
+        })
+        freshUrl = res.request?.responseURL || fileUrl
+      } catch (err) {
+        console.error('Failed to get fresh PDF URL for share', err)
+      }
+    }
+    if (option === 'copy') {
+      if (!freshUrl) return
+      await navigator.clipboard.writeText(freshUrl)
+      customToast.success('Link copied to clipboard!')
+    } else if (option === 'share') {
+      if (!freshUrl) return
+      if (navigator.share) {
+        try {
+          const response = await fetch(freshUrl)
+          const blob = await response.blob()
+          const file = new File([blob], `${titleStr}.pdf`, { type: 'application/pdf' })
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: titleStr })
+          } else {
+            await navigator.share({ url: freshUrl, title: titleStr })
+          }
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            await navigator.clipboard.writeText(freshUrl)
+            customToast.success('Link copied! Share it manually.')
+          }
+        }
+      } else {
+        await navigator.clipboard.writeText(freshUrl)
+        customToast.success('Link copied to clipboard!')
+      }
+    }
+  }
 
   useEffect(() => {
     if (!isLoggedIn) return
@@ -176,23 +229,41 @@ const DashboardPage = () => {
                         </span>
                       ) : (
                         fileUrl && (
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(fileUrl)
-                              customToast.success('Link copied to clipboard!')
-                            }}
-                            className="flex items-center gap-1 rounded-lg border border-[#e2dbd2] bg-white px-2 py-1 text-xs hover:bg-[#faf8f3] text-[#4b4742]"
-                            title="Share link"
-                          >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="18" cy="5" r="3" />
-                              <circle cx="6" cy="12" r="3" />
-                              <circle cx="18" cy="19" r="3" />
-                              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                            </svg>
-                            Share
-                          </button>
+                          <div className="relative share-dropdown-container">
+                            <button
+                              onClick={() => setOpenShareId(openShareId === item.id ? null : item.id)}
+                              className="flex items-center gap-1 rounded-lg border border-[#e2dbd2] bg-white px-2 py-1 text-xs hover:bg-[#faf8f3] text-[#4b4742]"
+                              title="Share options"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="18" cy="5" r="3" />
+                                <circle cx="6" cy="12" r="3" />
+                                <circle cx="18" cy="19" r="3" />
+                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                              </svg>
+                              Share
+                            </button>
+                            {openShareId === item.id && (
+                              <div className="absolute bottom-full right-0 mb-2 z-50 min-w-[168px] rounded-xl border border-[#e2dbd2] bg-white shadow-xl overflow-hidden">
+                                <p className="px-3.5 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest text-[#a39b92]">Share options</p>
+                                <button
+                                  onClick={() => handleShareOption('copy', item, isPack, fileUrl, item.name)}
+                                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-left text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors"
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                  Copy link
+                                </button>
+                                <button
+                                  onClick={() => handleShareOption('share', item, isPack, fileUrl, item.name)}
+                                  className="flex w-full items-center gap-2.5 px-3.5 py-2 pb-2.5 text-xs font-medium text-left text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors border-t border-[#f0ede7]"
+                                >
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                                  Share file
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         )
                       )}
                       {fileUrl && (
@@ -204,11 +275,26 @@ const DashboardPage = () => {
                             Download
                           </button>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
+                              let viewUrl = isPack ? item.pdf_url : item.image_url
+
+                              // For packs: get a fresh presigned URL so it never expires
+                              if (isPack && item.id) {
+                                try {
+                                  const res = await axiosInstance.get(`/scrib/packs/${item.id}/pdf/`, {
+                                    maxRedirects: 0,
+                                    validateStatus: (s) => s < 400,
+                                  })
+                                  viewUrl = res.request?.responseURL || viewUrl
+                                } catch (err) {
+                                  console.error('Failed to get fresh PDF URL', err)
+                                }
+                              }
+
                               navigate('/view', {
                                 state: {
-                                  pdfUrl: isPack ? item.pdf_url : null,
-                                  imageUrl: isPack ? null : item.image_url,
+                                  pdfUrl: isPack ? viewUrl : null,
+                                  imageUrl: isPack ? null : viewUrl,
                                   title: item.name,
                                   topics: item.topics_json || [item.name],
                                   totalPages: item.total_pages || 1,

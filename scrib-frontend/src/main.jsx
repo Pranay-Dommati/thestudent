@@ -13,6 +13,8 @@ import PricingPage from './PricingPage.jsx'
 import ProfilePage from './ProfilePage.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import PDFViewerPage from './PDFViewerPage.jsx'
+import ForgotPasswordPage from './ForgotPasswordPage.jsx'
+import ResetPasswordPage from './ResetPasswordPage.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -28,6 +30,8 @@ createRoot(document.getElementById('root')).render(
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/view" element={<PDFViewerPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password/:uid/:token" element={<ResetPasswordPage />} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-center" />

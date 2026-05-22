@@ -153,12 +153,12 @@ class AINarrator:
             try:
                 self.client = genai.Client(api_key=GEMINI_API_KEY)
                 self.is_available = True
-                print("✓ AI Narrator initialized with Gemini 2.5 Flash")
+                print("[SUCCESS] AI Narrator initialized with Gemini 2.5 Flash")
             except Exception as e:
-                print(f"⚠ AI Narrator initialization failed: {e}")
+                print(f"[WARNING] AI Narrator initialization failed: {e}")
                 self.is_available = False
         else:
-            print("⚠ GEMINI_API_KEY not found or google-genai not installed - AI narration disabled")
+            print("[INFO] GEMINI_API_KEY not found or google-genai not installed - AI narration disabled")
     
     def _format_variables(self, variables: Dict[str, Any]) -> str:
         if not variables:

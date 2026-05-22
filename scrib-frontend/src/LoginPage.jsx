@@ -51,7 +51,7 @@ const LoginPage = () => {
     }
   }
 
-  const { signInWithGoogle } = useGoogleAuth(
+  const { renderGoogleButton, isReady } = useGoogleAuth(
     async (credential) => {
       const success = await googleLogin(credential)
       if (success) {
@@ -59,6 +59,12 @@ const LoginPage = () => {
       }
     },
   )
+
+  useEffect(() => {
+    if (isReady) {
+      renderGoogleButton('google-login-btn')
+    }
+  }, [isReady])
 
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-[#1f1f1f]">
@@ -79,12 +85,9 @@ const LoginPage = () => {
           <h1 className="mt-3 text-2xl font-semibold">Welcome back</h1>
           <p className="mt-1 text-sm text-[#7b756d]">Log in to access your notes and credits.</p>
 
-          <button
-            onClick={signInWithGoogle}
-            className="mt-6 flex w-full items-center justify-center gap-3 rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-sm font-semibold"
-          >
-            <span className="text-base">G</span> Continue with Google
-          </button>
+          <div className="mt-6 flex w-full justify-center">
+            <div id="google-login-btn" className="w-full max-w-[400px] flex justify-center"></div>
+          </div>
 
           <div className="my-5 flex items-center gap-3 text-xs text-[#9a9289]">
             <span className="h-px flex-1 bg-[#eee6dc]" /> or <span className="h-px flex-1 bg-[#eee6dc]" />
@@ -113,7 +116,9 @@ const LoginPage = () => {
           </div>
 
           <div className="mt-3 text-right">
-            <button className="text-xs font-semibold text-[#7b756d]">Forgot password?</button>
+            <Link to="/forgot-password" className="text-xs font-semibold text-[#7b756d] hover:text-[#1f1f1f]">
+              Forgot password?
+            </Link>
           </div>
 
           <button

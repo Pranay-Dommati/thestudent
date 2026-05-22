@@ -14,4 +14,5 @@ urlpatterns = [
     path('me/', views.MeView.as_view(), name='me'),
     path('my-notes/', views.MyNotesView.as_view(), name='my-notes'),
     path('my-study-packs/', views.MyStudyPacksView.as_view(), name='my-study-packs'),
+    path('packs/<int:pack_id>/pdf/', views.StudyPackPdfView.as_view(), name='pack-pdf'),
 ]

@@ -99,7 +99,7 @@ const SignupPage = () => {
     }
   }
 
-  const { signInWithGoogle } = useGoogleAuth(
+  const { renderGoogleButton, isReady } = useGoogleAuth(
     async (credential) => {
       const success = await googleLogin(credential)
       if (success) {
@@ -107,6 +107,12 @@ const SignupPage = () => {
       }
     },
   )
+
+  useEffect(() => {
+    if (isReady) {
+      renderGoogleButton('google-signup-btn')
+    }
+  }, [isReady])
 
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-[#1f1f1f]">
@@ -127,12 +133,9 @@ const SignupPage = () => {
           <h1 className="mt-3 text-2xl font-semibold">Create your account</h1>
           <p className="mt-1 text-sm text-[#7b756d]">Start with 5 free credits - no card needed.</p>
 
-          <button
-            onClick={signInWithGoogle}
-            className="mt-6 flex w-full items-center justify-center gap-3 rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-sm font-semibold"
-          >
-            <span className="text-base">G</span> Continue with Google
-          </button>
+          <div className="mt-6 flex w-full justify-center">
+            <div id="google-signup-btn" className="w-full max-w-[400px] flex justify-center"></div>
+          </div>
 
           <div className="my-5 flex items-center gap-3 text-xs text-[#9a9289]">
             <span className="h-px flex-1 bg-[#eee6dc]" /> or <span className="h-px flex-1 bg-[#eee6dc]" />

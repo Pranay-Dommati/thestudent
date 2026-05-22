@@ -183,6 +183,7 @@ INSTALLED_APPS = [
     'scrib',
     'feedback',  # Add feedback app
     'newsletter',  # Add newsletter app
+    'payments',  # Add payments app
     'rest_framework',
     'social_django',  # Add social-auth-app-django
     'api.apps.ApiConfig',  # Self-ping logic

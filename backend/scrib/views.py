@@ -511,6 +511,7 @@ class GenerateStudyPackView(APIView):
                 title=title,
                 topics_json=pages,
                 pdf_url=pdf_url,
+                s3_key=pdf_result.get('s3_key'),   # permanent key for future re-access
                 total_pages=page_count,
                 credits_used=credits_used,
                 status=StudyPack.STATUS_READY,
@@ -652,7 +653,64 @@ class MyNotesView(APIView):
         return Response(serializer.data)
 
 
+class StudyPackPdfView(APIView):
+    """Serve the PDF for a study pack by generating a fresh presigned URL on every request.
+
+    This gives the owner permanent access to their PDF regardless of when the original
+    presigned URL was created (and expired).  The redirect URL is valid for 5 minutes
+    which is more than enough for a browser to download / display the file.
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pack_id):
+        pack = StudyPack.objects.filter(pk=pack_id, user=request.user).first()
+        if not pack:
+            return error_response('Study pack not found', status_code=404, code='not_found')
+
+        if not pack.s3_key:
+            # Older packs stored a full URL in pdf_url instead of a key — fall back to it.
+            if pack.pdf_url:
+                from django.http import HttpResponseRedirect
+                return HttpResponseRedirect(pack.pdf_url)
+            return error_response('PDF not available for this pack', status_code=404, code='not_found')
+
+        import boto3
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
+        region = getattr(settings, 'AWS_S3_REGION_NAME', 'ap-south-1')
+        access_key = getattr(settings, 'SCRIB_S3_ACCESS_KEY_ID', '')
+        secret_key = getattr(settings, 'SCRIB_S3_SECRET_ACCESS_KEY', '')
+
+        if not bucket or not access_key or not secret_key:
+            return error_response('Storage not configured', status_code=503, code='storage_unavailable')
+
+        try:
+            s3 = boto3.client(
+                's3',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=region,
+            )
+            # 5 minutes is plenty for the browser to start downloading.
+            fresh_url = s3.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': bucket, 'Key': pack.s3_key},
+                ExpiresIn=300,
+            )
+        except (BotoCoreError, ClientError) as exc:
+            import logging
+            logging.getLogger(__name__).error('[scrib] presign failed for pack %s: %s', pack_id, exc)
+            return error_response('Could not generate PDF link', status_code=503, code='storage_unavailable')
+
+        from django.http import HttpResponseRedirect
+        return HttpResponseRedirect(fresh_url)
+
+
 class MyStudyPacksView(APIView):
+
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 

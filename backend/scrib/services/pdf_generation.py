@@ -7,6 +7,7 @@ from PIL import Image
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
+# pyrefly: ignore [missing-import]
 from .image_generation import generate_handwritten_image_bytes, ImageGenerationError
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,8 @@ def _upload_to_s3(pdf_bytes, user_id):
     Uses SCRIB_S3_ACCESS_KEY_ID / SCRIB_S3_SECRET_ACCESS_KEY from settings
     (separate from the SES keys so permissions can be scoped to the scrib bucket).
 
-    Returns the public-facing HTTPS URL of the uploaded object.
+    Returns a tuple (presigned_url, s3_key) where s3_key is permanent and
+    presigned_url is a short-lived link for the current request.
     """
     import boto3
     from botocore.exceptions import BotoCoreError, ClientError
@@ -46,6 +48,9 @@ def _upload_to_s3(pdf_bytes, user_id):
     file_uuid = uuid.uuid4()
     s3_key = f'generated/{user_id}/{file_uuid}.pdf'
 
+    # Presigned URL expiry — configurable via SCRIB_PDF_URL_EXPIRY_SECONDS (default 3600 = 1 h).
+    expiry_seconds = int(getattr(settings, 'SCRIB_PDF_URL_EXPIRY_SECONDS', 3600))
+
     try:
         s3 = boto3.client(
             's3',
@@ -59,13 +64,19 @@ def _upload_to_s3(pdf_bytes, user_id):
             Body=pdf_bytes,
             ContentType='application/pdf',
         )
+        # Generate a presigned URL so private-bucket objects are accessible
+        # without making the bucket or object publicly readable.
+        pdf_url = s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket, 'Key': s3_key},
+            ExpiresIn=expiry_seconds,
+        )
     except (BotoCoreError, ClientError) as exc:
         logger.error('[scrib] S3 upload failed: %s', exc)
         raise PdfGenerationError(f'Failed to upload PDF to S3: {exc}') from exc
 
-    pdf_url = f'https://{bucket}.s3.{region}.amazonaws.com/{s3_key}'
-    logger.info('[scrib] PDF saved to S3: %s', pdf_url)
-    return pdf_url
+    logger.info('[scrib] PDF saved to S3 (presigned, expires in %ds): %s', expiry_seconds, s3_key)
+    return pdf_url, s3_key
 
 
 # ──────────────────────────────────────────────
@@ -90,19 +101,22 @@ def _save_pdf_locally(pdf_bytes):
 
 
 def _save_pdf_bytes(pdf_bytes, user_id=None):
-    """Save PDF — prefers S3, falls back to local filesystem."""
+    """Save PDF — prefers S3, falls back to local filesystem.
+
+    Returns (pdf_url, s3_key). s3_key is None when saved locally.
+    """
     bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
     access_key = getattr(settings, 'SCRIB_S3_ACCESS_KEY_ID', '')
     secret_key = getattr(settings, 'SCRIB_S3_SECRET_ACCESS_KEY', '')
 
     if bucket and access_key and secret_key and user_id is not None:
-        return _upload_to_s3(pdf_bytes, user_id)
+        return _upload_to_s3(pdf_bytes, user_id)  # returns (url, key)
 
     logger.warning(
         '[scrib] S3 not configured or user_id missing — saving PDF locally. '
         'Set SCRIB_S3_ACCESS_KEY_ID, SCRIB_S3_SECRET_ACCESS_KEY, AWS_STORAGE_BUCKET_NAME.'
     )
-    return _save_pdf_locally(pdf_bytes)
+    return _save_pdf_locally(pdf_bytes), None
 
 
 # ──────────────────────────────────────────────
@@ -165,7 +179,7 @@ def generate_study_pack_pdf(pages, title, user_id=None):
 
     placeholder_url = getattr(settings, 'SCRIB_PLACEHOLDER_PDF_URL', '')
     if placeholder_url:
-        return {'pdf_url': placeholder_url, 'total_pages': len(pages)}
+        return {'pdf_url': placeholder_url, 's3_key': None, 'total_pages': len(pages)}
 
     # Generate all page images in PARALLEL — each page calls OpenAI independently,
     # so there is no reason to wait for page N before starting page N+1.
@@ -180,10 +194,13 @@ def generate_study_pack_pdf(pages, title, user_id=None):
     try:
         with ThreadPoolExecutor(max_workers=min(len(pages), 5)) as executor:
             results = list(executor.map(_generate_page, enumerate(pages)))
+        # Sort by original page index to guarantee correct PDF page order
+        # (executor.map preserves order, but explicit sort is defensive).
+        results.sort(key=lambda r: r[0])
         images = [img for _, img in results]
     except ImageGenerationError as exc:
         raise PdfGenerationError(str(exc)) from exc
 
     pdf_bytes = _images_to_pdf(images)
-    pdf_url = _save_pdf_bytes(pdf_bytes, user_id=user_id)
-    return {'pdf_url': pdf_url, 'total_pages': len(pages)}
+    pdf_url, s3_key = _save_pdf_bytes(pdf_bytes, user_id=user_id)
+    return {'pdf_url': pdf_url, 's3_key': s3_key, 'total_pages': len(pages)}
