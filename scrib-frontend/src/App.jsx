@@ -359,29 +359,37 @@ const App = () => {
                 {pricingTiers.map((tier) => (
                   <div
                     key={`desktop-${tier.id}`}
-                    className={`relative rounded-2xl border bg-[#f7f4ee] p-5 text-center ${
-                      tier.highlight ? 'border-[#8fb0ff] ring-1 ring-[#8fb0ff]/50' : 'border-[#e2dbd2]'
+                    className={`relative flex flex-col rounded-2xl border bg-white p-6 ${
+                      tier.highlight ? 'border-[1.5px] border-black shadow-sm' : 'border-[#e2dbd2]'
                     }`}
                   >
                     {tier.highlight ? (
-                      <span className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-[#e8eefb] px-3 py-1 text-[10px] font-semibold text-[#4a6aa6]">
+                      <span className="absolute -top-[10px] left-1/2 -translate-x-1/2 rounded-full bg-[#1a1a1a] ring-4 ring-white px-3 py-0.5 text-[11px] font-semibold text-[#f0c06a]">
                         Most popular
                       </span>
                     ) : null}
-                    <div className="mt-6 text-2xl font-semibold">
-                      {tier.label} <span className="text-sm font-normal">/ pack</span>
+                    
+                    <div className="flex flex-col">
+                      <span className="text-4xl font-medium tracking-tight text-[#1f1f1f]">
+                        {tier.label.replace('Rs ', '₹')}
+                      </span>
+                      <span className="mt-1 text-sm text-[#5f5a54]">/ pack</span>
                     </div>
-                    <p className="mt-2 text-sm text-[#5f5a54]">{tier.note}</p>
-                    <p className="mt-2 text-xs text-[#8a847c]">{tier.helper}</p>
-                    <button
-                      className={`mt-5 w-full rounded-lg px-4 py-2 text-sm font-semibold ${
-                        tier.highlight
-                          ? 'bg-[#1b1b1b] text-white'
-                          : 'border border-[#d9d1c7] bg-white text-[#1f1f1f]'
-                      }`}
-                    >
-                      Buy pack
-                    </button>
+
+                    <div className="mt-6 flex flex-col">
+                      <span className="text-lg font-semibold text-[#1f1f1f]">{tier.note.split(' ')[0]} credits</span>
+                      <span className="mt-1 text-[13px] leading-snug text-[#5f5a54]">
+                        {tier.helper}
+                      </span>
+                    </div>
+
+                    <div className="mt-auto pt-8">
+                      <button
+                        className="w-full rounded-lg border border-[#d9d1c7] bg-white py-2 text-sm font-semibold text-[#1f1f1f] transition-colors hover:bg-[#faf8f3]"
+                      >
+                        Buy pack
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
