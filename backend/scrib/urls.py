@@ -9,8 +9,12 @@ urlpatterns = [
     path('generate-note/', views.GenerateNoteView.as_view(), name='generate-note'),
     path('generate-study-pack/', views.GenerateStudyPackView.as_view(), name='generate-study-pack'),
     path('organize-topics/', views.OrganizeTopicsView.as_view(), name='organize-topics'),
+    # Payment endpoints
     path('payments/create-order/', views.CreateOrderView.as_view(), name='payments-create-order'),
     path('payments/verify/', views.VerifyPaymentView.as_view(), name='payments-verify'),
+    path('payments/history/', views.PaymentHistoryView.as_view(), name='payments-history'),
+    path('payments/webhook/', views.razorpay_webhook, name='payments-webhook'),
+    # User data
     path('me/', views.MeView.as_view(), name='me'),
     path('my-notes/', views.MyNotesView.as_view(), name='my-notes'),
     path('my-study-packs/', views.MyStudyPacksView.as_view(), name='my-study-packs'),

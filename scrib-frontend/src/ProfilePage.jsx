@@ -1,39 +1,56 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
 import Breadcrumb from './components/Breadcrumb'
+import BuyCreditsModal from './components/BuyCreditsModal'
+import { fetchPaymentHistory } from './services/paymentService'
 
 const sections = [
   { id: 'profile', label: 'Profile' },
   { id: 'plan', label: 'Plan and billing' },
 ]
 
-const historyRows = [
-  { id: 'h1', date: 'May 01, 2026', credits: '10', amount: 'Rs 49', status: 'Paid' },
-  { id: 'h2', date: 'Apr 18, 2026', credits: '20', amount: 'Rs 99', status: 'Paid' },
-  { id: 'h3', date: 'Mar 05, 2026', credits: '40', amount: 'Rs 199', status: 'Paid' },
-]
-
-
-
 const ProfilePage = () => {
   const [activeSection, setActiveSection] = useState('profile')
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [isClosingAccount, setIsClosingAccount] = useState(false)
-  const { user, logout, isLoggedIn } = useAuth()
-  
+  const [showBuyModal, setShowBuyModal] = useState(false)
+  const [paymentHistory, setPaymentHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
+
+  const { user, logout, isLoggedIn, refreshUser } = useAuth()
+
+  // Load payment history when the "Plan and billing" tab is opened
+  const loadPaymentHistory = useCallback(async () => {
+    if (historyLoaded) return
+    setHistoryLoading(true)
+    try {
+      const data = await fetchPaymentHistory()
+      setPaymentHistory(data)
+      setHistoryLoaded(true)
+    } catch {
+      // Silently fail — table will show empty state
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [historyLoaded])
+
+  useEffect(() => {
+    if (activeSection === 'plan') {
+      loadPaymentHistory()
+    }
+  }, [activeSection, loadPaymentHistory])
+
   const handleCloseAccount = async () => {
     setIsClosingAccount(true)
     try {
       const axiosInstance = (await import('./utils/axios')).default
       const customToast = (await import('./utils/customToast')).default
-      
       await axiosInstance.delete('/auth/profile/')
       customToast.success('Account closed successfully.')
-      
-      // Force logout without confirmation modal
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
       window.location.href = '/'
@@ -46,47 +63,29 @@ const ProfilePage = () => {
     }
   }
 
-  const buyPack = async () => {
+  const handlePaymentSuccess = async ({ credits_added, credit_balance }) => {
+    // Refresh payment history list
+    setHistoryLoaded(false)
+    loadPaymentHistory()
+  }
+
+  const formatDate = (dateStr) => {
     try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/payments/create-order/",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            pack: "popular"
-          })
-        }
-      )
-
-      const data = await response.json()
-
-      const options = {
-        key: data.key,
-        amount: data.amount,
-        currency: "INR",
-        name: "Scrib",
-        description: "20 Credits",
-        order_id: data.order_id,
-        handler: async function (response) {
-          console.log("SUCCESS")
-          console.log(response)
-          alert("Payment successful")
-        }
-      }
-
-      const razor = new window.Razorpay(options)
-      razor.open()
-    } catch (err) {
-      console.error("Payment initiation failed", err)
-      alert("Payment failed to start")
+      return new Date(dateStr).toLocaleDateString('en-IN', {
+        day: 'numeric', month: 'short', year: 'numeric',
+      })
+    } catch {
+      return dateStr
     }
   }
 
+  const formatAmount = (paise) => {
+    const rupees = Math.round(paise / 100)
+    return `₹${rupees}`
+  }
+
   const activeLabel = useMemo(
-    () => sections.find((section) => section.id === activeSection)?.label || 'Profile',
+    () => sections.find((s) => s.id === activeSection)?.label || 'Profile',
     [activeSection],
   )
 
@@ -143,6 +142,7 @@ const ProfilePage = () => {
       </header>
 
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 md:flex-row md:px-6 md:py-8">
+        {/* Sidebar */}
         <aside className="w-full md:w-56">
           <div className="rounded-2xl border border-[#e2dbd2] bg-white p-3">
             <p className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#9a9289]">Account</p>
@@ -150,6 +150,7 @@ const ProfilePage = () => {
               {sections.map((section) => (
                 <button
                   key={section.id}
+                  id={`profile-tab-${section.id}`}
                   onClick={() => setActiveSection(section.id)}
                   className={`flex-1 rounded-lg px-3 py-2 text-center text-sm font-semibold md:text-left ${
                     activeSection === section.id
@@ -164,7 +165,9 @@ const ProfilePage = () => {
           </div>
         </aside>
 
+        {/* Main content */}
         <section className="flex-1">
+          {/* Section header */}
           <div className="rounded-2xl border border-[#e2dbd2] bg-white px-6 py-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -184,6 +187,7 @@ const ProfilePage = () => {
             </div>
           </div>
 
+          {/* Profile tab */}
           {activeSection === 'profile' ? (
             <div className="mt-6 space-y-4">
               <div className="rounded-2xl border border-[#e2dbd2] bg-white px-6 py-5">
@@ -198,7 +202,7 @@ const ProfilePage = () => {
                           ? 'border border-[#e0d9ce] bg-white text-[#1f1f1f]'
                           : 'border-transparent bg-[#faf8f3] text-[#7b756d] hover:bg-[#f3f0e8]'
                       }`}
-                      defaultValue={user?.full_name ?? 'Arjun Sharma'}
+                      defaultValue={user?.full_name ?? ''}
                       readOnly={!isEditingProfile}
                     />
                   </div>
@@ -210,11 +214,10 @@ const ProfilePage = () => {
                           ? 'border border-[#e0d9ce] bg-white text-[#1f1f1f]'
                           : 'border-transparent bg-[#faf8f3] text-[#7b756d] hover:bg-[#f3f0e8]'
                       }`}
-                      defaultValue={user?.email ?? 'arjun@college.edu'}
-                      readOnly={!isEditingProfile}
+                      defaultValue={user?.email ?? ''}
+                      readOnly
                     />
                   </div>
-
                 </div>
               </div>
 
@@ -223,7 +226,7 @@ const ProfilePage = () => {
                 <p className="mt-1 text-xs text-[#a06f6f]">
                   This will delete your credits, notes, and billing history permanently.
                 </p>
-                <button 
+                <button
                   onClick={() => setShowCloseModal(true)}
                   className="mt-4 rounded-full border border-[#e6b7b7] bg-white px-4 py-2 text-xs font-semibold text-[#a06f6f] hover:bg-[#fff0f0] transition-colors"
                 >
@@ -233,69 +236,130 @@ const ProfilePage = () => {
             </div>
           ) : null}
 
+          {/* Plan & Billing tab */}
           {activeSection === 'plan' ? (
             <div className="mt-6 space-y-4">
+              {/* Credits card */}
               <div className="rounded-2xl border border-[#e2dbd2] bg-white px-6 py-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h2 className="text-sm font-semibold">Credits</h2>
-                    <p className="text-xs text-[#7b756d]">Current balance: {user?.credit_balance ?? 0} credits</p>
+                    <p className="text-xs text-[#7b756d] mt-1">
+                      Current balance:{' '}
+                      <span className="font-semibold text-[#1f1f1f] text-base">{user?.credit_balance ?? 0}</span>{' '}
+                      credits
+                    </p>
+                    <p className="text-xs text-[#9a9289] mt-1">1 credit = 1 PDF page generated</p>
                   </div>
-                  <button onClick={buyPack} className="rounded-lg border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold hover:bg-[#faf8f3]">
-                    Buy credits
+                  <button
+                    id="profile-buy-credits-btn"
+                    onClick={() => setShowBuyModal(true)}
+                    className="rounded-lg bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity"
+                  >
+                    + Buy credits
                   </button>
+                </div>
+
+                {/* Quick buy packs */}
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {[
+                    { pack: 'starter', label: '10 cr', price: '₹49' },
+                    { pack: 'popular', label: '20 cr', price: '₹99', highlight: true },
+                    { pack: 'pro', label: '40 cr', price: '₹199' },
+                  ].map((item) => (
+                    <button
+                      key={item.pack}
+                      id={`profile-quick-buy-${item.pack}`}
+                      onClick={() => setShowBuyModal(true)}
+                      className={`relative flex flex-col items-center rounded-xl border py-3 text-center transition-colors hover:bg-[#faf8f3] ${
+                        item.highlight ? 'border-[1.5px] border-[#1f1f1f] bg-[#faf8f3]' : 'border-[#e2dbd2] bg-white'
+                      }`}
+                    >
+                      {item.highlight && (
+                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-[#1f1f1f] px-1.5 py-0.5 text-[9px] font-semibold text-[#f0c06a] ring-2 ring-white">
+                          Popular
+                        </span>
+                      )}
+                      <span className="text-base font-semibold">{item.price}</span>
+                      <span className="text-xs text-[#7b756d]">{item.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
+              {/* Payment history */}
               <div className="rounded-2xl border border-[#e2dbd2] bg-white px-6 py-5">
-                <h2 className="text-sm font-semibold">Billing history</h2>
+                <h2 className="text-sm font-semibold">Payment history</h2>
                 <div className="mt-4 overflow-hidden rounded-xl border border-[#eee6dc]">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-[#faf8f3] text-[#7b756d]">
                       <tr>
-                        <th className="px-3 py-2">Date</th>
-                        <th className="px-3 py-2">Credits</th>
-                        <th className="px-3 py-2">Amount</th>
-                        <th className="px-3 py-2">Status</th>
-                        <th className="px-3 py-2">Invoice</th>
+                        <th className="px-3 py-2.5">Date</th>
+                        <th className="px-3 py-2.5">Credits</th>
+                        <th className="px-3 py-2.5">Amount</th>
+                        <th className="px-3 py-2.5">Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {historyRows.map((row) => (
-                        <tr key={row.id} className="border-t border-[#eee6dc]">
-                          <td className="px-3 py-2">{row.date}</td>
-                          <td className="px-3 py-2">{row.credits}</td>
-                          <td className="px-3 py-2">{row.amount}</td>
-                          <td className="px-3 py-2 text-[#2b7a4b]">{row.status}</td>
-                          <td className="px-3 py-2">
-                            <button className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-[11px] font-semibold">
-                              View
-                            </button>
+                      {historyLoading ? (
+                        <tr>
+                          <td colSpan={4} className="px-3 py-6 text-center text-[#9a9289]">
+                            <span className="inline-flex items-center gap-2">
+                              <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                              </svg>
+                              Loading...
+                            </span>
                           </td>
                         </tr>
-                      ))}
+                      ) : paymentHistory.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-3 py-8 text-center text-[#9a9289]">
+                            No payments yet. Buy your first credit pack above!
+                          </td>
+                        </tr>
+                      ) : (
+                        paymentHistory.map((row) => (
+                          <tr key={row.id} className="border-t border-[#eee6dc]">
+                            <td className="px-3 py-2.5">{formatDate(row.created_at)}</td>
+                            <td className="px-3 py-2.5 font-medium">{row.credits_added} cr</td>
+                            <td className="px-3 py-2.5">{formatAmount(row.amount)}</td>
+                            <td className="px-3 py-2.5">
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                row.status === 'paid'
+                                  ? 'bg-[#eef7df] text-[#557a3f]'
+                                  : row.status === 'failed'
+                                  ? 'bg-[#fff0f0] text-[#a74c4c]'
+                                  : 'bg-[#f0ece5] text-[#7b756d]'
+                              }`}>
+                                {row.status === 'paid' ? 'Paid' : row.status === 'failed' ? 'Failed' : 'Pending'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[#e2dbd2] bg-white px-6 py-5">
-                <h2 className="text-sm font-semibold">Payment method</h2>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#eee6dc] px-4 py-3">
-                  <div>
-                    <p className="text-xs text-[#7b756d]">UPI</p>
-                    <p className="text-sm font-semibold">arjun@upi</p>
-                  </div>
-                  <button className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-[11px] font-semibold">
-                    Remove
-                  </button>
-                </div>
+              {/* Info card */}
+              <div className="rounded-xl border border-[#e2dbd2] bg-[#faf8f3] px-4 py-3 text-xs text-[#6f6a63]">
+                Payments via UPI / Razorpay · Secure · Credits added instantly after payment · No auto-renewal, ever
               </div>
             </div>
           ) : null}
-
         </section>
       </main>
+
+      {/* Buy Credits Modal */}
+      {showBuyModal && (
+        <BuyCreditsModal
+          onClose={() => setShowBuyModal(false)}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
 
       {/* Close Account Modal */}
       {showCloseModal && (
@@ -312,15 +376,15 @@ const ProfilePage = () => {
             </div>
             <p className="mt-4 text-sm text-[#1f1f1f] font-medium">Are you absolutely sure you want to proceed?</p>
             <div className="mt-6 flex justify-end gap-3">
-              <button 
-                onClick={() => setShowCloseModal(false)} 
+              <button
+                onClick={() => setShowCloseModal(false)}
                 disabled={isClosingAccount}
                 className="rounded-lg px-4 py-2 text-sm font-semibold text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors"
               >
                 Cancel
               </button>
-              <button 
-                onClick={handleCloseAccount} 
+              <button
+                onClick={handleCloseAccount}
                 disabled={isClosingAccount}
                 className="rounded-lg bg-[#c05c5c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a74c4c] transition-colors"
               >

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
-import axiosInstance from './utils/axios'
 import { getInitials } from './utils/user'
-import PDFThumbnail from './components/PDFThumbnail'
 import MobileMenu from './components/MobileMenu'
+import BuyCreditsModal from './components/BuyCreditsModal'
+import PreviewCard from './components/PreviewCard'
 
 const fallbackPreviewStrip = [
   { id: 'osi-model', title: 'OSI Model', pdfUrl: null },
@@ -43,6 +43,7 @@ const App = () => {
   const { user, logout, isLoggedIn } = useAuth()
   const [previewStrip, setPreviewStrip] = useState(fallbackPreviewStrip)
   const [topicInput, setTopicInput] = useState('')
+  const [showBuyModal, setShowBuyModal] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -187,7 +188,7 @@ const App = () => {
                 {previewStrip.map((note) => (
                   <div
                     key={note.id}
-                    className={`rounded-xl border border-[#e2dbd2] bg-[#f7f4ee] p-3 transition-shadow ${note.pdfUrl ? 'cursor-pointer hover:shadow-md' : 'opacity-60'}`}
+                    className={`transition-transform duration-200 ${note.pdfUrl ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg rounded-xl' : 'opacity-70'}`}
                     onClick={(e) => {
                       e.preventDefault()
                       if (!note.pdfUrl) return
@@ -203,29 +204,19 @@ const App = () => {
                     }}
                   >
                     {!note.pdfUrl && !note.imageUrl ? (
-                      <div className="animate-pulse">
-                        <div className="h-28 w-full rounded-lg bg-[#e8e2d9]"></div>
-                        <div className="mt-3 flex items-center justify-between">
-                          <div className="h-4 w-2/3 rounded bg-[#e8e2d9]"></div>
-                          <div className="h-4 w-8 rounded-full bg-[#e8e2d9]"></div>
+                      <div className="animate-pulse h-full flex flex-col rounded-xl border border-[#e2dbd2] bg-white overflow-hidden">
+                        <div className="h-28 w-full bg-[#e8e2d9]"></div>
+                        <div className="flex flex-1 flex-col p-4">
+                          <div className="mb-2 h-3 w-1/3 rounded bg-[#e8e2d9]"></div>
+                          <div className="h-4 w-3/4 rounded bg-[#e8e2d9]"></div>
+                          <div className="mt-auto pt-4 flex justify-between">
+                            <div className="h-3 w-16 rounded bg-[#e8e2d9]"></div>
+                            <div className="h-5 w-12 rounded-full bg-[#e8e2d9]"></div>
+                          </div>
                         </div>
                       </div>
                     ) : (
-                      <>
-                        <div className="rounded-lg border border-[#e7dfd4] bg-white p-2">
-                          {note.imageUrl ? (
-                            <img src={note.imageUrl} alt={note.title} className="h-24 w-full rounded-md bg-[#fbfaf7] object-cover" />
-                          ) : (
-                            <PDFThumbnail pdfUrl={note.pdfUrl} title={note.title} className="h-24 rounded-md bg-[#fbfaf7]" />
-                          )}
-                        </div>
-                        <div className="mt-3 flex items-center justify-between">
-                          <p className="text-sm font-semibold">{note.title}</p>
-                          <span className="rounded-full border border-[#e2dbd2] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#6b655d]">
-                            Free
-                          </span>
-                        </div>
-                      </>
+                      <PreviewCard title={note.title} subject={note.subject || 'Preview'} />
                     )}
                   </div>
                 ))}
@@ -336,6 +327,8 @@ const App = () => {
                     {/* Right: Button */}
                     <div className="flex-shrink-0">
                       <button
+                        id={`landing-buy-mobile-${tier.id}`}
+                        onClick={() => isLoggedIn ? setShowBuyModal(true) : navigate('/login')}
                         className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors ${
                           tier.highlight
                             ? 'bg-[#1b1b1b] text-white'
@@ -391,9 +384,11 @@ const App = () => {
 
                     <div className="mt-auto pt-8">
                       <button
+                        id={`landing-buy-desktop-${tier.id}`}
+                        onClick={() => isLoggedIn ? setShowBuyModal(true) : navigate('/login')}
                         className="w-full rounded-lg border border-[#d9d1c7] bg-white py-2 text-sm font-semibold text-[#1f1f1f] transition-colors hover:bg-[#faf8f3]"
                       >
-                        Buy pack
+                        {isLoggedIn ? 'Buy pack' : 'Sign in to buy'}
                       </button>
                     </div>
                   </div>
@@ -411,6 +406,14 @@ const App = () => {
           &copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.
         </div>
       </footer>
+
+      {/* Buy Credits Modal */}
+      {showBuyModal && (
+        <BuyCreditsModal
+          onClose={() => setShowBuyModal(false)}
+          onSuccess={() => {}}
+        />
+      )}
     </div>
   )
 }

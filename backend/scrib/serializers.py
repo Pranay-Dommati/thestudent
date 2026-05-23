@@ -53,12 +53,20 @@ class StudyPackSerializer(serializers.ModelSerializer):
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    amount_rupees = serializers.SerializerMethodField()
+
+    def get_amount_rupees(self, obj):
+        """Return amount in INR (divide paise by 100)."""
+        return round(obj.amount / 100, 2)
+
     class Meta:
         model = Payment
         fields = [
             'id',
             'razorpay_order_id',
+            'razorpay_payment_id',
             'amount',
+            'amount_rupees',
             'currency',
             'credits_added',
             'status',

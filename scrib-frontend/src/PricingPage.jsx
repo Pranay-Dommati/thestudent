@@ -1,28 +1,31 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
 import Breadcrumb from './components/Breadcrumb'
 import MobileMenu from './components/MobileMenu'
+import BuyCreditsModal from './components/BuyCreditsModal'
 
+// Pack IDs must match the backend CREDIT_PACKS keys exactly
 const tiers = [
   {
     id: 'starter',
-    price: 'Rs 49',
+    price: '₹49',
     credits: '10 credits',
     helper: '10 PDF pages',
     highlight: false,
   },
   {
-    id: 'standard',
-    price: 'Rs 99',
+    id: 'popular',
+    price: '₹99',
     credits: '20 credits',
     helper: '20 PDF pages',
-    tag: 'Best value - Rs 4.95/page',
+    tag: 'Best value — ₹4.95/page',
     highlight: true,
   },
   {
-    id: 'power',
-    price: 'Rs 199',
+    id: 'pro',
+    price: '₹199',
     credits: '40 credits',
     helper: '40 PDF pages',
     highlight: false,
@@ -33,7 +36,7 @@ const faqs = [
   {
     id: 'expire',
     question: 'Do credits expire?',
-    answer: 'Never. Buy once, use whenever - even months later.',
+    answer: 'Never. Buy once, use whenever — even months later.',
   },
   {
     id: 'count',
@@ -43,12 +46,24 @@ const faqs = [
   {
     id: 'redownload',
     question: 'Can I re-download a note I already generated?',
-    answer: 'Yes - from your dashboard, at no extra cost. You only pay once per generation.',
+    answer: 'Yes — from your dashboard, at no extra cost. You only pay once per generation.',
   },
 ]
 
 const PricingPage = () => {
   const { user, logout, isLoggedIn } = useAuth()
+  const navigate = useNavigate()
+  const [showBuyModal, setShowBuyModal] = useState(false)
+  const [defaultPack, setDefaultPack] = useState('popular')
+
+  const handleBuyClick = (packId) => {
+    if (!isLoggedIn) {
+      navigate('/login')
+      return
+    }
+    setDefaultPack(packId)
+    setShowBuyModal(true)
+  }
 
   return (
     <div className="min-h-screen bg-white text-[#1f1f1f]">
@@ -125,10 +140,10 @@ const PricingPage = () => {
                   Most popular
                 </span>
               ) : null}
-              
+
               <div className="flex flex-col">
                 <span className="text-4xl font-medium tracking-tight text-[#1f1f1f]">
-                  {tier.price.replace('Rs ', '₹')}
+                  {tier.price}
                 </span>
                 <span className="mt-1 text-sm text-[#5f5a54]">/ pack</span>
               </div>
@@ -149,9 +164,15 @@ const PricingPage = () => {
 
               <div className="mt-auto pt-8">
                 <button
-                  className="w-full rounded-lg border border-[#d9d1c7] bg-white py-2 text-sm font-semibold text-[#1f1f1f] transition-colors hover:bg-[#faf8f3]"
+                  id={`pricing-buy-${tier.id}`}
+                  onClick={() => handleBuyClick(tier.id)}
+                  className={`w-full rounded-lg py-2 text-sm font-semibold transition-colors ${
+                    tier.highlight
+                      ? 'bg-[#1f1f1f] text-white hover:opacity-90'
+                      : 'border border-[#d9d1c7] bg-white text-[#1f1f1f] hover:bg-[#faf8f3]'
+                  }`}
                 >
-                  Buy pack
+                  {isLoggedIn ? 'Buy pack' : 'Sign in to buy'}
                 </button>
               </div>
             </div>
@@ -163,7 +184,7 @@ const PricingPage = () => {
         </p>
 
         <div className="mt-6 rounded-xl border border-[#e2dbd2] bg-[#faf8f3] px-4 py-3 text-xs text-[#6f6a63]">
-          Payments via UPI / Razorpay - Secure - Credits added instantly after payment - No auto-renewal, ever
+          Payments via UPI / Razorpay · Secure · Credits added instantly after payment · No auto-renewal, ever
         </div>
 
         <div className="mt-10">
@@ -179,12 +200,19 @@ const PricingPage = () => {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-[#e4ddd4] bg-white py-8">
         <div className="mx-auto max-w-6xl px-6 text-center text-sm text-[#7b756d]">
           &copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.
         </div>
       </footer>
+
+      {/* Buy Credits Modal */}
+      {showBuyModal && (
+        <BuyCreditsModal
+          onClose={() => setShowBuyModal(false)}
+          onSuccess={() => {}}
+        />
+      )}
     </div>
   )
 }

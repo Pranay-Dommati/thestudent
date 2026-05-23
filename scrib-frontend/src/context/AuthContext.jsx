@@ -286,6 +286,32 @@ export const AuthProvider = ({ children }) => {
 
   const isAuthenticated = () => isLoggedIn && !!storage.getItem('accessToken')
 
+  /**
+   * Refresh the current user's data (including credit_balance) from the server.
+   * Call this after a successful payment to update credits instantly.
+   */
+  const refreshUser = async () => {
+    try {
+      const token = storage.getItem('accessToken')
+      if (!token) return
+      // /scrib/me/ returns id, email, full_name, credit_balance
+      const profileUrl = `${axiosInstance.defaults.baseURL}/scrib/me/`
+      const response = await axios.get(profileUrl, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      const scribData = response.data
+      // Merge the scrib credit_balance into the existing user object
+      setUser((prev) => ({
+        ...(prev || {}),
+        credit_balance: scribData.credit_balance,
+        full_name: scribData.full_name || prev?.full_name,
+      }))
+      return scribData
+    } catch (err) {
+      if (IS_DEV) console.error('refreshUser failed:', err)
+    }
+  }
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -298,6 +324,7 @@ export const AuthProvider = ({ children }) => {
       logout,
       setAuthSession,
       validateAuth,
+      refreshUser,
     }}>
       {children}
       {showLogoutModal && (

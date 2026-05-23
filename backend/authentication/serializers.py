@@ -1,16 +1,40 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import User
+from .models import User  # pyrefly: ignore [missing-import]
 from django.contrib.auth import authenticate
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
-from .models import EmailOTP
+from .models import EmailOTP  # pyrefly: ignore [missing-import]
 import re
 
 class UserSerializer(serializers.ModelSerializer):
+    credit_balance = serializers.SerializerMethodField()
+
+    def get_credit_balance(self, obj):
+        """Compute credit balance from CreditTransaction records."""
+        try:
+            from django.db.models import Case, F, IntegerField, Sum, When
+            from scrib.models import CreditTransaction
+            # Admin users get unlimited credits
+            if getattr(obj, 'is_staff', False) or getattr(obj, 'is_superuser', False):
+                return 10 ** 9
+            totals = CreditTransaction.objects.filter(user=obj).aggregate(
+                total=Sum(
+                    Case(
+                        When(direction=CreditTransaction.DIRECTION_CREDIT, then=F('credits')),
+                        When(direction=CreditTransaction.DIRECTION_DEBIT, then=-F('credits')),
+                        default=0,
+                        output_field=IntegerField(),
+                    )
+                )
+            )
+            return int(totals['total'] or 0)
+        except Exception:
+            return 0
+
     class Meta:
         model = User
-        fields = ('id', 'email', 'full_name', 'auth_method', 'agreed_to_terms', 'has_seen_onboarding')
+        fields = ('id', 'email', 'full_name', 'auth_method', 'agreed_to_terms', 'has_seen_onboarding', 'credit_balance')
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])

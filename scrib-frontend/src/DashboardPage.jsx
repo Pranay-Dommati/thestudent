@@ -6,6 +6,7 @@ import axiosInstance from './utils/axios'
 import { forceDownload } from './utils/download'
 import customToast from './utils/customToast'
 import Breadcrumb from './components/Breadcrumb'
+import BuyCreditsModal from './components/BuyCreditsModal'
 
 const toneColors = {
   blue: 'bg-[#7ba7ff]',
@@ -19,6 +20,7 @@ const DashboardPage = () => {
   const [historyItems, setHistoryItems] = useState([])
   const [statsData, setStatsData] = useState({ pdfs: 0, creditsUsed: 0 })
   const [openShareId, setOpenShareId] = useState(null)
+  const [showBuyModal, setShowBuyModal] = useState(false)
 
   // Close share dropdown when clicking outside
   useEffect(() => {
@@ -187,9 +189,13 @@ const DashboardPage = () => {
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#e2dbd2] bg-white px-4 py-3">
           <p className="text-sm text-[#6f6a63]">
-            Running low? <span className="font-semibold text-[#1f1f1f]">Top up credits</span> - starts at Rs 49 for 10.
+            Running low? <span className="font-semibold text-[#1f1f1f]">Top up credits</span> - starts at ₹49 for 10.
           </p>
-          <button className="rounded-lg border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold">
+          <button
+            id="dashboard-buy-credits-btn"
+            onClick={() => setShowBuyModal(true)}
+            className="rounded-lg border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold hover:bg-[#faf8f3] transition-colors"
+          >
             + Buy credits
           </button>
         </div>
@@ -320,6 +326,16 @@ const DashboardPage = () => {
           </div>
         </div>
       </main>
+
+      {/* Buy Credits Modal */}
+      {showBuyModal && (
+        <BuyCreditsModal
+          onClose={() => setShowBuyModal(false)}
+          onSuccess={({ credits_added }) => {
+            customToast.success(`${credits_added} credits added to your account!`)
+          }}
+        />
+      )}
     </div>
   )
 }

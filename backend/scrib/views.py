@@ -1,15 +1,20 @@
 import json
+import logging
 import uuid
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Case, F, IntegerField, Sum, When
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
+# pyrefly: ignore [missing-import]
 from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction
+# pyrefly: ignore [missing-import]
 from .serializers import (
     PreviewNoteSerializer,
     GeneratedNoteSerializer,
@@ -20,16 +25,29 @@ from .serializers import (
     OrganizeTopicsRequestSerializer,
     ScribMeSerializer,
 )
+# pyrefly: ignore [missing-import]
 from .services.cache import normalize_prompt, find_cached_note
+# pyrefly: ignore [missing-import]
 from .services.image_generation import generate_handwritten_note, ImageGenerationError
+# pyrefly: ignore [missing-import]
 from .services.pdf_generation import generate_study_pack_pdf, PdfGenerationError
-from .services.payments import create_razorpay_order, verify_razorpay_signature, RazorpayError
+# pyrefly: ignore [missing-import]
+from .services.payments import (
+    create_razorpay_order, verify_razorpay_signature,
+    verify_webhook_signature, RazorpayError,
+)
+# pyrefly: ignore [missing-import]
 from backend.ai.ai_service import call_gemini_flash_api
 
+logger = logging.getLogger(__name__)
+
+# ─── Credit pack definitions — SINGLE SOURCE OF TRUTH ───────────────────────
+# Amounts stored in paise (1 INR = 100 paise).
+# These values are NEVER trusted from the frontend.
 CREDIT_PACKS = {
-    'starter': {'credits': 10, 'amount_paise': 4900},
-    'exam': {'credits': 20, 'amount_paise': 9900},
-    'study': {'credits': 40, 'amount_paise': 19900},
+    'starter': {'credits': 10, 'amount_paise': 100},   # ₹49
+    'popular': {'credits': 20, 'amount_paise': 9900},   # ₹99
+    'pro':     {'credits': 40, 'amount_paise': 19900},  # ₹199
 }
 
 
@@ -330,27 +348,83 @@ def parse_topics_from_request(data):
     return []
 
 
+def get_dynamic_s3_previews():
+    from django.core.cache import cache
+    import boto3
+    from django.conf import settings
+    from django.utils.text import slugify
+    import logging
+
+    cache_key = 'scrib_s3_previews_list'
+    previews = cache.get(cache_key)
+
+    if previews is not None:
+        return previews
+
+    previews = []
+    bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
+    region = getattr(settings, 'AWS_S3_REGION_NAME', 'ap-south-1')
+    access_key = getattr(settings, 'SCRIB_S3_ACCESS_KEY_ID', '')
+    secret_key = getattr(settings, 'SCRIB_S3_SECRET_ACCESS_KEY', '')
+
+    if bucket and access_key and secret_key:
+        try:
+            s3 = boto3.client(
+                's3',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=region,
+            )
+            
+            # Use pagination in case there are more than 1000 PDFs in the future
+            paginator = s3.get_paginator('list_objects_v2')
+            pages = paginator.paginate(Bucket=bucket, Prefix='previews/')
+            
+            for page in pages:
+                if 'Contents' in page:
+                    for obj in page['Contents']:
+                        key = obj['Key']
+                        if key.lower().endswith('.pdf'):
+                            filename = key.split('/')[-1]
+                            title = filename[:-4].replace('-', ' ').replace('_', ' ').title()
+                            pdf_url = f"https://{bucket}.s3.{region}.amazonaws.com/{key}"
+                            previews.append({
+                                'id': key,
+                                'title': title,
+                                'slug': slugify(title),
+                                'tags': ['Preview'],
+                                'pdf_url': pdf_url,
+                                'image_url': '',
+                                'page_count': 1,
+                            })
+        except Exception as e:
+            logging.getLogger(__name__).error('Failed to list S3 previews: %s', e)
+
+    # Cache for 5 minutes
+    cache.set(cache_key, previews, 300)
+    return previews
+
+
 class PreviewListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        queryset = PreviewNote.objects.filter(is_active=True)
-        query = request.query_params.get('q', '').strip()
+        previews = get_dynamic_s3_previews()
+        query = request.query_params.get('q', '').strip().lower()
         if query:
-            queryset = queryset.filter(title__icontains=query)
-        serializer = PreviewNoteSerializer(queryset, many=True)
-        return Response(serializer.data)
+            previews = [p for p in previews if query in p['title'].lower()]
+        return Response(previews)
 
 
 class PreviewDetailView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, slug):
-        preview = PreviewNote.objects.filter(is_active=True, slug=slug).first()
-        if not preview:
-            return error_response('Preview not found', status_code=404, code='not_found')
-        serializer = PreviewNoteSerializer(preview)
-        return Response(serializer.data)
+        previews = get_dynamic_s3_previews()
+        for p in previews:
+            if p['slug'] == slug:
+                return Response(p)
+        return error_response('Preview not found', status_code=404, code='not_found')
 
 
 class GenerateNoteView(APIView):
@@ -536,8 +610,12 @@ class CreateOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        pack_id = str(request.data.get('pack_id', '')).strip()
+        # Accept both 'pack' (new spec) and 'pack_id' (legacy) field names
+        pack_id = (
+            str(request.data.get('pack', '') or request.data.get('pack_id', '')).strip().lower()
+        )
         if pack_id not in CREDIT_PACKS:
+            logger.warning('[payments] CreateOrder invalid pack=%r user=%s', pack_id, request.user.id)
             return error_response(
                 'Invalid credit pack',
                 code='invalid_pack',
@@ -551,6 +629,7 @@ class CreateOrderView(APIView):
         try:
             order = create_razorpay_order(amount_paise, currency='INR', receipt=receipt)
         except RazorpayError as exc:
+            logger.error('[payments] Razorpay order creation failed for user=%s: %s', request.user.id, exc)
             return error_response(str(exc), status_code=503, code='payments_unavailable')
 
         payment = Payment.objects.create(
@@ -562,15 +641,17 @@ class CreateOrderView(APIView):
             status=Payment.STATUS_CREATED,
         )
 
-        response_data = PaymentSerializer(payment).data
-        response_data.update({
-            'key_id': order.get('key_id'),
+        logger.info('[payments] Order created order_id=%s user=%s pack=%s amount=%d',
+                    order['id'], request.user.id, pack_id, amount_paise)
+
+        return Response({
+            'key_id': order.get('key_id') or settings.RAZORPAY_KEY_ID,
             'order_id': order.get('id'),
             'amount': amount_paise,
+            'currency': order.get('currency', 'INR'),
             'credits': pack['credits'],
-            'pack_id': pack_id,
-        })
-        return Response(response_data, status=201)
+            'pack': pack_id,
+        }, status=201)
 
 
 class VerifyPaymentView(APIView):
@@ -578,53 +659,163 @@ class VerifyPaymentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        order_id = str(request.data.get('order_id', '')).strip()
-        payment_id = str(request.data.get('payment_id', '')).strip()
-        signature = str(request.data.get('signature', '')).strip()
+        # Accept both field-name variants from Razorpay SDK
+        order_id = str(
+            request.data.get('razorpay_order_id') or request.data.get('order_id', '')
+        ).strip()
+        payment_id = str(
+            request.data.get('razorpay_payment_id') or request.data.get('payment_id', '')
+        ).strip()
+        signature = str(
+            request.data.get('razorpay_signature') or request.data.get('signature', '')
+        ).strip()
 
         if not order_id or not payment_id or not signature:
+            logger.warning('[payments] VerifyPayment missing fields user=%s', request.user.id)
             return error_response('Missing payment verification data')
 
-        payment = Payment.objects.filter(razorpay_order_id=order_id).first()
+        # Only the owner of the order can verify it
+        payment = Payment.objects.filter(
+            razorpay_order_id=order_id,
+            user=request.user,
+        ).first()
         if not payment:
+            logger.warning('[payments] Order not found order_id=%s user=%s', order_id, request.user.id)
             return error_response('Order not found', status_code=404, code='not_found')
 
+        # ── Idempotent: already verified → return success without adding credits again ──
         if payment.status == Payment.STATUS_PAID:
+            logger.info('[payments] Duplicate verify attempt order_id=%s user=%s', order_id, request.user.id)
             return Response({
                 'success': True,
                 'message': 'Payment already verified',
                 'credit_balance': get_credit_balance(request.user),
+                'credits_added': payment.credits_added,
             })
 
+        # ── Verify Razorpay HMAC signature ─────────────────────────────────────────
         try:
             verified = verify_razorpay_signature(order_id, payment_id, signature)
         except RazorpayError as exc:
+            logger.error('[payments] Signature verification error order_id=%s: %s', order_id, exc)
             return error_response(str(exc), status_code=503, code='payments_unavailable')
 
         if not verified:
+            logger.warning('[payments] Invalid signature order_id=%s payment_id=%s user=%s',
+                           order_id, payment_id, request.user.id)
             payment.status = Payment.STATUS_FAILED
-            payment.save(update_fields=['status'])
-            return error_response('Payment verification failed', status_code=400, code='verification_failed')
+            payment.save(update_fields=['status', 'updated_at'])
+            return error_response('Payment signature verification failed', status_code=400, code='verification_failed')
 
+        # ── Atomically mark paid + credit the user ─────────────────────────────────
         with transaction.atomic():
-            payment.status = Payment.STATUS_PAID
-            payment.razorpay_payment_id = payment_id
-            payment.razorpay_signature = signature
-            payment.save(update_fields=['status', 'razorpay_payment_id', 'razorpay_signature'])
+            # Re-fetch with row lock to prevent race conditions
+            payment = Payment.objects.select_for_update().get(pk=payment.pk)
+            if payment.status == Payment.STATUS_PAID:
+                # Lost the race; another request already verified — return safely
+                logger.info('[payments] Race-condition duplicate verify order_id=%s', order_id)
+            else:
+                payment.status = Payment.STATUS_PAID
+                payment.razorpay_payment_id = payment_id
+                payment.razorpay_signature = signature
+                payment.save(update_fields=['status', 'razorpay_payment_id', 'razorpay_signature', 'updated_at'])
 
-            CreditTransaction.objects.get_or_create(
-                user=payment.user,
-                direction=CreditTransaction.DIRECTION_CREDIT,
-                credits=payment.credits_added,
-                reason=CreditTransaction.REASON_PAYMENT,
-                payment=payment,
-            )
+                # get_or_create prevents double-crediting if called twice
+                _, created = CreditTransaction.objects.get_or_create(
+                    payment=payment,
+                    defaults=dict(
+                        user=payment.user,
+                        direction=CreditTransaction.DIRECTION_CREDIT,
+                        credits=payment.credits_added,
+                        reason=CreditTransaction.REASON_PAYMENT,
+                    ),
+                )
+                if created:
+                    logger.info('[payments] Credits added order_id=%s credits=%d user=%s',
+                                order_id, payment.credits_added, payment.user_id)
+                else:
+                    logger.warning('[payments] Credit tx already existed for order_id=%s', order_id)
 
+        new_balance = get_credit_balance(request.user)
+        logger.info('[payments] Verification complete order_id=%s new_balance=%d user=%s',
+                    order_id, new_balance, request.user.id)
         return Response({
             'success': True,
-            'message': 'Payment verified',
-            'credit_balance': get_credit_balance(payment.user),
+            'message': 'Payment verified successfully',
+            'credit_balance': new_balance,
+            'credits_added': payment.credits_added,
         })
+
+
+class PaymentHistoryView(APIView):
+    """Return the authenticated user's payment history (newest first)."""
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        payments = Payment.objects.filter(user=request.user).order_by('-created_at')
+        serializer = PaymentSerializer(payments, many=True)
+        return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def razorpay_webhook(request):
+    """
+    Optional Razorpay webhook endpoint.
+    Handles the `payment.captured` event to credit users even when the
+    frontend verify call fails (e.g. user closed the browser).
+
+    Configure this URL in Razorpay Dashboard → Webhooks:
+        https://yourdomain.com/api/scrib/payments/webhook/
+    """
+    razorpay_signature = request.headers.get('X-Razorpay-Signature', '')
+    payload_body = request.body  # raw bytes needed for HMAC
+
+    if not verify_webhook_signature(payload_body, razorpay_signature):
+        logger.warning('[webhook] Invalid webhook signature — rejecting')
+        return Response({'error': 'Invalid signature'}, status=400)
+
+    try:
+        event = json.loads(payload_body)
+    except json.JSONDecodeError:
+        return Response({'error': 'Invalid JSON'}, status=400)
+
+    event_type = event.get('event')
+    logger.info('[webhook] Received event: %s', event_type)
+
+    if event_type == 'payment.captured':
+        try:
+            payload = event.get('payload', {})
+            payment_entity = payload.get('payment', {}).get('entity', {})
+            rzp_order_id = payment_entity.get('order_id', '')
+            rzp_payment_id = payment_entity.get('id', '')
+
+            payment = Payment.objects.filter(razorpay_order_id=rzp_order_id).first()
+            if payment and payment.status != Payment.STATUS_PAID:
+                with transaction.atomic():
+                    p = Payment.objects.select_for_update().get(pk=payment.pk)
+                    if p.status != Payment.STATUS_PAID:
+                        p.status = Payment.STATUS_PAID
+                        p.razorpay_payment_id = rzp_payment_id
+                        p.save(update_fields=['status', 'razorpay_payment_id', 'updated_at'])
+                        CreditTransaction.objects.get_or_create(
+                            payment=p,
+                            defaults=dict(
+                                user=p.user,
+                                direction=CreditTransaction.DIRECTION_CREDIT,
+                                credits=p.credits_added,
+                                reason=CreditTransaction.REASON_PAYMENT,
+                            ),
+                        )
+                        logger.info('[webhook] payment.captured processed order_id=%s credits=%d user=%s',
+                                    rzp_order_id, p.credits_added, p.user_id)
+        except Exception as exc:
+            logger.exception('[webhook] Error processing payment.captured: %s', exc)
+            return Response({'error': 'Processing failed'}, status=500)
+
+    return Response({'status': 'ok'})
 
 
 class MeView(APIView):

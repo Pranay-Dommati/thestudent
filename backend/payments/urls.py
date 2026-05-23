@@ -1,6 +1,7 @@
 from django.urls import path
-from .views import create_order
+# pyrefly: ignore [missing-import]
+from .views import payment_info
 
 urlpatterns = [
-    path("create-order/", create_order),
+    path('', payment_info, name='payment-info'),
 ]

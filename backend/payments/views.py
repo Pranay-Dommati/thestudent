@@ -1,50 +1,27 @@
-import razorpay
-from django.conf import settings
+"""
+payments app views — Deprecated stub.
+
+All payment functionality has moved to the scrib app:
+  POST /api/scrib/payments/create-order/
+  POST /api/scrib/payments/verify/
+  GET  /api/scrib/payments/history/
+  POST /api/scrib/payments/webhook/
+
+This file is kept for backward compatibility only.
+"""
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 
-
-PACKS = {
-    "starter": {
-        "credits": 10,
-        "amount": 4900
-    },
-    "popular": {
-        "credits": 20,
-        "amount": 9900
-    },
-    "pro": {
-        "credits": 40,
-        "amount": 19900
-    }
-}
-
-@api_view(["POST"])
-def create_order(request):
-    pack = request.data.get("pack")
-    
-    client = razorpay.Client(
-        auth=(
-            settings.RAZORPAY_KEY_ID,
-            settings.RAZORPAY_KEY_SECRET
-        )
-    )
-    
-    if pack not in PACKS:
-        return Response({"error": "Invalid pack"}, status=400)
-
-    selected = PACKS[pack]
-
-    order = client.order.create({
-        "amount": selected["amount"],
-        "currency": "INR",
-        "payment_capture": 1
-    })
-
+@api_view(['GET'])
+def payment_info(request):
+    """Redirect information — payment endpoints have moved to /api/scrib/payments/."""
     return Response({
-        "order_id": order["id"],
-        "amount": selected["amount"],
-        "key": settings.RAZORPAY_KEY_ID,
-        "credits": selected["credits"]
+        'message': 'Payment endpoints have moved.',
+        'endpoints': {
+            'create_order': '/api/scrib/payments/create-order/',
+            'verify': '/api/scrib/payments/verify/',
+            'history': '/api/scrib/payments/history/',
+            'webhook': '/api/scrib/payments/webhook/',
+        }
     })
