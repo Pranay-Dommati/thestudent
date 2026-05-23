@@ -52,6 +52,22 @@ const GeneratePage = () => {
   const [imageLoaded, setImageLoaded] = useState(false)
   const location = useLocation()
 
+  // --- Browser Notifications Setup ---
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) return
+    if (Notification.permission === 'default') {
+      await Notification.requestPermission()
+    }
+  }
+
+  const showNotification = (title, options) => {
+    if (!('Notification' in window)) return
+    if (Notification.permission === 'granted') {
+      new Notification(title, options)
+    }
+  }
+
+
   const loadHistory = async () => {
     if (!isLoggedIn) return
     setIsLoadingHistory(true)
@@ -147,6 +163,49 @@ const GeneratePage = () => {
       loadHistory()
     }
   }, [activeTab, isLoggedIn])
+
+  // --- Polling logic for generating packs ---
+  useEffect(() => {
+    const generatingPacks = historyItems.filter(item => item.type === 'pack' && item.status === 'generating')
+    if (generatingPacks.length === 0) return
+
+    const interval = setInterval(() => {
+      generatingPacks.forEach(async (pack) => {
+        try {
+          const res = await axiosInstance.get(`/scrib/packs/${pack.id}/status/`)
+          if (res.data && res.data.status === 'ready') {
+            // Update the pack in historyItems
+            setHistoryItems(prev => prev.map(item => {
+              if (item.type === 'pack' && item.id === pack.id) {
+                return { ...item, status: 'ready', pdf_url: res.data.pdf_url, s3_key: res.data.s3_key }
+              }
+              return item
+            }))
+            
+            // Show notifications
+            showNotification('Your Scrib notes are ready!', {
+              body: `The study pack for ${pack.name || 'your notes'} has finished generating. Click to view.`,
+              icon: '/scrib_favicon.svg'
+            })
+            customToast.success(`Study pack "${pack.name}" is ready!`)
+          } else if (res.data && res.data.status === 'failed') {
+            // Mark as failed
+            setHistoryItems(prev => prev.map(item => {
+              if (item.type === 'pack' && item.id === pack.id) {
+                return { ...item, status: 'failed' }
+              }
+              return item
+            }))
+            customToast.error(`Failed to generate study pack "${pack.name}".`)
+          }
+        } catch (err) {
+          console.error(`Failed to poll status for pack ${pack.id}`, err)
+        }
+      })
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [historyItems])
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -315,20 +374,21 @@ const GeneratePage = () => {
       // One topic per page
       const pages = cleanedTopics.map(topic => [topic])
       const payload = { title: packTitle, pages }
+      
+      // Request notification permission if they haven't yet
+      requestNotificationPermission()
 
       const response = await axiosInstance.post('/scrib/generate-study-pack/', payload)
       const data = response.data || {}
-      setGeneratedPack({
-        title: data.title || payload.title,
-        pdfUrl: data.pdf_url,
-        totalPages: data.total_pages ?? cleanedTopics.length,
-      })
+      
       if (typeof data.credit_balance === 'number') {
         setLatestCreditBalance(data.credit_balance)
       }
-      customToast.success(cleanedTopics.length === 1 ? 'PDF generated successfully!' : 'Study pack ready!')
+      
+      // Now it returns 202 Accepted instantly
+      customToast.success('Generation started! We will notify you when it is ready.')
       setHistoryItems(prev => prev.filter(item => item.id !== tempId))
-      loadHistory() // Refresh history to get the real item
+      loadHistory() // Refresh history to get the real generating item
     } catch (error) {
       // Remove the pending item if request fails
       setHistoryItems(prev => prev.filter(item => item.id !== tempId))
@@ -359,12 +419,6 @@ const GeneratePage = () => {
               <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex">
                 Dashboard
               </Link>
-              <button
-                onClick={logout}
-                className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex"
-              >
-                Log out
-              </button>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
                 {creditBalance} cr
               </span>
@@ -653,8 +707,11 @@ const GeneratePage = () => {
                 const titleStr = isPack ? `${item.name} — ${pages} pages` : item.name
                 const dateStr = item._displayDate || new Date(item.created_at).toLocaleDateString()
 
+                const isGenerating = item.status === 'generating' || item.status === 'pending'
+                const isFailed = item.status === 'failed'
+
                 const openViewer = async () => {
-                  if (item._isPending) return
+                  if (item._isPending || isGenerating || isFailed) return
 
                   let resolvedUrl = url
 
@@ -694,10 +751,16 @@ const GeneratePage = () => {
                   <div key={id} className="flex flex-col gap-3 rounded-xl border border-[#e2dbd2] bg-[#fbfaf7] p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-1 items-start gap-3 overflow-hidden cursor-pointer" onClick={openViewer}>
                       <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white shadow-sm mt-0.5">
-                        {item._isPending ? (
+                        {item._isPending || isGenerating ? (
                            <svg className="animate-spin text-[#a39b92]" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
                            </svg>
+                        ) : isFailed ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                          </svg>
                         ) : isPack ? (
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -728,8 +791,10 @@ const GeneratePage = () => {
                     </div>
 
                     <div className="flex w-full flex-shrink-0 items-center justify-end gap-2 sm:w-auto">
-                      {item._isPending ? (
+                      {item._isPending || isGenerating ? (
                         <div className="text-xs font-medium text-[#7b756d] italic px-2">Generating...</div>
+                      ) : isFailed ? (
+                        <div className="text-xs font-medium text-[#ef4444] italic px-2">Failed</div>
                       ) : (
                         <>
                           <button onClick={openViewer} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] sm:flex-none">

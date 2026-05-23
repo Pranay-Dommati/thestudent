@@ -365,6 +365,28 @@ if not DEBUG:
     WHITENOISE_MAX_AGE = int(os.environ.get('WHITENOISE_MAX_AGE', 60 * 60 * 24 * 365))
 
 # Media files (uploads) and persistent storage
+# --- Celery Configuration ---
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://127.0.0.1:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://127.0.0.1:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+# If no remote Redis URL is provided and we are running locally without Redis installed,
+# run tasks synchronously so development is not blocked.
+if not os.environ.get('CELERY_BROKER_URL'):
+    import socket
+    _redis_running = False
+    try:
+        _s = socket.create_connection(('127.0.0.1', 6379), timeout=0.1)
+        _s.close()
+        _redis_running = True
+    except:
+        pass
+    if not _redis_running:
+        CELERY_TASK_ALWAYS_EAGER = True
+        print("WARNING: Redis is not running locally. Celery tasks will execute synchronously (ALWAYS_EAGER = True).")
 # Default to filesystem; switch to Cloudinary when configured
 MEDIA_URL = os.environ.get('MEDIA_URL', '/media/')
 MEDIA_ROOT = os.environ.get('MEDIA_ROOT', os.path.join(BASE_DIR, 'media'))

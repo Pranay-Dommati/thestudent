@@ -134,12 +134,6 @@ const DashboardPage = () => {
           </nav>
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
-              <button
-                onClick={logout}
-                className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex"
-              >
-                Log out
-              </button>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
                 {user?.credit_balance ?? 0} cr
               </span>

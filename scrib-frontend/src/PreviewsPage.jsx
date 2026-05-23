@@ -19,6 +19,12 @@ const PreviewsPage = () => {
   const navigate = useNavigate()
   const [previewCards, setPreviewCards] = useState(fallbackPreviewCards)
   const [query, setQuery] = useState('')
+  const [visibleCount, setVisibleCount] = useState(10)
+
+  // Reset visible count on new search
+  useEffect(() => {
+    setVisibleCount(10)
+  }, [query])
 
   useEffect(() => {
     let isMounted = true
@@ -75,12 +81,6 @@ const PreviewsPage = () => {
               <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex">
                 Dashboard
               </Link>
-              <button
-                onClick={logout}
-                className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex"
-              >
-                Log out
-              </button>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
                 {user?.credit_balance ?? 0} cr
               </span>
@@ -164,7 +164,7 @@ const PreviewsPage = () => {
             </div>
           )}
 
-          {filtered.map((note) => (
+          {filtered.slice(0, visibleCount).map((note) => (
             <div
               key={note.id}
               className={`transition-transform duration-200 ${note.pdfUrl ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg rounded-xl' : 'opacity-70'}`}
@@ -199,16 +199,19 @@ const PreviewsPage = () => {
             </div>
           ))}
 
-          {/* More previews placeholder */}
-          {!query && (
-            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#d6cfc6] bg-[#f4f1ea] p-4">
+          {/* Load more inline button */}
+          {visibleCount < filtered.length && (
+            <button
+              onClick={() => setVisibleCount((prev) => prev + 10)}
+              className="flex min-h-[16rem] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#d6cfc6] bg-[#f4f1ea] p-4 transition-colors hover:bg-[#f0ece5] md:min-h-[22rem]"
+            >
               <div className="grid grid-cols-3 gap-1">
                 {Array.from({ length: 9 }).map((_, i) => (
-                  <span key={i} className="h-1 w-1 rounded-full bg-[#cfc7bd]" />
+                  <span key={i} className="h-1.5 w-1.5 rounded-full bg-[#cfc7bd]" />
                 ))}
               </div>
-              <p className="text-sm text-[#8a847c]">495 more previews</p>
-            </div>
+              <p className="text-sm font-medium text-[#8a847c]">Load more</p>
+            </button>
           )}
         </div>
       </main>

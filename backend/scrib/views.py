@@ -65,17 +65,16 @@ def is_admin_user(user):
 def get_credit_balance(user):
     if is_admin_user(user):
         return 10 ** 9
-    totals = CreditTransaction.objects.filter(user=user).aggregate(
-        total=Sum(
-            Case(
-                When(direction=CreditTransaction.DIRECTION_CREDIT, then=F('credits')),
-                When(direction=CreditTransaction.DIRECTION_DEBIT, then=-F('credits')),
-                default=0,
-                output_field=IntegerField(),
-            )
-        )
-    )
-    return int(totals['total'] or 0)
+    
+    credits_in = CreditTransaction.objects.filter(
+        user=user, direction=CreditTransaction.DIRECTION_CREDIT
+    ).aggregate(total=Sum('credits'))['total'] or 0
+    
+    credits_out = CreditTransaction.objects.filter(
+        user=user, direction=CreditTransaction.DIRECTION_DEBIT
+    ).aggregate(total=Sum('credits'))['total'] or 0
+    
+    return int(credits_in - credits_out)
 
 
 def ensure_absolute_url(request, url):
@@ -521,6 +520,8 @@ class GenerateNoteView(APIView):
 
 
 
+from scrib.tasks import generate_study_pack_task
+
 class GenerateStudyPackView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -539,10 +540,7 @@ class GenerateStudyPackView(APIView):
         required_credits = len(pages)
         page_count = len(pages)
 
-        # --- Phase 1: Quick DB check (credits), then release connection ---
-        from django.db import close_old_connections
-        close_old_connections()
-
+        # --- Phase 1: Quick DB check (credits) ---
         user_model = get_user_model()
         user = user_model.objects.get(pk=request.user.pk)
         is_admin = is_admin_user(user)
@@ -556,27 +554,7 @@ class GenerateStudyPackView(APIView):
                 details={'balance': balance, 'required': required_credits},
             )
 
-        # Explicitly close DB connection before the long PDF generation.
-        # PDF generation calls OpenAI per page and can take 30–120s per page,
-        # which would cause MySQL to drop the idle connection.
-        from django.db import connection as _db_conn
-        _db_conn.close()
-
-        # --- Phase 2: Generate PDF OUTSIDE any transaction ---
-        try:
-            pdf_result = generate_study_pack_pdf(pages, title=title, user_id=request.user.id)
-            pdf_url = pdf_result.get('pdf_url')
-        except PdfGenerationError as exc:
-            return error_response(str(exc), status_code=503, code='generation_unavailable')
-
-        if not pdf_url:
-            return error_response('PDF generation failed', status_code=502, code='generation_failed')
-
-        pdf_url = ensure_absolute_url(request, pdf_url)
-
-        # --- Phase 3: Fresh DB connection, save in a short transaction ---
-        close_old_connections()
-
+        # --- Phase 2: Create StudyPack with generating status ---
         with transaction.atomic():
             user = user_model.objects.select_for_update().get(pk=request.user.pk)
 
@@ -584,11 +562,9 @@ class GenerateStudyPackView(APIView):
                 user=user,
                 title=title,
                 topics_json=pages,
-                pdf_url=pdf_url,
-                s3_key=pdf_result.get('s3_key'),   # permanent key for future re-access
                 total_pages=page_count,
                 credits_used=credits_used,
-                status=StudyPack.STATUS_READY,
+                status=StudyPack.STATUS_GENERATING,
             )
 
             if not is_admin:
@@ -599,11 +575,36 @@ class GenerateStudyPackView(APIView):
                     reason=CreditTransaction.REASON_GENERATION,
                     study_pack=pack,
                 )
+                
+        # --- Phase 3: Trigger Background Task ---
+        generate_study_pack_task.delay(pack.id, pages, title, request.user.id)
+
+        # If Celery is running synchronously (ALWAYS_EAGER), the task can take 30+ seconds,
+        # which might cause the MySQL connection to time out. Close it so Django reconnects.
+        from django.db import connection
+        connection.close()
 
         response_data = StudyPackSerializer(pack).data
         response_data['credit_balance'] = get_credit_balance(user)
-        return Response(response_data, status=201)
+        # Return 202 Accepted because processing is in background
+        return Response(response_data, status=202)
 
+
+class StudyPackStatusView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pack_id):
+        try:
+            pack = StudyPack.objects.get(pk=pack_id, user=request.user)
+            return Response({
+                'id': pack.id,
+                'status': pack.status,
+                'pdf_url': pack.pdf_url,
+                's3_key': pack.s3_key
+            })
+        except StudyPack.DoesNotExist:
+            return Response({'error': 'Not found'}, status=404)
 
 class CreateOrderView(APIView):
     authentication_classes = [JWTAuthentication]

@@ -1,18 +1,6 @@
-"""
-Backend package init.
+# This will make sure the app is always imported when
+# Django starts so that shared_task will use this app.
+# pyrefly: ignore [missing-import]
+from .celery import app as celery_app
 
-Includes optional PyMySQL fallback so the app can run on hosts where
-`mysqlclient` native bindings aren't available.
-"""
-
-# Try to ensure MySQL DB driver availability
-try:
-	import MySQLdb  # type: ignore  # noqa: F401
-except Exception:
-	try:
-		import pymysql  # type: ignore
-		pymysql.install_as_MySQLdb()
-	except Exception:
-		# If both drivers are unavailable, Django will raise a clear error
-		# when trying to connect using the MySQL backend.
-		pass
+__all__ = ('celery_app',)

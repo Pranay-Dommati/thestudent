@@ -111,12 +111,6 @@ const ProfilePage = () => {
               <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex">
                 Dashboard
               </Link>
-              <button
-                onClick={logout}
-                className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex"
-              >
-                Log out
-              </button>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
                 {user?.credit_balance ?? 0} cr
               </span>
@@ -219,6 +213,17 @@ const ProfilePage = () => {
                     />
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#e2dbd2] bg-white px-6 py-5">
+                <h2 className="text-sm font-semibold">Account access</h2>
+                <p className="mt-1 text-xs text-[#7b756d]">Sign out of your account on this device.</p>
+                <button
+                  onClick={logout}
+                  className="mt-4 rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold text-[#1f1f1f] hover:bg-[#faf8f3] transition-colors"
+                >
+                  Log out
+                </button>
               </div>
 
               <div className="rounded-2xl border border-[#f2d8d8] bg-[#fff7f7] px-6 py-5">

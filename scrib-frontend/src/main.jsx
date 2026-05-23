@@ -15,6 +15,7 @@ import { AuthProvider } from './context/AuthContext.jsx'
 import PDFViewerPage from './PDFViewerPage.jsx'
 import ForgotPasswordPage from './ForgotPasswordPage.jsx'
 import ResetPasswordPage from './ResetPasswordPage.jsx'
+import GlobalGenerationIndicator from './components/GlobalGenerationIndicator.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -33,6 +34,7 @@ createRoot(document.getElementById('root')).render(
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:uid/:token" element={<ResetPasswordPage />} />
         </Routes>
+        <GlobalGenerationIndicator />
       </BrowserRouter>
       <Toaster position="top-center" />
     </AuthProvider>

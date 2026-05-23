@@ -13,22 +13,21 @@ class UserSerializer(serializers.ModelSerializer):
     def get_credit_balance(self, obj):
         """Compute credit balance from CreditTransaction records."""
         try:
-            from django.db.models import Case, F, IntegerField, Sum, When
+            from django.db.models import Sum
             from scrib.models import CreditTransaction
             # Admin users get unlimited credits
             if getattr(obj, 'is_staff', False) or getattr(obj, 'is_superuser', False):
                 return 10 ** 9
-            totals = CreditTransaction.objects.filter(user=obj).aggregate(
-                total=Sum(
-                    Case(
-                        When(direction=CreditTransaction.DIRECTION_CREDIT, then=F('credits')),
-                        When(direction=CreditTransaction.DIRECTION_DEBIT, then=-F('credits')),
-                        default=0,
-                        output_field=IntegerField(),
-                    )
-                )
-            )
-            return int(totals['total'] or 0)
+            
+            credits_in = CreditTransaction.objects.filter(
+                user=obj, direction=CreditTransaction.DIRECTION_CREDIT
+            ).aggregate(total=Sum('credits'))['total'] or 0
+            
+            credits_out = CreditTransaction.objects.filter(
+                user=obj, direction=CreditTransaction.DIRECTION_DEBIT
+            ).aggregate(total=Sum('credits'))['total'] or 0
+            
+            return int(credits_in - credits_out)
         except Exception:
             return 0
 
