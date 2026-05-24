@@ -44,6 +44,7 @@ const GeneratePage = () => {
   const [generationNotice, setGenerationNotice] = useState('')
   const [dragGroup, setDragGroup] = useState(null)
   const [editingIndex, setEditingIndex] = useState(null)
+  const [invalidTopics, setInvalidTopics] = useState([])
   const [addingToGroupIndex, setAddingToGroupIndex] = useState(null)
   const [newGroupTopic, setNewGroupTopic] = useState('')
   const [aiGeneratedWarning, setAiGeneratedWarning] = useState(false)
@@ -294,14 +295,17 @@ const GeneratePage = () => {
     if (!trimmed) return
     setTopics((prev) => [...prev, trimmed])
     setNewTopic('')
+    setInvalidTopics([])
   }
 
   const handleTopicChange = (value, index) => {
     setTopics((prev) => prev.map((item, idx) => (idx === index ? value : item)))
+    setInvalidTopics([])
   }
 
   const handleRemoveTopic = (index) => {
     setTopics((prev) => prev.filter((_, idx) => idx !== index))
+    setInvalidTopics([])
   }
 
   const handleEditTopic = (event) => {
@@ -345,6 +349,51 @@ const GeneratePage = () => {
     }
 
     setIsGenerating(true)
+
+    // Moderation Check
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
+      if (apiKey) {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `You are a strict content moderator for an educational app. Evaluate the following list of study topics. Return a JSON array of booleans corresponding to each topic. True means it is a valid, acceptable educational or general topic. False means it is highly inappropriate, sexually explicit, pornographic, or hate speech. Return ONLY the JSON array.\n\nTopics:\n${JSON.stringify(cleanedTopics)}`
+              }]
+            }]
+          })
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
+          const jsonMatch = content.match(/\[.*\]/s)
+          let validityArray = []
+          try {
+            validityArray = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content)
+          } catch (err) {}
+
+          if (Array.isArray(validityArray) && validityArray.length === cleanedTopics.length) {
+            const badTopics = cleanedTopics.filter((_, idx) => validityArray[idx] === false)
+            if (badTopics.length > 0) {
+              if (mode === 'paste') {
+                setTopics(cleanedTopics)
+                setMode('manual')
+              }
+              setInvalidTopics(badTopics)
+              customToast.error('Please enter appropriate educational topics.', { id: 'gen-error' })
+              setIsGenerating(false)
+              return
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Moderation check failed', err)
+    }
+
     setGeneratedNote(null)
     setGeneratedPack(null)
     setGenerationNotice('')
@@ -565,7 +614,11 @@ const GeneratePage = () => {
                   {topics.map((topic, index) => (
                     <div
                       key={`topic-${index}`}
-                      className="flex items-center gap-3 rounded-xl md:rounded-none border border-[#e2dbd2] md:border-x-0 md:border-t-0 md:border-b md:border-[#efe7dd] bg-white md:bg-transparent p-3 md:px-4 md:py-3 last:border-b-0 shadow-sm md:shadow-none"
+                      className={`flex items-center gap-3 rounded-xl md:rounded-none border md:border-x-0 md:border-t-0 md:border-b p-3 md:px-4 md:py-3 last:border-b-0 shadow-sm md:shadow-none ${
+                        invalidTopics.includes(topic.trim()) 
+                          ? 'border-red-500 bg-red-50 md:border-red-500' 
+                          : 'border-[#e2dbd2] md:border-[#efe7dd] bg-white md:bg-transparent'
+                      }`}
                       data-topic-row
                       data-topic-index={index}
                     >
@@ -677,7 +730,7 @@ const GeneratePage = () => {
                   className="min-h-[120px] w-full resize-none border-none bg-transparent text-sm outline-none"
                   placeholder="Paste your syllabus here"
                   value={pasteText}
-                  onChange={(event) => setPasteText(event.target.value)}
+                  onChange={(event) => { setPasteText(event.target.value); setInvalidTopics([]); }}
                 />
                 {!pasteText ? (
                   <div className="mt-4 text-xs text-[#8a847c]">
