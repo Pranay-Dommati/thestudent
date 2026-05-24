@@ -57,6 +57,7 @@ const GeneratePage = () => {
   const [openDropdownId, setOpenDropdownId] = useState(null)
   const [shareModalData, setShareModalData] = useState(null)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [showNotice, setShowNotice] = useState(true)
 
   // Sync active tab if URL changes
   useEffect(() => {
@@ -448,7 +449,7 @@ const GeneratePage = () => {
           ) : (
             <div className="flex items-center gap-2">
               <Link to="/login" className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold md:inline-block">
-                Log in
+              Log in
               </Link>
               <Link to="/signup" className="hidden rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white md:inline-block">
                 Get started free
@@ -459,8 +460,8 @@ const GeneratePage = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 py-10">
-        <div className="mb-6 flex space-x-6 border-b border-[#e2dbd2]">
+      <main className="mx-auto max-w-5xl px-4 md:px-6 py-4 md:py-10">
+        <div className="mb-4 md:mb-6 flex space-x-6 border-b border-[#e2dbd2]">
           <button
             onClick={() => setActiveTab('generate')}
             className={`pb-2 text-sm font-semibold transition-colors ${
@@ -485,40 +486,63 @@ const GeneratePage = () => {
 
         {activeTab === 'generate' && (
           <>
-            <div className="rounded-2xl border border-[#e2dbd2] bg-white">
-              <div className="border-b border-[#eee6dc] px-6 py-4">
-                <h1 className="text-lg font-semibold">Generate handwritten notes</h1>
-            <p className="text-sm text-[#7b756d]">
-              Type topics one by one, or paste your full syllabus - AI will organise it.
-            </p>
-            <div className="mt-3 flex items-start gap-2 rounded-lg bg-[#fcf9f4] border border-[#e2dbd2] p-3 text-xs text-[#5f5a54]">
-              <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#8a847c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 16v-4" />
-                <path d="M12 8h.01" />
-              </svg>
-              Every topic added becomes a separate page in the PDF and costs 1 credit.
-            </div>
-          </div>
+            <div className="md:rounded-2xl md:border md:border-[#e2dbd2] md:bg-white pb-32 md:pb-0">
+              <div className="md:border-b md:border-[#eee6dc] md:px-6 md:py-4 px-1 py-2">
+                <h1 className="text-2xl md:text-lg font-medium md:font-semibold text-[#1f1f1f]">
+                  <span className="md:hidden">Generate notes</span>
+                  <span className="hidden md:inline">Generate handwritten notes</span>
+                </h1>
+                <p className="mt-1 md:mt-0 text-[13px] md:text-sm text-[#8a847c] md:text-[#7b756d] leading-relaxed">
+                  <span className="md:hidden">Add topics below — each becomes one handwritten page in the PDF.</span>
+                  <span className="hidden md:inline">Type topics one by one, or paste your full syllabus - AI will organise it.</span>
+                </p>
+                {showNotice && (
+                  <div className="mt-4 md:mt-3 flex items-start gap-3 rounded-xl md:rounded-lg bg-white md:bg-[#fcf9f4] border border-[#e2dbd2] p-3.5 md:p-3 text-[13px] md:text-xs text-[#5f5a54] shadow-sm md:shadow-none relative pr-10">
+                    <span className="md:hidden text-[#a39b92] mt-0.5">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 16v-4" />
+                        <path d="M12 8h.01" />
+                      </svg>
+                    </span>
+                    <span className="md:hidden">Paste a full syllabus or add topics one by one. AI will organise and format each page.</span>
+                    
+                    <span className="hidden md:flex items-start gap-2">
+                      <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#8a847c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 16v-4" />
+                        <path d="M12 8h.01" />
+                      </svg>
+                      Every topic added becomes a separate page in the PDF and costs 1 credit.
+                    </span>
+                    <button onClick={() => setShowNotice(false)} className="absolute right-3.5 top-3.5 md:top-3 text-[#a39b92] hover:text-[#1f1f1f]">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
 
-          <div className="px-6 py-5">
-            <div className="flex flex-wrap gap-3">
+          <div className="px-1 py-4 md:px-6 md:py-5">
+            <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 mb-6 md:mb-0">
               <button
                 onClick={() => setMode('manual')}
-                className={`rounded-full border px-4 py-2 text-xs font-semibold ${
+                className={`rounded-xl md:rounded-full border px-4 py-3 md:py-2 text-sm md:text-xs font-medium md:font-semibold transition-colors ${
                   mode === 'manual'
                     ? 'border-[#1f1f1f] bg-[#1f1f1f] text-white'
-                    : 'border-[#d9d1c7] bg-white text-[#3f3a35]'
+                    : 'border-[#d9d1c7] bg-white text-[#5f5a54] hover:bg-[#f5f2ec]'
                 }`}
               >
                 Add topics
               </button>
               <button
                 onClick={() => setMode('paste')}
-                className={`rounded-full border px-4 py-2 text-xs font-semibold ${
+                className={`rounded-xl md:rounded-full border px-4 py-3 md:py-2 text-sm md:text-xs font-medium md:font-semibold transition-colors ${
                   mode === 'paste'
                     ? 'border-[#1f1f1f] bg-[#1f1f1f] text-white'
-                    : 'border-[#d9d1c7] bg-white text-[#3f3a35]'
+                    : 'border-[#d9d1c7] bg-white text-[#5f5a54] hover:bg-[#f5f2ec]'
                 }`}
               >
                 Paste syllabus
@@ -527,108 +551,122 @@ const GeneratePage = () => {
 
             {mode === 'manual' ? (
               <>
-                <div className="mt-4 rounded-xl border border-[#ded6cc]">
+                <div className="mb-3 md:hidden text-[11px] font-bold tracking-widest text-[#a39b92] uppercase mt-4">
+                  TOPICS · {topics.length} ADDED
+                </div>
+                
+                <div className="mt-0 md:mt-4 flex flex-col gap-3 md:gap-0 md:rounded-xl md:border md:border-[#ded6cc]">
                   {topics.map((topic, index) => (
                     <div
                       key={`topic-${index}`}
-                    className="flex items-center gap-3 border-b border-[#efe7dd] px-4 py-3 last:border-b-0"
-                    data-topic-row
-                    data-topic-index={index}
-                  >
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#d9d1c7] text-xs text-[#6b655d]">
-                      {index + 1}
+                      className="flex items-center gap-3 rounded-xl md:rounded-none border border-[#e2dbd2] md:border-x-0 md:border-t-0 md:border-b md:border-[#efe7dd] bg-white md:bg-transparent p-3 md:px-4 md:py-3 last:border-b-0 shadow-sm md:shadow-none"
+                      data-topic-row
+                      data-topic-index={index}
+                    >
+                      <span className="flex h-7 w-7 md:h-6 md:w-6 shrink-0 items-center justify-center rounded-lg md:rounded-full bg-[#f5f2ec] md:bg-transparent md:border md:border-[#d9d1c7] text-xs font-semibold md:font-medium text-[#8a847c] md:text-[#6b655d]">
+                        {index + 1}
+                      </span>
+                      <input
+                        className={`w-full text-sm outline-none ${
+                          editingIndex === index
+                            ? 'rounded-md border border-[#e0d9ce] bg-white px-2 py-1 text-[#1f1f1f]'
+                            : 'border-none bg-transparent text-[#6b655d]'
+                        }`}
+                        value={topic}
+                        onChange={(event) => handleTopicChange(event.target.value, index)}
+                        readOnly={editingIndex !== index}
+                        onBlur={() => setEditingIndex(null)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            setEditingIndex(null)
+                          }
+                        }}
+                      />
+                      <div className="flex items-center gap-2">
+                        {editingIndex === index ? (
+                          <button
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault() // prevent onBlur from firing first
+                              setEditingIndex(null)
+                            }}
+                            className="rounded-full border border-[#1f1f1f] bg-[#1f1f1f] p-1 text-white"
+                            aria-label="Save topic"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleEditTopic}
+                            className="p-1 text-[#d9d1c7] md:text-[#a39b92] transition-colors hover:text-[#1f1f1f] md:rounded-full md:border md:border-[#e0d9ce] md:bg-white hidden md:block"
+                            aria-label="Edit topic"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 20h9" />
+                              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                            </svg>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTopic(index)}
+                          className="p-1 text-[#a39b92] transition-colors hover:text-[#dc2626] md:rounded-full md:border md:border-[#e0d9ce] md:bg-white"
+                          aria-label="Remove topic"
+                        >
+                          <svg className="md:hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                          <svg className="hidden md:block" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="9" />
+                            <line x1="8" y1="12" x2="16" y2="12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <div className="mt-3 md:mt-0 flex items-center gap-3 rounded-xl border border-dashed border-[#d9d1c7] md:border-solid md:border-x-0 md:border-b-0 md:border-t md:border-[#efe7dd] bg-white md:bg-transparent px-3 py-3 md:px-4 md:py-3 shadow-sm md:shadow-none">
+                    <span className="text-[#a39b92] md:text-[#1f1f1f] text-base font-medium md:font-normal pl-1 pr-1">
+                      +
                     </span>
+                    
                     <input
-                      className={`w-full text-sm outline-none ${
-                        editingIndex === index
-                          ? 'rounded-md border border-[#e0d9ce] bg-white px-2 py-1 text-[#1f1f1f]'
-                          : 'border-none bg-transparent text-[#6b655d]'
-                      }`}
-                      value={topic}
-                      onChange={(event) => handleTopicChange(event.target.value, index)}
-                      readOnly={editingIndex !== index}
-                      onBlur={() => setEditingIndex(null)}
+                      className="flex-1 bg-transparent py-2 md:p-0 text-sm md:text-xs text-[#1f1f1f] outline-none placeholder:text-[#a39b92]"
+                      placeholder={mode === 'manual' && topics.length === 0 ? "Add a topic..." : "Add another topic..."}
+                      value={newTopic}
+                      onChange={(event) => setNewTopic(event.target.value)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
                           event.preventDefault()
-                          setEditingIndex(null)
+                          handleAddTopic()
                         }
                       }}
                     />
-                    <div className="flex items-center gap-2">
-                      {editingIndex === index ? (
-                        <button
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault() // prevent onBlur from firing first
-                            setEditingIndex(null)
-                          }}
-                          className="rounded-full border border-[#1f1f1f] bg-[#1f1f1f] p-1 text-white"
-                          aria-label="Save topic"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={handleEditTopic}
-                          className="rounded-full border border-[#e0d9ce] bg-white p-1 text-[#a39b92] transition-colors hover:text-[#1f1f1f]"
-                          aria-label="Edit topic"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M12 20h9" />
-                            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                          </svg>
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTopic(index)}
-                        className="rounded-full border border-[#e0d9ce] bg-white p-1 text-[#a39b92] transition-colors hover:text-[#dc2626]"
-                        aria-label="Remove topic"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="9" />
-                          <line x1="8" y1="12" x2="16" y2="12" />
-                        </svg>
-                      </button>
-                    </div>
+                    <button
+                      onClick={handleAddTopic}
+                      className={`rounded-lg md:rounded-full border px-4 py-2 md:px-3 md:py-1 text-sm md:text-xs font-medium md:font-semibold transition-all duration-300 ${
+                        highlightAddBtn 
+                          ? 'border-red-500 bg-red-50 text-red-600 shadow-[0_0_10px_rgba(239,68,68,0.5)] scale-110' 
+                          : newTopic.trim()
+                            ? 'border-[#1f1f1f] bg-[#1f1f1f] text-white md:border-[#d9d1c7] md:bg-white md:text-[#1f1f1f]'
+                            : 'border-[#f0ece5] md:border-[#d9d1c7] bg-transparent md:bg-white text-[#cfc7bd] md:text-[#5a554f]'
+                      }`}
+                    >
+                      Add
+                    </button>
                   </div>
-                ))}
-                <div className="flex flex-wrap items-center gap-3 border-t border-[#efe7dd] px-4 py-3">
-                  <span className="text-base">+</span>
-                  <input
-                    className="flex-1 border-none bg-transparent text-xs outline-none"
-                    placeholder="Add another topic for a multi-page PDF"
-                    value={newTopic}
-                    onChange={(event) => setNewTopic(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        handleAddTopic()
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={handleAddTopic}
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all duration-300 ${
-                      highlightAddBtn 
-                        ? 'border-red-500 bg-red-50 text-red-600 shadow-[0_0_10px_rgba(239,68,68,0.5)] scale-110' 
-                        : 'border-[#d9d1c7] bg-white text-[#5a554f]'
-                    }`}
-                  >
-                    Add
-                  </button>
                 </div>
-              </div>
-              {aiGeneratedWarning && (
-                <p className="mt-2 text-xs text-[#8a847c]">AI makes mistakes so recheck once.</p>
-              )}
-            </>
+                {aiGeneratedWarning && (
+                  <p className="mt-2 text-xs text-[#8a847c]">AI makes mistakes so recheck once.</p>
+                )}
+              </>
             ) : (
-              <div className="mt-4 rounded-xl border border-[#ded6cc] bg-[#faf8f3] p-4">
+              <div className="mt-4 rounded-xl border border-[#ded6cc] bg-white md:bg-[#faf8f3] p-4 shadow-sm md:shadow-none">
                 <textarea
                   className="min-h-[120px] w-full resize-none border-none bg-transparent text-sm outline-none"
                   placeholder="Paste your syllabus here"
@@ -661,7 +699,7 @@ const GeneratePage = () => {
 
             {mode === 'manual' ? (
               <>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="mt-3 hidden md:flex flex-wrap items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-4 text-[#6f6a63]">
                     <span className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-[#6db05d]" />
@@ -677,33 +715,56 @@ const GeneratePage = () => {
 
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#eee6dc] bg-[#f7f4ee] px-6 py-4">
-            <div>
-              <p className="text-sm font-semibold">
-                {baseTopics.length} credit{baseTopics.length !== 1 ? 's' : ''}
-              </p>
-              <p className="text-xs text-[#7b756d]">
-                {isLoggedIn ? (
-                  <>
-                    {creditBalance} credits remaining{' '}
-                    <span className="ml-2 rounded-full bg-[#f2e6c9] px-2 py-0.5 text-[10px] font-semibold text-[#7a5a26]">
-                      {Math.max(creditBalance - baseTopics.length, 0)} after
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-[#a74c4c] font-medium">Sign up to start generating your custom notes!</span>
-                )}
-              </p>
+          <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col md:static md:flex-row md:flex-wrap md:items-center justify-between gap-4 border-t border-[#e2dbd2] md:border-[#eee6dc] bg-white md:bg-[#f7f4ee] px-5 py-4 md:px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] md:shadow-none">
+            {/* Mobile Top Row */}
+            {mode !== 'paste' && (
+              <div className="flex items-center justify-between md:hidden w-full mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#059669]" />
+                  <span className="text-sm font-medium text-[#5f5a54]">PDF · <span className="font-bold text-[#1f1f1f]">{baseTopics.length} pages</span></span>
+                </div>
+                <span className="rounded-full bg-[#fdf2df] border border-[#f3d9a9] px-3 py-1 text-[11px] font-semibold text-[#b47a26]">
+                  {baseTopics.length} credits
+                </span>
+              </div>
+            )}
+
+            {/* Desktop Left Side */}
+            <div className="hidden md:block">
+              {mode !== 'paste' ? (
+                <>
+                  <p className="text-sm font-semibold">
+                    {baseTopics.length} credit{baseTopics.length !== 1 ? 's' : ''}
+                  </p>
+                  <p className="text-xs text-[#7b756d]">
+                    {isLoggedIn ? (
+                      <>
+                        {creditBalance} credits remaining{' '}
+                        <span className="ml-2 rounded-full bg-[#f2e6c9] px-2 py-0.5 text-[10px] font-semibold text-[#7a5a26]">
+                          {Math.max(creditBalance - baseTopics.length, 0)} after
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-[#a74c4c] font-medium">Sign up to start generating your custom notes!</span>
+                    )}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-[#7b756d]">
+                  {isLoggedIn ? `${creditBalance} credits available` : <span className="text-[#a74c4c] font-medium">Sign up to start generating your custom notes!</span>}
+                </p>
+              )}
             </div>
+            
             <button
               onClick={!isLoggedIn ? () => navigate('/login?next=/generate') : handleGenerate}
               disabled={!import.meta.env.DEV || isGenerating || mode === 'paste' || isOrganizing}
-              className={`rounded-xl px-5 py-2 text-xs font-semibold transition-all ${
+              className={`w-full md:w-auto rounded-xl px-5 py-3 md:py-2 text-sm md:text-bold font-bold transition-all ${
                 !import.meta.env.DEV || isGenerating || mode === 'paste' || isOrganizing
-                  ? 'bg-[#e7e2db] text-[#b1aaa0]'
+                  ? 'border border-[#f0ece5] bg-transparent text-[#e0d9ce] md:border-none md:bg-[#e7e2db] md:text-[#b1aaa0]'
                   : !isLoggedIn
-                    ? 'bg-[#1b1b1b] text-white hover:bg-black hover:shadow-md hover:-translate-y-0.5'
-                    : 'bg-[#1b1b1b] text-white hover:bg-black'
+                    ? 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white hover:bg-[#1f1f1f] hover:text-white md:hover:bg-black hover:-translate-y-0.5'
+                    : 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white hover:bg-[#1f1f1f] hover:text-white md:hover:bg-black'
               }`}
             >
               {!import.meta.env.DEV
@@ -716,6 +777,12 @@ const GeneratePage = () => {
                       ? 'Sign up to Generate'
                       : 'Generate PDF'}
             </button>
+            
+            <p className="mt-1 text-center text-[11px] text-[#a39b92] md:hidden">
+               {mode !== 'paste' 
+                 ? (isLoggedIn ? `${Math.max(creditBalance - baseTopics.length, 0)} credits remaining after` : 'Sign up to generate notes')
+                 : (isLoggedIn ? `${creditBalance} credits available` : 'Sign up to generate notes')}
+            </p>
           </div>
         </div>
         </>

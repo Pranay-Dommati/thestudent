@@ -11,6 +11,8 @@ import LoginPage from './LoginPage.jsx'
 import DashboardPage from './DashboardPage.jsx'
 import PricingPage from './PricingPage.jsx'
 import ProfilePage from './ProfilePage.jsx'
+import TermsPage from './TermsPage.jsx'
+import PrivacyPage from './PrivacyPage.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import PDFViewerPage from './PDFViewerPage.jsx'
 import ForgotPasswordPage from './ForgotPasswordPage.jsx'
@@ -30,6 +32,8 @@ createRoot(document.getElementById('root')).render(
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/view" element={<PDFViewerPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:uid/:token" element={<ResetPasswordPage />} />

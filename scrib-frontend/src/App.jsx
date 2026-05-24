@@ -485,8 +485,12 @@ const App = () => {
 
       {/* Footer */}
       <footer className="border-t border-[#e4ddd4] bg-white py-8">
-        <div className="mx-auto max-w-6xl px-6 text-center text-sm text-[#7b756d]">
-          &copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.
+        <div className="mx-auto max-w-6xl px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-[#7b756d]">
+          <p>&copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.</p>
+          <div className="flex items-center gap-6">
+            <Link to="/terms" className="hover:text-[#1f1f1f] transition-colors">Terms</Link>
+            <Link to="/privacy" className="hover:text-[#1f1f1f] transition-colors">Privacy</Link>
+          </div>
         </div>
       </footer>
 

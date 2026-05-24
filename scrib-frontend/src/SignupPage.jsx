@@ -18,7 +18,7 @@ const SignupPage = () => {
   const [otpOpen, setOtpOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const location = useLocation()
-  const nextUrl = new URLSearchParams(location.search).get('next') || '/dashboard'
+  const nextUrl = new URLSearchParams(location.search).get('next') || '/'
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -133,8 +133,11 @@ const SignupPage = () => {
           <h1 className="mt-3 text-2xl font-semibold">Create your account</h1>
           <p className="mt-1 text-sm text-[#7b756d]">Start with 5 free credits - no card needed.</p>
 
-          <div className="mt-6 flex w-full justify-center">
+          <div className="mt-6 flex w-full flex-col items-center">
             <div id="google-signup-btn" className="w-full max-w-[400px] flex justify-center"></div>
+            <p className="mt-3 text-[11px] text-[#9a9289]">
+              By signing up, you agree to our <Link to="/terms" className="underline hover:text-[#1f1f1f]">Terms</Link> and <Link to="/privacy" className="underline hover:text-[#1f1f1f]">Privacy Policy</Link>.
+            </p>
           </div>
 
           <div className="my-5 flex items-center gap-3 text-xs text-[#9a9289]">
@@ -187,7 +190,9 @@ const SignupPage = () => {
                 checked={agreedToTerms}
                 onChange={(event) => setAgreedToTerms(event.target.checked)}
               />
-              I agree to the Terms and Privacy Policy
+              <span>
+                I agree to the <Link to="/terms" className="underline hover:text-[#1f1f1f]">Terms</Link> and <Link to="/privacy" className="underline hover:text-[#1f1f1f]">Privacy Policy</Link>
+              </span>
             </label>
             {formErrors.agreedToTerms ? (
               <p className="text-xs text-[#c05c5c]">{formErrors.agreedToTerms}</p>

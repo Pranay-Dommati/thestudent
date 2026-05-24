@@ -12,7 +12,7 @@ const LoginPage = () => {
   const [formErrors, setFormErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const location = useLocation()
-  const nextUrl = new URLSearchParams(location.search).get('next') || '/dashboard'
+  const nextUrl = new URLSearchParams(location.search).get('next') || '/'
 
   useEffect(() => {
     if (isLoggedIn) {
