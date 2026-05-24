@@ -1,8 +1,14 @@
 import { Link } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 
 const PrivacyPage = () => {
   return (
     <div className="min-h-screen bg-[#fcf9f4] text-[#1f1f1f]">
+      <Helmet>
+        <title>Privacy Policy - Scrib</title>
+        <meta name="description" content="Privacy Policy for Scrib by EasyLearnova." />
+        <link rel="canonical" href="https://scrib.easylearnova.com/privacy" />
+      </Helmet>
       <header className="sticky top-0 z-50 border-b border-[#e2dbd2] bg-[#fcf9f4]/80 px-6 py-4 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <Link to="/" className="flex items-center gap-3 transition-opacity hover:opacity-80">

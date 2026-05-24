@@ -130,7 +130,7 @@ def _topics_to_prompt(topics):
     return ', '.join(clean)
 
 
-def _images_to_pdf(images):
+def _images_to_pdf(images, title=None):
     buffer = BytesIO()
     pdf = None
 
@@ -153,6 +153,12 @@ def _images_to_pdf(images):
 
     if pdf is None:
         raise PdfGenerationError('No images to convert to PDF')
+
+    if title:
+        pdf.setTitle(f"{title} Handwritten Notes")
+        pdf.setSubject('AI-generated handwritten exam notes')
+        pdf.setAuthor('Scrib by EasyLearnova')
+        pdf.setKeywords(f"{title} notes, handwritten notes, exam pdf, revision notes")
 
     pdf.save()
     return buffer.getvalue()
@@ -201,6 +207,6 @@ def generate_study_pack_pdf(pages, title, user_id=None):
     except ImageGenerationError as exc:
         raise PdfGenerationError(str(exc)) from exc
 
-    pdf_bytes = _images_to_pdf(images)
+    pdf_bytes = _images_to_pdf(images, title=title)
     pdf_url, s3_key = _save_pdf_bytes(pdf_bytes, user_id=user_id)
     return {'pdf_url': pdf_url, 's3_key': s3_key, 'total_pages': len(pages)}

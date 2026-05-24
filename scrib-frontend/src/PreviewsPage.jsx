@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
 import axiosInstance from './utils/axios'
@@ -36,6 +37,7 @@ const PreviewsPage = () => {
         if (!isMounted || !Array.isArray(data)) return
         const mapped = data.map((item) => ({
           id: item.id ?? item.slug ?? item.title,
+          slug: item.slug,
           title: item.title,
           subject: item.tags?.[0] || 'Preview',
           pdfUrl: item.pdf_url || null,
@@ -65,6 +67,11 @@ const PreviewsPage = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f7f3] text-[#1f1f1f]">
+      <Helmet>
+        <title>Browse Topics - Scrib by EasyLearnova</title>
+        <meta name="description" content="Browse hundreds of free AI-generated handwritten exam notes for Computer Science, Engineering, Physics, and Mathematics." />
+        <link rel="canonical" href="https://scrib.easylearnova.com/previews" />
+      </Helmet>
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
@@ -170,7 +177,7 @@ const PreviewsPage = () => {
               className={`transition-transform duration-200 ${note.pdfUrl ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg rounded-xl' : 'opacity-70'}`}
               onClick={() => {
                 if (!note.pdfUrl) return
-                navigate('/view', {
+                navigate(`/view/${note.slug}`, {
                   state: {
                     pdfUrl: note.pdfUrl,
                     title: note.title,

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
 import Breadcrumb from './components/Breadcrumb'
@@ -89,6 +90,25 @@ const PricingPage = () => {
 
   return (
     <div className="min-h-screen bg-white text-[#1f1f1f]">
+      <Helmet>
+        <title>Pricing - Scrib by EasyLearnova</title>
+        <meta name="description" content="Affordable pay-as-you-go pricing for AI-generated handwritten exam notes. Start for free and buy credits as you need them." />
+        <link rel="canonical" href="https://scrib.easylearnova.com/pricing" />
+        <script type="application/ld+json">
+          {`
+            {
+              "@context": "https://schema.org",
+              "@type": "Product",
+              "name": "Handwritten Notes Credits",
+              "offers": {
+                "@type": "Offer",
+                "price": "99",
+                "priceCurrency": "INR"
+              }
+            }
+          `}
+        </script>
+      </Helmet>
       <header className="border-b border-[#e4ddd4] bg-white/90">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">

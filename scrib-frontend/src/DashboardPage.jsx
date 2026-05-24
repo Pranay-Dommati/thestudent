@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
+import { Helmet } from 'react-helmet-async'
 import { getInitials } from './utils/user'
 import axiosInstance from './utils/axios'
 import { forceDownload } from './utils/download'
@@ -93,8 +94,12 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f4ee] text-[#1f1f1f]">
-      <header className="border-b border-[#e4ddd4] bg-white/90">
+    <div className="flex min-h-screen flex-col bg-[#fcf9f4]">
+      <Helmet>
+        <title>Dashboard - Scrib</title>
+        <meta name="robots" content="noindex,nofollow" />
+      </Helmet>
+      <header className="sticky top-0 z-50 border-b border-[#e2dbd2] bg-[#fcf9f4]/80 px-6 py-4 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
             <Link to="/" className="flex-shrink-0 hover:opacity-90 transition-opacity">
@@ -256,7 +261,8 @@ const DashboardPage = () => {
                                 }
                               }
 
-                              navigate('/view', {
+                              const slug = (item.name || 'document').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                              navigate(`/view/${slug}`, {
                                 state: {
                                   pdfUrl: isPack ? viewUrl : null,
                                   imageUrl: isPack ? null : viewUrl,

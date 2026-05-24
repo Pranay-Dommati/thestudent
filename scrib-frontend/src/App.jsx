@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { useAuth } from './context/AuthContext'
 import axiosInstance from './utils/axios'
 import { getInitials } from './utils/user'
@@ -113,6 +114,7 @@ const App = () => {
         
         const mapped = selectedItems.map((item) => ({
           id: item.id ?? item.slug ?? item.title,
+          slug: item.slug,
           title: item.title,
           pdfUrl: item.pdf_url || null,
           imageUrl: item.image_url || null,
@@ -133,7 +135,33 @@ const App = () => {
   }, [])
 
   return (
-    <div className="min-h-screen bg-white text-[#1f1f1f]">
+    <div className="min-h-screen bg-[#fcf9f4] text-[#1f1f1f] font-sans overflow-x-hidden selection:bg-[#d9d1c7] selection:text-[#1f1f1f]">
+      <Helmet>
+        <title>Scrib by EasyLearnova – AI Handwritten Exam Notes Generator</title>
+        <meta name="description" content="Generate handwritten exam notes PDFs instantly using AI. Browse free previews or create custom handwritten notes for any topic in seconds." />
+        <meta name="keywords" content="handwritten notes generator, exam notes pdf, AI handwritten notes, study notes pdf, handwritten pdf generator" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Generate Handwritten Exam Notes with AI" />
+        <meta property="og:description" content="Turn any topic into handwritten exam notes instantly." />
+        <meta property="og:image" content="https://scrib.easylearnova.com/og/home.png" />
+        <meta property="og:url" content="https://scrib.easylearnova.com" />
+        <meta property="og:site_name" content="Scrib by EasyLearnova" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Generate Handwritten Exam Notes with AI" />
+        <meta name="twitter:description" content="AI-generated handwritten exam notes PDFs in seconds." />
+        <meta name="twitter:image" content="https://scrib.easylearnova.com/og/home.png" />
+        <link rel="canonical" href="https://scrib.easylearnova.com/" />
+        <script type="application/ld+json">
+          {`
+            {
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              "name": "Scrib by EasyLearnova",
+              "url": "https://scrib.easylearnova.com"
+            }
+          `}
+        </script>
+      </Helmet>
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
@@ -255,7 +283,7 @@ const App = () => {
                     onClick={(e) => {
                       e.preventDefault()
                       if (!note.pdfUrl) return
-                      navigate('/view', {
+                      navigate(`/view/${note.slug}`, {
                         state: {
                           pdfUrl: note.pdfUrl,
                           title: note.title,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
+import { Helmet } from 'react-helmet-async'
 import { getInitials } from './utils/user'
 import Breadcrumb from './components/Breadcrumb'
 import BuyCreditsModal from './components/BuyCreditsModal'
@@ -123,8 +124,12 @@ const ProfilePage = () => {
   )
 
   return (
-    <div className="min-h-screen bg-[#f7f4ee] text-[#1f1f1f]">
-      <header className="border-b border-[#e4ddd4] bg-white/90">
+    <div className="min-h-screen bg-[#fcf9f4] text-[#1f1f1f]">
+      <Helmet>
+        <title>Profile - Scrib</title>
+        <meta name="robots" content="noindex,nofollow" />
+      </Helmet>
+      <header className="border-b border-[#e2dbd2] bg-white/90">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
             <Link to="/" className="flex-shrink-0 hover:opacity-90 transition-opacity">

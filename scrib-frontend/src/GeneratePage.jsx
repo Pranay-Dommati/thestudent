@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
 import axiosInstance from './utils/axios'
@@ -418,6 +419,11 @@ const GeneratePage = () => {
 
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-[#1f1f1f]">
+      <Helmet>
+        <title>Generate Notes - Scrib</title>
+        <meta name="description" content="Create custom handwritten notes from your topics or syllabus. Organize and download PDF study packs instantly." />
+        <link rel="canonical" href="https://scrib.easylearnova.com/generate" />
+      </Helmet>
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
@@ -851,7 +857,8 @@ const GeneratePage = () => {
                   const topicsArr = Array.isArray(item.topics_json)
                     ? item.topics_json.map(t => Array.isArray(t) ? t.join(', ') : t)
                     : Array.from({ length: pages }, (_, i) => `Page ${i + 1}`)
-                  navigate('/view', {
+                  const noteSlug = (item.name || 'study-pack').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                  navigate(`/view/${noteSlug}`, {
                     state: {
                       pdfUrl: resolvedUrl,
                       title: item.name || titleStr,
