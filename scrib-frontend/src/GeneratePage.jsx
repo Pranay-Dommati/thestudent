@@ -60,6 +60,7 @@ const GeneratePage = () => {
   const [shareModalData, setShareModalData] = useState(null)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [showNotice, setShowNotice] = useState(true)
+  const [hideBanner, setHideBanner] = useState(false)
 
   // Sync active tab if URL changes
   useEffect(() => {
@@ -445,6 +446,7 @@ const GeneratePage = () => {
       
       // Now it returns 202 Accepted instantly
       customToast.success('Generation started! We will notify you when it is ready.')
+      setHideBanner(false)
       setHistoryItems(prev => prev.filter(item => item.id !== tempId))
       loadHistory() // Refresh history to get the real generating item
     } catch (error) {
@@ -847,12 +849,15 @@ const GeneratePage = () => {
 
         {activeTab === 'history' && (
           <div className="space-y-4">
-            {historyItems.some(i => i._isPending || i.status === 'generating' || i.status === 'pending') && (
-              <div className="mb-6 rounded-xl border border-[#dbe8c3] bg-[#eef7df] p-4 text-[#557a3f] shadow-sm">
-                <div className="flex items-start gap-3">
-                  <svg className="mt-0.5 h-5 w-5 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            {!hideBanner && historyItems.some(i => i._isPending || i.status === 'generating' || i.status === 'pending') && (
+              <div className="mb-6 rounded-xl border border-[#dbe8c3] bg-[#eef7df] p-4 text-[#557a3f] shadow-sm relative">
+                <button onClick={() => setHideBanner(true)} className="absolute right-3 top-3 text-[#557a3f] hover:text-[#3f5c2d] transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
+                </button>
+                <div className="flex items-start gap-3 pr-6">
                   <div>
                     <h3 className="text-sm font-bold">Your Scrib is being generated!</h3>
                     <p className="mt-1 text-xs text-[#557a3f]/90 leading-relaxed max-w-2xl">
