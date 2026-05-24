@@ -21,7 +21,7 @@ const GlobalGenerationIndicator = () => {
         // The API returns paginated results, packs are in response.data.results
         const packs = response.data.results || response.data;
         if (Array.isArray(packs)) {
-          const active = packs.filter(p => p.status === 'generating' || p.status === 'queued');
+          const active = packs.filter(p => p.status === 'generating' || p.status === 'queued' || p.status === 'pending');
           setGeneratingPacks(active);
         }
       } catch (err) {
