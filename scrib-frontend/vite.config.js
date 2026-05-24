@@ -12,6 +12,17 @@ export default defineConfig(({ mode }) => {
       react()
     ],
     base,
+    build: {
+      target: 'es2019',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            pdfjs: ['react-pdf', 'pdfjs-dist'],
+            vendor: ['react', 'react-dom', 'react-router-dom', 'react-helmet-async'],
+          }
+        }
+      }
+    },
     cacheDir: 'node_modules/.vite-cache',
     server: {
       fs: { strict: false },

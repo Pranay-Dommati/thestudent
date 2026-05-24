@@ -5,8 +5,8 @@ const NotFoundPage = () => {
   return (
     <>
       <Helmet>
-        <title>Page Not Found - Scrib</title>
-        <meta name="robots" content="noindex" />
+        <title>404 - Page Not Found | Scrib</title>
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#fcf9f4] text-[#1f1f1f]">
         <h1 className="text-6xl font-bold">404</h1>
