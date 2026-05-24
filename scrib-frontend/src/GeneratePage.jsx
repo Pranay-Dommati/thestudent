@@ -764,18 +764,16 @@ const GeneratePage = () => {
             
             <button
               onClick={!isLoggedIn ? () => navigate('/login?next=/generate') : handleGenerate}
-              disabled={!import.meta.env.DEV || isGenerating || mode === 'paste' || isOrganizing}
+              disabled={isGenerating || mode === 'paste' || isOrganizing}
               className={`w-full md:w-auto rounded-xl px-5 py-3 md:py-2 text-sm md:text-bold font-bold transition-all ${
-                !import.meta.env.DEV || isGenerating || mode === 'paste' || isOrganizing
+                isGenerating || mode === 'paste' || isOrganizing
                   ? 'border border-[#f0ece5] bg-transparent text-[#e0d9ce] md:border-none md:bg-[#e7e2db] md:text-[#b1aaa0]'
                   : !isLoggedIn
                     ? 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white hover:bg-[#1f1f1f] hover:text-white md:hover:bg-black hover:-translate-y-0.5'
                     : 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white hover:bg-[#1f1f1f] hover:text-white md:hover:bg-black'
               }`}
             >
-              {!import.meta.env.DEV
-                  ? 'Disabled in Prod'
-                  : isGenerating
+              {isGenerating
                   ? 'Generating...'
                   : mode === 'paste'
                     ? 'Organize topics first'
