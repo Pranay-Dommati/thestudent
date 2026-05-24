@@ -132,6 +132,9 @@ if _COOP_ENV is not None:
 else:
     SECURE_CROSS_ORIGIN_OPENER_POLICY = (None if DEBUG else 'same-origin-allow-popups')
 
+# URLs
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173' if DEBUG else 'https://scrib.easylearnova.com')
+
 # Cache Configuration - Required for Rate Limiting
 # Use Redis in production (when REDIS_URL is set) to avoid MySQL connection exhaustion
 # Falls back to DatabaseCache for local development

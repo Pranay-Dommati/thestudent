@@ -55,7 +55,7 @@ def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
             <p>Hi {user.full_name or 'there'},</p>
             <p>Your study pack <strong>"{pack.title}"</strong> has been successfully generated.</p>
             <p>
-              <a href="{frontend_url}/generate?tab=history" style="display:inline-block;padding:10px 20px;background-color:#1f1f1f;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold;">
+              <a href="{frontend_url}/generate?tab=history" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;border:1px solid #1d4ed8;">
                 View your notes
               </a>
             </p>
