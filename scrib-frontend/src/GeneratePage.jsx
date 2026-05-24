@@ -847,6 +847,22 @@ const GeneratePage = () => {
 
         {activeTab === 'history' && (
           <div className="space-y-4">
+            {historyItems.some(i => i._isPending || i.status === 'generating' || i.status === 'pending') && (
+              <div className="mb-6 rounded-xl border border-[#dbe8c3] bg-[#eef7df] p-4 text-[#557a3f] shadow-sm">
+                <div className="flex items-start gap-3">
+                  <svg className="mt-0.5 h-5 w-5 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                  <div>
+                    <h3 className="text-sm font-bold">Your Scrib is being generated!</h3>
+                    <p className="mt-1 text-xs text-[#557a3f]/90 leading-relaxed max-w-2xl">
+                      Please feel free to explore the site or come back later. We will send you an email as soon as your handwritten notes are ready.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {isLoadingHistory && historyItems.filter(i => i._isPending).length === 0 ? (
               <p className="text-sm text-[#7b756d]">Loading history...</p>
             ) : historyItems.length === 0 ? (
