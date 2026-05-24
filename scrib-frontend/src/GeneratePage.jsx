@@ -369,7 +369,20 @@ const GeneratePage = () => {
 
         if (response.ok) {
           const data = await response.json()
+          const finishReason = data.candidates?.[0]?.finishReason
           const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
+
+          if (finishReason === 'SAFETY' || finishReason === 'RECITATION' || finishReason === 'OTHER') {
+            if (mode === 'paste') {
+              setTopics(cleanedTopics)
+              setMode('manual')
+            }
+            setInvalidTopics(cleanedTopics)
+            customToast.error('Please enter appropriate educational topics.', { id: 'gen-error' })
+            setIsGenerating(false)
+            return
+          }
+
           const jsonMatch = content.match(/\[.*\]/s)
           let validityArray = []
           try {
@@ -388,7 +401,25 @@ const GeneratePage = () => {
               setIsGenerating(false)
               return
             }
+          } else {
+             if (mode === 'paste') {
+               setTopics(cleanedTopics)
+               setMode('manual')
+             }
+             setInvalidTopics(cleanedTopics)
+             customToast.error('Please enter appropriate educational topics.', { id: 'gen-error' })
+             setIsGenerating(false)
+             return
           }
+        } else if (response.status === 400) {
+           if (mode === 'paste') {
+             setTopics(cleanedTopics)
+             setMode('manual')
+           }
+           setInvalidTopics(cleanedTopics)
+           customToast.error('Please enter appropriate educational topics.', { id: 'gen-error' })
+           setIsGenerating(false)
+           return
         }
       }
     } catch (err) {

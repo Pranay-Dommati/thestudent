@@ -54,6 +54,13 @@ const MobileMenu = ({ isLoggedIn, user, logout }) => {
                   Dashboard
                 </Link>
                 <Link 
+                  to="/generate?tab=history" 
+                  className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
+                  onClick={() => setIsOpen(false)}
+                >
+                  My Scribs
+                </Link>
+                <Link 
                   to="/profile" 
                   className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
                   onClick={() => setIsOpen(false)}
