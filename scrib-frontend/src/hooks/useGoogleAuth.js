@@ -29,8 +29,8 @@ export const useGoogleAuth = (onSuccess, onError) => {
       }
       const existing = document.querySelector('script[src*="accounts.google.com/gsi/client"]')
       if (existing) {
-        existing.onload = resolve
-        existing.onerror = reject
+        existing.addEventListener('load', resolve)
+        existing.addEventListener('error', reject)
         return
       }
       const script = document.createElement('script')

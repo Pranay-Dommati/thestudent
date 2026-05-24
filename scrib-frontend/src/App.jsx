@@ -168,7 +168,7 @@ const App = () => {
             <img src="/scrib_favicon.svg" alt="Scrib" className="h-9 w-9 rounded-lg border border-[#e2dbd2] shadow-sm object-cover" />
             <div>
               <p className="text-sm font-semibold">Scrib</p>
-              <p className="text-xs text-[#7b756d]">by EasyLearnova</p>
+              <p className="hidden text-xs text-[#7b756d] sm:block">by EasyLearnova</p>
             </div>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
@@ -199,7 +199,7 @@ const App = () => {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1.5 text-xs font-semibold md:px-4 md:py-2">
+              <Link to="/login" className="hidden sm:inline-flex rounded-full border border-[#d9d1c7] bg-white px-3 py-1.5 text-xs font-semibold md:px-4 md:py-2">
                 Log in
               </Link>
               <Link to="/signup" className="rounded-full bg-[#1f3a5f] px-3 py-1.5 text-xs font-semibold text-white md:px-4 md:py-2">

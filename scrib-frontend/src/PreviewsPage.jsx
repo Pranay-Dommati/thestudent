@@ -101,7 +101,7 @@ const PreviewsPage = () => {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
+              <Link to="/login" className="hidden sm:inline-flex rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
                 Log in
               </Link>
               <Link to="/signup" className="rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white">
