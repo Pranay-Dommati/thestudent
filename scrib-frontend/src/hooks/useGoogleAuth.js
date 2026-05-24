@@ -25,6 +25,7 @@ export const useGoogleAuth = (onSuccess, onError) => {
       }
       // Prevent loading script during react-snap prerendering
       if (typeof window !== 'undefined' && window.navigator.userAgent.includes('ReactSnap')) {
+        resolve()
         return
       }
       const existing = document.querySelector('script[src*="accounts.google.com/gsi/client"]')

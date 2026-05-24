@@ -11,6 +11,11 @@ const instance = axios.create({
 
 instance.interceptors.request.use(
   async (config) => {
+    // Prevent API calls from hanging the react-snap prerender
+    if (typeof window !== 'undefined' && window.navigator.userAgent.includes('ReactSnap')) {
+      return Promise.reject(new Error('API calls disabled during prerendering'))
+    }
+
     const url = String(config.url || '')
     const isRefreshEndpoint = /\/auth\/token\/refresh\/?$/i.test(url)
     if (!isRefreshEndpoint) {
