@@ -43,22 +43,22 @@ const GlobalGenerationIndicator = () => {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-auto">
+    <div className="fixed bottom-20 right-4 z-[9999] flex flex-col gap-2 pointer-events-auto md:bottom-6 md:right-6 md:gap-3">
       {generatingPacks.slice(0, 3).map(pack => (
         <div 
           key={pack.id}
           onClick={() => navigate('/generate?tab=history')}
-          className="flex cursor-pointer items-center gap-4 rounded-xl border border-black bg-white p-4 shadow-xl transition-all hover:scale-105 hover:shadow-2xl"
+          className="flex cursor-pointer items-center gap-3 rounded-xl border border-black bg-white p-3 shadow-xl transition-all active:scale-95 md:gap-4 md:p-4 hover:scale-105 hover:shadow-2xl"
         >
-          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f8f5f1]">
-            <svg className="h-5 w-5 animate-spin text-black" fill="none" viewBox="0 0 24 24">
+          <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f8f5f1] md:h-10 md:w-10">
+            <svg className="h-4 w-4 animate-spin text-black md:h-5 md:w-5" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
           </div>
           <div className="flex flex-col">
-            <p className="text-sm font-bold text-black">Generating Notes...</p>
-            <p className="text-xs font-medium text-gray-700 line-clamp-1 max-w-[180px]">
+            <p className="text-xs font-bold text-black md:text-sm">Generating Notes...</p>
+            <p className="text-[11px] font-medium text-gray-700 line-clamp-1 max-w-[150px] md:text-xs md:max-w-[180px]">
               {pack.title || pack.topic || 'Custom Topic'} • {pack.total_pages || pack.pages || 1} pages
             </p>
           </div>
