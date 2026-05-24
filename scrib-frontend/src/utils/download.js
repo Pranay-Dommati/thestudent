@@ -21,11 +21,14 @@ export const forceDownload = (url, title, isPack) => {
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      window.URL.revokeObjectURL(blobUrl)
+      // Delay revocation to ensure iOS Safari has time to start the download
+      setTimeout(() => {
+        window.URL.revokeObjectURL(blobUrl)
+      }, 1000)
     })
     .catch(() => {
-      // CORS blocked or network error — fall back to opening in a new tab.
-      // User can Save As from there.
-      window.open(url, '_blank')
+      // CORS blocked or network error. 
+      // window.open inside async is blocked by Safari popup blocker, so we navigate directly.
+      window.location.assign(url)
     })
 }
