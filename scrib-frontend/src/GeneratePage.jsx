@@ -491,6 +491,14 @@ const GeneratePage = () => {
             <p className="text-sm text-[#7b756d]">
               Type topics one by one, or paste your full syllabus - AI will organise it.
             </p>
+            <div className="mt-3 flex items-start gap-2 rounded-lg bg-[#fcf9f4] border border-[#e2dbd2] p-3 text-xs text-[#5f5a54]">
+              <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#8a847c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </svg>
+              Every topic added becomes a separate page in the PDF and costs 1 credit.
+            </div>
           </div>
 
           <div className="px-6 py-5">

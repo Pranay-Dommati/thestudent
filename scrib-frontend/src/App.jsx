@@ -6,6 +6,8 @@ import { getInitials } from './utils/user'
 import MobileMenu from './components/MobileMenu'
 import BuyCreditsModal from './components/BuyCreditsModal'
 import PreviewCard from './components/PreviewCard'
+import { startPaymentFlow } from './services/paymentService'
+import customToast from './utils/customToast'
 
 const fallbackPreviewStrip = [
   { id: 'osi-model', title: 'OSI Model', pdfUrl: null },
@@ -41,11 +43,42 @@ const topicChips = ['Cloud Computing', 'Photosynthesis', "Ohm's Law", 'Recursion
 
 
 const App = () => {
-  const { user, logout, isLoggedIn } = useAuth()
+  const { user, refreshUser, logout, isLoggedIn } = useAuth()
   const [previewStrip, setPreviewStrip] = useState(fallbackPreviewStrip)
   const [topicInput, setTopicInput] = useState('')
   const [showBuyModal, setShowBuyModal] = useState(false)
+  const [processingPack, setProcessingPack] = useState(null)
+  const [activePreviewIndex, setActivePreviewIndex] = useState(0)
   const navigate = useNavigate()
+
+  const handleBuyClick = async (packId) => {
+    if (!isLoggedIn) {
+      navigate('/login')
+      return
+    }
+    if (processingPack) return
+    setProcessingPack(packId)
+
+    await startPaymentFlow({
+      pack: packId,
+      user,
+      onSuccess: async ({ credit_balance, credits_added }) => {
+        setProcessingPack(null)
+        await refreshUser?.()
+        customToast.success(
+          `🎉 ${credits_added} credits added! New balance: ${credit_balance} credits`,
+          { duration: 4000 }
+        )
+      },
+      onFailure: (message) => {
+        setProcessingPack(null)
+        customToast.error(message || 'Payment failed. Please try again.')
+      },
+      onDismiss: () => {
+        setProcessingPack(null)
+      },
+    })
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -112,6 +145,7 @@ const App = () => {
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
             <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
+            <Link to="/generate" className="hover:text-[#1f1f1f]">Generate</Link>
             <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
             {isLoggedIn && (
               <Link to="/generate?tab=history" className="hover:text-[#1f1f1f]">My Scribs</Link>
@@ -184,13 +218,13 @@ const App = () => {
             </div>
             <div className="mt-4 flex flex-wrap justify-center gap-3 text-xs text-[#9a9289]">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#6db05d]" /> No signup to browse
+                <span className="h-1.5 w-1.5 rounded-full bg-[#6db05d]" /> Handwritten exam notes
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#6db05d]" /> UPI / Razorpay
+                <span className="h-1.5 w-1.5 rounded-full bg-[#6db05d]" /> Instant PDF generation
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#6db05d]" /> Instant PDF
+                <span className="h-1.5 w-1.5 rounded-full bg-[#6db05d]" /> Built for students
               </span>
             </div>
           </div>
@@ -204,11 +238,20 @@ const App = () => {
                   Free previews - browse and download &rarr;
                 </p>
               </Link>
-              <div className="mt-4 grid gap-4 md:grid-cols-4">
+              <div 
+                className="mt-4 flex overflow-x-auto gap-4 pb-4 snap-x hide-scrollbar md:grid md:grid-cols-4 md:overflow-x-visible md:pb-0" 
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                onScroll={(e) => {
+                  const scrollLeft = e.target.scrollLeft;
+                  const itemWidth = 296; // 280px width + 16px gap
+                  const index = Math.round(scrollLeft / itemWidth);
+                  setActivePreviewIndex(index);
+                }}
+              >
                 {previewStrip.map((note) => (
                   <div
                     key={note.id}
-                    className={`transition-transform duration-200 ${note.pdfUrl ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg rounded-xl' : 'opacity-70'}`}
+                    className={`shrink-0 w-[280px] md:w-auto snap-start transition-transform duration-200 ${note.pdfUrl ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg rounded-xl' : 'opacity-70'}`}
                     onClick={(e) => {
                       e.preventDefault()
                       if (!note.pdfUrl) return
@@ -240,7 +283,9 @@ const App = () => {
                     )}
                   </div>
                 ))}
-                <Link to="/previews" className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#d6cfc6] bg-[#f4f1ea] p-4 transition-colors hover:bg-[#f0ece5]">
+                
+                {/* 50+ more card */}
+                <Link to="/previews" className="shrink-0 w-[280px] md:w-auto snap-start flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#d6cfc6] bg-[#f4f1ea] p-4 transition-colors hover:bg-[#f0ece5]">
                   <div className="grid grid-cols-3 gap-1">
                     {Array.from({ length: 9 }).map((_, index) => (
                       <span key={index} className="h-1 w-1 rounded-full bg-[#cfc7bd]" />
@@ -248,6 +293,18 @@ const App = () => {
                   </div>
                   <p className="text-sm font-medium text-[#8a847c]">50+ more</p>
                 </Link>
+              </div>
+
+              {/* Scroll indicators (Dots) for mobile only */}
+              <div className="mt-2 flex justify-center gap-1.5 md:hidden">
+                {Array.from({ length: previewStrip.length + 1 }).map((_, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`h-1.5 rounded-full transition-all ${
+                      idx === activePreviewIndex ? 'w-4 bg-[#1f1f1f]' : 'w-1.5 bg-[#d6cfc6]'
+                    }`}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -313,7 +370,7 @@ const App = () => {
             <div className="md:hidden rounded-[24px] border border-[#e2dbd2] bg-white p-5 shadow-sm">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a847c]">Pricing</p>
               <h2 className="mt-1 text-2xl font-semibold text-[#1f1f1f]">Credit packs</h2>
-              <p className="mt-1 text-sm text-[#5f5a54]">Pay only for what you generate. Credits never expire.</p>
+              <p className="mt-1 text-sm text-[#5f5a54]">Pay only for what you generate. Credits never expire. Built to remain affordable while supporting AI generation and cloud processing.</p>
               
               <div className="mt-8 flex flex-col gap-4">
                 {pricingTiers.map((tier) => (
@@ -326,7 +383,7 @@ const App = () => {
                     {tier.highlight && (
                       <span className="absolute -top-[14px] left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-[#efedfc] border-4 border-white px-2 py-0.5 text-[10px] font-bold text-[#6246ea] shadow-sm">
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.6H22l-6.1 4.5 2.3 7.5-6.2-4.6-6.2 4.6 2.3-7.5L2 9.6h7.6z"/></svg>
-                        Most popular
+                        Best value
                       </span>
                     )}
                     
@@ -348,14 +405,15 @@ const App = () => {
                     <div className="flex-shrink-0">
                       <button
                         id={`landing-buy-mobile-${tier.id}`}
-                        onClick={() => isLoggedIn ? setShowBuyModal(true) : navigate('/login')}
-                        className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors ${
+                        onClick={() => handleBuyClick(tier.id)}
+                        disabled={processingPack === tier.id}
+                        className={`mt-4 w-full rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
                           tier.highlight
-                            ? 'bg-[#1b1b1b] text-white'
-                            : 'bg-[#f7f4ee] text-[#1f1f1f] hover:bg-[#ede9e1]'
-                        }`}
+                            ? 'bg-[#1a1a1a] text-white hover:bg-[#333333]'
+                            : 'border border-[#e2dbd2] bg-white text-[#1f1f1f] hover:bg-[#f7f4ee]'
+                        } disabled:opacity-50`}
                       >
-                        Buy
+                        {processingPack === tier.id ? 'Processing...' : isLoggedIn ? 'Buy' : 'Sign in to buy'}
                       </button>
                     </div>
                   </div>
@@ -373,7 +431,7 @@ const App = () => {
             {/* --- Desktop View (Original Grid Cards) --- */}
             <div className="hidden md:block">
               <p className="text-sm font-semibold">Credit packs</p>
-              <p className="text-sm text-[#7b756d]">Pay only for what you generate. Credits never expire.</p>
+              <p className="text-sm text-[#7b756d]">Pay only for what you generate. Credits never expire. Built to remain affordable while supporting AI generation and cloud processing.</p>
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 {pricingTiers.map((tier) => (
                   <div
@@ -384,7 +442,7 @@ const App = () => {
                   >
                     {tier.highlight ? (
                       <span className="absolute -top-[10px] left-1/2 -translate-x-1/2 rounded-full bg-[#1a1a1a] ring-4 ring-white px-3 py-0.5 text-[11px] font-semibold text-[#f0c06a]">
-                        Most popular
+                        Best value
                       </span>
                     ) : null}
                     
@@ -405,10 +463,15 @@ const App = () => {
                     <div className="mt-auto pt-8">
                       <button
                         id={`landing-buy-desktop-${tier.id}`}
-                        onClick={() => isLoggedIn ? setShowBuyModal(true) : navigate('/login')}
-                        className="w-full rounded-lg border border-[#d9d1c7] bg-white py-2 text-sm font-semibold text-[#1f1f1f] transition-colors hover:bg-[#faf8f3]"
+                        onClick={() => handleBuyClick(tier.id)}
+                        disabled={processingPack === tier.id}
+                        className={`mt-6 w-full rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                          tier.highlight
+                            ? 'bg-[#1a1a1a] text-white hover:bg-[#333333]'
+                            : 'border border-[#e2dbd2] bg-white text-[#1f1f1f] hover:bg-[#f7f4ee]'
+                        } disabled:opacity-50`}
                       >
-                        {isLoggedIn ? 'Buy pack' : 'Sign in to buy'}
+                        {processingPack === tier.id ? 'Processing...' : isLoggedIn ? 'Buy pack' : 'Sign in to buy'}
                       </button>
                     </div>
                   </div>

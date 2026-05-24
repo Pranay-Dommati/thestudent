@@ -4,7 +4,8 @@ import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
 import Breadcrumb from './components/Breadcrumb'
 import BuyCreditsModal from './components/BuyCreditsModal'
-import { fetchPaymentHistory } from './services/paymentService'
+import { fetchPaymentHistory, startPaymentFlow } from './services/paymentService'
+import customToast from './utils/customToast'
 
 const sections = [
   { id: 'profile', label: 'Profile' },
@@ -17,11 +18,43 @@ const ProfilePage = () => {
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [isClosingAccount, setIsClosingAccount] = useState(false)
   const [showBuyModal, setShowBuyModal] = useState(false)
+  const [processingPack, setProcessingPack] = useState(null)
   const [paymentHistory, setPaymentHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyLoaded, setHistoryLoaded] = useState(false)
 
   const { user, logout, isLoggedIn, refreshUser } = useAuth()
+
+  const handleBuyClick = async (packId) => {
+    if (processingPack) return
+    setProcessingPack(packId)
+
+    await startPaymentFlow({
+      pack: packId,
+      user,
+      onSuccess: async ({ credit_balance, credits_added }) => {
+        setProcessingPack(null)
+        await refreshUser?.()
+        
+        // Refresh payment history if loaded
+        if (historyLoaded) {
+          setHistoryLoaded(false) // This will trigger loadPaymentHistory again
+        }
+
+        customToast.success(
+          `🎉 ${credits_added} credits added! New balance: ${credit_balance} credits`,
+          { duration: 4000 }
+        )
+      },
+      onFailure: (message) => {
+        setProcessingPack(null)
+        customToast.error(message || 'Payment failed. Please try again.')
+      },
+      onDismiss: () => {
+        setProcessingPack(null)
+      },
+    })
+  }
 
   // Load payment history when the "Plan and billing" tab is opened
   const loadPaymentHistory = useCallback(async () => {
@@ -267,7 +300,7 @@ const ProfilePage = () => {
                 </div>
 
                 {/* Quick buy packs */}
-                <div className="mt-4 grid grid-cols-3 gap-2">
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                   {[
                     { pack: 'starter', label: '10 cr', price: '₹59' },
                     { pack: 'popular', label: '20 cr', price: '₹99', highlight: true },
@@ -276,24 +309,30 @@ const ProfilePage = () => {
                     <div
                       key={item.pack}
                       id={`profile-quick-buy-${item.pack}`}
-                      onClick={() => setShowBuyModal(true)}
-                      className={`relative flex cursor-pointer flex-col items-center rounded-xl border py-4 text-center transition-all hover:scale-[1.02] hover:shadow-sm ${
+                      onClick={() => handleBuyClick(item.pack)}
+                      className={`relative flex cursor-pointer flex-row sm:flex-col items-center justify-between sm:justify-start rounded-xl border px-5 sm:px-0 py-4 transition-all hover:scale-[1.02] hover:shadow-sm ${
                         item.highlight ? 'border-[1.5px] border-[#1f1f1f] bg-[#faf8f3] shadow-sm' : 'border-[#e2dbd2] bg-white'
                       }`}
                     >
                       {item.highlight && (
-                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-[#1f1f1f] px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#f0c06a] ring-2 ring-white shadow-sm">
-                          POPULAR
+                        <span className="absolute sm:-top-2 sm:left-1/2 sm:-translate-x-1/2 sm:right-auto top-2 right-2 rounded-full bg-[#1f1f1f] px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#f0c06a] ring-2 ring-white shadow-sm z-10">
+                          BEST VALUE
                         </span>
                       )}
-                      <span className="text-xl font-bold text-[#1f1f1f]">{item.price}</span>
-                      <span className="mb-3 text-xs font-medium text-[#7b756d]">{item.label}</span>
-                      <button className={`w-3/4 rounded-lg py-1.5 text-xs font-bold transition-colors ${
+                      
+                      <div className="flex flex-col items-start sm:items-center sm:mb-3 mt-1 sm:mt-0">
+                        <span className="text-xl font-bold text-[#1f1f1f] leading-none mb-1 sm:mb-0">{item.price}</span>
+                        <span className="text-sm font-medium text-[#7b756d]">{item.label}</span>
+                      </div>
+
+                      <button 
+                        disabled={processingPack === item.pack}
+                        className={`w-auto sm:w-3/4 rounded-lg px-6 sm:px-0 py-2 sm:py-1.5 text-xs font-bold transition-colors disabled:opacity-50 ${
                         item.highlight 
                           ? 'bg-[#1f1f1f] text-white hover:bg-black' 
                           : 'bg-[#f4f0ea] text-[#1f1f1f] hover:bg-[#e8e2d9]'
                       }`}>
-                        Buy now
+                        {processingPack === item.pack ? '...' : 'Buy now'}
                       </button>
                     </div>
                   ))}

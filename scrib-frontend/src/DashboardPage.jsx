@@ -19,20 +19,12 @@ const DashboardPage = () => {
   const navigate = useNavigate()
   const [historyItems, setHistoryItems] = useState([])
   const [statsData, setStatsData] = useState({ pdfs: 0, creditsUsed: 0 })
-  const [openShareId, setOpenShareId] = useState(null)
+  const [shareModalData, setShareModalData] = useState(null)
   const [showBuyModal, setShowBuyModal] = useState(false)
 
-  // Close share dropdown when clicking outside
-  useEffect(() => {
-    const handler = (e) => {
-      if (!e.target.closest('.share-dropdown-container')) setOpenShareId(null)
-    }
-    document.addEventListener('click', handler)
-    return () => document.removeEventListener('click', handler)
-  }, [])
-
   const handleShareOption = async (option, item, isPack, fileUrl, titleStr) => {
-    setOpenShareId(null)
+    // Use custom share modal immediately
+    setShareModalData({ title: titleStr, url: 'Fetching secure link...', isLoading: true })
     let freshUrl = fileUrl
     if (isPack && item.id) {
       try {
@@ -45,32 +37,17 @@ const DashboardPage = () => {
         console.error('Failed to get fresh PDF URL for share', err)
       }
     }
-    if (option === 'copy') {
-      if (!freshUrl) return
-      await navigator.clipboard.writeText(freshUrl)
+    setShareModalData({ title: titleStr, url: freshUrl, isLoading: false })
+  }
+
+  const copyShareLink = async () => {
+    if (!shareModalData || shareModalData.isLoading) return
+    try {
+      await navigator.clipboard.writeText(shareModalData.url)
       customToast.success('Link copied to clipboard!')
-    } else if (option === 'share') {
-      if (!freshUrl) return
-      if (navigator.share) {
-        try {
-          const response = await fetch(freshUrl)
-          const blob = await response.blob()
-          const file = new File([blob], `${titleStr}.pdf`, { type: 'application/pdf' })
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], title: titleStr })
-          } else {
-            await navigator.share({ url: freshUrl, title: titleStr })
-          }
-        } catch (err) {
-          if (err.name !== 'AbortError') {
-            await navigator.clipboard.writeText(freshUrl)
-            customToast.success('Link copied! Share it manually.')
-          }
-        }
-      } else {
-        await navigator.clipboard.writeText(freshUrl)
-        customToast.success('Link copied to clipboard!')
-      }
+      setShareModalData(null)
+    } catch (err) {
+      console.error('Failed to copy', err)
     }
   }
 
@@ -228,47 +205,30 @@ const DashboardPage = () => {
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0">
-                      {item.status === 'pending' || item.status === 'generating' ? (
+                      {item.status === 'failed' ? (
+                        <span className="text-[11px] font-medium text-red-500">
+                          Failed
+                        </span>
+                      ) : item.status === 'pending' || item.status === 'generating' ? (
                         <span className="rounded-full border border-[#e2dbd2] bg-[#f5f2ec] px-3 py-1 text-[10px] font-semibold text-[#6b655d] uppercase tracking-wider">
                           Generating...
                         </span>
                       ) : (
                         fileUrl && (
-                          <div className="relative share-dropdown-container">
-                            <button
-                              onClick={() => setOpenShareId(openShareId === item.id ? null : item.id)}
-                              className="flex items-center gap-1 rounded-lg border border-[#e2dbd2] bg-white px-2 py-1 text-xs hover:bg-[#faf8f3] text-[#4b4742]"
-                              title="Share options"
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="18" cy="5" r="3" />
-                                <circle cx="6" cy="12" r="3" />
-                                <circle cx="18" cy="19" r="3" />
-                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                              </svg>
-                              Share
-                            </button>
-                            {openShareId === item.id && (
-                              <div className="absolute bottom-full right-0 mb-2 z-50 min-w-[168px] rounded-xl border border-[#e2dbd2] bg-white shadow-xl overflow-hidden">
-                                <p className="px-3.5 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest text-[#a39b92]">Share options</p>
-                                <button
-                                  onClick={() => handleShareOption('copy', item, isPack, fileUrl, item.name)}
-                                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-left text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors"
-                                >
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                                  Copy link
-                                </button>
-                                <button
-                                  onClick={() => handleShareOption('share', item, isPack, fileUrl, item.name)}
-                                  className="flex w-full items-center gap-2.5 px-3.5 py-2 pb-2.5 text-xs font-medium text-left text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors border-t border-[#f0ede7]"
-                                >
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
-                                  Share file
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          <button
+                            onClick={() => handleShareOption('share', item, isPack, fileUrl, item.name)}
+                            className="flex items-center gap-1 rounded-lg border border-[#e2dbd2] bg-white px-2 py-1 text-xs hover:bg-[#faf8f3] text-[#4b4742]"
+                            title="Share"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="18" cy="5" r="3" />
+                              <circle cx="6" cy="12" r="3" />
+                              <circle cx="18" cy="19" r="3" />
+                              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                            </svg>
+                            Share
+                          </button>
                         )
                       )}
                       {fileUrl && (
@@ -331,6 +291,38 @@ const DashboardPage = () => {
           }}
         />
       )}
+      {/* Share Modal */}
+      {shareModalData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl relative">
+            <button
+              onClick={() => setShareModalData(null)}
+              className="absolute right-4 top-4 text-[#9a9289] hover:text-[#1f1f1f] transition-colors"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <h2 className="mb-1 text-lg font-bold text-[#1f1f1f]">Share link</h2>
+            <p className="mb-5 text-sm text-[#7b756d]">Anyone with this link can view and download.</p>
+            
+            <div className="flex items-center gap-2 rounded-xl border border-[#e2dbd2] bg-[#faf8f3] p-1.5">
+              <input 
+                type="text" 
+                readOnly 
+                value={shareModalData.url} 
+                className="w-full bg-transparent px-3 py-2 text-sm text-[#5a554f] outline-none"
+              />
+              <button
+                onClick={copyShareLink}
+                disabled={shareModalData.isLoading}
+                className="flex-shrink-0 rounded-lg bg-[#1f1f1f] px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

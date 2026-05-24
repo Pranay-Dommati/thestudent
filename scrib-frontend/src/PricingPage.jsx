@@ -5,6 +5,8 @@ import { getInitials } from './utils/user'
 import Breadcrumb from './components/Breadcrumb'
 import MobileMenu from './components/MobileMenu'
 import BuyCreditsModal from './components/BuyCreditsModal'
+import { startPaymentFlow } from './services/paymentService'
+import customToast from './utils/customToast'
 
 // Pack IDs must match the backend CREDIT_PACKS keys exactly
 const tiers = [
@@ -51,18 +53,38 @@ const faqs = [
 ]
 
 const PricingPage = () => {
-  const { user, logout, isLoggedIn } = useAuth()
+  const { user, refreshUser, logout, isLoggedIn } = useAuth()
   const navigate = useNavigate()
   const [showBuyModal, setShowBuyModal] = useState(false)
-  const [defaultPack, setDefaultPack] = useState('popular')
+  const [processingPack, setProcessingPack] = useState(null)
 
-  const handleBuyClick = (packId) => {
+  const handleBuyClick = async (packId) => {
     if (!isLoggedIn) {
       navigate('/login')
       return
     }
-    setDefaultPack(packId)
-    setShowBuyModal(true)
+    if (processingPack) return
+    setProcessingPack(packId)
+
+    await startPaymentFlow({
+      pack: packId,
+      user,
+      onSuccess: async ({ credit_balance, credits_added }) => {
+        setProcessingPack(null)
+        await refreshUser?.()
+        customToast.success(
+          `🎉 ${credits_added} credits added! New balance: ${credit_balance} credits`,
+          { duration: 4000 },
+        )
+      },
+      onFailure: (message) => {
+        setProcessingPack(null)
+        customToast.error(message || 'Payment failed. Please try again.')
+      },
+      onDismiss: () => {
+        setProcessingPack(null)
+      },
+    })
   }
 
   return (
@@ -119,7 +141,7 @@ const PricingPage = () => {
         <div className="text-center px-4">
           <h1 className="text-2xl font-semibold md:text-3xl lg:text-4xl">Simple, pay-as-you-go pricing</h1>
           <p className="mt-3 text-sm text-[#7b756d]">
-            No subscriptions. Buy credits once, use whenever. Credits never expire.
+            No subscriptions. Buy credits once, use whenever. Credits never expire. Built to remain affordable while supporting AI generation and cloud processing.
           </p>
         </div>
 
@@ -133,7 +155,7 @@ const PricingPage = () => {
             >
               {tier.highlight ? (
                 <span className="absolute -top-[10px] left-1/2 -translate-x-1/2 rounded-full bg-[#1a1a1a] ring-4 ring-white px-3 py-0.5 text-[11px] font-semibold text-[#f0c06a]">
-                  Most popular
+                  Best value
                 </span>
               ) : null}
 
@@ -162,13 +184,14 @@ const PricingPage = () => {
                 <button
                   id={`pricing-buy-${tier.id}`}
                   onClick={() => handleBuyClick(tier.id)}
-                  className={`w-full rounded-lg py-2 text-sm font-semibold transition-colors ${
+                  disabled={processingPack === tier.id}
+                  className={`mt-6 w-full rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
                     tier.highlight
-                      ? 'bg-[#1f1f1f] text-white hover:opacity-90'
-                      : 'border border-[#d9d1c7] bg-white text-[#1f1f1f] hover:bg-[#faf8f3]'
-                  }`}
+                      ? 'bg-[#1a1a1a] text-white hover:bg-[#333333]'
+                      : 'border border-[#e2dbd2] bg-white text-[#1f1f1f] hover:bg-[#f7f4ee]'
+                  } disabled:opacity-50`}
                 >
-                  {isLoggedIn ? 'Buy pack' : 'Sign in to buy'}
+                  {processingPack === tier.id ? 'Processing...' : isLoggedIn ? 'Buy pack' : 'Sign in to buy'}
                 </button>
               </div>
             </div>

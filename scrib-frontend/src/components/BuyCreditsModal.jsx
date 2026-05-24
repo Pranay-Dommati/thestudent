@@ -125,7 +125,7 @@ const BuyCreditsModal = ({ onClose, onSuccess }) => {
               >
                 {pack.highlight && (
                   <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#1f1f1f] px-2.5 py-0.5 text-[10px] font-semibold text-[#f0c06a] ring-4 ring-white">
-                    Most popular
+                    Best value
                   </span>
                 )}
 
