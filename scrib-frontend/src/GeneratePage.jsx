@@ -109,10 +109,9 @@ const GeneratePage = () => {
         (a, b) => new Date(b.created_at) - new Date(a.created_at)
       )
 
-      setHistoryItems(prev => {
-        const pendingItems = prev.filter(item => item._isPending)
-        return [...pendingItems, ...combined]
-      })
+      // The API now returns the real pack (with generating/pending status),
+      // so we can safely replace the whole state — no need to keep the temp _isPending item.
+      setHistoryItems(combined)
     } catch (err) {
       console.error(err)
       customToast.error('Failed to load history')

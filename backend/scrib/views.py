@@ -973,14 +973,6 @@ class MyStudyPacksView(APIView):
         # Clean up any zombie packs before returning history
         cleanup_stuck_packs(request.user)
         
-        cache_key = f'scrib_my_study_packs_api_{request.user.id}'
-        cached_data = cache.get(cache_key)
-        if cached_data is not None:
-            return Response(cached_data)
-        
         packs = StudyPack.objects.filter(user=request.user)
         serializer = StudyPackSerializer(packs, many=True)
-        
-        # Cache the result for 5 minutes
-        cache.set(cache_key, serializer.data, timeout=300)
         return Response(serializer.data)
