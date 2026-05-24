@@ -16,7 +16,7 @@ const fallbackPreviewStrip = [
 const pricingTiers = [
   {
     id: 'starter',
-    label: 'Rs 49',
+    label: 'Rs 59',
     note: '10 credits',
     helper: '10 PDF pages',
     highlight: false,
@@ -57,7 +57,28 @@ const App = () => {
         if (!isMounted || !Array.isArray(data)) {
           return
         }
-        const mapped = data.slice(0, 3).map((item) => ({
+        const desiredTitles = [
+          'software engineering',
+          'vlsi fabrication steps',
+          'ray optics'
+        ]
+        
+        const selectedItems = desiredTitles.map(t => data.find(item => item.title.toLowerCase() === t)).filter(Boolean)
+        
+        // Fallback to top items if any are missing
+        if (selectedItems.length < 3) {
+          const usedIds = new Set(selectedItems.map(i => i.id || i.slug || i.title))
+          for (const item of data) {
+            if (selectedItems.length >= 3) break
+            const id = item.id || item.slug || item.title
+            if (!usedIds.has(id)) {
+              selectedItems.push(item)
+              usedIds.add(id)
+            }
+          }
+        }
+        
+        const mapped = selectedItems.map((item) => ({
           id: item.id ?? item.slug ?? item.title,
           title: item.title,
           pdfUrl: item.pdf_url || null,
@@ -92,6 +113,9 @@ const App = () => {
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
             <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
             <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
+            {isLoggedIn && (
+              <Link to="/generate?tab=history" className="hover:text-[#1f1f1f]">My Scribs</Link>
+            )}
           </nav>
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
@@ -100,7 +124,7 @@ const App = () => {
               </Link>
 
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-                {user?.credit_balance ?? 0} cr
+                {user?.credit_balance ?? 0} credits
               </span>
               <Link
                 to="/profile"
@@ -277,7 +301,7 @@ const App = () => {
                   </button>
                 ))}
               </div>
-              <p className="mt-3 text-xs text-[#8a847c]">10 credits = Rs 49. Sign in to generate.</p>
+              <p className="mt-3 text-xs text-[#8a847c]">10 credits = Rs 59. Sign in to generate.</p>
             </div>
           </div>
         </section>
@@ -285,56 +309,60 @@ const App = () => {
         <section id="landing-pricing" className="py-10">
           <div className="mx-auto max-w-6xl px-4 md:px-6">
             
-            {/* --- Mobile View (Beautiful Vertical Cards) --- */}
+            {/* --- Mobile View (Compact Horizontal Cards) --- */}
             <div className="md:hidden rounded-[24px] border border-[#e2dbd2] bg-white p-5 shadow-sm">
-              <div className="text-center">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a847c]">Pricing</p>
-                <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#1f1f1f]">Credit packs</h2>
-                <p className="mt-1 text-xs text-[#5f5a54]">Pay only for what you generate. Credits never expire.</p>
-              </div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a847c]">Pricing</p>
+              <h2 className="mt-1 text-2xl font-semibold text-[#1f1f1f]">Credit packs</h2>
+              <p className="mt-1 text-sm text-[#5f5a54]">Pay only for what you generate. Credits never expire.</p>
               
-              <div className="mt-8 flex flex-col gap-6">
+              <div className="mt-8 flex flex-col gap-4">
                 {pricingTiers.map((tier) => (
                   <div
                     key={`mobile-${tier.id}`}
-                    className={`relative flex flex-col items-center justify-center rounded-2xl p-5 transition-transform ${
-                      tier.highlight ? 'border-2 border-black bg-white shadow-md scale-[1.02]' : 'border border-[#e2dbd2] bg-[#fdfdfc]'
+                    className={`relative flex items-center justify-between rounded-xl p-3 ${
+                      tier.highlight ? 'border-2 border-[#6246ea] bg-white shadow-sm' : 'border border-[#e2dbd2] bg-white'
                     }`}
                   >
                     {tier.highlight && (
-                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-black px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-[#f0c06a] shadow-sm">
-                        ★ Most popular
+                      <span className="absolute -top-[14px] left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-[#efedfc] border-4 border-white px-2 py-0.5 text-[10px] font-bold text-[#6246ea] shadow-sm">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.6H22l-6.1 4.5 2.3 7.5-6.2-4.6-6.2 4.6 2.3-7.5L2 9.6h7.6z"/></svg>
+                        Most popular
                       </span>
                     )}
                     
-                    <div className="flex flex-col items-center">
-                      <span className="text-3xl font-extrabold tracking-tight text-[#1f1f1f]">
+                    {/* Left: Price */}
+                    <div className="flex w-20 flex-col justify-center">
+                      <span className={`text-2xl font-bold leading-none tracking-tight ${tier.highlight ? 'text-[#6246ea]' : 'text-[#1f1f1f]'}`}>
                         {tier.label.replace('Rs ', '₹')}
                       </span>
-                      <span className="mt-0.5 text-[11px] font-medium text-[#8a847c]">/ pack</span>
+                      <span className="mt-1 text-[11px] leading-none text-[#8a847c]">/ pack</span>
                     </div>
 
-                    <div className="mt-4 flex w-full flex-col items-center justify-center rounded-xl bg-[#f7f5f2] py-3">
-                      <span className="text-base font-bold text-[#1f1f1f]">{tier.note.split(' ')[0]} credits</span>
-                      <span className="text-xs text-[#8a847c]">{tier.helper.split(' ')[0]} PDF pages</span>
+                    {/* Middle: Details */}
+                    <div className="flex flex-1 flex-col items-start px-2">
+                      <span className="text-sm font-bold text-[#1f1f1f]">{tier.note.split(' ')[0]} credits</span>
+                      <span className="text-[11px] text-[#8a847c]">{tier.helper.split(' ')[0]} PDF pages</span>
                     </div>
 
-                    <button
-                      id={`landing-buy-mobile-${tier.id}`}
-                      onClick={() => isLoggedIn ? setShowBuyModal(true) : navigate('/login')}
-                      className={`mt-5 w-full rounded-xl py-3 text-sm font-bold transition-all ${
-                        tier.highlight
-                          ? 'bg-black text-white hover:bg-gray-800 shadow-md'
-                          : 'border border-[#d9d1c7] bg-white text-[#1f1f1f] hover:bg-[#faf8f3]'
-                      }`}
-                    >
-                      {isLoggedIn ? 'Buy pack' : 'Sign in to buy'}
-                    </button>
+                    {/* Right: Button */}
+                    <div className="flex-shrink-0">
+                      <button
+                        id={`landing-buy-mobile-${tier.id}`}
+                        onClick={() => isLoggedIn ? setShowBuyModal(true) : navigate('/login')}
+                        className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors ${
+                          tier.highlight
+                            ? 'bg-[#1b1b1b] text-white'
+                            : 'bg-[#f7f4ee] text-[#1f1f1f] hover:bg-[#ede9e1]'
+                        }`}
+                      >
+                        Buy
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-6 flex items-center justify-center gap-1.5 text-[11px] font-medium text-[#8a847c]">
+              <div className="mt-6 flex items-center justify-center gap-1.5 text-[11px] text-[#8a847c]">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
                 </svg>

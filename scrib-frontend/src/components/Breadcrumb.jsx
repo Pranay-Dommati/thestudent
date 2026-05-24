@@ -9,7 +9,7 @@ const Breadcrumb = ({ crumbs = [] }) => {
   if (!crumbs.length) return null
 
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs">
+    <nav aria-label="Breadcrumb" className="hidden sm:flex items-center gap-1.5 text-xs">
       {crumbs.map((crumb, i) => {
         const isLast = i === crumbs.length - 1
         return (

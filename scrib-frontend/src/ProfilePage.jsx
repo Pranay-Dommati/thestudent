@@ -105,6 +105,7 @@ const ProfilePage = () => {
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
             <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
             <Link to="/generate" className="hover:text-[#1f1f1f]">Generate</Link>
+            <Link to="/generate?tab=history" className="hover:text-[#1f1f1f]">My Scribs</Link>
           </nav>
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
@@ -112,7 +113,7 @@ const ProfilePage = () => {
                 Dashboard
               </Link>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-                {user?.credit_balance ?? 0} cr
+                {user?.credit_balance ?? 0} credits
               </span>
               <Link
                 to="/profile"
@@ -268,26 +269,33 @@ const ProfilePage = () => {
                 {/* Quick buy packs */}
                 <div className="mt-4 grid grid-cols-3 gap-2">
                   {[
-                    { pack: 'starter', label: '10 cr', price: '₹49' },
+                    { pack: 'starter', label: '10 cr', price: '₹59' },
                     { pack: 'popular', label: '20 cr', price: '₹99', highlight: true },
                     { pack: 'pro', label: '40 cr', price: '₹199' },
                   ].map((item) => (
-                    <button
+                    <div
                       key={item.pack}
                       id={`profile-quick-buy-${item.pack}`}
                       onClick={() => setShowBuyModal(true)}
-                      className={`relative flex flex-col items-center rounded-xl border py-3 text-center transition-colors hover:bg-[#faf8f3] ${
-                        item.highlight ? 'border-[1.5px] border-[#1f1f1f] bg-[#faf8f3]' : 'border-[#e2dbd2] bg-white'
+                      className={`relative flex cursor-pointer flex-col items-center rounded-xl border py-4 text-center transition-all hover:scale-[1.02] hover:shadow-sm ${
+                        item.highlight ? 'border-[1.5px] border-[#1f1f1f] bg-[#faf8f3] shadow-sm' : 'border-[#e2dbd2] bg-white'
                       }`}
                     >
                       {item.highlight && (
-                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-[#1f1f1f] px-1.5 py-0.5 text-[9px] font-semibold text-[#f0c06a] ring-2 ring-white">
-                          Popular
+                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-[#1f1f1f] px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#f0c06a] ring-2 ring-white shadow-sm">
+                          POPULAR
                         </span>
                       )}
-                      <span className="text-base font-semibold">{item.price}</span>
-                      <span className="text-xs text-[#7b756d]">{item.label}</span>
-                    </button>
+                      <span className="text-xl font-bold text-[#1f1f1f]">{item.price}</span>
+                      <span className="mb-3 text-xs font-medium text-[#7b756d]">{item.label}</span>
+                      <button className={`w-3/4 rounded-lg py-1.5 text-xs font-bold transition-colors ${
+                        item.highlight 
+                          ? 'bg-[#1f1f1f] text-white hover:bg-black' 
+                          : 'bg-[#f4f0ea] text-[#1f1f1f] hover:bg-[#e8e2d9]'
+                      }`}>
+                        Buy now
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>

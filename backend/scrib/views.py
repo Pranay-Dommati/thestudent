@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 # Amounts stored in paise (1 INR = 100 paise).
 # These values are NEVER trusted from the frontend.
 CREDIT_PACKS = {
-    'starter': {'credits': 10, 'amount_paise': 100},   # ₹49
+    'starter': {'credits': 10, 'amount_paise': 5900},   # ₹59
     'popular': {'credits': 20, 'amount_paise': 9900},   # ₹99
     'pro':     {'credits': 40, 'amount_paise': 19900},  # ₹199
 }
@@ -408,10 +408,21 @@ class PreviewListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        previews = get_dynamic_s3_previews()
+        from django.core.cache import cache
         query = request.query_params.get('q', '').strip().lower()
+        
+        # Check cache first
+        cache_key = f'scrib_previews_list_api_q_{query}'
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return Response(cached_data)
+
+        previews = get_dynamic_s3_previews()
         if query:
             previews = [p for p in previews if query in p['title'].lower()]
+            
+        # Cache the result for 5 minutes
+        cache.set(cache_key, previews, timeout=300)
         return Response(previews)
 
 
@@ -419,9 +430,19 @@ class PreviewDetailView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request, slug):
+        from django.core.cache import cache
+        
+        # Check cache first
+        cache_key = f'scrib_preview_detail_api_{slug}'
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return Response(cached_data)
+
         previews = get_dynamic_s3_previews()
         for p in previews:
             if p['slug'] == slug:
+                # Cache the result for 5 minutes
+                cache.set(cache_key, p, timeout=300)
                 return Response(p)
         return error_response('Preview not found', status_code=404, code='not_found')
 
@@ -578,6 +599,10 @@ class GenerateStudyPackView(APIView):
                 
         # --- Phase 3: Trigger Background Task ---
         generate_study_pack_task.delay(pack.id, pages, title, request.user.id)
+        
+        # Invalidate history cache
+        from django.core.cache import cache
+        cache.delete(f'scrib_my_study_packs_api_{request.user.id}')
 
         # If Celery is running synchronously (ALWAYS_EAGER), the task can take 30+ seconds,
         # which might cause the MySQL connection to time out. Close it so Django reconnects.
@@ -590,11 +615,47 @@ class GenerateStudyPackView(APIView):
         return Response(response_data, status=202)
 
 
+from django.utils import timezone
+from datetime import timedelta
+from django.db import transaction
+
+def cleanup_stuck_packs(user):
+    """
+    Find packs that are stuck in PENDING or GENERATING for more than 5 minutes
+    due to a server crash, mark them as FAILED, and refund the credits.
+    """
+    cutoff = timezone.now() - timedelta(minutes=5)
+    stuck_packs = StudyPack.objects.filter(
+        user=user,
+        status__in=[StudyPack.STATUS_PENDING, StudyPack.STATUS_GENERATING],
+        created_at__lt=cutoff
+    )
+    cache_invalidated = False
+    for pack in stuck_packs:
+        with transaction.atomic():
+            pack.status = StudyPack.STATUS_FAILED
+            pack.save(update_fields=['status'])
+            if pack.credits_used > 0:
+                CreditTransaction.objects.create(
+                    user=user,
+                    direction=CreditTransaction.DIRECTION_CREDIT,
+                    credits=pack.credits_used,
+                    reason=CreditTransaction.REASON_REFUND
+                )
+            cache_invalidated = True
+            
+    if cache_invalidated:
+        from django.core.cache import cache
+        cache.delete(f'scrib_my_study_packs_api_{user.id}')
+
 class StudyPackStatusView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pack_id):
+        # Clean up any zombie packs before checking status
+        cleanup_stuck_packs(request.user)
+        
         try:
             pack = StudyPack.objects.get(pk=pack_id, user=request.user)
             return Response({
@@ -907,6 +968,18 @@ class MyStudyPacksView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from django.core.cache import cache
+        # Clean up any zombie packs before returning history
+        cleanup_stuck_packs(request.user)
+        
+        cache_key = f'scrib_my_study_packs_api_{request.user.id}'
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return Response(cached_data)
+        
         packs = StudyPack.objects.filter(user=request.user)
         serializer = StudyPackSerializer(packs, many=True)
+        
+        # Cache the result for 5 minutes
+        cache.set(cache_key, serializer.data, timeout=300)
         return Response(serializer.data)

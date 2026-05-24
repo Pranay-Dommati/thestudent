@@ -10,7 +10,7 @@ import BuyCreditsModal from './components/BuyCreditsModal'
 const tiers = [
   {
     id: 'starter',
-    price: '₹49',
+    price: '₹59',
     credits: '10 credits',
     helper: '10 PDF pages',
     highlight: false,
@@ -80,6 +80,8 @@ const PricingPage = () => {
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
             <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
+            <Link to="/generate" className="hover:text-[#1f1f1f]">Generate</Link>
+            <Link to="/generate?tab=history" className="hover:text-[#1f1f1f]">My Scribs</Link>
             <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
           </nav>
           {isLoggedIn ? (
@@ -88,7 +90,7 @@ const PricingPage = () => {
                 Dashboard
               </Link>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-                {user?.credit_balance ?? 0} cr
+                {user?.credit_balance ?? 0} credits
               </span>
               <Link
                 to="/profile"

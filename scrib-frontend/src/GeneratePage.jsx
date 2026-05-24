@@ -30,6 +30,7 @@ const GeneratePage = () => {
   const [mode, setMode] = useState('manual')
   const [topics, setTopics] = useState([])
   const [newTopic, setNewTopic] = useState('')
+  const [highlightAddBtn, setHighlightAddBtn] = useState(false)
   const [pasteText, setPasteText] = useState('')
   const [isOrganizing, setIsOrganizing] = useState(false)
   const [isOrganized, setIsOrganized] = useState(false)
@@ -45,12 +46,24 @@ const GeneratePage = () => {
   const [addingToGroupIndex, setAddingToGroupIndex] = useState(null)
   const [newGroupTopic, setNewGroupTopic] = useState('')
   const [aiGeneratedWarning, setAiGeneratedWarning] = useState(false)
-  const [activeTab, setActiveTab] = useState('generate')
+  const location = useLocation()
+  
+  // Initialize tab from URL query parameter
+  const initialTab = new URLSearchParams(location.search).get('tab') === 'history' ? 'history' : 'generate'
+  const [activeTab, setActiveTab] = useState(initialTab)
+  
   const [historyItems, setHistoryItems] = useState([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [openDropdownId, setOpenDropdownId] = useState(null)
+  const [shareModalData, setShareModalData] = useState(null)
   const [imageLoaded, setImageLoaded] = useState(false)
-  const location = useLocation()
+
+  // Sync active tab if URL changes
+  useEffect(() => {
+    const tab = new URLSearchParams(location.search).get('tab')
+    if (tab === 'history') setActiveTab('history')
+    else if (tab === 'generate') setActiveTab('generate')
+  }, [location.search])
 
   // --- Browser Notifications Setup ---
   const requestNotificationPermission = async () => {
@@ -105,8 +118,9 @@ const GeneratePage = () => {
   }
 
   // ── Share helper ────────────────────────────────────────────────────────
-  const handleShareOption = async (option, item, isPack, url, titleStr) => {
+  const handleShareClick = async (item, isPack, url, titleStr) => {
     setOpenDropdownId(null)
+    setShareModalData({ title: titleStr, url: 'Fetching secure link...', isLoading: true })
 
     // Always get a fresh presigned URL for packs so links don't expire
     let freshUrl = url
@@ -122,39 +136,17 @@ const GeneratePage = () => {
       }
     }
 
-    if (option === 'copy') {
-      if (!freshUrl) return
-      try {
-        await navigator.clipboard.writeText(freshUrl)
-        customToast.success('Link copied to clipboard!')
-      } catch {
-        customToast.error('Failed to copy link')
-      }
-    } else if (option === 'share') {
-      if (!freshUrl) return
-      if (navigator.share) {
-        try {
-          // Prefer sharing the actual PDF file so recipient can open it in any app
-          const response = await fetch(freshUrl)
-          const blob = await response.blob()
-          const file = new File([blob], `${titleStr}.pdf`, { type: 'application/pdf' })
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], title: titleStr })
-          } else {
-            await navigator.share({ url: freshUrl, title: titleStr })
-          }
-        } catch (err) {
-          if (err.name !== 'AbortError') {
-            // Fallback: copy link
-            await navigator.clipboard.writeText(freshUrl)
-            customToast.success('Link copied! Share it manually.')
-          }
-        }
-      } else {
-        // Desktop browsers without Web Share API — just copy
-        await navigator.clipboard.writeText(freshUrl)
-        customToast.success('Link copied to clipboard!')
-      }
+    setShareModalData({ title: titleStr, url: freshUrl, isLoading: false })
+  }
+
+  const copyShareLink = async () => {
+    if (!shareModalData || shareModalData.isLoading) return
+    try {
+      await navigator.clipboard.writeText(shareModalData.url)
+      customToast.success('Link copied to clipboard!')
+      setShareModalData(null) // optionally close after copy
+    } catch {
+      customToast.error('Failed to copy link')
     }
   }
 
@@ -340,7 +332,13 @@ const GeneratePage = () => {
     const cleanedTopics = sourceTopics.map((item) => item.trim()).filter(Boolean)
 
     if (!cleanedTopics.length) {
-      customToast.error('Add at least one topic to generate a note.')
+      if (mode === 'manual' && newTopic.trim()) {
+        customToast.error('Please click "Add" to confirm your topic first.', { id: 'gen-error' })
+        setHighlightAddBtn(true)
+        setTimeout(() => setHighlightAddBtn(false), 2000)
+      } else {
+        customToast.error('Add at least one topic to generate a note.', { id: 'gen-error' })
+      }
       return
     }
 
@@ -353,6 +351,15 @@ const GeneratePage = () => {
     const packTitle = cleanedTopics.length === 1 
       ? cleanedTopics[0] 
       : `${cleanedTopics[0]} +${cleanedTopics.length - 1}`
+
+    const creditsNeeded = cleanedTopics.length
+    const currentCredits = latestCreditBalance ?? user?.credit_balance ?? 0
+
+    if (currentCredits < creditsNeeded) {
+      customToast.error('Please add credits first to generate this note.', { id: 'gen-error' })
+      navigate('/pricing')
+      return
+    }
 
     // Switch to history tab immediately and add a pending item
     setActiveTab('history')
@@ -392,8 +399,15 @@ const GeneratePage = () => {
     } catch (error) {
       // Remove the pending item if request fails
       setHistoryItems(prev => prev.filter(item => item.id !== tempId))
-      const message = error?.response?.data?.message || 'Generation failed. Please try again.'
-      customToast.error(message, { id: 'gen-error' })
+      setActiveTab('generate') // Switch back to generate tab so they aren't stuck on history
+      
+      if (error?.response?.status === 402) {
+        customToast.error('Please add credits first to generate this note.', { id: 'gen-error' })
+        navigate('/pricing')
+      } else {
+        const message = error?.response?.data?.message || 'Generation failed. Please try again.'
+        customToast.error(message, { id: 'gen-error' })
+      }
     } finally {
       setIsGenerating(false)
     }
@@ -420,7 +434,7 @@ const GeneratePage = () => {
                 Dashboard
               </Link>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-                {creditBalance} cr
+                {creditBalance} credits
               </span>
               <Link
                 to="/profile"
@@ -591,7 +605,11 @@ const GeneratePage = () => {
                   />
                   <button
                     onClick={handleAddTopic}
-                    className="rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold text-[#5a554f]"
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all duration-300 ${
+                      highlightAddBtn 
+                        ? 'border-red-500 bg-red-50 text-red-600 shadow-[0_0_10px_rgba(239,68,68,0.5)] scale-110' 
+                        : 'border-[#d9d1c7] bg-white text-[#5a554f]'
+                    }`}
                   >
                     Add
                   </button>
@@ -665,17 +683,19 @@ const GeneratePage = () => {
                     </span>
                   </>
                 ) : (
-                  'Log in to see your credits'
+                  <span className="text-[#a74c4c] font-medium">Sign up to start generating your custom notes!</span>
                 )}
               </p>
             </div>
             <button
-              onClick={handleGenerate}
-              disabled={!import.meta.env.DEV || isGenerating || !isLoggedIn || mode === 'paste' || isOrganizing}
-              className={`rounded-xl px-5 py-2 text-xs font-semibold ${
-                !import.meta.env.DEV || isGenerating || !isLoggedIn || mode === 'paste' || isOrganizing
+              onClick={!isLoggedIn ? () => navigate('/login?next=/generate') : handleGenerate}
+              disabled={!import.meta.env.DEV || isGenerating || mode === 'paste' || isOrganizing}
+              className={`rounded-xl px-5 py-2 text-xs font-semibold transition-all ${
+                !import.meta.env.DEV || isGenerating || mode === 'paste' || isOrganizing
                   ? 'bg-[#e7e2db] text-[#b1aaa0]'
-                  : 'bg-[#1b1b1b] text-white'
+                  : !isLoggedIn
+                    ? 'bg-[#1b1b1b] text-white hover:bg-black hover:shadow-md hover:-translate-y-0.5'
+                    : 'bg-[#1b1b1b] text-white hover:bg-black'
               }`}
             >
               {!import.meta.env.DEV
@@ -684,7 +704,9 @@ const GeneratePage = () => {
                   ? 'Generating...'
                   : mode === 'paste'
                     ? 'Organize topics first'
-                    : 'Generate PDF'}
+                    : !isLoggedIn
+                      ? 'Sign up to Generate'
+                      : 'Generate PDF'}
             </button>
           </div>
         </div>
@@ -696,7 +718,25 @@ const GeneratePage = () => {
             {isLoadingHistory && historyItems.filter(i => i._isPending).length === 0 ? (
               <p className="text-sm text-[#7b756d]">Loading history...</p>
             ) : historyItems.length === 0 ? (
-              <p className="text-sm text-[#7b756d]">No history yet. Generate some notes first!</p>
+              <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#e2dbd2] py-16 text-center">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#f8f5f1]">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a39b92" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 8 9" />
+                  </svg>
+                </div>
+                <h3 className="mb-2 text-base font-bold text-[#1f1f1f]">No Scribs yet</h3>
+                <p className="mb-6 max-w-sm text-sm text-[#7b756d]">You haven't generated any handwritten notes yet. Create your first custom Scrib in seconds!</p>
+                <button
+                  onClick={() => setActiveTab('generate')}
+                  className="rounded-full bg-[#1f1f1f] px-6 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm"
+                >
+                  Create your first Scrib →
+                </button>
+              </div>
             ) : (
               historyItems.map((item) => {
                 const isPack = item.type === 'pack'
@@ -804,35 +844,14 @@ const GeneratePage = () => {
                           <button onClick={(e) => forceDownload(url, titleStr, isPack)} className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] ${!url && 'pointer-events-none opacity-50'}`}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                           </button>
-                          <div className="relative dropdown-container">
-                            <button
-                              onClick={() => setOpenDropdownId(openDropdownId === `share-${id}` ? null : `share-${id}`)}
-                              disabled={!url}
-                              title="Share options"
-                              className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50`}
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-                            </button>
-                            {openDropdownId === `share-${id}` && (
-                              <div className="absolute bottom-full right-0 mb-2 z-50 min-w-[168px] rounded-xl border border-[#e2dbd2] bg-white shadow-xl overflow-hidden">
-                                <p className="px-3.5 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest text-[#a39b92]">Share options</p>
-                                <button
-                                  onClick={() => handleShareOption('copy', item, isPack, url, titleStr)}
-                                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-left text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors"
-                                >
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                                  Copy link
-                                </button>
-                                <button
-                                  onClick={() => handleShareOption('share', item, isPack, url, titleStr)}
-                                  className="flex w-full items-center gap-2.5 px-3.5 py-2 pb-2.5 text-xs font-medium text-left text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors border-t border-[#f0ede7]"
-                                >
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
-                                  Share file
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          <button
+                            onClick={() => handleShareClick(item, isPack, url, titleStr)}
+                            disabled={!url}
+                            title="Share"
+                            className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50`}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                          </button>
                         </>
                       )}
                     </div>
@@ -843,6 +862,38 @@ const GeneratePage = () => {
           </div>
         )}
       </main>
+
+      {/* Share Modal */}
+      {shareModalData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl relative">
+            <button
+              onClick={() => setShareModalData(null)}
+              className="absolute right-4 top-4 text-[#9a9289] hover:text-[#1f1f1f] transition-colors"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <h2 className="mb-1 text-lg font-bold text-[#1f1f1f]">Share link</h2>
+            <p className="mb-5 text-sm text-[#7b756d]">Anyone with this link can view and download.</p>
+            
+            <div className="flex items-center gap-2 rounded-xl border border-[#e2dbd2] bg-[#faf8f3] p-1.5">
+              <input 
+                type="text" 
+                readOnly 
+                value={shareModalData.url} 
+                className="w-full bg-transparent px-3 py-2 text-sm text-[#5a554f] outline-none"
+              />
+              <button
+                onClick={copyShareLink}
+                disabled={shareModalData.isLoading}
+                className="flex-shrink-0 rounded-lg bg-[#1f1f1f] px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

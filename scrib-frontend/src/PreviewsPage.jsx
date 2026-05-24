@@ -82,7 +82,7 @@ const PreviewsPage = () => {
                 Dashboard
               </Link>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
-                {user?.credit_balance ?? 0} cr
+                {user?.credit_balance ?? 0} credits
               </span>
               <Link
                 to="/profile"

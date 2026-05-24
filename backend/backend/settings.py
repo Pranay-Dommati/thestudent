@@ -804,3 +804,38 @@ SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'true').lower() in ('1', 'true', '
 
 # Optional: Frontend domain for building links in emails
 FRONTEND_DOMAIN = os.environ.get('FRONTEND_DOMAIN', 'http://localhost:5173')
+
+# -----------------------------------------------------------------------------
+# MONKEY PATCH: Automatic Retries for Flaky Remote MySQL Connections
+# Handle 2002 (Can't connect) and 10060 (Timeout) errors from Hostinger
+# -----------------------------------------------------------------------------
+try:
+    import time
+    import logging
+    from django.db.backends.mysql.base import DatabaseWrapper as MySQLDatabaseWrapper
+
+    db_logger = logging.getLogger('django.db.backends')
+    original_get_new_connection = MySQLDatabaseWrapper.get_new_connection
+
+    def get_new_connection_with_retry(self, conn_params):
+        max_retries = 3
+        retry_delay = 1.0  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                return original_get_new_connection(self, conn_params)
+            except Exception as e:
+                error_msg = str(e)
+                # 2002 = Can't connect to server
+                # 10060 = Windows connection timeout
+                # 2006 = MySQL server has gone away
+                if ('2002' in error_msg or '10060' in error_msg or '2006' in error_msg) and attempt < max_retries - 1:
+                    db_logger.warning(f"MySQL connection failed (attempt {attempt+1}/{max_retries}): {e}. Retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    continue
+                raise
+
+    MySQLDatabaseWrapper.get_new_connection = get_new_connection_with_retry
+    print("[DB] Monkey-patched MySQLDatabaseWrapper for automatic connection retries.")
+except Exception as patch_exc:
+    print(f"[DB] Failed to patch MySQLDatabaseWrapper: {patch_exc}")

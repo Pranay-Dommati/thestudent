@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { useGoogleAuth } from './hooks/useGoogleAuth'
 import OtpModal from './components/Auth/OtpModal'
@@ -17,12 +17,14 @@ const SignupPage = () => {
   const [formErrors, setFormErrors] = useState({})
   const [otpOpen, setOtpOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const location = useLocation()
+  const nextUrl = new URLSearchParams(location.search).get('next') || '/dashboard'
 
   useEffect(() => {
     if (isLoggedIn) {
-      navigate('/dashboard', { replace: true })
+      navigate(nextUrl, { replace: true })
     }
-  }, [isLoggedIn, navigate])
+  }, [isLoggedIn, navigate, nextUrl])
 
   const validateForm = () => {
     const errors = {}
@@ -103,7 +105,7 @@ const SignupPage = () => {
     async (credential) => {
       const success = await googleLogin(credential)
       if (success) {
-        navigate('/dashboard')
+        navigate(nextUrl)
       }
     },
   )
@@ -202,7 +204,7 @@ const SignupPage = () => {
 
           <p className="mt-4 text-xs text-[#7b756d]">
             Already have an account?{' '}
-            <Link to="/login" className="font-semibold text-[#1f1f1f]">
+            <Link to={`/login${location.search}`} className="font-semibold text-[#1f1f1f]">
               Log in
             </Link>
           </p>
@@ -224,7 +226,7 @@ const SignupPage = () => {
               access: data.access,
               refresh: data.refresh,
             })
-            navigate('/dashboard')
+            navigate(nextUrl)
           }
         }}
       />

@@ -41,6 +41,10 @@ def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
         pack.s3_key = pdf_result.get('s3_key')
         pack.save(update_fields=['status', 'pdf_url', 's3_key'])
         
+        # Invalidate cache so History page updates
+        from django.core.cache import cache
+        cache.delete(f'scrib_my_study_packs_api_{user_id}')
+        
         # Send Email Notification
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
         # We can construct an email body directly
@@ -78,5 +82,22 @@ def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
         pack = StudyPack.objects.get(id=study_pack_id)
         pack.status = StudyPack.STATUS_FAILED
         pack.save(update_fields=['status'])
+        
+        # Invalidate cache so History page updates
+        from django.core.cache import cache
+        cache.delete(f'scrib_my_study_packs_api_{user_id}')
+        
+        # Safely refund credits for the failed generation
+        if pack.credits_used > 0:
+            from scrib.models import CreditTransaction
+            CreditTransaction.objects.create(
+                user_id=user_id,
+                direction=CreditTransaction.DIRECTION_CREDIT,
+                credits=pack.credits_used,
+                reason=CreditTransaction.REASON_REFUND,
+                study_pack=pack,
+            )
+            logger.info(f"Refunded {pack.credits_used} credits to user {user_id} for failed StudyPack {study_pack_id}")
+            
         # Optionally retry
         # raise self.retry(exc=exc, countdown=60)

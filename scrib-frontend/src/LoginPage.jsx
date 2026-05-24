@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { useGoogleAuth } from './hooks/useGoogleAuth'
 import universalToast from './utils/universalToast'
@@ -11,12 +11,14 @@ const LoginPage = () => {
   const [password, setPassword] = useState('')
   const [formErrors, setFormErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const location = useLocation()
+  const nextUrl = new URLSearchParams(location.search).get('next') || '/dashboard'
 
   useEffect(() => {
     if (isLoggedIn) {
-      navigate('/dashboard', { replace: true })
+      navigate(nextUrl, { replace: true })
     }
-  }, [isLoggedIn, navigate])
+  }, [isLoggedIn, navigate, nextUrl])
 
   const validateForm = () => {
     const errors = {}
@@ -44,10 +46,10 @@ const LoginPage = () => {
     const result = await login(email.trim(), password)
     setIsSubmitting(false)
     if (result?.success) {
-      navigate('/dashboard')
+      navigate(nextUrl)
     } else if (result?.suggestSignup) {
       universalToast.error('No account found with this email. Please sign up to continue.')
-      navigate('/signup')
+      navigate(`/signup${location.search}`)
     }
   }
 
@@ -55,7 +57,7 @@ const LoginPage = () => {
     async (credential) => {
       const success = await googleLogin(credential)
       if (success) {
-        navigate('/dashboard')
+        navigate(nextUrl)
       }
     },
   )
@@ -129,7 +131,7 @@ const LoginPage = () => {
 
           <p className="mt-4 text-xs text-[#7b756d]">
             Don't have an account?{' '}
-            <Link to="/signup" className="font-semibold text-[#1f1f1f]">
+            <Link to={`/signup${location.search}`} className="font-semibold text-[#1f1f1f]">
               Sign up free
             </Link>
           </p>
