@@ -386,7 +386,14 @@ def get_dynamic_s3_previews():
                         if key.lower().endswith('.pdf'):
                             filename = key.split('/')[-1]
                             title = filename[:-4].replace('-', ' ').replace('_', ' ').title()
-                            pdf_url = f"https://{bucket}.s3.{region}.amazonaws.com/{key}"
+                            
+                            # Generate a presigned URL valid for 1 hour to bypass bucket public policies
+                            pdf_url = s3.generate_presigned_url(
+                                'get_object',
+                                Params={'Bucket': bucket, 'Key': key},
+                                ExpiresIn=3600
+                            )
+                            
                             previews.append({
                                 'id': key,
                                 'title': title,
