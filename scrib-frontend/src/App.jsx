@@ -168,7 +168,7 @@ const App = () => {
             <img src="/scrib_favicon.svg" alt="Scrib" className="h-9 w-9 rounded-lg border border-[#e2dbd2] shadow-sm object-cover" />
             <div>
               <p className="text-sm font-semibold">Scrib</p>
-              <p className="hidden text-xs text-[#7b756d] sm:block">by EasyLearnova</p>
+              <p className="text-xs text-[#7b756d]">by EasyLearnova</p>
             </div>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
