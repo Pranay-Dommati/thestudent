@@ -8,6 +8,7 @@ import { forceDownload } from './utils/download'
 import customToast from './utils/customToast'
 import Breadcrumb from './components/Breadcrumb'
 import BuyCreditsModal from './components/BuyCreditsModal'
+import MobileMenu from './components/MobileMenu'
 
 const toneColors = {
   blue: 'bg-[#7ba7ff]',
@@ -127,6 +128,7 @@ const DashboardPage = () => {
               >
                 {getInitials(user?.full_name)}
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -136,6 +138,7 @@ const DashboardPage = () => {
               <Link to="/signup" className="rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white">
                 Get started free
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           )}
         </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -8,20 +8,36 @@ pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.vers
 
 const MobilePDFViewer = ({ url }) => {
   const [numPages, setNumPages] = useState(null)
-  const [width, setWidth] = useState(window.innerWidth)
+  const [pageWidth, setPageWidth] = useState(null)
+  const containerRef = useRef(null)
+
+  // Measure the container width once on mount (and only on a real layout resize,
+  // NOT on pinch-zoom — which changes visualViewport but not layout width).
+  const measureWidth = useCallback(() => {
+    if (containerRef.current) {
+      setPageWidth(containerRef.current.offsetWidth)
+    }
+  }, [])
 
   useEffect(() => {
-    const handleResize = () => setWidth(window.innerWidth)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
+    measureWidth()
+
+    // ResizeObserver fires on actual layout changes (orientation flip, etc.)
+    // but NOT on pinch-zoom, which only changes the visual viewport scale.
+    const ro = new ResizeObserver(measureWidth)
+    if (containerRef.current) ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [measureWidth])
 
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages)
   }
 
   return (
-    <div className="relative flex flex-col items-center w-full h-full overflow-y-auto bg-black pt-16">
+    <div
+      ref={containerRef}
+      className="relative flex flex-col items-center w-full h-full overflow-y-auto bg-black pt-16"
+    >
       {/* Floating page indicator */}
       {numPages && (
         <div className="absolute top-4 left-4 z-10 flex items-center gap-1.5 rounded-full bg-[#1c1c1e]/80 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md">
@@ -40,13 +56,13 @@ const MobilePDFViewer = ({ url }) => {
         loading={<div className="py-20 text-sm text-gray-400">Loading document...</div>}
         error={<div className="py-20 text-sm text-red-500">Failed to load PDF.</div>}
       >
-        {Array.from(new Array(numPages || 0), (el, index) => (
+        {pageWidth && Array.from(new Array(numPages || 0), (el, index) => (
           <div key={`page_${index + 1}`} className="w-full mb-4">
             <Page
               pageNumber={index + 1}
-              width={width} // full width, no padding
+              width={pageWidth}
               renderAnnotationLayer={false}
-              renderTextLayer={true}
+              renderTextLayer={false}
             />
           </div>
         ))}

@@ -123,23 +123,29 @@ const GeneratePage = () => {
   // ── Share helper ────────────────────────────────────────────────────────
   const handleShareClick = async (item, isPack, url, titleStr) => {
     setOpenDropdownId(null)
-    setShareModalData({ title: titleStr, url: 'Fetching secure link...', isLoading: true })
+    setShareModalData({ title: titleStr, url: 'Generating share link...', isLoading: true })
 
-    // Always get a fresh presigned URL for packs so links don't expire
-    let freshUrl = url
+    // For packs: generate a permanent share token — anyone can open this forever
     if (isPack && item.id && !String(item.id).startsWith('pending-')) {
       try {
-        const res = await axiosInstance.get(`/scrib/packs/${item.id}/pdf/`, {
-          maxRedirects: 0,
-          validateStatus: (s) => s < 400,
-        })
-        freshUrl = res.request?.responseURL || url
+        // If the pack already has a share_token, use it; otherwise POST to generate one
+        let token = item.share_token
+        if (!token) {
+          const res = await axiosInstance.post(`/scrib/packs/${item.id}/pdf/`)
+          token = res.data?.share_token
+        }
+        if (token) {
+          const shareUrl = `${window.location.origin}/view/share/${token}`
+          setShareModalData({ title: titleStr, url: shareUrl, isLoading: false })
+          return
+        }
       } catch (err) {
-        console.error('Failed to get fresh PDF URL for share', err)
+        console.error('Failed to generate share token', err)
       }
     }
 
-    setShareModalData({ title: titleStr, url: freshUrl, isLoading: false })
+    // Fallback for notes (no share token)
+    setShareModalData({ title: titleStr, url: url || window.location.href, isLoading: false })
   }
 
   const copyShareLink = async () => {
@@ -147,7 +153,7 @@ const GeneratePage = () => {
     try {
       await navigator.clipboard.writeText(shareModalData.url)
       customToast.success('Link copied to clipboard!')
-      setShareModalData(null) // optionally close after copy
+      setShareModalData(null)
     } catch {
       customToast.error('Failed to copy link')
     }
@@ -806,7 +812,7 @@ const GeneratePage = () => {
 
           </div>
 
-          <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col md:static md:flex-row md:flex-wrap md:items-center justify-between gap-4 border-t border-[#e2dbd2] md:border-[#eee6dc] bg-white md:bg-[#f7f4ee] px-5 py-4 md:px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] md:shadow-none">
+          <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col md:static md:flex-row md:flex-wrap md:items-center justify-between gap-2 md:gap-4 border-t border-[#e2dbd2] md:border-[#eee6dc] bg-white md:bg-[#f7f4ee] px-5 py-3 md:py-4 md:px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] md:shadow-none">
             {/* Mobile Top Row */}
             {mode !== 'paste' && (
               <div className="flex items-center justify-between md:hidden w-full mb-1">
@@ -850,12 +856,12 @@ const GeneratePage = () => {
             <button
               onClick={!isLoggedIn ? () => navigate('/login?next=/generate') : handleGenerate}
               disabled={isGenerating || mode === 'paste' || isOrganizing}
-              className={`w-full md:w-auto rounded-xl px-5 py-3 md:py-2 text-sm md:text-bold font-bold transition-all ${
+              className={`w-full md:w-auto rounded-xl px-5 py-2.5 md:py-2 text-sm md:text-bold font-bold transition-all ${
                 isGenerating || mode === 'paste' || isOrganizing
                   ? 'border border-[#f0ece5] bg-transparent text-[#e0d9ce] md:border-none md:bg-[#e7e2db] md:text-[#b1aaa0]'
                   : !isLoggedIn
-                    ? 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white hover:bg-[#1f1f1f] hover:text-white md:hover:bg-black hover:-translate-y-0.5'
-                    : 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white hover:bg-[#1f1f1f] hover:text-white md:hover:bg-black'
+                    ? 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black hover:-translate-y-0.5'
+                    : 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black'
               }`}
             >
               {isGenerating
@@ -867,7 +873,7 @@ const GeneratePage = () => {
                       : 'Generate PDF'}
             </button>
             
-            <p className="mt-1 text-center text-[11px] text-[#a39b92] md:hidden">
+            <p className="mt-0.5 text-center text-[11px] text-[#a39b92] md:hidden">
                {mode !== 'paste' 
                  ? (isLoggedIn ? `${Math.max(creditBalance - baseTopics.length, 0)} credits remaining after` : 'Sign up to generate notes')
                  : (isLoggedIn ? `${creditBalance} credits available` : 'Sign up to generate notes')}

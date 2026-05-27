@@ -1,14 +1,25 @@
+const isIOS = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
 export const forceDownload = (url, title, isPack) => {
-  if (!url) return
+  if (!url) return Promise.resolve()
 
   // Derive a clean filename from the title
   const cleanTitle = (title || 'document').replace(/[^a-z0-9]/gi, '_').toLowerCase()
   const ext = isPack || url.toLowerCase().includes('.pdf') ? 'pdf' : 'png'
   const filename = `${cleanTitle}.${ext}`
 
-  // Fetch as blob — this works for same-origin URLs and CORS-enabled CDNs.
-  // It guarantees a true "Save As" download dialog regardless of Content-Disposition headers.
-  fetch(url)
+  // iOS Safari completely ignores the `download` attribute on anchor tags.
+  // The only reliable way is to open the URL in a new tab and let the user
+  // use the native share sheet to "Save to Files".
+  if (isIOS()) {
+    window.open(url, '_blank')
+    return Promise.resolve()
+  }
+
+  // Desktop & Android: fetch as blob and trigger a true Save-As dialog.
+  return fetch(url)
     .then((res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return res.blob()
@@ -21,14 +32,12 @@ export const forceDownload = (url, title, isPack) => {
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      // Delay revocation to ensure iOS Safari has time to start the download
       setTimeout(() => {
         window.URL.revokeObjectURL(blobUrl)
       }, 1000)
     })
     .catch(() => {
-      // CORS blocked or network error. 
-      // window.open inside async is blocked by Safari popup blocker, so we navigate directly.
-      window.location.assign(url)
+      // CORS blocked or network error — open in a new tab as fallback.
+      window.open(url, '_blank')
     })
 }

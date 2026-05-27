@@ -97,6 +97,7 @@ class StudyPack(models.Model):
     topics_json = models.JSONField(default=list, blank=True)
     pdf_url = models.TextField(blank=True, null=True)         # legacy / presigned URL (may expire — use s3_key for access)
     s3_key = models.CharField(max_length=1024, blank=True, null=True)  # permanent S3 object key
+    share_token = models.UUIDField(default=None, null=True, blank=True, unique=True, db_index=True)  # permanent public share token
     total_pages = models.PositiveIntegerField(default=0)
     credits_used = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)

@@ -21,6 +21,7 @@ import PDFViewerPage from './PDFViewerPage.jsx'
 import ForgotPasswordPage from './ForgotPasswordPage.jsx'
 import ResetPasswordPage from './ResetPasswordPage.jsx'
 import GlobalGenerationIndicator from './components/GlobalGenerationIndicator.jsx'
+import ScrollToTop from './components/ScrollToTop.jsx'
 
 const rootElement = document.getElementById('root')
 
@@ -29,6 +30,7 @@ const AppContent = (
     <HelmetProvider>
       <AuthProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <Routes>
           <Route path="/" element={<App />} />
           <Route path="/previews" element={<PreviewsPage />} />
@@ -40,6 +42,7 @@ const AppContent = (
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/view/share/:shareToken" element={<PDFViewerPage />} />
           <Route path="/view/:slug" element={<PDFViewerPage />} />
           <Route path="/view" element={<PDFViewerPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />

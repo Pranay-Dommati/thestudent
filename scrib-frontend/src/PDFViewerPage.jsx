@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { forceDownload } from './utils/download'
 import customToast from './utils/customToast'
@@ -32,12 +32,41 @@ const isImageUrl = (url) => {
   return /\.(png|jpg|jpeg|gif|webp)(\?|$)/i.test(url) && !/\.pdf(\?|$)/i.test(url)
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api'
+
 const PDFViewerPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
+  const { shareToken } = useParams()
   const { user } = useAuth()
 
-  const { pdfUrl: rawPdfUrl, title, topics = [], totalPages = 1, isImage: forceImage = false } = location.state || {}
+  // State for share-token mode (data fetched from the public API)
+  const [shareData, setShareData] = useState(null)
+  const [shareLoading, setShareLoading] = useState(false)
+  const [shareError, setShareError] = useState(null)
+
+  useEffect(() => {
+    if (!shareToken) return
+    setShareLoading(true)
+    fetch(`${API_BASE}/scrib/packs/share/${shareToken}/`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.pdf_url) {
+          setShareData(data)
+        } else {
+          setShareError('This share link is invalid or the PDF is not ready yet.')
+        }
+      })
+      .catch(() => setShareError('Failed to load the shared PDF.'))
+      .finally(() => setShareLoading(false))
+  }, [shareToken])
+
+  const routeState = location.state || {}
+  const rawPdfUrl = shareToken ? shareData?.pdf_url : routeState.pdfUrl
+  const title = shareToken ? shareData?.title : routeState.title
+  const topics = shareToken ? (shareData?.topics_json || []) : (routeState.topics || [])
+  const totalPages = shareToken ? (shareData?.total_pages || 1) : (routeState.totalPages || 1)
+  const forceImage = shareToken ? false : (routeState.isImage || false)
 
   // Rewrite backend absolute URL → relative path so Vite proxy handles it
   const pdfUrl = normalizeUrl(rawPdfUrl)
@@ -62,12 +91,44 @@ const PDFViewerPage = () => {
   }
 
   const handleDownload = async () => {
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
     try {
       await forceDownload(rawPdfUrl || pdfUrl, title || 'Scrib_Notes', !renderAsImage)
-      customToast.success('Download started')
+      if (isIOS) {
+        customToast.success('Opening PDF — tap the Share icon to save to Files', { duration: 4000 })
+      } else {
+        customToast.success('Download started')
+      }
     } catch (err) {
       customToast.error('Download failed. Try again.')
     }
+  }
+
+  if (shareToken && shareLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f4ee]">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[#1f1f1f] border-t-transparent"></div>
+          <p className="text-sm text-[#7b756d]">Loading shared PDF…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (shareToken && shareError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f4ee]">
+        <div className="text-center max-w-sm px-6">
+          <p className="text-sm font-semibold text-[#1f1f1f] mb-2">Link not found</p>
+          <p className="text-sm text-[#7b756d] mb-4">{shareError}</p>
+          <Link to="/" className="rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white">
+            Go to Scrib
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   if (!pdfUrl) {

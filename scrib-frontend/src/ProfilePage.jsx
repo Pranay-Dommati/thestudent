@@ -4,6 +4,7 @@ import { useAuth } from './context/AuthContext'
 import { Helmet } from 'react-helmet-async'
 import { getInitials } from './utils/user'
 import Breadcrumb from './components/Breadcrumb'
+import MobileMenu from './components/MobileMenu'
 import BuyCreditsModal from './components/BuyCreditsModal'
 import { fetchPaymentHistory, startPaymentFlow } from './services/paymentService'
 import customToast from './utils/customToast'
@@ -16,6 +17,8 @@ const sections = [
 const ProfilePage = () => {
   const [activeSection, setActiveSection] = useState('profile')
   const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [editFullName, setEditFullName] = useState('')
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [isClosingAccount, setIsClosingAccount] = useState(false)
   const [showBuyModal, setShowBuyModal] = useState(false)
@@ -25,6 +28,31 @@ const ProfilePage = () => {
   const [historyLoaded, setHistoryLoaded] = useState(false)
 
   const { user, logout, isLoggedIn, refreshUser } = useAuth()
+
+  useEffect(() => {
+    if (user?.full_name) {
+      setEditFullName(user.full_name)
+    }
+  }, [user?.full_name])
+
+  const handleSaveProfile = async () => {
+    if (!editFullName.trim()) {
+      customToast.error('Name cannot be empty')
+      return
+    }
+    setIsSavingProfile(true)
+    try {
+      const axiosInstance = (await import('./utils/axios')).default
+      await axiosInstance.patch('/auth/profile/', { full_name: editFullName.trim() })
+      await refreshUser?.()
+      customToast.success('Profile updated successfully')
+      setIsEditingProfile(false)
+    } catch (error) {
+      customToast.error('Failed to update profile')
+    } finally {
+      setIsSavingProfile(false)
+    }
+  }
 
   const handleBuyClick = async (packId) => {
     if (processingPack) return
@@ -160,6 +188,7 @@ const ProfilePage = () => {
               >
                 {getInitials(user?.full_name)}
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -169,6 +198,7 @@ const ProfilePage = () => {
               <Link to="/signup" className="rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white">
                 Get started free
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           )}
         </div>
@@ -208,14 +238,36 @@ const ProfilePage = () => {
                 <h1 className="mt-2 text-xl font-semibold">{activeLabel}</h1>
               </div>
               {activeSection === 'profile' ? (
-                <button
-                  onClick={() => setIsEditingProfile(!isEditingProfile)}
-                  className={`rounded-full border border-[#d9d1c7] px-4 py-2 text-xs font-semibold ${
-                    isEditingProfile ? 'bg-[#1f1f1f] text-white border-[#1f1f1f]' : 'bg-white'
-                  }`}
-                >
-                  {isEditingProfile ? 'Save changes' : 'Edit profile'}
-                </button>
+                <div className="flex gap-2">
+                  {isEditingProfile && (
+                    <button
+                      onClick={() => {
+                        setIsEditingProfile(false)
+                        setEditFullName(user?.full_name ?? '')
+                      }}
+                      className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold text-[#1f1f1f]"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (isEditingProfile) {
+                        handleSaveProfile()
+                      } else {
+                        setIsEditingProfile(true)
+                      }
+                    }}
+                    disabled={isSavingProfile}
+                    className={`rounded-full border px-4 py-2 text-xs font-semibold ${
+                      isEditingProfile 
+                        ? 'border-[#1f1f1f] bg-[#1f1f1f] text-white disabled:opacity-70' 
+                        : 'border-[#d9d1c7] bg-white text-[#1f1f1f]'
+                    }`}
+                  >
+                    {isSavingProfile ? 'Saving...' : isEditingProfile ? 'Save changes' : 'Edit profile'}
+                  </button>
+                </div>
               ) : null}
             </div>
           </div>
@@ -225,31 +277,26 @@ const ProfilePage = () => {
             <div className="mt-6 space-y-4">
               <div className="rounded-2xl border border-[#e2dbd2] bg-white px-6 py-5">
                 <h2 className="text-sm font-semibold">Profile</h2>
-                <p className="mt-1 text-xs text-[#7b756d]">Update your name and contact details.</p>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <p className="mt-1 text-xs text-[#7b756d]">Update your name.</p>
+                <div className="mt-4 max-w-md">
                   <div>
                     <p className="text-xs text-[#7b756d]">Full name</p>
                     <input
-                      className={`mt-2 w-full rounded-lg px-3 py-2 text-sm outline-none ${
+                      className={`mt-2 w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors ${
                         isEditingProfile
-                          ? 'border border-[#e0d9ce] bg-white text-[#1f1f1f]'
-                          : 'border-transparent bg-[#faf8f3] text-[#7b756d] hover:bg-[#f3f0e8]'
+                          ? 'border border-[#e0d9ce] bg-white text-[#1f1f1f] focus:border-[#1f1f1f]'
+                          : 'border border-transparent bg-[#faf8f3] text-[#7b756d]'
                       }`}
-                      defaultValue={user?.full_name ?? ''}
+                      value={isEditingProfile ? editFullName : (user?.full_name ?? '')}
+                      onChange={(e) => setEditFullName(e.target.value)}
                       readOnly={!isEditingProfile}
                     />
                   </div>
-                  <div>
-                    <p className="text-xs text-[#7b756d]">Email address</p>
-                    <input
-                      className={`mt-2 w-full rounded-lg px-3 py-2 text-sm outline-none ${
-                        isEditingProfile
-                          ? 'border border-[#e0d9ce] bg-white text-[#1f1f1f]'
-                          : 'border-transparent bg-[#faf8f3] text-[#7b756d] hover:bg-[#f3f0e8]'
-                      }`}
-                      defaultValue={user?.email ?? ''}
-                      readOnly
-                    />
+                  <div className="mt-4">
+                    <p className="text-xs text-[#7b756d]">Email address (cannot be changed)</p>
+                    <div className="mt-2 w-full rounded-lg px-3 py-2 text-sm border border-transparent bg-[#faf8f3] text-[#7b756d]">
+                      {user?.email ?? ''}
+                    </div>
                   </div>
                 </div>
               </div>

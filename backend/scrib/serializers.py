@@ -1,4 +1,5 @@
 from rest_framework import serializers
+# pyrefly: ignore [missing-import]
 from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction
 
 
@@ -48,6 +49,7 @@ class StudyPackSerializer(serializers.ModelSerializer):
             'total_pages',
             'credits_used',
             'status',
+            'share_token',
             'created_at',
         ]
 

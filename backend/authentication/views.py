@@ -507,7 +507,7 @@ def smtp_test(request):
         logger.debug(f"SMTP diagnostics results: {results}; sent_mode={sent_mode}")
     return Response({'results': results, 'sent_mode': sent_mode}, status=status.HTTP_200_OK)
 
-@api_view(['GET', 'DELETE'])
+@api_view(['GET', 'PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def user_profile(request):
     if request.method == 'DELETE':
@@ -515,6 +515,15 @@ def user_profile(request):
         logger.info(f"User {user.email} is closing their account.")
         user.delete()
         return Response({'message': 'Account closed successfully.'}, status=status.HTTP_200_OK)
+
+    if request.method == 'PATCH':
+        user = request.user
+        full_name = request.data.get('full_name')
+        if full_name is not None:
+            user.full_name = full_name.strip()
+            user.save(update_fields=['full_name'])
+        serializer = UserSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     serializer = UserSerializer(request.user)
     return Response(serializer.data)

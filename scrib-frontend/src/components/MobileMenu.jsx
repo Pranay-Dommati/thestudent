@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
 const MobileMenu = ({ isLoggedIn, user, logout }) => {
   const [isOpen, setIsOpen] = useState(false)
+  const location = useLocation()
 
   return (
     <div className="md:hidden">
@@ -29,44 +30,79 @@ const MobileMenu = ({ isLoggedIn, user, logout }) => {
       {isOpen && (
         <div className="absolute left-0 top-[60px] w-full border-b border-[#e4ddd4] bg-white shadow-lg z-50">
           <nav className="flex flex-col px-6 py-4">
-            <Link 
-              to="/previews" 
-              className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
-              onClick={() => setIsOpen(false)}
-            >
-              Previews
-            </Link>
-            <Link 
-              to="/pricing" 
-              className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
-              onClick={() => setIsOpen(false)}
-            >
-              Pricing
-            </Link>
+            {location.pathname !== '/' && (
+              <Link 
+                to="/" 
+                className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
+                onClick={() => setIsOpen(false)}
+              >
+                Home
+              </Link>
+            )}
+            
+            {location.pathname !== '/previews' && (
+              <Link 
+                to="/previews" 
+                className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
+                onClick={() => setIsOpen(false)}
+              >
+                Previews
+              </Link>
+            )}
+
+            {location.pathname !== '/generate' && (
+              <Link 
+                to="/generate" 
+                className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
+                onClick={() => setIsOpen(false)}
+              >
+                Generate
+              </Link>
+            )}
+
+            {location.pathname !== '/pricing' && (
+              <Link 
+                to="/pricing" 
+                className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
+                onClick={() => setIsOpen(false)}
+              >
+                Pricing
+              </Link>
+            )}
             
             {isLoggedIn ? (
               <>
-                <Link 
-                  to="/dashboard" 
-                  className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Dashboard
-                </Link>
-                <Link 
-                  to="/generate?tab=history" 
-                  className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
-                  onClick={() => setIsOpen(false)}
-                >
-                  My Scribs
-                </Link>
-                <Link 
-                  to="/profile" 
-                  className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
-                  onClick={() => setIsOpen(false)}
-                >
-                  Profile ({user?.credit_balance ?? 0} cr)
-                </Link>
+                {location.pathname !== '/dashboard' && (
+                  <Link 
+                    to="/dashboard" 
+                    className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
+                )}
+
+                {/* Always show My Scribs unless we are strictly on the history tab */}
+                {!(location.pathname === '/generate' && location.search.includes('tab=history')) && (
+                  <Link 
+                    to="/generate?tab=history" 
+                    className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    My Scribs
+                  </Link>
+                )}
+
+                {location.pathname !== '/profile' && (
+                  <Link 
+                    to="/profile" 
+                    className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Profile ({user?.credit_balance ?? 0} cr)
+                  </Link>
+                )}
+                
                 <button 
                   onClick={() => {
                     logout()

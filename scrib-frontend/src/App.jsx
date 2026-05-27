@@ -25,14 +25,14 @@ const pricingTiers = [
     highlight: false,
   },
   {
-    id: 'standard',
+    id: 'popular',
     label: 'Rs 99',
     note: '20 credits',
     helper: '20 PDF pages',
     highlight: true,
   },
   {
-    id: 'power',
+    id: 'pro',
     label: 'Rs 199',
     note: '40 credits',
     helper: '40 PDF pages',

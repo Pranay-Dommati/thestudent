@@ -962,6 +962,79 @@ class StudyPackPdfView(APIView):
         from django.http import HttpResponseRedirect
         return HttpResponseRedirect(fresh_url)
 
+    def post(self, request, pack_id):
+        """Generate (or return existing) a permanent share token for this pack."""
+        import uuid
+        pack = StudyPack.objects.filter(pk=pack_id, user=request.user).first()
+        if not pack:
+            return error_response('Study pack not found', status_code=404, code='not_found')
+        if pack.status != StudyPack.STATUS_READY:
+            return error_response('Pack is not ready yet', status_code=400, code='not_ready')
+        if not pack.share_token:
+            pack.share_token = uuid.uuid4()
+            pack.save(update_fields=['share_token'])
+        return Response({'share_token': str(pack.share_token)})
+
+
+class StudyPackShareView(APIView):
+    """Public endpoint — no authentication required.
+
+    Given a share_token, generate a fresh presigned URL and redirect to it.
+    This lets anyone with the share link access the PDF forever, because we
+    regenerate the presigned URL on every request rather than relying on an
+    expiring stored URL.
+    """
+
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request, share_token):
+        pack = StudyPack.objects.filter(share_token=share_token, status=StudyPack.STATUS_READY).first()
+        if not pack:
+            return error_response('Share link not found or pack is not ready', status_code=404, code='not_found')
+
+        if not pack.s3_key:
+            if pack.pdf_url:
+                from django.http import HttpResponseRedirect
+                return HttpResponseRedirect(pack.pdf_url)
+            return error_response('PDF not available', status_code=404, code='not_found')
+
+        import boto3
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
+        region = getattr(settings, 'AWS_S3_REGION_NAME', 'ap-south-1')
+        access_key = getattr(settings, 'SCRIB_S3_ACCESS_KEY_ID', '')
+        secret_key = getattr(settings, 'SCRIB_S3_SECRET_ACCESS_KEY', '')
+
+        if not bucket or not access_key or not secret_key:
+            return error_response('Storage not configured', status_code=503, code='storage_unavailable')
+
+        try:
+            s3 = boto3.client(
+                's3',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=region,
+            )
+            fresh_url = s3.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': bucket, 'Key': pack.s3_key},
+                ExpiresIn=300,  # 5 min — plenty for the browser to start loading
+            )
+        except (BotoCoreError, ClientError) as exc:
+            import logging
+            logging.getLogger(__name__).error('[scrib] share presign failed for token %s: %s', share_token, exc)
+            return error_response('Could not generate PDF link', status_code=503, code='storage_unavailable')
+
+        # Also return pack metadata so the viewer page can render the title/topics
+        return Response({
+            'pdf_url': fresh_url,
+            'title': pack.title,
+            'total_pages': pack.total_pages,
+            'topics_json': pack.topics_json,
+        })
+
 
 class MyStudyPacksView(APIView):
 
@@ -976,3 +1049,4 @@ class MyStudyPacksView(APIView):
         packs = StudyPack.objects.filter(user=request.user)
         serializer = StudyPackSerializer(packs, many=True)
         return Response(serializer.data)
+

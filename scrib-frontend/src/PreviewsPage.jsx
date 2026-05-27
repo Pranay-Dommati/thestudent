@@ -5,6 +5,7 @@ import { useAuth } from './context/AuthContext'
 import { getInitials } from './utils/user'
 import axiosInstance from './utils/axios'
 import Breadcrumb from './components/Breadcrumb'
+import MobileMenu from './components/MobileMenu'
 import PreviewCard from './components/PreviewCard'
 
 const fallbackPreviewCards = [
@@ -98,6 +99,7 @@ const PreviewsPage = () => {
               >
                 {getInitials(user?.full_name)}
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -107,6 +109,7 @@ const PreviewsPage = () => {
               <Link to="/signup" className="rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white">
                 Get started free
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           )}
         </div>
