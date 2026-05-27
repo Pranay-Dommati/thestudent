@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 # Amounts stored in paise (1 INR = 100 paise).
 # These values are NEVER trusted from the frontend.
 CREDIT_PACKS = {
-    'starter': {'credits': 10, 'amount_paise': 5900},   # ₹59
+    'starter': {'credits': 10, 'amount_paise': 100},   # ₹59
     'popular': {'credits': 20, 'amount_paise': 9900},   # ₹99
     'pro':     {'credits': 40, 'amount_paise': 19900},  # ₹199
 }
@@ -825,33 +825,36 @@ class PaymentHistoryView(APIView):
 @permission_classes([AllowAny])
 @authentication_classes([])
 def razorpay_webhook(request):
-    """
-    Optional Razorpay webhook endpoint.
-    Handles the `payment.captured` event to credit users even when the
-    frontend verify call fails (e.g. user closed the browser).
-
-    Configure this URL in Razorpay Dashboard → Webhooks:
-        https://yourdomain.com/api/scrib/payments/webhook/
-    """
-    razorpay_signature = request.headers.get('X-Razorpay-Signature', '')
-    payload_body = request.body  # raw bytes needed for HMAC
-
-    if not verify_webhook_signature(payload_body, razorpay_signature):
-        logger.warning('[webhook] Invalid webhook signature — rejecting')
-        return Response({'error': 'Invalid signature'}, status=400)
-
     try:
-        event = json.loads(payload_body)
-    except json.JSONDecodeError:
-        return Response({'error': 'Invalid JSON'}, status=400)
+        logger.info("WEBHOOK HIT")
 
-    event_type = event.get('event')
-    logger.info('[webhook] Received event: %s', event_type)
+        body = request.body.decode("utf-8")
+        logger.info(f"BODY: {body}")
 
-    if event_type == 'payment.captured':
-        try:
-            payload = event.get('payload', {})
-            payment_entity = payload.get('payment', {}).get('entity', {})
+        signature = request.headers.get("X-Razorpay-Signature")
+        logger.info(f"SIGNATURE: {signature}")
+
+        from django.conf import settings
+        import razorpay
+        client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+        webhook_secret = settings.RAZORPAY_WEBHOOK_SECRET
+
+        # Verify signature using Razorpay client directly as requested
+        client.utility.verify_webhook_signature(
+            body,
+            signature,
+            webhook_secret
+        )
+
+        logger.info("SIGNATURE VERIFIED")
+
+        payload = json.loads(body)
+        logger.info(f"PAYLOAD: {payload}")
+
+        event_type = payload.get('event')
+        
+        if event_type == 'payment.captured':
+            payment_entity = payload.get('payload', {}).get('payment', {}).get('entity', {})
             rzp_order_id = payment_entity.get('order_id', '')
             rzp_payment_id = payment_entity.get('id', '')
 
@@ -872,13 +875,22 @@ def razorpay_webhook(request):
                                 reason=CreditTransaction.REASON_PAYMENT,
                             ),
                         )
-                        logger.info('[webhook] payment.captured processed order_id=%s credits=%d user=%s',
-                                    rzp_order_id, p.credits_added, p.user_id)
-        except Exception as exc:
-            logger.exception('[webhook] Error processing payment.captured: %s', exc)
-            return Response({'error': 'Processing failed'}, status=500)
+                        logger.info(f'[webhook] payment.captured processed order_id={rzp_order_id} credits={p.credits_added} user={p.user_id}')
+        
+        return Response(
+            {"success": True},
+            status=200
+        )
 
-    return Response({'status': 'ok'})
+    except Exception as e:
+        import traceback
+        logger.error("WEBHOOK ERROR:")
+        logger.error(traceback.format_exc())
+
+        return Response(
+            {"error": str(e)},
+            status=400
+        )
 
 
 class MeView(APIView):

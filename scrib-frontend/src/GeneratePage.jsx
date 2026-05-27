@@ -148,6 +148,45 @@ const GeneratePage = () => {
     setShareModalData({ title: titleStr, url: url || window.location.href, isLoading: false })
   }
 
+  const handleDownloadClick = async (item, isPack, storedUrl, titleStr) => {
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+    let newTab = null
+    if (isIOS) {
+      newTab = window.open('', '_blank')
+    }
+
+    if (isPack && item.id && !String(item.id).startsWith('pending-')) {
+      try {
+        const res = await axiosInstance.get(`/scrib/packs/${item.id}/pdf/`, {
+          maxRedirects: 0,
+          validateStatus: function (status) {
+            return status >= 200 && status < 400
+          }
+        })
+        const freshUrl = res.headers.location || res.data?.pdf_url
+        if (newTab) {
+          newTab.location.href = freshUrl
+        } else {
+          forceDownload(freshUrl, titleStr, isPack)
+        }
+        return
+      } catch (err) {
+        if (newTab) newTab.close()
+        customToast.error('Failed to prepare download.')
+        return
+      }
+    }
+
+    if (newTab) {
+      newTab.location.href = storedUrl || window.location.href
+    } else {
+      forceDownload(storedUrl, titleStr, isPack)
+    }
+  }
+
   const copyShareLink = async () => {
     if (!shareModalData || shareModalData.isLoading) return
     try {
@@ -1031,7 +1070,7 @@ const GeneratePage = () => {
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                             Open
                           </button>
-                          <button onClick={(e) => forceDownload(url, titleStr, isPack)} className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] ${!url && 'pointer-events-none opacity-50'}`}>
+                          <button onClick={(e) => handleDownloadClick(item, isPack, url, titleStr)} className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] ${!url && 'pointer-events-none opacity-50'}`}>
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                           </button>
                           <button
