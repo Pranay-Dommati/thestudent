@@ -1,8 +1,15 @@
+import os, sys
+sys.path.append(os.path.abspath('.'))
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
+
+import django
+django.setup()
+from django.conf import settings
 import requests
 
 response = requests.post(
     'https://api.openai.com/v1/images/generations',
-    headers={'Authorization': "Bearer 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"},
+    headers={'Authorization': f"Bearer {settings.OPENAI_API_KEY}"},
     json={
         'prompt': 'A testing prompt',
         'model': 'gpt-image-2',
