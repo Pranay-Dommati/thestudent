@@ -743,23 +743,16 @@ const GeneratePage = () => {
               </>
             ) : (
               <div className="mt-4 rounded-xl border border-[#ded6cc] bg-white md:bg-[#faf8f3] p-4 shadow-sm md:shadow-none">
+                <p className="mb-2 text-xs font-semibold text-[#5f5a54] tracking-wide">
+                  Please add your syllabus topics as comma separated values
+                </p>
                 <textarea
                   className="min-h-[120px] w-full resize-none border-none bg-transparent text-sm outline-none"
-                  placeholder="Paste your syllabus here"
+                  placeholder="e.g. Blockchain, Cryptography, Merkle Trees, Digital Signatures..."
                   value={pasteText}
                   onChange={(event) => { setPasteText(event.target.value); setInvalidTopics([]); }}
                 />
-                {!pasteText ? (
-                  <div className="mt-4 text-xs text-[#8a847c]">
-                    <p className="font-semibold text-[#7b756d]">Examples:</p>
-                    <ul className="mt-2 space-y-1">
-                      <li>Unit 1: Cloud Computing, Virtualization, IaaS, PaaS</li>
-                      <li>Chapter 3 - Sorting: Bubble Sort, Merge Sort, Quick Sort</li>
-                      <li>Krebs Cycle, Photosynthesis, Cell Division</li>
-                      <li>Or just a messy list - AI will figure it out</li>
-                    </ul>
-                  </div>
-                ) : (
+                {pasteText && (
                   <div className="mt-4 flex justify-end">
                     <button
                       onClick={handleOrganizeTopics}
