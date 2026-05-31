@@ -1143,6 +1143,7 @@ def google_auth_token(request):
     access_token = request.data.get('access_token')
     # Google Identity Services may send this as 'id_token' or 'credential'
     id_token = request.data.get('id_token') or request.data.get('credential')
+    signup_source = request.data.get('signup_source', 'main')
     
     # Use ID token if available, otherwise fallback to access token
     token_to_verify = id_token or access_token
@@ -1247,7 +1248,8 @@ def google_auth_token(request):
                     email=email,
                     full_name=full_name,
                     auth_method='google',  # Set auth method for Google users
-                    agreed_to_terms=True  # Google users implicitly agree
+                    agreed_to_terms=True,  # Google users implicitly agree
+                    signup_source=signup_source
                 )
                 created = True
                 logger.info(f"Google token auth: New user created - {email}")

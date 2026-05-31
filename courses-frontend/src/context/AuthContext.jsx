@@ -143,10 +143,18 @@ export const AuthProvider = ({ children }) => {
     validateAuth().finally(() => setLoading(false));
   }, []);
 
-  // Set up periodic token refresh
+  // Set up periodic token refresh and product usage recording
   useEffect(() => {
     if (isLoggedIn) {
       const interval = setInterval(refreshAccessToken, TOKEN_REFRESH_INTERVAL);
+      
+      // Record product usage once per session
+      if (!sessionStorage.getItem('productRecorded')) {
+        axiosInstance.post('/auth/record-product/', { product: 'courses' })
+          .then(() => sessionStorage.setItem('productRecorded', 'true'))
+          .catch(err => console.error('Failed to record product usage', err));
+      }
+      
       return () => clearInterval(interval);
     }
   }, [isLoggedIn]);
@@ -170,7 +178,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (registrationData) => {
     try {
-      const response = await axiosInstance.post('/auth/register/', registrationData);
+      const response = await axiosInstance.post('/auth/register/', { ...registrationData, signup_source: 'courses' });
       const { user, tokens } = response.data;
 
   storage.setItem('accessToken', tokens.access);
@@ -268,7 +276,8 @@ export const AuthProvider = ({ children }) => {
   const googleLogin = async (googleToken) => {
     try {
       const response = await axiosInstance.post('/auth/google/token/', {
-        id_token: googleToken
+        id_token: googleToken,
+        signup_source: 'courses'
       });
       
       const { user, access, refresh } = response.data;

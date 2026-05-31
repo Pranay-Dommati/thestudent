@@ -45,7 +45,7 @@ const topicChips = ['Cloud Computing', 'Photosynthesis', "Ohm's Law", 'Recursion
 
 
 const App = () => {
-  const { user, refreshUser, logout, isLoggedIn } = useAuth()
+  const { user, refreshUser, logout, isLoggedIn, loading } = useAuth()
   const [previewStrip, setPreviewStrip] = useState(fallbackPreviewStrip)
   const [topicInput, setTopicInput] = useState('')
   const [showBuyModal, setShowBuyModal] = useState(false)
@@ -533,7 +533,7 @@ const App = () => {
       )}
 
       {/* Free Credits Promo Modal for first-time visitors */}
-      <FreeCreditsModal isLoggedIn={isLoggedIn} />
+      <FreeCreditsModal isLoggedIn={isLoggedIn} loading={loading} />
     </div>
   )
 }

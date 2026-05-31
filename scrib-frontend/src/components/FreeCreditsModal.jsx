@@ -3,18 +3,24 @@ import { Link } from 'react-router-dom'
 
 const STORAGE_KEY = 'scrib_promo_modal_seen'
 
-const FreeCreditsModal = ({ isLoggedIn }) => {
+const FreeCreditsModal = ({ isLoggedIn, loading }) => {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
+    // Wait until auth state is determined
+    if (loading) return
+    
     // Don't show if user is logged in or has already seen the modal
-    if (isLoggedIn) return
+    if (isLoggedIn) {
+      setVisible(false)
+      return
+    }
     if (localStorage.getItem(STORAGE_KEY)) return
 
     // Show after a short delay so the page loads first
-    const timer = setTimeout(() => setVisible(true), 2000)
+    const timer = setTimeout(() => setVisible(true), 1500)
     return () => clearTimeout(timer)
-  }, [isLoggedIn])
+  }, [isLoggedIn, loading])
 
   const dismiss = () => {
     setVisible(false)

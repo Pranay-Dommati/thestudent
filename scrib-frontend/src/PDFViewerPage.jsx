@@ -5,6 +5,7 @@ import { forceDownload } from './utils/download'
 import customToast from './utils/customToast'
 import Breadcrumb from './components/Breadcrumb'
 import MobilePDFViewer from './components/MobilePDFViewer'
+import axiosInstance from './utils/axios'
 
 // In development the backend returns absolute URLs like http://127.0.0.1:8000/media/...
 // We strip the host so the Vite proxy (localhost:5173/media → 127.0.0.1:8000/media) handles it.
@@ -32,41 +33,66 @@ const isImageUrl = (url) => {
   return /\.(png|jpg|jpeg|gif|webp)(\?|$)/i.test(url) && !/\.pdf(\?|$)/i.test(url)
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api'
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
 
 const PDFViewerPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { shareToken } = useParams()
+  const { shareToken, slug } = useParams()
   const { user } = useAuth()
 
-  // State for share-token mode (data fetched from the public API)
-  const [shareData, setShareData] = useState(null)
-  const [shareLoading, setShareLoading] = useState(false)
-  const [shareError, setShareError] = useState(null)
+  // State for fetched mode (data fetched from the public API)
+  const [fetchedData, setFetchedData] = useState(null)
+  const [dataLoading, setDataLoading] = useState(false)
+  const [dataError, setDataError] = useState(null)
+  
+  const [shareModalData, setShareModalData] = useState(null)
 
   useEffect(() => {
-    if (!shareToken) return
-    setShareLoading(true)
-    fetch(`${API_BASE}/scrib/packs/share/${shareToken}/`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.pdf_url) {
-          setShareData(data)
-        } else {
-          setShareError('This share link is invalid or the PDF is not ready yet.')
-        }
-      })
-      .catch(() => setShareError('Failed to load the shared PDF.'))
-      .finally(() => setShareLoading(false))
-  }, [shareToken])
+    if (shareToken) {
+      setDataLoading(true)
+      fetch(`${API_BASE}/scrib/packs/share/${shareToken}/`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.pdf_url) {
+            setFetchedData(data)
+          } else {
+            setDataError('This share link is invalid or the PDF is not ready yet.')
+          }
+        })
+        .catch(() => setDataError('Failed to load the shared PDF.'))
+        .finally(() => setDataLoading(false))
+    } else if (slug && !location.state?.pdfUrl) {
+      setDataLoading(true)
+      fetch(`${API_BASE}/scrib/previews/${slug}/`)
+        .then((r) => {
+          if (!r.ok) throw new Error('Not found')
+          return r.json()
+        })
+        .then((data) => {
+          if (data.pdf_url || data.image_url) {
+            setFetchedData({
+              pdf_url: data.pdf_url || data.image_url,
+              title: data.title,
+              topics_json: data.tags,
+              total_pages: data.page_count,
+              isImage: !data.pdf_url && data.image_url
+            })
+          } else {
+            setDataError('This note could not be found.')
+          }
+        })
+        .catch(() => setDataError('Failed to load the preview note.'))
+        .finally(() => setDataLoading(false))
+    }
+  }, [shareToken, slug, location.state])
 
   const routeState = location.state || {}
-  const rawPdfUrl = shareToken ? shareData?.pdf_url : routeState.pdfUrl
-  const title = shareToken ? shareData?.title : routeState.title
-  const topics = shareToken ? (shareData?.topics_json || []) : (routeState.topics || [])
-  const totalPages = shareToken ? (shareData?.total_pages || 1) : (routeState.totalPages || 1)
-  const forceImage = shareToken ? false : (routeState.isImage || false)
+  const rawPdfUrl = fetchedData ? fetchedData.pdf_url : routeState.pdfUrl
+  const title = fetchedData ? fetchedData.title : routeState.title
+  const topics = fetchedData ? (fetchedData.topics_json || []) : (routeState.topics || [])
+  const totalPages = fetchedData ? (fetchedData.total_pages || 1) : (routeState.totalPages || 1)
+  const forceImage = fetchedData ? (fetchedData.isImage || false) : (routeState.isImage || false)
 
   // Rewrite backend absolute URL → relative path so Vite proxy handles it
   const pdfUrl = normalizeUrl(rawPdfUrl)
@@ -78,16 +104,73 @@ const PDFViewerPage = () => {
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
+    
+    // Clear toasts if page goes to background or is restored from bfcache (iOS Safari back button fix)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        customToast.dismiss()
+      }
+    }
+    const handlePageShow = (event) => {
+      if (event.persisted) {
+        customToast.dismiss()
+      }
+    }
+
     window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    window.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('pageshow', handlePageShow)
+    
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('pageshow', handlePageShow)
+    }
   }, [])
 
   const creditBalance = user?.credit_balance ?? 0
   const pageCount = totalPages
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href)
-    customToast.success('Link copied to clipboard')
+  const handleShare = async () => {
+    // If we are already on a share page, the URL is perfect.
+    if (shareToken) {
+      setShareModalData({ title, url: window.location.href, isLoading: false })
+      return
+    }
+
+    const { isPack, packId, shareToken: stateShareToken } = routeState
+
+    if (isPack && packId) {
+      setShareModalData({ title, url: 'Generating share link...', isLoading: true })
+      try {
+        let token = stateShareToken
+        if (!token) {
+          const res = await axiosInstance.post(`/scrib/packs/${packId}/pdf/`)
+          token = res.data?.share_token
+        }
+        if (token) {
+          const shareUrl = `${window.location.origin}/view/share/${token}`
+          setShareModalData({ title, url: shareUrl, isLoading: false })
+          return
+        }
+      } catch (err) {
+        console.error('Failed to generate share token', err)
+      }
+    }
+    
+    // Fallback: copy current url
+    setShareModalData({ title, url: window.location.href, isLoading: false })
+  }
+
+  const copyShareLink = async () => {
+    if (!shareModalData || shareModalData.isLoading) return
+    try {
+      await navigator.clipboard.writeText(shareModalData.url)
+      customToast.success('Link copied to clipboard!')
+      setShareModalData(null)
+    } catch {
+      customToast.error('Failed to copy link')
+    }
   }
 
   const handleDownload = async () => {
@@ -106,23 +189,31 @@ const PDFViewerPage = () => {
     }
   }
 
-  if (shareToken && shareLoading) {
+  const handleBack = () => {
+    if (shareToken) {
+      navigate('/')
+    } else {
+      navigate(-1)
+    }
+  }
+
+  if ((shareToken || slug) && dataLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f7f4ee]">
         <div className="text-center">
           <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-[#1f1f1f] border-t-transparent"></div>
-          <p className="text-sm text-[#7b756d]">Loading shared PDF…</p>
+          <p className="text-sm text-[#7b756d]">Loading document…</p>
         </div>
       </div>
     )
   }
 
-  if (shareToken && shareError) {
+  if ((shareToken || slug) && dataError) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f7f4ee]">
         <div className="text-center max-w-sm px-6">
           <p className="text-sm font-semibold text-[#1f1f1f] mb-2">Link not found</p>
-          <p className="text-sm text-[#7b756d] mb-4">{shareError}</p>
+          <p className="text-sm text-[#7b756d] mb-4">{dataError}</p>
           <Link to="/" className="rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white">
             Go to Scrib
           </Link>
@@ -137,7 +228,7 @@ const PDFViewerPage = () => {
         <div className="text-center">
           <p className="text-sm text-[#7b756d]">No PDF to display.</p>
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="mt-4 rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white"
           >
             Go back
@@ -155,7 +246,7 @@ const PDFViewerPage = () => {
         <div className="flex items-center gap-2 md:gap-3">
           {/* Mobile Back Button (icon only) */}
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1c1c1e] text-white hover:bg-[#2c2c2e] transition-colors md:hidden"
             aria-label="Go back"
           >
@@ -166,7 +257,7 @@ const PDFViewerPage = () => {
           
           {/* Desktop Back Button (with text) */}
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="hidden items-center gap-1.5 rounded-full border border-[#e0d9ce] bg-[#f7f4ee] px-3 py-1.5 text-xs font-semibold text-[#5a554f] hover:bg-[#ede9e1] transition-colors md:flex"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -268,6 +359,47 @@ const PDFViewerPage = () => {
           </div>
         </main>
       </div>
+
+      {/* Share Modal */}
+      {shareModalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm transition-all duration-300">
+          <div 
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl border border-[#e2dbd2] transform scale-100 opacity-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-[#1f1f1f]">Share link</h3>
+              <button 
+                onClick={() => setShareModalData(null)}
+                className="rounded-full p-1.5 text-[#9a9289] hover:bg-[#f5f2ec] hover:text-[#1f1f1f] transition-colors"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+            
+            <p className="text-sm text-[#7b756d] mb-4">
+              Anyone with this link can view and download.
+            </p>
+            
+            <div className="flex items-center gap-2">
+              <input 
+                type="text" 
+                readOnly 
+                value={shareModalData.url} 
+                className="w-full rounded-xl border border-[#e2dbd2] bg-[#faf8f3] px-3 py-2 text-sm text-[#5a554f] focus:border-[#1f1f1f] focus:outline-none"
+                disabled={shareModalData.isLoading}
+              />
+              <button 
+                onClick={copyShareLink}
+                disabled={shareModalData.isLoading}
+                className="flex-shrink-0 rounded-xl bg-[#1f1f1f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#333] transition-colors disabled:opacity-50"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

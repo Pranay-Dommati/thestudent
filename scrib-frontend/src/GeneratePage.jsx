@@ -1030,7 +1030,9 @@ const GeneratePage = () => {
                       title: item.name || titleStr,
                       topics: topicsArr,
                       totalPages: pages,
-                      isPack: true,
+                      isPack: isPack,
+                      packId: isPack ? item.id : null,
+                      shareToken: item.share_token || null
                     }
                   })
                 }
