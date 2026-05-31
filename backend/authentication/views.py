@@ -57,7 +57,7 @@ from backend.db_utils import db_retry_on_connection_error
 logger = logging.getLogger(__name__)
 
 
-def send_email_via_ses(to_email: str, subject: str, html_content: str) -> bool:
+def send_email_via_ses(to_email: str, subject: str, html_content: str, reply_to: str = None) -> bool:
     """Send an HTML email using AWS SES API (boto3).
     Works on Render free tier since it uses HTTPS instead of SMTP ports.
     Returns True on success, False on failure.
@@ -92,17 +92,23 @@ def send_email_via_ses(to_email: str, subject: str, html_content: str) -> bool:
         # Format sender with display name (RFC 5322 format)
         sender = f"EasyLearnova <{from_email}>"
         
-        # Send email via SES API
-        response = ses.send_email(
-            Source=sender,
-            Destination={'ToAddresses': [to_email]},
-            Message={
+        # Build SES parameters
+        ses_params = {
+            'Source': sender,
+            'Destination': {'ToAddresses': [to_email]},
+            'Message': {
                 'Subject': {'Data': subject, 'Charset': 'UTF-8'},
                 'Body': {
                     'Html': {'Data': html_content, 'Charset': 'UTF-8'}
                 }
             }
-        )
+        }
+        
+        if reply_to:
+            ses_params['ReplyToAddresses'] = [reply_to]
+            
+        # Send email via SES API
+        response = ses.send_email(**ses_params)
         
         if getattr(settings, 'DEBUG', False):
             logger.debug(f"AWS SES email sent to {to_email} - MessageId: {response.get('MessageId')}")

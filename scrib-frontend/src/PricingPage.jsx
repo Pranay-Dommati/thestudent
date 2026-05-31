@@ -165,6 +165,45 @@ const PricingPage = () => {
           </p>
         </div>
 
+        {/* Trust banner — see before you buy */}
+        {/* Mobile: compact single row */}
+        <div className="mt-6 flex items-center justify-between gap-2 rounded-xl border border-[#e2dbd2] bg-[#fdfcf9] px-3 py-2.5 sm:hidden">
+          <div className="flex items-center gap-2 min-w-0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4e8c3a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <p className="text-[11px] text-[#5f5a54] truncate">New here? See the notes before buying</p>
+          </div>
+          <Link
+            to="/previews"
+            className="flex-shrink-0 rounded-full border border-[#1f1f1f] px-3 py-1 text-[11px] font-semibold text-[#1f1f1f] hover:bg-[#1f1f1f] hover:text-white transition-colors"
+          >
+            Preview →
+          </Link>
+        </div>
+        {/* Desktop: full card */}
+        <div className="mt-6 hidden sm:flex flex-row items-center justify-between gap-3 rounded-2xl border border-[#e2dbd2] bg-[#fdfcf9] px-5 py-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#f0f9eb] border border-[#cce8ba]">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4e8c3a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[#1f1f1f]">New here? See exactly what you're paying for</p>
+              <p className="mt-0.5 text-xs text-[#7b756d]">Browse 50+ free handwritten note previews — no account needed. Verify the quality before spending a single rupee.</p>
+            </div>
+          </div>
+          <Link
+            to="/previews"
+            className="flex-shrink-0 rounded-full border border-[#1f1f1f] bg-white px-4 py-2 text-xs font-semibold text-[#1f1f1f] hover:bg-[#1f1f1f] hover:text-white transition-colors whitespace-nowrap"
+          >
+            Browse free previews →
+          </Link>
+        </div>
+
         <div className="mt-8 grid gap-3 grid-cols-1 sm:grid-cols-3 md:grid-cols-3">
           {tiers.map((tier) => (
             <div
@@ -218,9 +257,7 @@ const PricingPage = () => {
           ))}
         </div>
 
-        <p className="mt-6 text-center text-xs text-[#7b756d]">
-          New here? Explore free previews and see exactly what your notes will look like.
-        </p>
+
 
         <div className="mt-6 rounded-xl border border-[#e2dbd2] bg-[#faf8f3] px-4 py-3 text-xs text-[#6f6a63]">
           Payments via UPI / Razorpay · Secure · Credits added instantly after payment · No auto-renewal, ever
@@ -240,8 +277,13 @@ const PricingPage = () => {
       </main>
 
       <footer className="border-t border-[#e4ddd4] bg-white py-8">
-        <div className="mx-auto max-w-6xl px-6 text-center text-sm text-[#7b756d]">
-          &copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.
+        <div className="mx-auto max-w-6xl px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-[#7b756d]">
+          <p>&copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.</p>
+          <div className="flex items-center gap-6">
+            <Link to="/support" className="hover:text-[#1f1f1f] transition-colors">Support</Link>
+            <Link to="/terms" className="hover:text-[#1f1f1f] transition-colors">Terms</Link>
+            <Link to="/privacy" className="hover:text-[#1f1f1f] transition-colors">Privacy</Link>
+          </div>
         </div>
       </footer>
 

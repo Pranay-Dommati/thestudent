@@ -3,6 +3,7 @@ import logging
 import uuid
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import Case, F, IntegerField, Sum, When
 from django.views.decorators.csrf import csrf_exempt
@@ -1046,6 +1047,57 @@ class StudyPackShareView(APIView):
             'total_pages': pack.total_pages,
             'topics_json': pack.topics_json,
         })
+
+
+class ContactSupportView(APIView):
+    authentication_classes = [JWTAuthentication]
+    # Allow any so both guests and logged-in users can reach it
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        name = request.data.get('name', '').strip()
+        email = request.data.get('email', '').strip()
+        subject = request.data.get('subject', '').strip()
+        message = request.data.get('message', '').strip()
+
+        # If user is authenticated, use their info if they didn't provide any or as a fallback
+        if request.user.is_authenticated:
+            if not name:
+                name = getattr(request.user, 'full_name', '') or request.user.email
+            if not email:
+                email = request.user.email
+
+        if not subject or not message:
+            return error_response('Subject and message are required.')
+            
+        if not email:
+            return error_response('An email address is required so we can reply to you.')
+
+        # Construct email body
+        body = f"New Support Request from Scrib\n\n"
+        body += f"Name: {name or 'Not provided'}\n"
+        body += f"Email: {email}\n"
+        if request.user.is_authenticated:
+            body += f"User ID: {request.user.id}\n"
+        body += f"\nMessage:\n{message}\n"
+
+        try:
+            from authentication.views import send_email_via_ses
+            html_body = body.replace("\n", "<br>")
+            success = send_email_via_ses(
+                to_email='bannydommati@gmail.com',
+                subject=f"[Scrib Support] {subject}",
+                html_content=html_body,
+                reply_to=email if email else None
+            )
+            
+            if success:
+                return Response({'success': True, 'message': 'Your message has been sent successfully. We will get back to you soon!'})
+            else:
+                return error_response('Failed to send message via SES. Please try again later.', status_code=500)
+        except Exception as e:
+            logger.error(f"Failed to send support email: {e}", exc_info=True)
+            return error_response('Failed to send message. Please try again later.', status_code=500)
 
 
 class MyStudyPacksView(APIView):

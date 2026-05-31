@@ -32,6 +32,11 @@ body {
   color: var(--scrib-text);
 }
 
+/* Prevent iOS Safari from auto-zooming into inputs/textareas when font-size < 16px */
+input, textarea, select {
+  font-size: 16px;
+}
+
 h1, h2, h3 {
   font-family: "Sora", sans-serif;
   letter-spacing: -0.02em;
@@ -136,6 +141,33 @@ a {
   background: var(--scrib-accent);
   color: var(--scrib-accent-ink);
   border-color: var(--scrib-accent);
+}
+
+.btn-shine-effect {
+  position: relative;
+  background: #1f1f1f;
+  overflow: hidden;
+}
+
+.btn-shine-effect::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    105deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 80%
+  );
+  animation: btn-shine-sweep 4s linear infinite;
+}
+
+@keyframes btn-shine-sweep {
+  0%   { left: -70%; }
+  100% { left: 130%; }
 }
 
 .scrib-btn-secondary {

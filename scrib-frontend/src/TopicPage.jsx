@@ -175,7 +175,8 @@ const TopicPage = () => {
       <footer className="border-t border-[#e2dbd2] py-8 text-center text-sm text-[#7b756d]">
         <div className="mx-auto max-w-5xl px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <p>&copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.</p>
-          <div className="flex items-center gap-6">
+          <div className="flex justify-center gap-4">
+            <Link to="/support" className="hover:text-[#1f1f1f] transition-colors">Support</Link>
             <Link to="/terms" className="hover:text-[#1f1f1f] transition-colors">Terms</Link>
             <Link to="/privacy" className="hover:text-[#1f1f1f] transition-colors">Privacy</Link>
           </div>

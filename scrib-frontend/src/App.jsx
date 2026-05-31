@@ -240,7 +240,7 @@ const App = () => {
               </Link>
               <button
                 onClick={() => navigate('/generate')}
-                className="rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity"
+                className="rounded-full btn-shine-effect px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity"
               >
                 Generate custom notes
               </button>
@@ -517,6 +517,7 @@ const App = () => {
         <div className="mx-auto max-w-6xl px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-[#7b756d]">
           <p>&copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.</p>
           <div className="flex items-center gap-6">
+            <Link to="/support" className="hover:text-[#1f1f1f] transition-colors">Support</Link>
             <Link to="/terms" className="hover:text-[#1f1f1f] transition-colors">Terms</Link>
             <Link to="/privacy" className="hover:text-[#1f1f1f] transition-colors">Privacy</Link>
           </div>

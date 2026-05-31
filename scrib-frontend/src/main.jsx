@@ -13,6 +13,7 @@ import PricingPage from './PricingPage.jsx'
 import ProfilePage from './ProfilePage.jsx'
 import TermsPage from './TermsPage.jsx'
 import PrivacyPage from './PrivacyPage.jsx'
+import SupportPage from './SupportPage.jsx'
 import TopicPage from './TopicPage.jsx'
 import NotFoundPage from './NotFoundPage.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
@@ -42,6 +43,7 @@ const AppContent = (
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/support" element={<SupportPage />} />
           <Route path="/view/share/:shareToken" element={<PDFViewerPage />} />
           <Route path="/view/:slug" element={<PDFViewerPage />} />
           <Route path="/view" element={<PDFViewerPage />} />

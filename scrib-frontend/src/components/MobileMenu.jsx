@@ -69,6 +69,16 @@ const MobileMenu = ({ isLoggedIn, user, logout }) => {
                 Pricing
               </Link>
             )}
+
+            {location.pathname !== '/support' && (
+              <Link 
+                to="/support" 
+                className="py-3 text-sm font-semibold text-[#1f1f1f] border-b border-[#f5f2ec]"
+                onClick={() => setIsOpen(false)}
+              >
+                Support
+              </Link>
+            )}
             
             {isLoggedIn ? (
               <>

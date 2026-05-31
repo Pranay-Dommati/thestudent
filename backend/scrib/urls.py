@@ -22,4 +22,7 @@ urlpatterns = [
     path('packs/<int:pack_id>/pdf/', views.StudyPackPdfView.as_view(), name='pack-pdf'),
     path('packs/<int:pack_id>/status/', views.StudyPackStatusView.as_view(), name='pack-status'),
     path('packs/share/<uuid:share_token>/', views.StudyPackShareView.as_view(), name='pack-share'),
+    
+    # Support
+    path('support/', views.ContactSupportView.as_view(), name='support'),
 ]
