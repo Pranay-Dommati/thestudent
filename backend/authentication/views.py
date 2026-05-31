@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 import logging
 import requests
 from django.core.mail import send_mail
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -28,7 +28,7 @@ from .serializers import (
     OTPSignupSerializer, OTPVerifySerializer, OTPResendSerializer,
 )
 # pyrefly: ignore [missing-import]
-from .models import User, EmailOTP
+from .models import User, EmailOTP, UserProduct
 
 SIGNUP_FREE_CREDITS = 2
 
@@ -746,6 +746,11 @@ def admin_list_users(request):
         elif status_filter == 'inactive':
             queryset = queryset.filter(is_active=False)
 
+        # Product filter
+        product_filter = (request.GET.get('product') or 'all').strip().lower()
+        if product_filter != 'all':
+            queryset = queryset.filter(products__product=product_filter)
+
         # Role filter
         if role_filter == 'admin':
             queryset = queryset.filter(is_superuser=True)
@@ -781,12 +786,16 @@ def admin_list_users(request):
         items = list(queryset[start:end])
 
         # Stats
+        # Compute enrolled courses count per listed user in one query
         total_users = User.objects.count()
         active_users = User.objects.filter(is_active=True).count()
         from django.utils import timezone
         now = timezone.now()
         new_this_month = User.objects.filter(date_joined__year=now.year, date_joined__month=now.month).count()
         inactive_users = total_users - active_users
+        
+        # Product stats
+        product_stats = dict(UserProduct.objects.values('product').annotate(count=Count('user', distinct=True)).values_list('product', 'count'))
 
         # Compute enrolled courses count per listed user in one query
         try:
@@ -797,8 +806,15 @@ def admin_list_users(request):
                 UserStartedPredefinedCourse.objects.filter(user_id__in=user_ids)
                 .values('user_id').annotate(c=_Count('id'))
             )}
+            
+            # Fetch products for these users
+            user_products_qs = UserProduct.objects.filter(user_id__in=user_ids).values_list('user_id', 'product')
+            products_map = {}
+            for uid, prod in user_products_qs:
+                products_map.setdefault(uid, []).append(prod)
         except Exception:
             enrolled_map = {}
+            products_map = {}
 
         payload = {
             'results': [
@@ -810,6 +826,8 @@ def admin_list_users(request):
                     'is_superuser': bool(getattr(u, 'is_superuser', False)),
                     'enrolledCourses': int(enrolled_map.get(u.id, 0) or 0),
                     'joinDate': u.date_joined.isoformat() if getattr(u, 'date_joined', None) else None,
+                    'signup_source': getattr(u, 'signup_source', 'main'),
+                    'products': products_map.get(u.id, []),
                 }
                 for u in items
             ],
@@ -825,6 +843,9 @@ def admin_list_users(request):
                 'active_users': active_users,
                 'new_this_month': new_this_month,
                 'inactive_users': inactive_users,
+                'scrib_users': product_stats.get('scrib', 0),
+                'courses_users': product_stats.get('courses', 0),
+                'codevisualizer_users': product_stats.get('codevisualizer', 0),
             },
         }
 
@@ -1069,15 +1090,17 @@ def google_auth_callback(request):
         except User.DoesNotExist:
             # Create new user using your custom UserManager.create_user method
             try:
+                signup_source = request.data.get('signup_source', 'main')
                 user = User.objects.create_user(
                     email=email,
                     full_name=full_name,
-                    agreed_to_terms=True  # Google users implicitly agree
+                    agreed_to_terms=True,  # Google users implicitly agree
+                    signup_source=signup_source
                 )
                 created = True
-                logger.info(f"Google auth: New user created - {email}")
+                logger.info(f"Google Auth Token: New user created - {email}")
             except Exception as e:
-                logger.error(f"Error creating user: {str(e)}")
+                logger.error(f"Error creating user from token: {str(e)}")
                 return Response(
                     {"error": "Failed to create user account"},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -1715,5 +1738,20 @@ def test_smtp_connection(request):
             else '❌ Check SMTP credentials and firewall settings'
         )
     }
-    
     return Response(response_data, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def record_product_usage(request):
+    """
+    Record that a user has accessed a specific product in the ecosystem.
+    Expected data: {"product": "scrib" | "courses" | "codevisualizer"}
+    """
+    product = request.data.get('product')
+    if product not in dict(UserProduct.PRODUCT_CHOICES):
+        return Response({"error": "Invalid product"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # get_or_create ensures we only record the first time they use it
+    UserProduct.objects.get_or_create(user=request.user, product=product)
+    
+    return Response({"success": True})

@@ -22,6 +22,7 @@ from .views import (
     validate_reset_token,
     admin_set_user_password,
     TokenRefreshViewWithRetry,  # Custom token refresh with retry logic
+    record_product_usage,
 )
 
 urlpatterns = [
@@ -35,6 +36,7 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshViewWithRetry.as_view(), name='token_refresh'),  # Use retry-enabled view
     path('profile/', user_profile, name='user_profile'),
     path('onboarding/mark-seen/', mark_onboarding_seen, name='mark_onboarding_seen'),
+    path('record-product/', record_product_usage, name='record_product_usage'),
     
     # Google OAuth2 endpoints
     path('google/auth-url/', google_auth_url, name='google_auth_url'),

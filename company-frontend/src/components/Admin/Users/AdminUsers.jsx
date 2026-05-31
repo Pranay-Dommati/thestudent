@@ -4,10 +4,10 @@ import authService from '../../../services/authService';
 
 const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  // Filters
   const [statusFilter, setStatusFilter] = useState('all'); // all|active|inactive
   const [roleFilter, setRoleFilter] = useState('all'); // all|admin|user
   const [joinedFilter, setJoinedFilter] = useState('all'); // all|last7|last30|thismonth
+  const [productFilter, setProductFilter] = useState('all'); // all|scrib|courses|codevisualizer
   const [sortBy, setSortBy] = useState('recent'); // recent|oldest|name
   // Additional filter: enrollment count quick filter (client-side)
   const [enrollmentFilter, setEnrollmentFilter] = useState('all'); // all|none|1plus|5plus
@@ -26,6 +26,7 @@ const AdminUsers = () => {
         status: statusFilter,
         role: roleFilter,
         joined: joinedFilter,
+        product: productFilter,
         order: sortBy,
         page: String(currentPage),
         page_size: '10',
@@ -48,7 +49,7 @@ const AdminUsers = () => {
   useEffect(() => {
     fetchUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, statusFilter, roleFilter, joinedFilter, sortBy, currentPage]);
+  }, [searchQuery, statusFilter, roleFilter, joinedFilter, productFilter, sortBy, currentPage]);
 
   // Derive client-side filter for enrollment counts (backend may ignore this param)
   const usersToRender = React.useMemo(() => {
@@ -106,22 +107,38 @@ const AdminUsers = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-2xl font-bold text-blue-600">{stats.total_users}</div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+          <div className="text-2xl font-bold text-blue-600">{stats.total_users || 0}</div>
           <div className="text-sm text-gray-500">Total Users</div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-2xl font-bold text-green-600">{stats.active_users}</div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+          <div className="text-2xl font-bold text-green-600">{stats.active_users || 0}</div>
           <div className="text-sm text-gray-500">Active Users</div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-2xl font-bold text-yellow-600">{stats.new_this_month}</div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+          <div className="text-2xl font-bold text-yellow-600">{stats.new_this_month || 0}</div>
           <div className="text-sm text-gray-500">New This Month</div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-2xl font-bold text-red-600">{stats.inactive_users}</div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+          <div className="text-2xl font-bold text-red-600">{stats.inactive_users || 0}</div>
           <div className="text-sm text-gray-500">Inactive Users</div>
+        </div>
+      </div>
+      
+      {/* Ecosystem Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+          <div className="text-2xl font-bold text-indigo-600">{stats.scrib_users || 0}</div>
+          <div className="text-sm text-gray-500">Scrib Users</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+          <div className="text-2xl font-bold text-teal-600">{stats.courses_users || 0}</div>
+          <div className="text-sm text-gray-500">Courses Users</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+          <div className="text-2xl font-bold text-orange-600">{stats.codevisualizer_users || 0}</div>
+          <div className="text-sm text-gray-500">Visualizer Users</div>
         </div>
       </div>
 
@@ -170,6 +187,18 @@ const AdminUsers = () => {
           <option value="last30">Last 30 days</option>
           <option value="thismonth">This month</option>
         </select>
+        
+        {/* Product filter */}
+        <select
+          value={productFilter}
+          onChange={(e) => { setProductFilter(e.target.value); setCurrentPage(1); }}
+          className="w-full sm:w-44 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="all">All Products</option>
+          <option value="scrib">Scrib Only</option>
+          <option value="courses">Courses Only</option>
+          <option value="codevisualizer">Visualizer Only</option>
+        </select>
 
         {/* Enrollment count (client-side) */}
         <select
@@ -212,6 +241,9 @@ const AdminUsers = () => {
                 </th>
                 <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Join Date
+                </th>
+                <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Products Used
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -260,6 +292,14 @@ const AdminUsers = () => {
                   </td>
                   <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {user.joinDate ? new Date(user.joinDate).toLocaleDateString() : '-'}
+                    <div className="text-[10px] text-gray-400 mt-0.5">via {user.signup_source || 'main'}</div>
+                  </td>
+                  <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div className="flex gap-2">
+                      <span title="Scrib" className={`w-5 h-5 flex items-center justify-center rounded-full text-xs ${user.products?.includes('scrib') ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-300'}`}>S</span>
+                      <span title="Courses" className={`w-5 h-5 flex items-center justify-center rounded-full text-xs ${user.products?.includes('courses') ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-300'}`}>C</span>
+                      <span title="Code Visualizer" className={`w-5 h-5 flex items-center justify-center rounded-full text-xs ${user.products?.includes('codevisualizer') ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-300'}`}>V</span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end items-center space-x-3">

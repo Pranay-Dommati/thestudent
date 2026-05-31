@@ -52,6 +52,20 @@ class User(AbstractUser):
     # Onboarding tracking
     has_seen_onboarding = models.BooleanField(default=False, help_text='Whether user has seen the onboarding modal')
     
+    # Signup origin tracking
+    SIGNUP_SOURCE_CHOICES = [
+        ('courses', 'Courses'),
+        ('codevisualizer', 'Code Visualizer'),
+        ('scrib', 'Scrib'),
+        ('main', 'Main Website')
+    ]
+    signup_source = models.CharField(
+        max_length=50,
+        choices=SIGNUP_SOURCE_CHOICES,
+        default='main',
+        help_text='Which product the user originally signed up from'
+    )
+    
     date_joined = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -95,3 +109,27 @@ class EmailOTP(models.Model):
         if not self.is_used:
             self.is_used = True
             self.save(update_fields=['is_used'])
+
+
+class UserProduct(models.Model):
+    """Tracks which products a user has accessed within the ecosystem."""
+    PRODUCT_CHOICES = [
+        ('courses', 'Courses'),
+        ('codevisualizer', 'Code Visualizer'),
+        ('scrib', 'Scrib')
+    ]
+    
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE,
+        related_name='products'
+    )
+    product = models.CharField(max_length=50, choices=PRODUCT_CHOICES)
+    first_used_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'product')
+        ordering = ['-first_used_at']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.get_product_display()}"

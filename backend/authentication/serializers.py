@@ -41,7 +41,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('email', 'full_name', 'password', 'confirm_password', 'agreed_to_terms')
+        fields = ('email', 'full_name', 'password', 'confirm_password', 'agreed_to_terms', 'signup_source')
         extra_kwargs = {
             'agreed_to_terms': {'required': True}
         }
@@ -59,7 +59,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             email=validated_data['email'],
             full_name=validated_data['full_name'],
             password=validated_data['password'],
-            agreed_to_terms=validated_data.get('agreed_to_terms', False)
+            agreed_to_terms=validated_data.get('agreed_to_terms', False),
+            signup_source=validated_data.get('signup_source', 'main')
         )
         return user
 
@@ -95,6 +96,7 @@ class OTPSignupSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, validators=[validate_password])
     agreed_to_terms = serializers.BooleanField()
+    signup_source = serializers.CharField(required=False, allow_blank=True, max_length=50)
 
     def validate_email(self, value):
         value = value.strip().lower()

@@ -39,6 +39,13 @@ const GeneratePage = () => {
   const [aiMeta, setAiMeta] = useState(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [latestCreditBalance, setLatestCreditBalance] = useState(null)
+  const [showBuyModal, setShowBuyModal] = useState(false)
+  const [processingPack, setProcessingPack] = useState(null)
+  
+  // Loading states for actions
+  const [loadingItemId, setLoadingItemId] = useState(null)
+  const [downloadingItemId, setDownloadingItemId] = useState(null)
+  
   const [generatedNote, setGeneratedNote] = useState(null)
   const [generatedPack, setGeneratedPack] = useState(null)
   const [generationNotice, setGenerationNotice] = useState('')
@@ -149,14 +156,14 @@ const GeneratePage = () => {
   }
 
   const handleDownloadClick = async (item, isPack, storedUrl, titleStr) => {
+    if (downloadingItemId === item.id) return
+    setDownloadingItemId(item.id)
+
     const isIOS =
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 
-    let newTab = null
-    if (isIOS) {
-      newTab = window.open('', '_blank')
-    }
+    let resolvedUrl = storedUrl
 
     if (isPack && item.id && !String(item.id).startsWith('pending-')) {
       try {
@@ -166,25 +173,23 @@ const GeneratePage = () => {
             return status >= 200 && status < 400
           }
         })
-        const freshUrl = res.headers.location || res.data?.pdf_url
-        if (newTab) {
-          newTab.location.href = freshUrl
-        } else {
-          forceDownload(freshUrl, titleStr, isPack)
-        }
-        return
+        resolvedUrl = res.headers.location || res.data?.pdf_url || res.request?.responseURL || storedUrl
       } catch (err) {
-        if (newTab) newTab.close()
         customToast.error('Failed to prepare download.')
+        setDownloadingItemId(null)
         return
       }
     }
 
-    if (newTab) {
-      newTab.location.href = storedUrl || window.location.href
+    if (isIOS) {
+      // iOS Safari aggressively blocks popups from async callbacks.
+      // The most reliable way to show/download a PDF on iOS is navigating to it in the same tab.
+      window.location.href = resolvedUrl
     } else {
-      forceDownload(storedUrl, titleStr, isPack)
+      await forceDownload(resolvedUrl, titleStr, isPack)
     }
+    
+    setDownloadingItemId(null)
   }
 
   const copyShareLink = async () => {
@@ -991,8 +996,9 @@ const GeneratePage = () => {
                 const isFailed = item.status === 'failed'
 
                 const openViewer = async () => {
-                  if (item._isPending || isGenerating || isFailed) return
+                  if (item._isPending || isGenerating || isFailed || loadingItemId === id) return
 
+                  setLoadingItemId(id)
                   let resolvedUrl = url
 
                   // For packs: always fetch a fresh presigned URL from the backend
@@ -1012,6 +1018,7 @@ const GeneratePage = () => {
                     }
                   }
 
+                  setLoadingItemId(null)
                   if (!resolvedUrl) return
                   const topicsArr = Array.isArray(item.topics_json)
                     ? item.topics_json.map(t => Array.isArray(t) ? t.join(', ') : t)
@@ -1078,12 +1085,20 @@ const GeneratePage = () => {
                         <div className="text-xs font-medium text-[#ef4444] italic px-2">Failed</div>
                       ) : (
                         <>
-                          <button onClick={openViewer} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] sm:flex-none">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                          <button onClick={openViewer} disabled={loadingItemId === id} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] sm:flex-none disabled:opacity-50">
+                            {loadingItemId === id ? (
+                              <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            )}
                             Open
                           </button>
-                          <button onClick={(e) => handleDownloadClick(item, isPack, url, titleStr)} className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] ${!url && 'pointer-events-none opacity-50'}`}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                          <button onClick={(e) => handleDownloadClick(item, isPack, url, titleStr)} disabled={downloadingItemId === item.id || !url} className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50`}>
+                            {downloadingItemId === item.id ? (
+                              <svg className="animate-spin text-[#1f1f1f]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            )}
                           </button>
                           <button
                             onClick={() => handleShareClick(item, isPack, url, titleStr)}

@@ -128,6 +128,14 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (isLoggedIn) {
       const interval = setInterval(refreshAccessToken, TOKEN_REFRESH_INTERVAL)
+      
+      // Record product usage once per session
+      if (!sessionStorage.getItem('productRecorded')) {
+        axiosInstance.post('/auth/record-product/', { product: 'scrib' })
+          .then(() => sessionStorage.setItem('productRecorded', 'true'))
+          .catch(() => {})
+      }
+      
       return () => clearInterval(interval)
     }
   }, [isLoggedIn])
@@ -150,7 +158,8 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (registrationData) => {
     try {
-      const response = await axiosInstance.post('/auth/register/', registrationData)
+      const dataWithSource = { ...registrationData, signup_source: 'scrib' }
+      const response = await axiosInstance.post('/auth/register/', dataWithSource)
       const { user: createdUser, tokens } = response.data
 
       storage.setItem('accessToken', tokens.access)
@@ -233,6 +242,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axiosInstance.post('/auth/google/token/', {
         id_token: googleToken,
+        signup_source: 'scrib'
       })
 
       const { user: loggedInUser, access, refresh } = response.data
