@@ -3,8 +3,7 @@
 # Deployment script for Hostinger
 echo "Preparing files for deployment..."
 
-# Copy .htaccess to dist folder
-cp .htaccess dist/
+# .htaccess is now in public/ and copied automatically by Vite
 
 # Create a zip file of the dist folder
 echo "Creating deployment package..."

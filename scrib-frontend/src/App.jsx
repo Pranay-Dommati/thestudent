@@ -6,6 +6,7 @@ import axiosInstance from './utils/axios'
 import { getInitials } from './utils/user'
 import MobileMenu from './components/MobileMenu'
 import BuyCreditsModal from './components/BuyCreditsModal'
+import FreeCreditsModal from './components/FreeCreditsModal'
 import PreviewCard from './components/PreviewCard'
 import { startPaymentFlow } from './services/paymentService'
 import customToast from './utils/customToast'
@@ -529,6 +530,9 @@ const App = () => {
           onSuccess={() => {}}
         />
       )}
+
+      {/* Free Credits Promo Modal for first-time visitors */}
+      <FreeCreditsModal isLoggedIn={isLoggedIn} />
     </div>
   )
 }

@@ -30,6 +30,27 @@ from .serializers import (
 # pyrefly: ignore [missing-import]
 from .models import User, EmailOTP
 
+SIGNUP_FREE_CREDITS = 2
+
+def grant_signup_credits(user):
+    """Award free signup credits to a newly activated user.
+    Safe to import from any view — uses lazy import to avoid circular deps.
+    Idempotent: only adds credits via CreditTransaction; balance is computed
+    from transactions so calling this once per signup is sufficient.
+    """
+    try:
+        from scrib.models import CreditTransaction
+        CreditTransaction.objects.create(
+            user=user,
+            direction=CreditTransaction.DIRECTION_CREDIT,
+            credits=SIGNUP_FREE_CREDITS,
+            reason=CreditTransaction.REASON_ADJUSTMENT,
+        )
+        logger.info(f"Granted {SIGNUP_FREE_CREDITS} signup credits to new user {user.email}")
+    except Exception as exc:
+        # Non-fatal: log but don't block signup
+        logger.error(f"Failed to grant signup credits to {user.email}: {exc}")
+
 # Import database retry utilities for handling remote MySQL (Hostinger) connection issues
 from backend.db_utils import db_retry_on_connection_error
 
@@ -353,9 +374,12 @@ def otp_verify(request):
 
     # Mark used and activate user
     otp.mark_used()
-    if not user.is_active:
+    first_activation = not user.is_active
+    if first_activation:
         user.is_active = True
         user.save(update_fields=['is_active'])
+        # Grant 2 free signup credits on first ever account activation
+        grant_signup_credits(user)
 
     # Issue tokens
     refresh = RefreshToken.for_user(user)
@@ -1198,6 +1222,8 @@ def google_auth_token(request):
                 )
                 created = True
                 logger.info(f"Google token auth: New user created - {email}")
+                # Grant 2 free signup credits for new Google users
+                grant_signup_credits(user)
             except Exception as e:
                 logger.error(f"Error creating user: {str(e)}")
                 return Response(

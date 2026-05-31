@@ -135,8 +135,9 @@ def _images_to_pdf(images, title=None):
     pdf = None
 
     for image_bytes in images:
-        image = Image.open(BytesIO(image_bytes)).convert('RGB')
-        img_width, img_height = image.size
+        # Open with PIL just to get dimensions (avoiding convert('RGB') which strips format info)
+        with Image.open(BytesIO(image_bytes)) as img:
+            img_width, img_height = img.size
 
         # Use image pixel dimensions as the PDF page size (1pt = 1px at 72 DPI).
         # This makes the PDF page exactly match the image — no white border, no scaling.
@@ -148,7 +149,10 @@ def _images_to_pdf(images, title=None):
             pdf.setPageSize(page_size)
 
         # Draw image edge-to-edge from bottom-left (0, 0)
-        pdf.drawImage(ImageReader(image), 0, 0, img_width, img_height)
+        # Pass the raw BytesIO directly to ImageReader. This prevents ReportLab from
+        # automatically re-encoding PIL Image objects (often as lossy JPEGs), 
+        # preserving the exact original image quality in the PDF.
+        pdf.drawImage(ImageReader(BytesIO(image_bytes)), 0, 0, img_width, img_height)
         pdf.showPage()
 
     if pdf is None:

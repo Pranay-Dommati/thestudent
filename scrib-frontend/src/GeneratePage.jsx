@@ -199,7 +199,7 @@ const GeneratePage = () => {
   }
 
   useEffect(() => {
-    if (activeTab === 'history') {
+    if (activeTab === 'history' && !isGenerating) {
       loadHistory()
     }
   }, [activeTab, isLoggedIn])
@@ -522,8 +522,12 @@ const GeneratePage = () => {
       // Now it returns 202 Accepted instantly
       customToast.success('Generation started! We will notify you when it is ready.')
       setHideBanner(false)
-      setHistoryItems(prev => prev.filter(item => item.id !== tempId))
-      loadHistory() // Refresh history to get the real generating item
+      // Small delay to ensure the backend has committed the new pack
+      // before we refresh the history list
+      setTimeout(() => {
+        setHistoryItems(prev => prev.filter(item => item.id !== tempId))
+        loadHistory()
+      }, 800)
     } catch (error) {
       // Remove the pending item if request fails
       setHistoryItems(prev => prev.filter(item => item.id !== tempId))
@@ -893,7 +897,13 @@ const GeneratePage = () => {
             </div>
             
             <button
-              onClick={!isLoggedIn ? () => navigate('/login?next=/generate') : handleGenerate}
+              onClick={
+                !isLoggedIn 
+                  ? () => navigate('/login?next=/generate') 
+                  : (creditBalance < Math.max(1, baseTopics.length))
+                    ? () => navigate('/pricing')
+                    : handleGenerate
+              }
               disabled={isGenerating || mode === 'paste' || isOrganizing}
               className={`w-full md:w-auto rounded-xl px-5 py-2.5 md:py-2 text-sm md:text-bold font-bold transition-all ${
                 isGenerating || mode === 'paste' || isOrganizing
@@ -909,7 +919,9 @@ const GeneratePage = () => {
                     ? 'Organize topics first'
                     : !isLoggedIn
                       ? 'Sign up to Generate'
-                      : 'Generate PDF'}
+                      : (creditBalance < Math.max(1, baseTopics.length))
+                        ? 'Add credits to generate'
+                        : 'Generate PDF'}
             </button>
             
             <p className="mt-0.5 text-center text-[11px] text-[#a39b92] md:hidden">

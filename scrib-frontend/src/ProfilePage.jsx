@@ -19,8 +19,6 @@ const ProfilePage = () => {
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [editFullName, setEditFullName] = useState('')
   const [isSavingProfile, setIsSavingProfile] = useState(false)
-  const [showCloseModal, setShowCloseModal] = useState(false)
-  const [isClosingAccount, setIsClosingAccount] = useState(false)
   const [showBuyModal, setShowBuyModal] = useState(false)
   const [processingPack, setProcessingPack] = useState(null)
   const [paymentHistory, setPaymentHistory] = useState([])
@@ -106,24 +104,7 @@ const ProfilePage = () => {
     }
   }, [activeSection, loadPaymentHistory])
 
-  const handleCloseAccount = async () => {
-    setIsClosingAccount(true)
-    try {
-      const axiosInstance = (await import('./utils/axios')).default
-      const customToast = (await import('./utils/customToast')).default
-      await axiosInstance.delete('/auth/profile/')
-      customToast.success('Account closed successfully.')
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      window.location.href = '/'
-    } catch (error) {
-      console.error('Failed to close account', error)
-      const customToast = (await import('./utils/customToast')).default
-      customToast.error('Failed to close account. Please try again.')
-      setIsClosingAccount(false)
-      setShowCloseModal(false)
-    }
-  }
+
 
   const handlePaymentSuccess = async ({ credits_added, credit_balance }) => {
     // Refresh payment history list
@@ -312,18 +293,7 @@ const ProfilePage = () => {
                 </button>
               </div>
 
-              <div className="rounded-2xl border border-[#f2d8d8] bg-[#fff7f7] px-6 py-5">
-                <h2 className="text-sm font-semibold text-[#a74c4c]">Close account</h2>
-                <p className="mt-1 text-xs text-[#a06f6f]">
-                  This will delete your credits, notes, and billing history permanently.
-                </p>
-                <button
-                  onClick={() => setShowCloseModal(true)}
-                  className="mt-4 rounded-full border border-[#e6b7b7] bg-white px-4 py-2 text-xs font-semibold text-[#a06f6f] hover:bg-[#fff0f0] transition-colors"
-                >
-                  Close account
-                </button>
-              </div>
+
             </div>
           ) : null}
 
@@ -465,39 +435,7 @@ const ProfilePage = () => {
         />
       )}
 
-      {/* Close Account Modal */}
-      {showCloseModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-[#e2dbd2] bg-white p-6 shadow-xl">
-            <h3 className="text-xl font-semibold text-[#c05c5c]">Close Account</h3>
-            <div className="mt-3 rounded-lg border border-[#f2d8d8] bg-[#fff7f7] p-3">
-              <p className="text-sm font-semibold text-[#a06f6f]">Warning: This action is irreversible.</p>
-              <ul className="mt-2 list-disc pl-5 text-xs text-[#a06f6f]">
-                <li>You will lose access to all generated PDF notes.</li>
-                <li>Your remaining credits ({user?.credit_balance ?? 0}) will be permanently deleted.</li>
-                <li>There are no refunds for unused credits.</li>
-              </ul>
-            </div>
-            <p className="mt-4 text-sm text-[#1f1f1f] font-medium">Are you absolutely sure you want to proceed?</p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setShowCloseModal(false)}
-                disabled={isClosingAccount}
-                className="rounded-lg px-4 py-2 text-sm font-semibold text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCloseAccount}
-                disabled={isClosingAccount}
-                className="rounded-lg bg-[#c05c5c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#a74c4c] transition-colors"
-              >
-                {isClosingAccount ? 'Closing...' : 'Yes, close my account'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }

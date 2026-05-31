@@ -270,6 +270,9 @@ export const AuthProvider = ({ children }) => {
     setShowLogoutModal(false)
     handleAuthFailure()
     customToast.success('Logged out successfully', { id: 'auth-logout' })
+    setTimeout(() => {
+      window.location.href = '/'
+    }, 500)
   }
 
   const cancelLogout = () => {

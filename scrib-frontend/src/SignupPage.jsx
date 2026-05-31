@@ -131,7 +131,11 @@ const SignupPage = () => {
         <div className="w-full rounded-2xl border border-[#e2dbd2] bg-white px-8 py-10 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#9a9289]">Scrib</p>
           <h1 className="mt-3 text-2xl font-semibold">Create your account</h1>
-          <p className="mt-1 text-sm text-[#7b756d]">Start with 5 free credits - no card needed.</p>
+          {/* 2 free credits highlight */}
+          <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1">
+            <span className="text-base">🎁</span>
+            <span className="text-xs font-semibold text-[#557a3f]">Get 2 free credits on sign up — no card needed</span>
+          </div>
 
           <div className="mt-6 flex w-full flex-col items-center">
             <div id="google-signup-btn" className="w-full max-w-[400px] flex justify-center"></div>
