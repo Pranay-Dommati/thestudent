@@ -6,8 +6,7 @@ import { getInitials } from './utils/user'
 import Breadcrumb from './components/Breadcrumb'
 import MobileMenu from './components/MobileMenu'
 import customToast from './utils/customToast'
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
+import axiosInstance from './utils/axios'
 
 const SupportPage = () => {
   const { user, isLoggedIn, logout } = useAuth()
@@ -41,27 +40,16 @@ const SupportPage = () => {
     setIsSubmitting(true)
     
     try {
-      const headers = { 'Content-Type': 'application/json' }
-      if (isLoggedIn) {
-        headers['Authorization'] = `Bearer ${localStorage.getItem('access_token')}`
-      }
+      const res = await axiosInstance.post('/scrib/support/', formData)
       
-      const res = await fetch(`${API_BASE}/scrib/support/`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(formData)
-      })
-      
-      const data = await res.json()
-      
-      if (data.success) {
-        customToast.success(data.message || 'Message sent successfully!')
+      if (res.data?.success) {
+        customToast.success(res.data.message || 'Message sent successfully!')
         setFormData(prev => ({ ...prev, subject: '', message: '' }))
       } else {
-        customToast.error(data.message || 'Failed to send message.')
+        customToast.error(res.data?.message || 'Failed to send message.')
       }
     } catch (err) {
-      customToast.error('Network error. Please try again later.')
+      customToast.error(err.response?.data?.message || 'Network error. Please try again later.')
     } finally {
       setIsSubmitting(false)
     }

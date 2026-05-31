@@ -10,6 +10,8 @@ urlpatterns = [
     path('generate-note/', views.GenerateNoteView.as_view(), name='generate-note'),
     path('generate-study-pack/', views.GenerateStudyPackView.as_view(), name='generate-study-pack'),
     path('organize-topics/', views.OrganizeTopicsView.as_view(), name='organize-topics'),
+    path('parse-syllabus/', views.ParseSyllabusView.as_view(), name='parse-syllabus'),
+    path('moderate-topics/', views.ModerateTopicsView.as_view(), name='moderate-topics'),
     # Payment endpoints
     path('payments/create-order/', views.CreateOrderView.as_view(), name='payments-create-order'),
     path('payments/verify/', views.VerifyPaymentView.as_view(), name='payments-verify'),

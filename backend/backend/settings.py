@@ -781,6 +781,11 @@ LOGGING = {
             'level': os.environ.get('LOG_LEVEL', 'INFO'),
             'propagate': False,
         },
+        'scrib': {  # Scrib Vertex AI logs
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 

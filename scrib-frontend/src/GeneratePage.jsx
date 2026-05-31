@@ -280,38 +280,12 @@ const GeneratePage = () => {
 
     setIsOrganizing(true)
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-      if (!apiKey) throw new Error('Gemini API key not found in environment variables')
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Extract all specific study topics from the following syllabus. Rules:\n1. Make each topic standalone and understandable out of context. If it's a sub-topic, prepend its parent category (e.g., 'Testing Strategies: Strategic issues', 'Testing: Testing Concepts').\n2. Do NOT exclude sub-topics. For example, in 'Testing Strategies: A Strategic approach to software testing', the topic is 'Testing Strategies: A Strategic approach to software testing'.\n3. Return ONLY a valid JSON array of strings, and nothing else. No markdown or code block tags.\n\nSyllabus:\n${trimmed}`
-            }]
-          }]
-        })
+      const response = await axiosInstance.post('/scrib/parse-syllabus/', {
+        syllabus: trimmed
       })
-
-      if (!response.ok) {
-        const errorData = await response.text()
-        console.error('Gemini API Error Response:', response.status, errorData)
-        throw new Error('Failed to parse syllabus with AI')
-      }
       
-      const data = await response.json()
-      const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
-      const jsonMatch = content.match(/\[.*\]/s)
-      let parsedTopics = []
+      const parsedTopics = response.data
       
-      try {
-        parsedTopics = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content)
-      } catch (err) {
-        throw new Error('AI did not return valid JSON')
-      }
-
       if (!Array.isArray(parsedTopics) || !parsedTopics.length) {
          throw new Error('AI returned an empty or invalid array')
       }
@@ -402,74 +376,23 @@ const GeneratePage = () => {
 
     // Moderation Check
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-      if (apiKey) {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: `You are a strict content moderator for an educational app. Evaluate the following list of study topics. Return a JSON array of booleans corresponding to each topic. True means it is a valid, acceptable educational or general topic. False means it is highly inappropriate, sexually explicit, pornographic, or hate speech. Return ONLY the JSON array.\n\nTopics:\n${JSON.stringify(cleanedTopics)}`
-              }]
-            }]
-          })
-        })
+      const response = await axiosInstance.post('/scrib/moderate-topics/', {
+        topics: cleanedTopics
+      })
+      
+      const moderationFlags = response.data.moderation || []
+      const isValid = moderationFlags.every((flag) => flag === true)
 
-        if (response.ok) {
-          const data = await response.json()
-          const finishReason = data.candidates?.[0]?.finishReason
-          const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
-
-          if (finishReason === 'SAFETY' || finishReason === 'RECITATION' || finishReason === 'OTHER') {
-            if (mode === 'paste') {
-              setTopics(cleanedTopics)
-              setMode('manual')
-            }
-            setInvalidTopics(cleanedTopics)
-            customToast.error('Please enter appropriate educational topics.', { id: 'gen-error' })
-            setIsGenerating(false)
-            return
-          }
-
-          const jsonMatch = content.match(/\[.*\]/s)
-          let validityArray = []
-          try {
-            validityArray = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content)
-          } catch (err) {}
-
-          if (Array.isArray(validityArray) && validityArray.length === cleanedTopics.length) {
-            const badTopics = cleanedTopics.filter((_, idx) => validityArray[idx] === false)
-            if (badTopics.length > 0) {
-              if (mode === 'paste') {
-                setTopics(cleanedTopics)
-                setMode('manual')
-              }
-              setInvalidTopics(badTopics)
-              customToast.error('Please enter appropriate educational topics.', { id: 'gen-error' })
-              setIsGenerating(false)
-              return
-            }
-          } else {
-             if (mode === 'paste') {
-               setTopics(cleanedTopics)
-               setMode('manual')
-             }
-             setInvalidTopics(cleanedTopics)
-             customToast.error('Please enter appropriate educational topics.', { id: 'gen-error' })
-             setIsGenerating(false)
-             return
-          }
-        } else if (response.status === 400) {
-           if (mode === 'paste') {
-             setTopics(cleanedTopics)
-             setMode('manual')
-           }
-           setInvalidTopics(cleanedTopics)
-           customToast.error('Please enter appropriate educational topics.', { id: 'gen-error' })
-           setIsGenerating(false)
-           return
+      if (!isValid) {
+        const badTopics = cleanedTopics.filter((_, idx) => moderationFlags[idx] === false)
+        if (mode === 'paste') {
+          setTopics(cleanedTopics)
+          setMode('manual')
         }
+        setInvalidTopics(badTopics.length > 0 ? badTopics : cleanedTopics)
+        customToast.error('One or more topics violate our content policy (NSFW/Hate Speech). Please revise your topics.', { id: 'gen-error', duration: 5000 })
+        setIsGenerating(false)
+        return
       }
     } catch (err) {
       console.error('Moderation check failed', err)
@@ -720,10 +643,18 @@ const GeneratePage = () => {
                         value={topic}
                         onChange={(event) => handleTopicChange(event.target.value, index)}
                         readOnly={editingIndex !== index}
-                        onBlur={() => setEditingIndex(null)}
+                        onBlur={(e) => {
+                          // Only close if focus is moving outside the topic row entirely
+                          const row = e.currentTarget.closest('[data-topic-row]')
+                          if (row && row.contains(e.relatedTarget)) return
+                          setEditingIndex(null)
+                        }}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter') {
                             event.preventDefault()
+                            setEditingIndex(null)
+                          }
+                          if (event.key === 'Escape') {
                             setEditingIndex(null)
                           }
                         }}
@@ -732,8 +663,8 @@ const GeneratePage = () => {
                         {editingIndex === index ? (
                           <button
                             type="button"
-                            onMouseDown={(e) => {
-                              e.preventDefault() // prevent onBlur from firing first
+                            onClick={(e) => {
+                              e.stopPropagation()
                               setEditingIndex(null)
                             }}
                             className="rounded-full border border-[#1f1f1f] bg-[#1f1f1f] p-1 text-white"

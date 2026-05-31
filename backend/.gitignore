@@ -13,6 +13,13 @@
 .env.test
 *.env
 
+# Google Service Account JSON keys
+easylearnova-*.json
+*-key.json
+*gcp*.json
+*vertex*.json
+
+
 # -------------------------
 # Python cache directories
 # -------------------------

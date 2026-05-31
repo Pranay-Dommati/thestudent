@@ -1,0 +1,68 @@
+import os
+import json
+import tempfile
+import logging
+from google import genai
+from django.conf import settings
+
+logger = logging.getLogger('scrib')
+MODEL_NAME = "gemini-2.5-flash"
+
+def _setup_credentials():
+    """
+    Set up Google Application Credentials.
+    - On Render (production): reads JSON from GOOGLE_SERVICE_ACCOUNT_JSON env var.
+    - Locally: reads from the JSON key file in the backend directory.
+    """
+    # Option 1: Render/production — JSON content stored as env var
+    service_account_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if service_account_json:
+        try:
+            # Validate it's real JSON
+            json.loads(service_account_json)
+            # Write to a temp file so google-genai can read it
+            tmp = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json")
+            tmp.write(service_account_json)
+            tmp.flush()
+            tmp.close()
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = tmp.name
+            logger.info("[SCRIB AI] Credentials loaded from GOOGLE_SERVICE_ACCOUNT_JSON env var (Render/production)")
+            return
+        except (json.JSONDecodeError, Exception) as e:
+            logger.error(f"[SCRIB AI] Failed to parse GOOGLE_SERVICE_ACCOUNT_JSON: {e}")
+            raise
+
+    # Option 2: Local development — JSON file on disk
+    key_path = os.path.join(settings.BASE_DIR, 'easylearnova-5a2456bf394b.json')
+    if os.path.exists(key_path):
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = key_path
+        logger.info(f"[SCRIB AI] Credentials loaded from local file: {os.path.basename(key_path)}")
+        return
+
+    raise RuntimeError(
+        "No Google credentials found. "
+        "Set GOOGLE_SERVICE_ACCOUNT_JSON env var on Render, "
+        "or place easylearnova-5a2456bf394b.json in the backend directory locally."
+    )
+
+
+def call_scrib_vertex_ai(prompt):
+    _setup_credentials()
+
+    logger.info("[SCRIB AI] *** USING GOOGLE VERTEX AI ***")
+    logger.info(f"[SCRIB AI] Model: {MODEL_NAME}")
+    logger.info(f"[SCRIB AI] Project: easylearnova | Location: us-central1")
+
+    client = genai.Client(
+        vertexai=True,
+        project="easylearnova",
+        location="us-central1",
+    )
+
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=prompt
+    )
+
+    logger.info(f"[SCRIB AI] SUCCESS - Response received from Vertex AI ({MODEL_NAME}). No fallback used.")
+    return response.text

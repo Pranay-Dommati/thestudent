@@ -1,16 +1,39 @@
-import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
+import { Document, Page, pdfjs } from 'react-pdf'
+import 'react-pdf/dist/Page/AnnotationLayer.css'
+import 'react-pdf/dist/Page/TextLayer.css'
 import axiosInstance from './utils/axios'
 import { getTopicContent } from './utils/topicContentGenerator'
 import NotFoundPage from './NotFoundPage'
 
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+
 const TopicPage = () => {
   const { slug } = useParams()
+  const navigate = useNavigate()
   const [topic, setTopic] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [content, setContent] = useState(null)
+  
+  const containerRef = useRef(null)
+  const [pdfWidth, setPdfWidth] = useState(null)
+
+  const measureWidth = useCallback(() => {
+    if (containerRef.current) {
+      setPdfWidth(containerRef.current.offsetWidth)
+    }
+  }, [])
+
+  useEffect(() => {
+    measureWidth()
+    const ro = new ResizeObserver(measureWidth)
+    if (containerRef.current) ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [measureWidth, topic])
+
 
   useEffect(() => {
     let isMounted = true
@@ -89,7 +112,15 @@ const TopicPage = () => {
         <meta property="og:type" content="article" />
         <meta property="og:title" content={`${topic.title} Handwritten Notes`} />
         <meta property="og:description" content={content?.overview} />
+        <meta property="og:image" content={topic.image_url || 'https://scrib.easylearnova.com/og-image.png'} />
         <meta property="og:url" content={`https://scrib.easylearnova.com/topic/${slug}`} />
+        <meta property="og:site_name" content="Scrib by EasyLearnova" />
+        
+        {/* Twitter Card Tags */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${topic.title} Handwritten Notes`} />
+        <meta name="twitter:description" content={content?.overview} />
+        <meta name="twitter:image" content={topic.image_url || 'https://scrib.easylearnova.com/og-image.png'} />
         
         {/* Structured Data */}
         <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
@@ -143,9 +174,12 @@ const TopicPage = () => {
             </div>
 
             <div className="mt-10 flex flex-col gap-4">
-              <a href={topic.pdf_url} target="_blank" rel="noopener noreferrer" className="w-full rounded-lg bg-[#c05c5c] px-6 py-3 text-center text-sm font-semibold text-white hover:bg-[#a84d4d] transition-colors shadow-sm">
-                Download PDF Notes
-              </a>
+              <button 
+                onClick={() => navigate(`/view/${slug}`, { state: { pdfUrl: topic.pdf_url, title: topic.title, topics: [content?.category || topic.title], totalPages: topic.page_count, isPack: true } })}
+                className="w-full rounded-lg bg-[#c05c5c] px-6 py-3 text-center text-sm font-semibold text-white hover:bg-[#a84d4d] transition-colors shadow-sm"
+              >
+                View Full PDF Notes
+              </button>
               <Link to="/generate" className="w-full rounded-lg border border-[#e2dbd2] bg-white px-6 py-3 text-center text-sm font-semibold text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors">
                 Generate Custom Notes
               </Link>
@@ -153,16 +187,30 @@ const TopicPage = () => {
           </div>
 
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#e2dbd2]">
-            <div className="aspect-[1/1.4] w-full rounded-xl overflow-hidden bg-[#f0eadd] relative group">
-              <iframe 
-                src={`${topic.pdf_url}#toolbar=0&navpanes=0`}
-                className="w-full h-full border-0 object-cover pointer-events-none"
-                title={`${topic.title} Preview`}
-              />
-              <div className="absolute inset-0 bg-black/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <a href={topic.pdf_url} target="_blank" rel="noopener noreferrer" className="rounded-full bg-white/90 backdrop-blur px-6 py-2 text-sm font-bold shadow-sm hover:scale-105 transition-transform">
-                  View Full PDF
-                </a>
+            <div 
+              ref={containerRef}
+              className="aspect-[1/1.4] w-full rounded-xl overflow-hidden bg-[#f0eadd] relative group flex items-center justify-center cursor-pointer"
+              onClick={() => navigate(`/view/${slug}`, { state: { pdfUrl: topic.pdf_url, title: topic.title, topics: [content?.category || topic.title], totalPages: topic.page_count, isPack: true } })}
+            >
+              <Document
+                file={topic.pdf_url}
+                loading={<span className="text-sm font-semibold text-[#9a9289]">Loading Preview...</span>}
+                className="flex items-center justify-center w-full h-full"
+              >
+                {pdfWidth && (
+                  <Page
+                    pageNumber={1}
+                    width={pdfWidth}
+                    renderAnnotationLayer={false}
+                    renderTextLayer={false}
+                    className="shadow-md"
+                  />
+                )}
+              </Document>
+              <div className="absolute inset-0 bg-black/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="rounded-full bg-white/95 backdrop-blur px-6 py-2 text-sm font-bold shadow-md transform group-hover:scale-105 transition-all">
+                  Open in Viewer
+                </span>
               </div>
             </div>
             <p className="text-center text-xs text-[#9a9289] mt-3 uppercase tracking-widest font-semibold">

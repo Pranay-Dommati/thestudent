@@ -39,6 +39,8 @@ from .services.payments import (
 )
 # pyrefly: ignore [missing-import]
 from backend.ai.ai_service import call_gemini_flash_api
+# pyrefly: ignore [missing-import]
+from .vertex_ai import call_scrib_vertex_ai
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +48,7 @@ logger = logging.getLogger(__name__)
 # Amounts stored in paise (1 INR = 100 paise).
 # These values are NEVER trusted from the frontend.
 CREDIT_PACKS = {
-    'starter': {'credits': 10, 'amount_paise': 100},   # ₹59
+    'starter': {'credits': 10, 'amount_paise': 5900},   # ₹59
     'popular': {'credits': 20, 'amount_paise': 9900},   # ₹99
     'pro':     {'credits': 40, 'amount_paise': 19900},  # ₹199
 }
@@ -279,8 +281,14 @@ class OrganizeTopicsView(APIView):
         )
 
         try:
-            response_data = call_gemini_flash_api(prompt)
-            response_text = _extract_gemini_text(response_data)
+            response_text = call_scrib_vertex_ai(prompt)
+            
+            # Clean up the markdown if present
+            if response_text.startswith('```json'):
+                response_text = response_text[7:-3].strip()
+            elif response_text.startswith('```'):
+                response_text = response_text[3:-3].strip()
+                
             parsed = json.loads(response_text)
         except Exception as exc:
             groups = _build_groups_fallback(topics)
@@ -318,8 +326,72 @@ class OrganizeTopicsView(APIView):
             'groups': groups,
             'total_pages': total_pages,
             'credit_savings': credit_savings,
-            'source': 'gemini',
+            'source': 'vertex_ai',
         })
+
+class ParseSyllabusView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        syllabus = request.data.get('syllabus')
+        if not syllabus:
+            return error_response('Syllabus text is required', status_code=400)
+            
+        prompt = (
+            f"Extract all specific study topics from the following syllabus. Rules:\n"
+            f"1. Make each topic standalone and understandable out of context. If it's a sub-topic, prepend its parent category (e.g., 'Testing Strategies: Strategic issues', 'Testing: Testing Concepts').\n"
+            f"2. Do NOT exclude sub-topics. For example, in 'Testing Strategies: A Strategic approach to software testing', the topic is 'Testing Strategies: A Strategic approach to software testing'.\n"
+            f"3. Return ONLY a valid JSON array of strings, and nothing else. No markdown or code block tags.\n\n"
+            f"Syllabus:\n{syllabus}"
+        )
+        
+        try:
+            logger.info("[SCRIB API] /parse-syllabus/ called - sending to Vertex AI...")
+            response_text = call_scrib_vertex_ai(prompt)
+            
+            # Clean up the markdown if present
+            if response_text.startswith('```json'):
+                response_text = response_text[7:-3].strip()
+            elif response_text.startswith('```'):
+                response_text = response_text[3:-3].strip()
+            
+            parsed = json.loads(response_text)
+            logger.info(f"[SCRIB API] SUCCESS - Vertex AI parsed {len(parsed)} topics. NO FALLBACK USED.")
+            return Response(parsed)
+        except Exception as e:
+            logger.error(f"[SCRIB API] FAILED - Vertex AI error: {str(e)}")
+            return error_response(f"Failed to parse syllabus: {str(e)}", status_code=500)
+
+class ModerateTopicsView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        topics = request.data.get('topics')
+        if not topics or not isinstance(topics, list):
+            return error_response('List of topics is required', status_code=400)
+            
+        prompt = (
+            f"You are a strict content moderator for an educational app. Evaluate the following list of study topics. "
+            f"Return a JSON array of booleans corresponding to each topic. True means it is a valid, acceptable educational or general topic. "
+            f"False means it is highly inappropriate, sexually explicit, pornographic, or hate speech. Return ONLY the JSON array.\n\n"
+            f"Topics:\n{json.dumps(topics)}"
+        )
+        
+        try:
+            response_text = call_scrib_vertex_ai(prompt)
+            
+            # Clean up the markdown if present
+            if response_text.startswith('```json'):
+                response_text = response_text[7:-3].strip()
+            elif response_text.startswith('```'):
+                response_text = response_text[3:-3].strip()
+                
+            return Response({'moderation': json.loads(response_text)})
+        except Exception as e:
+            # Fallback: assume valid if AI fails, but log it
+            logger.error(f"Moderation failed: {e}")
+            return Response({'moderation': [True] * len(topics)})
+
 
 
 def parse_topics_from_request(data):

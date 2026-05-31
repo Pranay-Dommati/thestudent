@@ -108,6 +108,13 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       if (IS_DEV) console.error('Auth validation failed:', error)
+      
+      // Prevent hydration mismatch: If react-snap blocks the API, we are definitely not logged in on the server.
+      if (error.message === 'API calls disabled during prerendering') {
+        handleAuthFailure()
+        return false
+      }
+
       const status = error.response?.status
       if (status === 401) {
         handleAuthFailure()

@@ -144,13 +144,13 @@ const App = () => {
         <meta property="og:type" content="website" />
         <meta property="og:title" content="Generate Handwritten Exam Notes with AI" />
         <meta property="og:description" content="Turn any topic into handwritten exam notes instantly." />
-        <meta property="og:image" content="https://scrib.easylearnova.com/og/home.png" />
+        <meta property="og:image" content="https://scrib.easylearnova.com/og-image.png" />
         <meta property="og:url" content="https://scrib.easylearnova.com" />
         <meta property="og:site_name" content="Scrib by EasyLearnova" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Generate Handwritten Exam Notes with AI" />
         <meta name="twitter:description" content="AI-generated handwritten exam notes PDFs in seconds." />
-        <meta name="twitter:image" content="https://scrib.easylearnova.com/og/home.png" />
+        <meta name="twitter:image" content="https://scrib.easylearnova.com/og-image.png" />
         <link rel="canonical" href="https://scrib.easylearnova.com/" />
         <script type="application/ld+json">
           {`
