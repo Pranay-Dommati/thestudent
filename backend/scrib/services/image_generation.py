@@ -46,7 +46,7 @@ def _openai_image_bytes(prompt):
                 'Content-Type': 'application/json',
             },
             json=payload,
-            timeout=180,  # gpt-image-2 can take up to 2-3 minutes
+            timeout=6000,
         )
     except requests.RequestException as exc:
         raise ImageGenerationError(f'Image generation request failed: {exc}') from exc

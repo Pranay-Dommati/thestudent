@@ -191,26 +191,87 @@ def generate_study_pack_pdf(pages, title, user_id=None):
     if placeholder_url:
         return {'pdf_url': placeholder_url, 's3_key': None, 'total_pages': len(pages)}
 
-    # Generate all page images in PARALLEL — each page calls OpenAI independently,
-    # so there is no reason to wait for page N before starting page N+1.
-    from concurrent.futures import ThreadPoolExecutor
+    # Generate all page images in BATCHES of 5 with detailed logging.
+    # For any number of pages (10, 20, 30), process 5 at a time in parallel,
+    # then move to the next batch. Retries on rate-limit (429) errors.
+    import time
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    def _generate_page(args):
-        index, page_topics = args
+    BATCH_SIZE = 5
+    total_pages = len(pages)
+    all_images = [None] * total_pages  # Pre-allocate to maintain order
+
+    logger.info(f'[scrib] ========== PDF GENERATION START ==========')
+    logger.info(f'[scrib] Title: "{title}" | Total pages: {total_pages} | Batch size: {BATCH_SIZE}')
+    gen_start = time.time()
+
+    def _generate_single_page(index, page_topics):
+        """Generate one page image with retry on rate-limit errors."""
         prompt = _topics_to_prompt(page_topics)
-        image_bytes = generate_handwritten_image_bytes(prompt)
-        return index, image_bytes
+        max_retries = 3
+        for attempt in range(max_retries):
+            page_start = time.time()
+            try:
+                logger.info(f'[scrib]   Page {index+1}/{total_pages} — sending to OpenAI (attempt {attempt+1})...')
+                image_bytes = generate_handwritten_image_bytes(prompt)
+                elapsed = time.time() - page_start
+                logger.info(f'[scrib]   Page {index+1}/{total_pages} — DONE in {elapsed:.1f}s ({len(image_bytes)} bytes)')
+                return index, image_bytes
+            except ImageGenerationError as exc:
+                elapsed = time.time() - page_start
+                err_str = str(exc)
+                err_lower = err_str.lower()
+                is_rate_limit = '429' in err_lower or 'rate limit' in err_lower or 'too many' in err_lower
+                is_timeout = 'timed out' in err_lower or 'timeout' in err_lower
+                
+                if (is_rate_limit or is_timeout) and attempt < max_retries - 1:
+                    wait = (attempt + 1) * 15  # 15s, 30s backoff
+                    reason = "RATE LIMITED" if is_rate_limit else "TIMED OUT"
+                    logger.warning(f'[scrib]   Page {index+1}/{total_pages} — {reason} after {elapsed:.1f}s, retrying in {wait}s (attempt {attempt+1}/{max_retries})')
+                    time.sleep(wait)
+                    continue
+                logger.error(f'[scrib]   Page {index+1}/{total_pages} — FAILED after {elapsed:.1f}s: {err_str}')
+                raise
 
     try:
-        with ThreadPoolExecutor(max_workers=min(len(pages), 5)) as executor:
-            results = list(executor.map(_generate_page, enumerate(pages)))
-        # Sort by original page index to guarantee correct PDF page order
-        # (executor.map preserves order, but explicit sort is defensive).
-        results.sort(key=lambda r: r[0])
-        images = [img for _, img in results]
+        # Process in batches of BATCH_SIZE
+        num_batches = (total_pages + BATCH_SIZE - 1) // BATCH_SIZE
+        for batch_idx in range(num_batches):
+            batch_start_idx = batch_idx * BATCH_SIZE
+            batch_end_idx = min(batch_start_idx + BATCH_SIZE, total_pages)
+            batch_pages = list(enumerate(pages))[batch_start_idx:batch_end_idx]
+            batch_num = batch_idx + 1
+
+            logger.info(f'[scrib]   --- Batch {batch_num}/{num_batches} (pages {batch_start_idx+1}-{batch_end_idx}) ---')
+            batch_start = time.time()
+
+            with ThreadPoolExecutor(max_workers=len(batch_pages)) as executor:
+                futures = {
+                    executor.submit(_generate_single_page, idx, topics): idx
+                    for idx, topics in batch_pages
+                }
+                for future in as_completed(futures):
+                    idx = futures[future]
+                    index, image_bytes = future.result()  # Raises if the page failed
+                    all_images[index] = image_bytes
+
+            batch_elapsed = time.time() - batch_start
+            logger.info(f'[scrib]   --- Batch {batch_num}/{num_batches} DONE in {batch_elapsed:.1f}s ---')
+
     except ImageGenerationError as exc:
+        total_elapsed = time.time() - gen_start
+        logger.error(f'[scrib] PDF GENERATION FAILED after {total_elapsed:.1f}s: {exc}')
         raise PdfGenerationError(str(exc)) from exc
 
-    pdf_bytes = _images_to_pdf(images, title=title)
+    total_elapsed = time.time() - gen_start
+    logger.info(f'[scrib] All {total_pages} pages generated in {total_elapsed:.1f}s — building PDF...')
+
+    pdf_bytes = _images_to_pdf(all_images, title=title)
+    logger.info(f'[scrib] PDF built ({len(pdf_bytes)} bytes) — uploading...')
+
     pdf_url, s3_key = _save_pdf_bytes(pdf_bytes, user_id=user_id)
-    return {'pdf_url': pdf_url, 's3_key': s3_key, 'total_pages': len(pages)}
+
+    logger.info(f'[scrib] ========== PDF GENERATION COMPLETE ==========')
+    logger.info(f'[scrib] Total time: {time.time() - gen_start:.1f}s | Pages: {total_pages} | PDF size: {len(pdf_bytes)} bytes')
+
+    return {'pdf_url': pdf_url, 's3_key': s3_key, 'total_pages': total_pages}
