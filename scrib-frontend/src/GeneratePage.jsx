@@ -242,6 +242,16 @@ const GeneratePage = () => {
               return item
             }))
             customToast.error(`Failed to generate study pack "${pack.name}".`)
+            
+            // Refresh credits so the UI shows the refunded credits immediately
+            try {
+              const profileRes = await axiosInstance.get('/auth/profile/')
+              if (profileRes.data && typeof profileRes.data.credit_balance === 'number') {
+                setLatestCreditBalance(profileRes.data.credit_balance)
+              }
+            } catch (profileErr) {
+              console.error('Failed to refresh credits after generation failure', profileErr)
+            }
           }
         } catch (err) {
           console.error(`Failed to poll status for pack ${pack.id}`, err)
