@@ -1066,7 +1066,7 @@ class StudyPackPdfView(APIView):
             fresh_url = s3.generate_presigned_url(
                 'get_object',
                 Params={'Bucket': bucket, 'Key': pack.s3_key},
-                ExpiresIn=300,
+                ExpiresIn=604800,  # 7 days to prevent expiry while reading
             )
         except (BotoCoreError, ClientError) as exc:
             import logging
@@ -1134,7 +1134,7 @@ class StudyPackShareView(APIView):
             fresh_url = s3.generate_presigned_url(
                 'get_object',
                 Params={'Bucket': bucket, 'Key': pack.s3_key},
-                ExpiresIn=300,  # 5 min — plenty for the browser to start loading
+                ExpiresIn=604800,  # 7 days to prevent expiry while reading
             )
         except (BotoCoreError, ClientError) as exc:
             import logging
