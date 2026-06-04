@@ -670,22 +670,51 @@ class GenerateStudyPackView(APIView):
                     reason=CreditTransaction.REASON_GENERATION,
                     study_pack=pack,
                 )
-                
-        # --- Phase 3: Trigger Background Task ---
-        generate_study_pack_task.delay(pack.id, pages, title, request.user.id)
-        
-        # Invalidate history cache
+
+        # Invalidate history cache immediately so the UI shows the GENERATING pack
         from django.core.cache import cache
         cache.delete(f'scrib_my_study_packs_api_{request.user.id}')
 
-        # If Celery is running synchronously (ALWAYS_EAGER), the task can take 30+ seconds,
-        # which might cause the MySQL connection to time out. Close it so Django reconnects.
-        from django.db import connection
-        connection.close()
+        # --- Phase 3: Dispatch generation to a true background thread ---
+        # CRITICAL: When no Redis broker is configured, Celery runs with
+        # CELERY_TASK_ALWAYS_EAGER=True which executes .delay() synchronously
+        # on the same gunicorn worker thread. This blocks the web response for
+        # minutes and gunicorn's --timeout kills the worker mid-generation,
+        # leaving the pack stuck in GENERATING with no error logged.
+        #
+        # Fix: detect ALWAYS_EAGER mode and spawn a daemon thread instead so
+        # the 202 response is returned immediately regardless of broker status.
+        from django.conf import settings as _settings
+        _always_eager = getattr(_settings, 'CELERY_TASK_ALWAYS_EAGER', False)
+
+        if _always_eager:
+            # No Redis available — run generation in a daemon background thread
+            # so this web request returns immediately.
+            import threading
+
+            def _run_in_thread():
+                # Each thread needs its own Django DB connection
+                from django.db import close_old_connections
+                close_old_connections()
+                try:
+                    generate_study_pack_task(pack.id, pages, title, request.user.id)
+                except Exception as exc:
+                    logger.exception(f'[scrib] Background thread error for StudyPack {pack.id}: {exc}')
+                finally:
+                    from django.db import connection as _conn
+                    _conn.close()
+
+            t = threading.Thread(target=_run_in_thread, daemon=True)
+            t.start()
+            logger.info(f'[scrib] StudyPack {pack.id} dispatched to background thread (no Redis broker)')
+        else:
+            # Redis is available — use Celery as designed
+            generate_study_pack_task.delay(pack.id, pages, title, request.user.id)
+            logger.info(f'[scrib] StudyPack {pack.id} dispatched to Celery worker')
 
         response_data = StudyPackSerializer(pack).data
         response_data['credit_balance'] = get_credit_balance(user)
-        # Return 202 Accepted because processing is in background
+        # Return 202 Accepted — generation continues in background
         return Response(response_data, status=202)
 
 

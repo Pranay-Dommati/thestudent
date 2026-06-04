@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot, hydrateRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
+import { Toaster, toast, ToastBar } from 'react-hot-toast'
 import './index.css'
 import App from './App.jsx'
 import PreviewsPage from './PreviewsPage.jsx'
@@ -54,7 +54,52 @@ const AppContent = (
         </Routes>
         <GlobalGenerationIndicator />
       </BrowserRouter>
-      <Toaster position="top-center" />
+      <Toaster position="top-center">
+        {(t) => (
+          <ToastBar toast={t}>
+            {({ icon, message }) => (
+              <>
+                {icon}
+                {message}
+                {/* Circular close button — only show on non-loading toasts */}
+                {t.type !== 'loading' && (
+                  <button
+                    onClick={() => toast.dismiss(t.id)}
+                    aria-label="Dismiss"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      border: '1.5px solid rgba(0,0,0,0.15)',
+                      background: 'rgba(0,0,0,0.06)',
+                      color: '#888',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      lineHeight: 1,
+                      flexShrink: 0,
+                      marginLeft: '4px',
+                      transition: 'background 0.15s, color 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(0,0,0,0.15)'
+                      e.currentTarget.style.color = '#333'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(0,0,0,0.06)'
+                      e.currentTarget.style.color = '#888'
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </>
+            )}
+          </ToastBar>
+        )}
+      </Toaster>
     </AuthProvider>
   </HelmetProvider>
 </StrictMode>
