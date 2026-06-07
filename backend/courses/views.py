@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse, Http404, FileResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import api_view, parser_classes, permission_classes, authentication_classes
@@ -1181,14 +1182,14 @@ def get_course_progress(request, course_id):
             is_school_course = True
             _db_time = (_time.time() - _start_db) * 1000
             print(f"⏱️  [DB Query] Found school course: {_db_time:.2f}ms")
-        except SchoolCourse.DoesNotExist:
+        except (SchoolCourse.DoesNotExist, django.core.exceptions.ValidationError):
             # If not found, try engineering course
             try:
                 course = EngineeringCourse.objects.prefetch_related('sections', 'sections__lessons').get(id=course_id)
                 is_school_course = False
                 _db_time = (_time.time() - _start_db) * 1000
                 print(f"⏱️  [DB Query] Found engineering course: {_db_time:.2f}ms")
-            except EngineeringCourse.DoesNotExist:
+            except (EngineeringCourse.DoesNotExist, django.core.exceptions.ValidationError):
                 _db_time = (_time.time() - _start_db) * 1000
                 print(f"❌ [ERROR] Course not found after {_db_time:.2f}ms")
                 return Response(
