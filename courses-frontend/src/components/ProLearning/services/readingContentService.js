@@ -8,7 +8,7 @@ import storage from '../../../utils/storage';
 const AI_CONFIG = {
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000, // Base delay in ms
-  TIMEOUT: 30000, // 30 seconds
+  TIMEOUT: 90000, // 90 seconds - allows for Vertex AI cold-start on first request
   MAX_TOPICS_PARALLEL: 3, // Prevent rate limiting
   MIN_CONTENT_LENGTH: 100,
   RATE_LIMIT_DELAY: 500 // Delay between requests

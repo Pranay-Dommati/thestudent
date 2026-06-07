@@ -8,12 +8,21 @@ from .sanitization import sanitize_ai_content
 
 def classify_topic_with_ai(topic):
     """
-    Use Gemini 2.5 Flash (fallback 2.0 Flash) to intelligently classify topic and select best prompt.
-    Falls back to keyword classification on any AI/formatting issue.
+    Classify the topic — uses fast keyword matching first.
+    Only falls back to AI classification if keywords return 'general' (no clear match).
+    This avoids a blocking Vertex AI round-trip before every reading stream.
     """
     print(f"🤖 Analyzing topic with AI: {topic}")
-    
-    # Create a prompt for AI to analyze the topic and choose the best category
+
+    # Step 1: Try fast keyword-based classification first
+    keyword_result = classify_topic(topic)
+    if keyword_result != 'general':
+        # Keywords gave a confident match — skip the extra AI call
+        print(f"⚡ Fast-path keyword classification: '{topic}' → '{keyword_result}' (skipping AI call)")
+        return keyword_result
+
+    # Step 2: Keywords returned 'general' — ask AI for a better classification
+    print(f"🎯 Keywords inconclusive — sending topic to Gemini for classification...")
     analysis_prompt = f"""You are an expert educational content categorizer. Analyze the given topic and determine which category it best fits into for educational content generation.
 
 Available Categories:
@@ -36,7 +45,6 @@ Instructions:
 Respond with ONLY the category name (technical, academic, skills, business_finance, creative, entrepreneurship, or general). No explanation needed."""
 
     try:
-        print(f"🎯 Sending topic analysis request to Gemini 2.5 Flash (fallback 2.0 Flash)...")
         response_data = call_gemini_api(analysis_prompt)
 
         # Extract the response text safely
@@ -54,7 +62,6 @@ Respond with ONLY the category name (technical, academic, skills, business_finan
                     text = first.get('text')
             # Fallbacks
             if not isinstance(text, str) or not text.strip():
-                # Try other shapes
                 text = candidate.get('text') if isinstance(candidate, dict) else None
 
             if isinstance(text, str) and text.strip():
@@ -72,17 +79,17 @@ Respond with ONLY the category name (technical, academic, skills, business_finan
                     print(f"✅ AI classified '{topic}' as: {category}")
                     return category
                 else:
-                    print(f"⚠️ AI returned invalid category '{category}', falling back to keyword classification")
-                    return classify_topic(topic)
+                    print(f"⚠️ AI returned invalid category '{category}', using 'general'")
+                    return 'general'
 
-        print("❌ Invalid or empty response from Gemini Flash model, falling back to keyword classification")
-        return classify_topic(topic)
+        print("❌ Invalid or empty response from Gemini Flash model, using 'general'")
+        return 'general'
 
     except Exception as e:
         print(f"❌ AI classification failed: {e}")
         print("🔄 Falling back to keyword-based classification")
-        # Fall back to the original keyword-based classification
         return classify_topic(topic)
+
 
 def classify_topic(topic):
     """
