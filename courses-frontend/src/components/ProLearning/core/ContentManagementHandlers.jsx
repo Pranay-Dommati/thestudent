@@ -135,19 +135,19 @@ export const loadProgressiveTopicContent = async (
           progressiveContentKeys: Object.keys(progressiveContent)
         });
 
-        // Set content for this topic only - but preserve any already displayed reading
-        // ONLY if it belongs to the SAME topic (avoid mixing topics' reading content)
-        const hasExistingReading = !!(content && typeof content.reading === 'string' && content.reading.trim().length);
-        const readingBelongsToCurrentTopic = hasExistingReading && contentTopicName === topicName;
-        const nextContent = readingBelongsToCurrentTopic
-          ? {
-              ...formattedContent,
-              reading: content.reading  // ← PRESERVE EXISTING READING for same topic
-            }
-          : {
-              ...formattedContent,
-              resourcesMetadata: formattedContent.resourcesMetadata  // ← PRESERVE METADATA
-            };
+        // CRITICAL FIX: Always prefer the stored reading (formattedContent.reading) since it's the
+        // authoritative, fully-generated, post-sanitization version from contentStorageService.
+        // The `content.reading` from the React state closure can be a PARTIAL streaming chunk
+        // captured before the stream completed — causing truncated display on first load.
+        const storedReadingIsValid = typeof formattedContent.reading === 'string' && formattedContent.reading.trim().length > 0;
+        const nextContent = {
+          ...formattedContent,
+          // Use stored reading (full) when available; fall back to existing only if stored is empty
+          reading: storedReadingIsValid
+            ? formattedContent.reading
+            : (content?.reading || ''),
+          resourcesMetadata: formattedContent.resourcesMetadata
+        };
         setContentWithSanitization(nextContent, 'progressive:topicContent');
         setContentTopicName(topicName);
 
@@ -164,8 +164,7 @@ export const loadProgressiveTopicContent = async (
           readingLength: nextContent.reading?.length || 0,
           summaryLength: nextContent.summary?.length || 0,
           formattedReadingLength: formattedContent.reading?.length || 0,
-          wasPreserved: readingBelongsToCurrentTopic,
-          isNewTopicReading: !readingBelongsToCurrentTopic && formattedContent.reading?.length > 0
+          usedStoredReading: storedReadingIsValid
         });
         
         if (hasValidReading) newReady.push('reading');
@@ -215,13 +214,16 @@ export const loadProgressiveTopicContent = async (
           console.log(`⚠️ [LOAD CONTENT] No tabs to unlock for ${topicName} (newReady is empty)`);
         }
         
-        // Parse and set reading sections only when we actually set reading freshly
-        if (progressiveContent.reading && !hasExistingReading) {
-          const sections = parseReadingSections(progressiveContent.reading);
+        // CRITICAL FIX: Always parse reading sections from the authoritative stored content.
+        // The old code checked `!hasExistingReading` which used a stale closure value,
+        // causing sections to be CLEARED even when storage had full reading.
+        const readingToParse = storedReadingIsValid ? formattedContent.reading : (content?.reading || '');
+        if (readingToParse && readingToParse.trim().length > 0) {
+          const sections = parseReadingSections(readingToParse);
           setReadingSections(sections);
           setReadingSectionIndex(0);
         } else {
-          // Ensure stale sections are cleared if reading isn't ready yet
+          // Only clear sections when there truly is no reading content at all
           setReadingSections([]);
           setReadingSectionIndex(0);
         }
