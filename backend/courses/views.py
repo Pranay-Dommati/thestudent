@@ -1,3 +1,4 @@
+import django
 from django.shortcuts import render, get_object_or_404
 from django.core.exceptions import ValidationError
 from django.http import HttpResponse, Http404, FileResponse
@@ -7,7 +8,9 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework_simplejwt.authentication import JWTAuthentication
+# pyrefly: ignore [missing-import]
 from .models import SchoolCourse, EngineeringCourse, Lesson, UserLessonProgress, LessonResource, LearningActivity, UserStartedPredefinedCourse, Certification, QuizQuestion
+# pyrefly: ignore [missing-import]
 from .serializers import (
     CourseWithChaptersSerializer, EngineeringCourseWithSectionsSerializer, CertificationSerializer,
     CourseStructureSerializer, EngineeringCourseStructureSerializer, LessonSerializer
@@ -857,6 +860,7 @@ def admin_enrollment_stats(request):
     }
     """
     try:
+        # pyrefly: ignore [missing-import]
         from .models import UserStartedPredefinedCourse as USP
 
         # Pre-compute counts for each course type
@@ -932,6 +936,7 @@ def admin_course_enrollments(request, course_type, course_id):
     }
     """
     try:
+        # pyrefly: ignore [missing-import]
         from .models import UserStartedPredefinedCourse as USP
         course_type = (course_type or '').lower()
 
@@ -1114,6 +1119,7 @@ def toggle_lesson_completion(request, lesson_id):
 
         # Persist progress to the user's enrollment so Learning Hub reflects updates
         try:
+            # pyrefly: ignore [missing-import]
             from .models import UserStartedPredefinedCourse
 
             enrollment_qs = UserStartedPredefinedCourse.objects.filter(user=user)
