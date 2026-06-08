@@ -10,6 +10,7 @@ import FreeCreditsModal from './components/FreeCreditsModal'
 import PreviewCard from './components/PreviewCard'
 import { startPaymentFlow } from './services/paymentService'
 import customToast from './utils/customToast'
+import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 
 const fallbackPreviewStrip = [
   { id: 'osi-model', title: 'OSI Model', pdfUrl: null },
@@ -180,7 +181,9 @@ const App = () => {
               <Link to="/generate?tab=history" className="hover:text-[#1f1f1f]">My Scribs</Link>
             )}
           </nav>
-          {isLoggedIn ? (
+          {loading ? (
+            <HeaderAuthSkeleton />
+          ) : isLoggedIn ? (
             <div className="flex items-center gap-2">
               <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold sm:inline-flex">
                 Dashboard

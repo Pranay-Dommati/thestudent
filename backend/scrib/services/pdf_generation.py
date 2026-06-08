@@ -39,14 +39,13 @@ def _log_memory(label):
 # S3 upload
 # ──────────────────────────────────────────────
 
-def _upload_to_s3(pdf_bytes, user_id):
-    """Upload PDF bytes to S3 under generated/{user_id}/{uuid}.pdf
+def _upload_to_s3(pdf_fileobj, user_id):
+    """Stream a file-like object directly to S3 — no getvalue() / double-copy.
 
-    Uses SCRIB_S3_ACCESS_KEY_ID / SCRIB_S3_SECRET_ACCESS_KEY from settings
-    (separate from the SES keys so permissions can be scoped to the scrib bucket).
+    Uses upload_fileobj (multipart streaming) instead of put_object(Body=bytes)
+    so the PDF is never duplicated in RAM.
 
-    Returns a tuple (presigned_url, s3_key) where s3_key is permanent and
-    presigned_url is a short-lived link for the current request.
+    Returns (presigned_url, s3_key).
     """
     import boto3
     from botocore.exceptions import BotoCoreError, ClientError
@@ -66,7 +65,6 @@ def _upload_to_s3(pdf_bytes, user_id):
     file_uuid = uuid.uuid4()
     s3_key = f'generated/{user_id}/{file_uuid}.pdf'
 
-    # Presigned URL expiry — configurable via SCRIB_PDF_URL_EXPIRY_SECONDS (default 3600 = 1 h).
     expiry_seconds = int(getattr(settings, 'SCRIB_PDF_URL_EXPIRY_SECONDS', 3600))
 
     try:
@@ -76,14 +74,13 @@ def _upload_to_s3(pdf_bytes, user_id):
             aws_secret_access_key=secret_key,
             region_name=region,
         )
-        s3.put_object(
-            Bucket=bucket,
-            Key=s3_key,
-            Body=pdf_bytes,
-            ContentType='application/pdf',
+        # Stream directly — no getvalue() / no second copy in RAM
+        s3.upload_fileobj(
+            pdf_fileobj,
+            bucket,
+            s3_key,
+            ExtraArgs={'ContentType': 'application/pdf'},
         )
-        # Generate a presigned URL so private-bucket objects are accessible
-        # without making the bucket or object publicly readable.
         pdf_url = s3.generate_presigned_url(
             'get_object',
             Params={'Bucket': bucket, 'Key': s3_key},
@@ -93,7 +90,7 @@ def _upload_to_s3(pdf_bytes, user_id):
         logger.error('[scrib] S3 upload failed: %s', exc)
         raise PdfGenerationError(f'Failed to upload PDF to S3: {exc}') from exc
 
-    logger.info('[scrib] PDF saved to S3 (presigned, expires in %ds): %s', expiry_seconds, s3_key)
+    logger.info('[scrib] PDF streamed to S3 (presigned, expires in %ds): %s', expiry_seconds, s3_key)
     return pdf_url, s3_key
 
 
@@ -101,8 +98,8 @@ def _upload_to_s3(pdf_bytes, user_id):
 # Fallback: local filesystem (development only)
 # ──────────────────────────────────────────────
 
-def _save_pdf_locally(pdf_bytes):
-    """Save PDF to local /media/ for development when S3 is not configured."""
+def _save_pdf_locally(pdf_fileobj):
+    """Write a file-like PDF object to local /media/ (development fallback)."""
     import os
 
     filename = f'{uuid.uuid4().hex}.pdf'
@@ -112,15 +109,16 @@ def _save_pdf_locally(pdf_bytes):
     abs_path = os.path.join(abs_dir, filename)
 
     with open(abs_path, 'wb') as f:
-        f.write(pdf_bytes)
+        f.write(pdf_fileobj.read())
 
     media_url = settings.MEDIA_URL.rstrip('/')
     return f"{media_url}/{rel_path.replace(os.sep, '/')}"
 
 
-def _save_pdf_bytes(pdf_bytes, user_id=None):
-    """Save PDF — prefers S3, falls back to local filesystem.
+def _save_pdf_bytes(pdf_fileobj, user_id=None):
+    """Save PDF from a seekable file-like object — prefers S3 streaming, falls back to local.
 
+    Accepts a BytesIO (already seeked to position 0).
     Returns (pdf_url, s3_key). s3_key is None when saved locally.
     """
     bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
@@ -128,13 +126,13 @@ def _save_pdf_bytes(pdf_bytes, user_id=None):
     secret_key = getattr(settings, 'SCRIB_S3_SECRET_ACCESS_KEY', '')
 
     if bucket and access_key and secret_key and user_id is not None:
-        return _upload_to_s3(pdf_bytes, user_id)  # returns (url, key)
+        return _upload_to_s3(pdf_fileobj, user_id)  # streams directly — no copy
 
     logger.warning(
         '[scrib] S3 not configured or user_id missing — saving PDF locally. '
         'Set SCRIB_S3_ACCESS_KEY_ID, SCRIB_S3_SECRET_ACCESS_KEY, AWS_STORAGE_BUCKET_NAME.'
     )
-    return _save_pdf_locally(pdf_bytes), None
+    return _save_pdf_locally(pdf_fileobj), None
 
 
 # ──────────────────────────────────────────────
@@ -315,23 +313,24 @@ def generate_study_pack_pdf(pages, title, user_id=None):
 
     # Finalise the PDF into the buffer
     pdf_canvas.save()
-    pdf_bytes = buffer.getvalue()
+    _log_memory('after pdf_canvas.save()')
 
-    # Free the canvas and buffer — we only need the bytes from here
-    del pdf_canvas
+    # ── CRITICAL: seek to start, then stream buffer directly to S3 ──
+    # Do NOT call buffer.getvalue() — that creates a second full copy in RAM.
+    # upload_fileobj reads from the BytesIO in chunks; peak extra memory ≈ 0.
+    del pdf_canvas  # release canvas object before upload
+    gc.collect()
+    _log_memory('after del canvas, before upload')
+
+    buffer.seek(0)
+    pdf_url, s3_key = _save_pdf_bytes(buffer, user_id=user_id)
+
+    # Free the buffer after upload
+    buffer.close()
     del buffer
     gc.collect()
 
-    logger.info(f'[scrib] PDF built ({len(pdf_bytes)} bytes) — uploading...')
-    _log_memory('after pdf build')
-
-    pdf_url, s3_key = _save_pdf_bytes(pdf_bytes, user_id=user_id)
-
-    # Free the raw PDF bytes after upload
-    del pdf_bytes
-    gc.collect()
-
-    _log_memory('after upload')
+    _log_memory('after upload + buffer freed')
     logger.info(f'[scrib] ========== PDF GENERATION COMPLETE ==========')
     logger.info(
         f'[scrib] Total time: {time.time() - gen_start:.1f}s | Pages: {total_pages}'

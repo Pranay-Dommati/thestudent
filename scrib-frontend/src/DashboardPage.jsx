@@ -9,6 +9,7 @@ import customToast from './utils/customToast'
 import Breadcrumb from './components/Breadcrumb'
 import BuyCreditsModal from './components/BuyCreditsModal'
 import MobileMenu from './components/MobileMenu'
+import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 
 const toneColors = {
   blue: 'bg-[#7ba7ff]',
@@ -17,7 +18,7 @@ const toneColors = {
 }
 
 const DashboardPage = () => {
-  const { user, logout, isLoggedIn } = useAuth()
+  const { user, logout, isLoggedIn, loading } = useAuth()
   const navigate = useNavigate()
   const [historyItems, setHistoryItems] = useState([])
   const [statsData, setStatsData] = useState({ pdfs: 0, creditsUsed: 0 })
@@ -116,7 +117,9 @@ const DashboardPage = () => {
             <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
             <Link to="/generate?tab=history" className="hover:text-[#1f1f1f]">My Scribs</Link>
           </nav>
-          {isLoggedIn ? (
+          {loading ? (
+            <HeaderAuthSkeleton />
+          ) : isLoggedIn ? (
             <div className="flex items-center gap-2">
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
                 {user?.credit_balance ?? 0} credits

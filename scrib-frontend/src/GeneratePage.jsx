@@ -8,6 +8,7 @@ import customToast from './utils/customToast'
 import { forceDownload } from './utils/download'
 import Breadcrumb from './components/Breadcrumb'
 import MobileMenu from './components/MobileMenu'
+import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 
 const parseTopics = (text) => {
   if (!text) return []
@@ -26,7 +27,7 @@ const chunkTopics = (items, size) => {
 }
 
 const GeneratePage = () => {
-  const { user, logout, isLoggedIn } = useAuth()
+  const { user, logout, isLoggedIn, loading } = useAuth()
   const navigate = useNavigate()
   const [mode, setMode] = useState('manual')
   const [topics, setTopics] = useState([])
@@ -503,7 +504,9 @@ const GeneratePage = () => {
               { label: 'Generate' },
             ]} />
           </div>
-          {isLoggedIn ? (
+          {loading ? (
+            <HeaderAuthSkeleton />
+          ) : isLoggedIn ? (
             <div className="flex items-center gap-2">
               <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex">
                 Dashboard
