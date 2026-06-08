@@ -10,7 +10,7 @@ services:
     region: oregon  # Choose closest to your users
     branch: dep-backend  # Deploy from this branch
     buildCommand: ./build.sh
-    startCommand: cd backend && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 360 --max-requests 200 --max-requests-jitter 20
+    startCommand: cd backend && celery -A backend worker --loglevel=info --concurrency=1 --max-tasks-per-child=5 & gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 360 --max-requests 200 --max-requests-jitter 20
     healthCheckPath: /api/chatbot/health/
     
     envVars:
@@ -54,10 +54,10 @@ services:
       
       # CORS and CSRF Settings
       - key: CORS_ALLOWED_ORIGINS
-        value: https://easylearnova.com,https://www.easylearnova.com
+        value: https://easylearnova.com,https://www.easylearnova.com,https://scrib.easylearnova.com
       
       - key: CSRF_TRUSTED_ORIGINS
-        value: https://easylearnova.com,https://www.easylearnova.com,https://easylearnova-backend.onrender.com
+        value: https://easylearnova.com,https://www.easylearnova.com,https://scrib.easylearnova.com,https://easylearnova-backend.onrender.com
       
       # Frontend Domain
       - key: FRONTEND_DOMAIN
@@ -155,3 +155,80 @@ services:
       # Logging
       - key: DJANGO_LOG_LEVEL
         value: INFO
+
+      # Redis / Celery - set these manually in the Render dashboard
+      # Get the "Internal Redis URL" from your easylearnova-redis service Info tab.
+      # It will look like:  redis://red-xxxxxxxxxxxx:6379
+      - key: REDIS_URL
+        sync: false
+
+      - key: CELERY_BROKER_URL
+        sync: false
+
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+
+  # Celery Worker Service
+  # Handles PDF generation completely outside gunicorn.
+  # Gunicorn timeouts can NEVER kill this process.
+  # --concurrency=1  keeps RAM usage to a single task at a time on the free tier.
+  # --max-tasks-per-child=5  recycles the process every 5 tasks to flush any leaks.
+  - type: worker
+    name: easylearnova-celery-worker
+    runtime: python
+    plan: free
+    region: oregon
+    branch: dep-backend
+    buildCommand: ./build.sh
+    startCommand: cd backend && celery -A backend worker --loglevel=info --concurrency=1 --max-tasks-per-child=5
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DEBUG
+        value: False
+      - key: SECRET_KEY
+        sync: false  # Must match the web service SECRET_KEY - set manually
+      - key: ALLOWED_HOSTS
+        value: .onrender.com,easylearnova.com,www.easylearnova.com
+      - key: DB_ENGINE
+        value: mysql
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: 3306
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSL_REQUIRE
+        value: false
+      - key: DB_CONN_MAX_AGE
+        value: 60
+      - key: REDIS_URL
+        sync: false
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: ap-south-1
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_IMAGE_MODEL
+        value: gpt-image-1
+      - key: DJANGO_LOG_LEVEL
+        value: INFO
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: SCRIB_S3_ACCESS_KEY_ID
+        sync: false
+      - key: SCRIB_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
