@@ -10,7 +10,7 @@ services:
     region: oregon  # Choose closest to your users
     branch: dep-backend  # Deploy from this branch
     buildCommand: ./build.sh
-    startCommand: cd backend && celery -A backend worker --loglevel=info --concurrency=1 --max-tasks-per-child=5 & gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 360 --max-requests 200 --max-requests-jitter 20
+    startCommand: cd backend && celery -A backend worker --loglevel=info --concurrency=1 --max-tasks-per-child=5 & cd backend && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 360 --max-requests 200 --max-requests-jitter 20
     healthCheckPath: /api/chatbot/health/
     
     envVars:
