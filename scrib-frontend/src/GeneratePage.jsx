@@ -645,14 +645,17 @@ const GeneratePage = () => {
                         {index + 1}
                       </span>
                       <input
-                        className={`w-full text-sm outline-none ${
+                        className={`w-full text-sm outline-none cursor-pointer ${
                           editingIndex === index
-                            ? 'rounded-md border border-[#e0d9ce] bg-white px-2 py-1 text-[#1f1f1f]'
+                            ? 'rounded-md border border-[#e0d9ce] bg-white px-2 py-1 text-[#1f1f1f] cursor-text'
                             : 'border-none bg-transparent text-[#6b655d]'
                         }`}
                         value={topic}
                         onChange={(event) => handleTopicChange(event.target.value, index)}
                         readOnly={editingIndex !== index}
+                        onClick={() => {
+                          if (editingIndex !== index) setEditingIndex(index)
+                        }}
                         onBlur={(e) => {
                           // Only close if focus is moving outside the topic row entirely
                           const row = e.currentTarget.closest('[data-topic-row]')
@@ -677,7 +680,7 @@ const GeneratePage = () => {
                               e.stopPropagation()
                               setEditingIndex(null)
                             }}
-                            className="rounded-full border border-[#1f1f1f] bg-[#1f1f1f] p-1 text-white"
+                            className="rounded-full border border-[#1f1f1f] bg-[#1f1f1f] p-1 text-white flex-shrink-0"
                             aria-label="Save topic"
                           >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -688,7 +691,7 @@ const GeneratePage = () => {
                           <button
                             type="button"
                             onClick={handleEditTopic}
-                            className="p-1 text-[#d9d1c7] md:text-[#a39b92] transition-colors hover:text-[#1f1f1f] md:rounded-full md:border md:border-[#e0d9ce] md:bg-white hidden md:block"
+                            className="p-1 text-[#a39b92] transition-colors hover:text-[#1f1f1f] rounded-full border border-[#e0d9ce] bg-white flex-shrink-0"
                             aria-label="Edit topic"
                           >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
