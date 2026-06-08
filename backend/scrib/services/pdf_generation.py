@@ -195,7 +195,7 @@ def generate_study_pack_pdf(pages, title, user_id=None):
     if placeholder_url:
         return {'pdf_url': placeholder_url, 's3_key': None, 'total_pages': len(pages)}
 
-    BATCH_SIZE = 5
+    BATCH_SIZE = 2
     total_pages = len(pages)
 
     logger.info(f'[scrib] ========== PDF GENERATION START ==========')
