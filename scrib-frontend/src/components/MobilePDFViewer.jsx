@@ -36,7 +36,7 @@ const MobilePDFViewer = ({ url }) => {
   return (
     <div
       ref={containerRef}
-      className="relative flex flex-col items-center w-full h-full overflow-y-auto bg-black pt-16"
+      className="relative flex flex-col items-center w-full h-full overflow-y-auto bg-black pt-16 pb-32 pb-[env(safe-area-inset-bottom)]"
     >
       {/* Floating page indicator */}
       {numPages && (

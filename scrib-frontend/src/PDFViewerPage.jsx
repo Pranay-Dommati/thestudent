@@ -239,7 +239,7 @@ const PDFViewerPage = () => {
   }
 
   return (
-    <div className={`flex h-screen flex-col overflow-hidden ${isMobile ? 'bg-black' : 'bg-[#f0ede7]'}`}>
+    <div className={`flex h-[100dvh] flex-col overflow-hidden ${isMobile ? 'bg-black' : 'bg-[#f0ede7]'}`}>
       {/* ── Top bar ── */}
       <header className={`flex flex-shrink-0 items-center justify-between px-3 py-2.5 md:px-5 md:py-3 ${isMobile ? 'bg-black text-white' : 'border-b border-[#e0d9ce] bg-white'}`}>
         {/* Left section: Back button, Logo, Breadcrumb */}
