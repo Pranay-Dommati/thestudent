@@ -639,6 +639,7 @@ const GeneratePage = () => {
                         {index + 1}
                       </span>
                       <input
+                        id={`topic-input-${index}`}
                         className={`w-full text-sm outline-none cursor-pointer ${
                           editingIndex === index
                             ? 'rounded-md border border-[#e0d9ce] bg-white px-2 py-1 text-[#1f1f1f] cursor-text'
@@ -646,8 +647,7 @@ const GeneratePage = () => {
                         }`}
                         value={topic}
                         onChange={(event) => handleTopicChange(event.target.value, index)}
-                        readOnly={editingIndex !== index}
-                        onClick={() => {
+                        onFocus={() => {
                           if (editingIndex !== index) setEditingIndex(index)
                         }}
                         onBlur={(e) => {
@@ -684,7 +684,13 @@ const GeneratePage = () => {
                         ) : (
                           <button
                             type="button"
-                            onClick={handleEditTopic}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEditingIndex(index)
+                              setTimeout(() => {
+                                document.getElementById(`topic-input-${index}`)?.focus()
+                              }, 0)
+                            }}
                             className="p-1 text-[#a39b92] transition-colors hover:text-[#1f1f1f] rounded-full border border-[#e0d9ce] bg-white flex-shrink-0"
                             aria-label="Edit topic"
                           >
