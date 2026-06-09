@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { otpResend, otpVerify } from '../../services/otpAuth'
 import universalToast from '../../utils/universalToast'
+import { usePostHog } from '@posthog/react'
 
 const OtpModal = ({ open, email, onClose, onVerified }) => {
+  const posthog = usePostHog()
   const [code, setCode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
@@ -48,6 +50,11 @@ const OtpModal = ({ open, email, onClose, onVerified }) => {
     setIsSubmitting(true)
     try {
       const data = await otpVerify({ email, code: code.trim() })
+      posthog?.identify(data?.user?.email || email, {
+        email: data?.user?.email || email,
+        name: data?.user?.full_name,
+      })
+      posthog?.capture('user_signed_up', { method: 'email' })
       universalToast.success('Email verified!')
       onVerified?.(data)
       onClose?.()

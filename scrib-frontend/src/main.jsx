@@ -2,6 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot, hydrateRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Toaster, toast, ToastBar } from 'react-hot-toast'
+import posthog from 'posthog-js'
+import { PostHogErrorBoundary, PostHogProvider } from '@posthog/react'
 import './index.css'
 import App from './App.jsx'
 import PreviewsPage from './PreviewsPage.jsx'
@@ -24,11 +26,18 @@ import ResetPasswordPage from './ResetPasswordPage.jsx'
 import GlobalGenerationIndicator from './components/GlobalGenerationIndicator.jsx'
 import ScrollToTop from './components/ScrollToTop.jsx'
 
+posthog.init(import.meta.env.VITE_POSTHOG_PROJECT_TOKEN, {
+  api_host: import.meta.env.VITE_POSTHOG_HOST,
+  defaults: '2026-01-30',
+})
+
 const rootElement = document.getElementById('root')
 
 const AppContent = (
   <StrictMode>
     <HelmetProvider>
+      <PostHogProvider client={posthog}>
+      <PostHogErrorBoundary>
       <AuthProvider>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ScrollToTop />
@@ -101,6 +110,8 @@ const AppContent = (
         )}
       </Toaster>
     </AuthProvider>
+      </PostHogErrorBoundary>
+      </PostHogProvider>
   </HelmetProvider>
 </StrictMode>
 )

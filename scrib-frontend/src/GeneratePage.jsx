@@ -9,6 +9,7 @@ import { forceDownload } from './utils/download'
 import Breadcrumb from './components/Breadcrumb'
 import MobileMenu from './components/MobileMenu'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
+import { usePostHog } from '@posthog/react'
 
 const parseTopics = (text) => {
   if (!text) return []
@@ -28,6 +29,7 @@ const chunkTopics = (items, size) => {
 
 const GeneratePage = () => {
   const { user, logout, isLoggedIn, loading } = useAuth()
+  const posthog = usePostHog()
   const navigate = useNavigate()
   const [mode, setMode] = useState('manual')
   const [topics, setTopics] = useState([])
@@ -189,7 +191,12 @@ const GeneratePage = () => {
     } else {
       await forceDownload(resolvedUrl, titleStr, isPack)
     }
-    
+
+    posthog?.capture('pdf_downloaded', {
+      item_type: isPack ? 'pack' : 'note',
+      title: titleStr,
+    })
+
     setDownloadingItemId(null)
   }
 
@@ -197,6 +204,7 @@ const GeneratePage = () => {
     if (!shareModalData || shareModalData.isLoading) return
     try {
       await navigator.clipboard.writeText(shareModalData.url)
+      posthog?.capture('pdf_shared', { title: shareModalData.title })
       customToast.success('Link copied to clipboard!')
       setShareModalData(null)
     } catch {
@@ -443,21 +451,33 @@ const GeneratePage = () => {
     }
     setHistoryItems((prev) => [tempItem, ...prev])
 
+    posthog?.capture('note_generation_started', {
+      topic_count: cleanedTopics.length,
+      credits_cost: cleanedTopics.length,
+      pack_title: packTitle,
+    })
+
     try {
       // One topic per page
       const pages = cleanedTopics.map(topic => [topic])
       const payload = { title: packTitle, pages }
-      
+
       // Request notification permission if they haven't yet
       requestNotificationPermission()
 
       const response = await axiosInstance.post('/scrib/generate-study-pack/', payload)
       const data = response.data || {}
-      
+
       if (typeof data.credit_balance === 'number') {
         setLatestCreditBalance(data.credit_balance)
       }
-      
+
+      posthog?.capture('note_generation_completed', {
+        topic_count: cleanedTopics.length,
+        credits_used: cleanedTopics.length,
+        pack_title: packTitle,
+      })
+
       // Now it returns 202 Accepted instantly
       customToast.success('Generation started! We will notify you when it is ready.')
       setHideBanner(false)
@@ -471,7 +491,12 @@ const GeneratePage = () => {
       // Remove the pending item if request fails
       setHistoryItems(prev => prev.filter(item => item.id !== tempId))
       setActiveTab('generate') // Switch back to generate tab so they aren't stuck on history
-      
+
+      posthog?.capture('note_generation_failed', {
+        topic_count: cleanedTopics.length,
+        error_status: error?.response?.status,
+      })
+
       if (error?.response?.status === 402) {
         customToast.error('Please add credits first to generate this note.', { id: 'gen-error' })
         navigate('/pricing')

@@ -7,6 +7,7 @@ import axiosInstance from './utils/axios'
 import Breadcrumb from './components/Breadcrumb'
 import MobileMenu from './components/MobileMenu'
 import PreviewCard from './components/PreviewCard'
+import { usePostHog } from '@posthog/react'
 
 const fallbackPreviewCards = [
   { id: 'osi-model', title: 'OSI Model', subject: 'Computer Networks', pdfUrl: null, pageCount: 1 },
@@ -18,6 +19,7 @@ const fallbackPreviewCards = [
 
 const PreviewsPage = () => {
   const { user, logout, isLoggedIn } = useAuth()
+  const posthog = usePostHog()
   const navigate = useNavigate()
   const [previewCards, setPreviewCards] = useState(fallbackPreviewCards)
   const [query, setQuery] = useState('')
@@ -180,6 +182,10 @@ const PreviewsPage = () => {
               className={`transition-transform duration-200 ${note.pdfUrl ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg rounded-xl' : 'opacity-70'}`}
               onClick={() => {
                 if (!note.pdfUrl) return
+                posthog?.capture('preview_viewed', {
+                  title: note.title,
+                  subject: note.subject,
+                })
                 navigate(`/view/${note.slug}`, {
                   state: {
                     pdfUrl: note.pdfUrl,

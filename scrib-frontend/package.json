@@ -25,7 +25,9 @@
     ]
   },
   "dependencies": {
+    "@posthog/react": "^1.10.0",
     "axios": "^1.6.8",
+    "posthog-js": "^1.383.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-helmet-async": "^3.0.0",

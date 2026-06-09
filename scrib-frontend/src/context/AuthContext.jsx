@@ -3,6 +3,7 @@ import axios from 'axios'
 import axiosInstance from '../utils/axios'
 import customToast from '../utils/customToast'
 import storage from '../utils/storage'
+import posthog from 'posthog-js'
 
 const AuthContext = createContext(null)
 const IS_DEV = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV
@@ -214,6 +215,12 @@ export const AuthProvider = ({ children }) => {
       setIsLoggedIn(true)
       setLastChecked(Date.now())
 
+      posthog.identify(loggedInUser.email, {
+        email: loggedInUser.email,
+        name: loggedInUser.full_name,
+      })
+      posthog.capture('user_logged_in', { method: 'email' })
+
       customToast.success('Login successful!', { id: 'auth-login' })
       return { success: true }
     } catch (error) {
@@ -261,6 +268,12 @@ export const AuthProvider = ({ children }) => {
       setIsLoggedIn(true)
       setLastChecked(Date.now())
 
+      posthog.identify(loggedInUser.email, {
+        email: loggedInUser.email,
+        name: loggedInUser.full_name,
+      })
+      posthog.capture('user_logged_in_google', { method: 'google' })
+
       customToast.success('Login successful!', { id: 'auth-login' })
       return true
     } catch (error) {
@@ -285,6 +298,8 @@ export const AuthProvider = ({ children }) => {
 
   const confirmLogout = () => {
     setShowLogoutModal(false)
+    posthog.capture('user_logged_out')
+    posthog.reset()
     handleAuthFailure()
     customToast.success('Logged out successfully', { id: 'auth-logout' })
     setTimeout(() => {

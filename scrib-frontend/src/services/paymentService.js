@@ -13,6 +13,7 @@
  *  - All critical logic happens on the backend after signature verification
  */
 import axiosInstance from '../utils/axios'
+import posthog from 'posthog-js'
 
 const RAZORPAY_CHECKOUT_URL = 'https://checkout.razorpay.com/v1/checkout.js'
 
@@ -124,6 +125,11 @@ export async function startPaymentFlow({ pack, user, onSuccess, onFailure, onDis
       try {
         const result = await verifyPayment(response)
         if (result.success) {
+          posthog.capture('payment_completed', {
+            pack,
+            credits_added: result.credits_added,
+            credit_balance: result.credit_balance,
+          })
           onSuccess?.({
             credit_balance: result.credit_balance,
             credits_added: result.credits_added,
@@ -143,10 +149,13 @@ export async function startPaymentFlow({ pack, user, onSuccess, onFailure, onDis
     },
   }
 
+  posthog.capture('payment_initiated', { pack, credits: orderData.credits, amount: orderData.amount })
+
   const razorpay = new window.Razorpay(options)
 
   razorpay.on('payment.failed', function (response) {
     const msg = response?.error?.description || 'Payment failed. Please try again.'
+    posthog.capture('payment_failed', { pack, error: response?.error?.code })
     onFailure?.(msg)
   })
 
