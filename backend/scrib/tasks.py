@@ -41,6 +41,8 @@ def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
         pack.s3_key = pdf_result.get('s3_key')
         pack.save(update_fields=['status', 'pdf_url', 's3_key'])
         
+        logger.info(f"[scrib] Status COMPLETE for StudyPack {study_pack_id}")
+        
         # Invalidate cache so History page updates
         from django.core.cache import cache
         cache.delete(f'scrib_my_study_packs_api_{user_id}')

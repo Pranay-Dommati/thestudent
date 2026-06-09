@@ -26,6 +26,11 @@ def _build_handwritten_prompt(topic):
 
 
 def _openai_image_bytes(prompt):
+    if getattr(settings, 'SCRIB_FAKE_GENERATION', False):
+        logger.info(f'[scrib] FAKE GENERATION MODE: bypassing OpenAI for "{prompt[:40]}..."')
+        # 1x1 white PNG base64
+        return base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=")
+
     if not settings.OPENAI_API_KEY:
         raise ImageGenerationError('OPENAI_API_KEY is not configured')
 

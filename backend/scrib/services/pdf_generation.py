@@ -323,7 +323,9 @@ def generate_study_pack_pdf(pages, title, user_id=None):
     _log_memory('after del canvas, before upload')
 
     buffer.seek(0)
+    logger.info('[scrib] Upload START')
     pdf_url, s3_key = _save_pdf_bytes(buffer, user_id=user_id)
+    logger.info('[scrib] Upload END')
 
     # Free the buffer after upload
     buffer.close()
