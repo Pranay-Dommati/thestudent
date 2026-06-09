@@ -727,7 +727,7 @@ def cleanup_stuck_packs(user):
     Find packs that are stuck in PENDING or GENERATING for more than 5 minutes
     due to a server crash, mark them as FAILED, and refund the credits.
     """
-    cutoff = timezone.now() - timedelta(minutes=5)
+    cutoff = timezone.now() - timedelta(minutes=25)
     stuck_packs = StudyPack.objects.filter(
         user=user,
         status__in=[StudyPack.STATUS_PENDING, StudyPack.STATUS_GENERATING],
