@@ -574,17 +574,8 @@ const GeneratePage = () => {
                   <span className="hidden md:inline">Type topics one by one, or paste your full syllabus - AI will organise it.</span>
                 </p>
                 {showNotice && (
-                  <div className="mt-4 md:mt-3 flex items-start gap-3 rounded-xl md:rounded-lg bg-white md:bg-[#fcf9f4] border border-[#e2dbd2] p-3.5 md:p-3 text-[13px] md:text-xs text-[#5f5a54] shadow-sm md:shadow-none relative pr-10">
-                    <span className="md:hidden text-[#a39b92] mt-0.5">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M12 16v-4" />
-                        <path d="M12 8h.01" />
-                      </svg>
-                    </span>
-                    <span className="md:hidden">Paste a full syllabus or add topics one by one. AI will organise and format each page.</span>
-                    
-                    <span className="hidden md:flex items-start gap-2">
+                  <div className="hidden md:flex mt-3 items-start gap-3 rounded-lg bg-[#fcf9f4] border border-[#e2dbd2] p-3 text-xs text-[#5f5a54] relative pr-10">
+                    <span className="flex items-start gap-2">
                       <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#8a847c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10" />
                         <path d="M12 16v-4" />
@@ -592,7 +583,7 @@ const GeneratePage = () => {
                       </svg>
                       Every topic added becomes a separate page in the PDF and costs 1 credit.
                     </span>
-                    <button onClick={() => setShowNotice(false)} className="absolute right-3.5 top-3.5 md:top-3 text-[#a39b92] hover:text-[#1f1f1f]">
+                    <button onClick={() => setShowNotice(false)} className="absolute right-3.5 top-3 text-[#a39b92] hover:text-[#1f1f1f]">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />
