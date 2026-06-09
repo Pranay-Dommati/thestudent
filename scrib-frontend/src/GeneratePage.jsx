@@ -670,6 +670,7 @@ const GeneratePage = () => {
                         {editingIndex === index ? (
                           <button
                             type="button"
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={(e) => {
                               e.stopPropagation()
                               setEditingIndex(null)
