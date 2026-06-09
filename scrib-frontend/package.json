@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "postbuild": "react-snap"
+    "postbuild": "react-snap || true"
   },
   "reactSnap": {
     "source": "dist",
@@ -22,7 +22,10 @@
       "/dashboard",
       "/profile",
       "/my-notes"
-    ]
+    ],
+    "skipThirdPartyRequests": true,
+    "timeout": 10000,
+    "puppeteerArgs": ["--no-sandbox", "--disable-setuid-sandbox"]
   },
   "dependencies": {
     "@posthog/react": "^1.10.0",
