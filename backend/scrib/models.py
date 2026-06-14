@@ -101,6 +101,7 @@ class StudyPack(models.Model):
     total_pages = models.PositiveIntegerField(default=0)
     credits_used = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    pages_done = models.PositiveIntegerField(default=0)  # incremented after each image completes
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

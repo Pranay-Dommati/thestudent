@@ -22,8 +22,22 @@ def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
         return
 
     try:
+        # Progress callback: called once per completed image (from inside the
+        # ThreadPoolExecutor as_completed loop). Writes pages_done to the DB
+        # immediately so the status endpoint can return live progress to the frontend.
+        def _on_page_done(pages_done_count: int):
+            StudyPack.objects.filter(
+                id=study_pack_id,
+                status=StudyPack.STATUS_GENERATING
+            ).update(pages_done=pages_done_count)
+
         # Generate the PDF
-        pdf_result = generate_study_pack_pdf(pages, title=title, user_id=user_id)
+        pdf_result = generate_study_pack_pdf(
+            pages,
+            title=title,
+            user_id=user_id,
+            progress_callback=_on_page_done,
+        )
         pdf_url = pdf_result.get('pdf_url')
         
         if not pdf_url:
@@ -34,18 +48,35 @@ def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
         from django.db import connection
         connection.close()
 
-        # Update pack status
-        pack = StudyPack.objects.get(id=study_pack_id)
-        pack.status = StudyPack.STATUS_READY
-        pack.pdf_url = pdf_url
-        pack.s3_key = pdf_result.get('s3_key')
-        pack.save(update_fields=['status', 'pdf_url', 's3_key'])
-        
+        # Update pack status — ONLY if it hasn't been marked FAILED by cleanup_stuck_packs.
+        # If cleanup already ran and refunded credits (status=FAILED), do not override to READY.
+        # This prevents the race condition where:
+        #   1. cleanup marks pack FAILED + refunds credits
+        #   2. Celery finishes + sets status=READY → user gets free PDF
+        updated_rows = StudyPack.objects.filter(
+            id=study_pack_id,
+            status=StudyPack.STATUS_GENERATING  # only update if still GENERATING
+        ).update(
+            status=StudyPack.STATUS_READY,
+            pdf_url=pdf_url,
+            s3_key=pdf_result.get('s3_key'),
+        )
+
+        if updated_rows == 0:
+            # Pack was already marked FAILED by cleanup — do NOT deliver the PDF for free.
+            logger.warning(
+                f"[scrib] StudyPack {study_pack_id} was already marked FAILED by cleanup. "
+                f"PDF generated but NOT delivered to prevent free credit exploit. "
+                f"PDF URL: {pdf_url}"
+            )
+            return
+
         logger.info(f"[scrib] Status COMPLETE for StudyPack {study_pack_id}")
-        
+
         # Invalidate cache so History page updates
         from django.core.cache import cache
         cache.delete(f'scrib_my_study_packs_api_{user_id}')
+
         
         # Send Email Notification
         frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')

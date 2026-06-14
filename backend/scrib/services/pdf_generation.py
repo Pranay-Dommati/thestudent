@@ -170,7 +170,7 @@ def _append_images_to_canvas(pdf_canvas, buffer, images):
 # Public entry point
 # ──────────────────────────────────────────────
 
-def generate_study_pack_pdf(pages, title, user_id=None):
+def generate_study_pack_pdf(pages, title, user_id=None, progress_callback=None):
     """Generate a multi-page PDF study pack.
 
     Memory-efficient implementation:
@@ -184,6 +184,8 @@ def generate_study_pack_pdf(pages, title, user_id=None):
         title: Human-readable title (used for logging only)
         user_id: Authenticated user's primary key — used to scope the S3 path
                  to generated/{user_id}/{uuid}.pdf
+        progress_callback: Optional callable(pages_done: int) called after each
+                           individual image completes. Used to update DB progress.
 
     Returns:
         dict with 'pdf_url' (str), 's3_key' (str|None), and 'total_pages' (int)
@@ -255,6 +257,13 @@ def generate_study_pack_pdf(pages, title, user_id=None):
     try:
         num_batches = (total_pages + BATCH_SIZE - 1) // BATCH_SIZE
 
+        # Thread-safe counter for per-image progress updates.
+        # as_completed() fires as each parallel image finishes, so this
+        # increments once per image (not once per batch).
+        import threading
+        _progress_lock = threading.Lock()
+        _completed_count = 0
+
         for batch_idx in range(num_batches):
             batch_start_idx = batch_idx * BATCH_SIZE
             batch_end_idx = min(batch_start_idx + BATCH_SIZE, total_pages)
@@ -281,6 +290,17 @@ def generate_study_pack_pdf(pages, title, user_id=None):
                     pos = futures[future]
                     _idx, image_bytes = future.result()  # raises on failure
                     batch_results[pos] = image_bytes
+
+                    # Fire progress callback immediately after each image —
+                    # one DB write per completed topic so the UI shows live progress.
+                    with _progress_lock:
+                        _completed_count += 1
+                        done_so_far = _completed_count
+                    if progress_callback is not None:
+                        try:
+                            progress_callback(done_so_far)
+                        except Exception as cb_exc:
+                            logger.warning(f'[scrib] progress_callback error (non-fatal): {cb_exc}')
 
             batch_elapsed = time.time() - batch_start
             logger.info(
