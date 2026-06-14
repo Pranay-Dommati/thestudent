@@ -724,10 +724,15 @@ from django.db import transaction
 
 def cleanup_stuck_packs(user):
     """
-    Find packs that are stuck in PENDING or GENERATING for more than 5 minutes
-    due to a server crash, mark them as FAILED, and refund the credits.
+    Find packs that are stuck in PENDING or GENERATING for more than 10 minutes
+    due to a server crash / worker restart, mark them as FAILED, and refund credits.
+
+    10 minutes is chosen because:
+    - A single-page PDF takes ~2 minutes (OpenAI image gen)
+    - A worst-case 5-page PDF would take ~10 minutes
+    - Anything beyond 10 minutes is certainly a dead/restarted worker
     """
-    cutoff = timezone.now() - timedelta(minutes=25)
+    cutoff = timezone.now() - timedelta(minutes=10)
     stuck_packs = StudyPack.objects.filter(
         user=user,
         status__in=[StudyPack.STATUS_PENDING, StudyPack.STATUS_GENERATING],

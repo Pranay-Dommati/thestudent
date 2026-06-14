@@ -17,6 +17,7 @@ PyPDF2>=3.0.0
 pytest>=8.2.0
 pytest-django>=4.8.0
 gunicorn>=21.2.0
+gevent>=23.9.0
 
 # AWS SES for email delivery
 boto3>=1.40.0

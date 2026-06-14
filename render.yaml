@@ -6,11 +6,11 @@ services:
   - type: web
     name: easylearnova-backend
     runtime: python
-    plan: free  # Change to 'starter' or higher for production
-    region: oregon  # Choose closest to your users
+    plan: standard
+    region: singapore
     branch: dep-backend  # Deploy from this branch
     buildCommand: ./build.sh
-    startCommand: cd backend && celery -A backend worker --loglevel=info --concurrency=1 --max-tasks-per-child=5 & cd backend && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 360 --max-requests 200 --max-requests-jitter 20
+    startCommand: cd backend && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --worker-class gevent --worker-connections 100 --timeout 30 --max-requests 500 --max-requests-jitter 50 --keep-alive 5
     healthCheckPath: /api/chatbot/health/
     
     envVars:
@@ -176,11 +176,11 @@ services:
   - type: worker
     name: easylearnova-celery-worker
     runtime: python
-    plan: free
-    region: oregon
+    plan: standard
+    region: singapore
     branch: dep-backend
     buildCommand: ./build.sh
-    startCommand: cd backend && celery -A backend worker --loglevel=info --concurrency=1 --max-tasks-per-child=5
+    startCommand: cd backend && celery -A backend worker --loglevel=info --concurrency=2 --max-tasks-per-child=10
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
