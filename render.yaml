@@ -176,11 +176,11 @@ services:
   - type: worker
     name: easylearnova-celery-worker
     runtime: python
-    plan: standard
+    plan: starter
     region: singapore
     branch: dep-backend
     buildCommand: ./build.sh
-    startCommand: cd backend && celery -A backend worker --loglevel=info --concurrency=2 --max-tasks-per-child=10
+    startCommand: cd backend && celery -A backend worker --loglevel=info --concurrency=1 --max-tasks-per-child=5
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
