@@ -27,6 +27,8 @@ const chunkTopics = (items, size) => {
   return chunks
 }
 
+const MAX_TOPICS = 8
+
 const GeneratePage = () => {
   const { user, logout, isLoggedIn, loading } = useAuth()
   const posthog = usePostHog()
@@ -220,30 +222,34 @@ const GeneratePage = () => {
 
   // --- Polling logic for generating packs ---
   useEffect(() => {
-    const generatingPacks = historyItems.filter(item => item.type === 'pack' && item.status === 'generating')
-    if (generatingPacks.length === 0) return
+    const activePacks = historyItems.filter(
+      item => item.type === 'pack' && (item.status === 'generating' || item.status === 'pending')
+    )
+    if (activePacks.length === 0) return
 
     const interval = setInterval(() => {
-      generatingPacks.forEach(async (pack) => {
+      activePacks.forEach(async (pack) => {
         try {
           const res = await axiosInstance.get(`/scrib/packs/${pack.id}/status/`)
           if (res.data && res.data.status === 'ready') {
-            // Update the pack in historyItems
             setHistoryItems(prev => prev.map(item => {
               if (item.type === 'pack' && item.id === pack.id) {
-                return { ...item, status: 'ready', pdf_url: res.data.pdf_url, s3_key: res.data.s3_key }
+                return {
+                  ...item,
+                  status: 'ready',
+                  pdf_url: res.data.pdf_url,
+                  s3_key: res.data.s3_key,
+                  _pagesDone: res.data.total_pages ?? item._pagesDone,
+                }
               }
               return item
             }))
-            
-            // Show notifications
             showNotification('Your Scrib notes are ready!', {
               body: `The study pack for ${pack.name || 'your notes'} has finished generating. Click to view.`,
               icon: '/scrib_favicon.svg'
             })
             customToast.success(`Study pack "${pack.name}" is ready!`)
           } else if (res.data && res.data.status === 'failed') {
-            // Mark as failed
             setHistoryItems(prev => prev.map(item => {
               if (item.type === 'pack' && item.id === pack.id) {
                 return { ...item, status: 'failed' }
@@ -251,8 +257,6 @@ const GeneratePage = () => {
               return item
             }))
             customToast.error(`Failed to generate study pack "${pack.name}".`)
-            
-            // Refresh credits so the UI shows the refunded credits immediately
             try {
               const profileRes = await axiosInstance.get('/auth/profile/')
               if (profileRes.data && typeof profileRes.data.credit_balance === 'number') {
@@ -261,15 +265,31 @@ const GeneratePage = () => {
             } catch (profileErr) {
               console.error('Failed to refresh credits after generation failure', profileErr)
             }
+          } else if (res.data && (res.data.status === 'generating' || res.data.status === 'pending')) {
+            // Update ETA countdown + live page progress in the history item
+            setHistoryItems(prev => prev.map(item => {
+              if (item.type === 'pack' && item.id === pack.id) {
+                return {
+                  ...item,
+                  status: res.data.status,
+                  _pagesDone: res.data.pages_done ?? item._pagesDone ?? 0,
+                  _remainingSeconds: res.data.remaining_seconds ?? null,
+                  _estimatedSeconds: res.data.estimated_seconds ?? null,
+                  _elapsedSeconds: res.data.elapsed_seconds ?? null,
+                }
+              }
+              return item
+            }))
           }
         } catch (err) {
           console.error(`Failed to poll status for pack ${pack.id}`, err)
         }
       })
-    }, 3000)
+    }, 5000)
 
     return () => clearInterval(interval)
   }, [historyItems])
+
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -336,6 +356,10 @@ const GeneratePage = () => {
   const handleAddTopic = () => {
     const trimmed = newTopic.trim()
     if (!trimmed) return
+    if (topics.length >= MAX_TOPICS) {
+      customToast.error(`Max ${MAX_TOPICS} topics per generation. Generate this batch first, then add more.`, { id: 'max-topics', duration: 4000 })
+      return
+    }
     setTopics((prev) => [...prev, trimmed])
     setNewTopic('')
     setInvalidTopics([])
@@ -365,7 +389,12 @@ const GeneratePage = () => {
   }
 
   const baseTopics = useMemo(
-    () => (mode === 'paste' ? detectedTopics : topics).map((item) => item.trim()).filter(Boolean),
+    () => (mode === 'paste' ? detectedTopics : topics).map((item) => item.trim()).filter(Boolean).slice(0, MAX_TOPICS),
+    [mode, detectedTopics, topics],
+  )
+
+  const overflowTopics = useMemo(
+    () => (mode === 'paste' ? detectedTopics : topics).map((item) => item.trim()).filter(Boolean).slice(MAX_TOPICS),
     [mode, detectedTopics, topics],
   )
 
@@ -644,17 +673,24 @@ const GeneratePage = () => {
 
             {mode === 'manual' ? (
               <>
-                <div className="mb-3 md:hidden text-[11px] font-bold tracking-widest text-[#a39b92] uppercase mt-4">
-                  TOPICS · {topics.length} ADDED
+                <div className="mb-3 md:hidden flex items-center justify-between mt-4">
+                  <span className="text-[11px] font-bold tracking-widest text-[#a39b92] uppercase">
+                    TOPICS · {Math.min(topics.length, MAX_TOPICS)}/{MAX_TOPICS}
+                  </span>
+                  {topics.length >= MAX_TOPICS && (
+                    <span className="rounded-full bg-[#fdf2df] border border-[#f3d9a9] px-2 py-0.5 text-[10px] font-bold text-[#b47a26]">
+                      Limit reached
+                    </span>
+                  )}
                 </div>
-                
+
                 <div className="mt-0 md:mt-4 flex flex-col gap-3 md:gap-0 md:rounded-xl md:border md:border-[#ded6cc]">
-                  {topics.map((topic, index) => (
+                  {topics.slice(0, MAX_TOPICS).map((topic, index) => (
                     <div
                       key={`topic-${index}`}
                       className={`flex items-center gap-3 rounded-xl md:rounded-none border md:border-x-0 md:border-t-0 md:border-b p-3 md:px-4 md:py-3 last:border-b-0 shadow-sm md:shadow-none ${
-                        invalidTopics.includes(topic.trim()) 
-                          ? 'border-red-500 bg-red-50 md:border-red-500' 
+                        invalidTopics.includes(topic.trim())
+                          ? 'border-red-500 bg-red-50 md:border-red-500'
                           : 'border-[#e2dbd2] md:border-[#efe7dd] bg-white md:bg-transparent'
                       }`}
                       data-topic-row
@@ -676,7 +712,6 @@ const GeneratePage = () => {
                           if (editingIndex !== index) setEditingIndex(index)
                         }}
                         onBlur={(e) => {
-                          // Only close if focus is moving outside the topic row entirely
                           const row = e.currentTarget.closest('[data-topic-row]')
                           if (row && row.contains(e.relatedTarget)) return
                           setEditingIndex(null)
@@ -744,41 +779,108 @@ const GeneratePage = () => {
                       </div>
                     </div>
                   ))}
-                  
-                  <div className="mt-3 md:mt-0 flex items-center gap-3 rounded-xl border border-dashed border-[#d9d1c7] md:border-solid md:border-x-0 md:border-b-0 md:border-t md:border-[#efe7dd] bg-white md:bg-transparent px-3 py-3 md:px-4 md:py-3 shadow-sm md:shadow-none">
-                    <span className="text-[#a39b92] md:text-[#1f1f1f] text-base font-medium md:font-normal pl-1 pr-1">
-                      +
-                    </span>
-                    
-                    <input
-                      className="flex-1 bg-transparent py-2 md:p-0 text-sm md:text-xs text-[#1f1f1f] outline-none placeholder:text-[#a39b92]"
-                      placeholder={mode === 'manual' && topics.length === 0 ? "Add a topic..." : "Add another topic..."}
-                      value={newTopic}
-                      onChange={(event) => setNewTopic(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          handleAddTopic()
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={handleAddTopic}
-                      className={`rounded-lg md:rounded-full border px-4 py-2 md:px-3 md:py-1 text-sm md:text-xs font-medium md:font-semibold transition-all duration-300 ${
-                        highlightAddBtn 
-                          ? 'border-red-500 bg-red-50 text-red-600 shadow-[0_0_10px_rgba(239,68,68,0.5)] scale-110' 
-                          : newTopic.trim()
-                            ? 'border-[#1f1f1f] bg-[#1f1f1f] text-white md:border-[#d9d1c7] md:bg-white md:text-[#1f1f1f]'
-                            : 'border-[#f0ece5] md:border-[#d9d1c7] bg-transparent md:bg-white text-[#cfc7bd] md:text-[#5a554f]'
-                      }`}
-                    >
-                      Add
-                    </button>
-                  </div>
+
+                  {/* Add row — hidden when at limit */}
+                  {topics.length < MAX_TOPICS ? (
+                    <div className="mt-3 md:mt-0 flex items-center gap-3 rounded-xl border border-dashed border-[#d9d1c7] md:border-solid md:border-x-0 md:border-b-0 md:border-t md:border-[#efe7dd] bg-white md:bg-transparent px-3 py-3 md:px-4 md:py-3 shadow-sm md:shadow-none">
+                      <span className="text-[#a39b92] md:text-[#1f1f1f] text-base font-medium md:font-normal pl-1 pr-1">+</span>
+                      <input
+                        className="flex-1 bg-transparent py-2 md:p-0 text-sm md:text-xs text-[#1f1f1f] outline-none placeholder:text-[#a39b92]"
+                        placeholder={topics.length === 0 ? 'Add a topic...' : 'Add another topic...'}
+                        value={newTopic}
+                        onChange={(event) => setNewTopic(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            handleAddTopic()
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={handleAddTopic}
+                        className={`rounded-lg md:rounded-full border px-4 py-2 md:px-3 md:py-1 text-sm md:text-xs font-medium md:font-semibold transition-all duration-300 ${
+                          highlightAddBtn
+                            ? 'border-red-500 bg-red-50 text-red-600 shadow-[0_0_10px_rgba(239,68,68,0.5)] scale-110'
+                            : newTopic.trim()
+                              ? 'border-[#1f1f1f] bg-[#1f1f1f] text-white md:border-[#d9d1c7] md:bg-white md:text-[#1f1f1f]'
+                              : 'border-[#f0ece5] md:border-[#d9d1c7] bg-transparent md:bg-white text-[#cfc7bd] md:text-[#5a554f]'
+                        }`}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  ) : (
+                    /* Limit reached row */
+                    <div className="mt-3 md:mt-0 flex items-center gap-3 rounded-xl border border-[#f3d9a9] bg-[#fdf9f0] md:bg-[#fdf9f0] px-3 py-3 md:px-4 md:py-3 shadow-sm md:shadow-none md:border-x-0 md:border-b-0 md:border-t md:rounded-none">
+                      <span className="text-[#b47a26] text-base pl-1">⚠</span>
+                      <p className="flex-1 text-xs text-[#b47a26] font-medium">
+                        <span className="font-bold">8/8 topics — limit reached.</span> Generate this batch first, then start a new generation for more topics.
+                      </p>
+                    </div>
+                  )}
                 </div>
                 {aiGeneratedWarning && (
                   <p className="mt-2 text-xs text-[#8a847c]">AI makes mistakes so recheck once.</p>
                 )}
+
+                {/* Overflow topics — shown dimmed when AI returns >8 topics */}
+                {overflowTopics.length > 0 && (
+                  <div className="mt-4">
+                    {/* Divider with next-batch label */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="flex-1 h-px bg-[#e2dbd2]" />
+                      <span className="text-[10px] font-bold tracking-wider uppercase text-[#a39b92] whitespace-nowrap px-1 text-center">
+                        {overflowTopics.length} remaining — generate as next batch
+                      </span>
+                      <div className="flex-1 h-px bg-[#e2dbd2]" />
+                    </div>
+
+                    {/* Info banner */}
+                    <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-[#dbe8c3] bg-[#eef7df] px-3 py-2.5 text-xs text-[#557a3f]">
+                      <svg className="mt-0.5 shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
+                      </svg>
+                      <span>
+                        <span className="font-bold">These {overflowTopics.length} topic{overflowTopics.length !== 1 ? 's' : ''} will not be included</span> in this generation (max 8 at a time).
+                        Generate the first 8 above, then come back and generate these as a separate batch.
+                      </span>
+                    </div>
+
+                    {/* Copy remaining button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(overflowTopics.join(', '))
+                        customToast.success('Remaining topics copied! Paste them in your next generation.', { duration: 4000 })
+                      }}
+                      className="mb-3 flex items-center gap-1.5 rounded-full border border-[#d9d1c7] bg-white px-3 py-1.5 text-xs font-semibold text-[#5f5a54] hover:bg-[#f5f2ec] transition-colors"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                      </svg>
+                      Copy remaining {overflowTopics.length} topics
+                    </button>
+
+                    {/* Dimmed overflow topic list */}
+                    <div className="flex flex-col gap-2 opacity-40 select-none pointer-events-none">
+                      {overflowTopics.map((topic, i) => (
+                        <div
+                          key={`overflow-${i}`}
+                          className="flex items-center gap-3 rounded-xl border border-[#e2dbd2] bg-white px-3 py-2.5 md:px-4 md:py-3"
+                        >
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#d9d1c7] text-xs font-medium text-[#8a847c]">
+                            {MAX_TOPICS + i + 1}
+                          </span>
+                          <span className="flex-1 text-sm text-[#6b655d] line-clamp-1">{topic}</span>
+                          <span className="rounded-full bg-[#f5f2ec] px-2 py-0.5 text-[9px] font-bold tracking-wider text-[#a39b92] uppercase whitespace-nowrap">
+                            Next batch
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
               </>
             ) : (
               <div className="mt-4 rounded-xl border border-[#ded6cc] bg-white md:bg-[#faf8f3] p-4 shadow-sm md:shadow-none">
@@ -1045,7 +1147,42 @@ const GeneratePage = () => {
 
                     <div className="flex w-full flex-shrink-0 items-center justify-end gap-2 sm:w-auto">
                       {item._isPending || isGenerating ? (
-                        <div className="text-xs font-medium text-[#7b756d] italic px-2">Generating...</div>
+                        <div className="flex flex-col items-end gap-1.5 px-2 min-w-[120px]">
+                          <span className="text-xs font-semibold text-[#7b756d]">
+                            {item.status === 'pending' ? '⏳ Queued...' : '⚙️ Generating...'}
+                          </span>
+
+                          {/* Progress bar — shows per-image progress once pages_done is available */}
+                          {(() => {
+                            const done = item._pagesDone ?? 0
+                            const total = pages
+                            const pct = total > 0 ? Math.round((done / total) * 100) : 0
+                            return (
+                              <div className="w-full">
+                                <div className="flex justify-between text-[10px] text-[#a39b92] mb-0.5">
+                                  <span>{done}/{total} pages</span>
+                                  <span>{pct}%</span>
+                                </div>
+                                <div className="h-1.5 w-full rounded-full bg-[#e8e2d9] overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-[#6366f1] transition-all duration-700"
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )
+                          })()}
+
+                          {item._remainingSeconds != null && item._remainingSeconds > 0 ? (
+                            <span className="text-[10px] text-[#a39b92]">
+                              ~{Math.ceil(item._remainingSeconds / 60)} min remaining
+                            </span>
+                          ) : item._elapsedSeconds != null ? (
+                            <span className="text-[10px] text-[#a39b92]">
+                              {Math.floor(item._elapsedSeconds / 60)}m {item._elapsedSeconds % 60}s elapsed
+                            </span>
+                          ) : null}
+                        </div>
                       ) : isFailed ? (
                         <div className="text-xs font-medium text-[#ef4444] italic px-2">Failed</div>
                       ) : (

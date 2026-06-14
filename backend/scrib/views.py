@@ -632,6 +632,17 @@ class GenerateStudyPackView(APIView):
         if not pages:
             return error_response('Provide at least one topic or page')
 
+        # Hard server-side cap: max 8 pages per generation to protect server resources.
+        # The frontend enforces this too, but we double-check here against API abuse.
+        MAX_PAGES_PER_GENERATION = 8
+        if len(pages) > MAX_PAGES_PER_GENERATION:
+            return error_response(
+                f'You can generate a maximum of {MAX_PAGES_PER_GENERATION} topics at a time. '
+                f'Please split your topics into separate generations.',
+                code='too_many_pages',
+                details={'submitted': len(pages), 'max_allowed': MAX_PAGES_PER_GENERATION},
+            )
+
         required_credits = len(pages)
         page_count = len(pages)
 
@@ -724,22 +735,34 @@ from django.db import transaction
 
 def cleanup_stuck_packs(user):
     """
-    Find packs that are stuck in PENDING or GENERATING for more than 10 minutes
-    due to a server crash / worker restart, mark them as FAILED, and refund credits.
+    Find packs stuck in PENDING or GENERATING and mark them as FAILED + refund credits.
 
-    10 minutes is chosen because:
-    - A single-page PDF takes ~2 minutes (OpenAI image gen)
-    - A worst-case 5-page PDF would take ~10 minutes
-    - Anything beyond 10 minutes is certainly a dead/restarted worker
+    Timeout is calculated dynamically per pack based on total_pages:
+      - Base: 8 minutes + 90 seconds per page
+      - Minimum: 12 minutes (covers a single slow page + queue wait)
+      - Maximum: 45 minutes (safety ceiling)
+
+    This prevents the common false-failure where a large pack is still legitimately
+    running (or waiting in the Celery queue) but gets killed by a flat 10-min cutoff.
+
+    With concurrency=1 on the Celery worker, a queued job could wait as long as the
+    current job takes (~6-8 min for 5 pages), so we add generous headroom.
     """
-    cutoff = timezone.now() - timedelta(minutes=10)
+    now = timezone.now()
     stuck_packs = StudyPack.objects.filter(
         user=user,
         status__in=[StudyPack.STATUS_PENDING, StudyPack.STATUS_GENERATING],
-        created_at__lt=cutoff
     )
     cache_invalidated = False
     for pack in stuck_packs:
+        # Dynamic timeout: base 8 min + 90s per page, clamped to [12, 45] minutes
+        pages = pack.total_pages or 1
+        timeout_minutes = max(12, min(45, 8 + (pages * 90 // 60)))
+        cutoff = pack.created_at + timedelta(minutes=timeout_minutes)
+
+        if now <= cutoff:
+            continue  # Still within the allowed window — leave it alone
+
         with transaction.atomic():
             pack.status = StudyPack.STATUS_FAILED
             pack.save(update_fields=['status'])
@@ -751,10 +774,16 @@ def cleanup_stuck_packs(user):
                     reason=CreditTransaction.REASON_REFUND
                 )
             cache_invalidated = True
-            
+            logger.info(
+                f"[scrib] Marked StudyPack {pack.id} as FAILED "
+                f"(stuck for >{timeout_minutes}min, pages={pages}). "
+                f"Refunded {pack.credits_used} credits to user {user.id}."
+            )
+
     if cache_invalidated:
         from django.core.cache import cache
         cache.delete(f'scrib_my_study_packs_api_{user.id}')
+
 
 class StudyPackStatusView(APIView):
     authentication_classes = [JWTAuthentication]
@@ -763,17 +792,26 @@ class StudyPackStatusView(APIView):
     def get(self, request, pack_id):
         # Clean up any zombie packs before checking status
         cleanup_stuck_packs(request.user)
-        
+
         try:
             pack = StudyPack.objects.get(pk=pack_id, user=request.user)
+            elapsed_seconds = int((timezone.now() - pack.created_at).total_seconds())
+            # ~90s per page is the realistic estimate for OpenAI image generation
+            estimated_seconds = (pack.total_pages or 1) * 90
             return Response({
                 'id': pack.id,
                 'status': pack.status,
                 'pdf_url': pack.pdf_url,
-                's3_key': pack.s3_key
+                's3_key': pack.s3_key,
+                'total_pages': pack.total_pages,
+                'pages_done': pack.pages_done,
+                'estimated_seconds': estimated_seconds,
+                'elapsed_seconds': elapsed_seconds,
+                'remaining_seconds': max(0, estimated_seconds - elapsed_seconds),
             })
         except StudyPack.DoesNotExist:
             return Response({'error': 'Not found'}, status=404)
+
 
 class CreateOrderView(APIView):
     authentication_classes = [JWTAuthentication]
