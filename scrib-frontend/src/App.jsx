@@ -21,21 +21,21 @@ const fallbackPreviewStrip = [
 const pricingTiers = [
   {
     id: 'starter',
-    label: 'Rs 59',
+    label: 'Rs 89',
     note: '10 credits',
     helper: '10 PDF pages',
     highlight: false,
   },
   {
     id: 'popular',
-    label: 'Rs 99',
+    label: 'Rs 169',
     note: '20 credits',
     helper: '20 PDF pages',
     highlight: true,
   },
   {
     id: 'pro',
-    label: 'Rs 199',
+    label: 'Rs 319',
     note: '40 credits',
     helper: '40 PDF pages',
     highlight: false,
@@ -445,7 +445,7 @@ const App = () => {
                   </button>
                 ))}
               </div>
-              <p className="mt-3 text-xs text-[#8a847c]">10 credits = Rs 59. Sign in to generate.</p>
+              <p className="mt-3 text-xs text-[#8a847c]">10 credits = Rs 89. Sign in to generate.</p>
             </div>
           </div>
         </section>

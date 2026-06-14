@@ -172,7 +172,7 @@ const DashboardPage = () => {
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#e2dbd2] bg-white px-4 py-3">
           <p className="text-sm text-[#6f6a63]">
-            Running low? <span className="font-semibold text-[#1f1f1f]">Top up credits</span> - starts at ₹59 for 10.
+            Running low? <span className="font-semibold text-[#1f1f1f]">Top up credits</span> - starts at ₹89 for 10.
           </p>
           <button
             id="dashboard-buy-credits-btn"

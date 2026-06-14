@@ -48,9 +48,9 @@ logger = logging.getLogger(__name__)
 # Amounts stored in paise (1 INR = 100 paise).
 # These values are NEVER trusted from the frontend.
 CREDIT_PACKS = {
-    'starter': {'credits': 10, 'amount_paise': 5900},   # ₹59
-    'popular': {'credits': 20, 'amount_paise': 9900},   # ₹99
-    'pro':     {'credits': 40, 'amount_paise': 19900},  # ₹199
+    'starter': {'credits': 10, 'amount_paise': 8900},   # ₹89
+    'popular': {'credits': 20, 'amount_paise': 16900},  # ₹169
+    'pro':     {'credits': 40, 'amount_paise': 31900},  # ₹319
 }
 
 

@@ -6,7 +6,7 @@ import customToast from '../utils/customToast'
 const PACKS = [
   {
     id: 'starter',
-    price: '₹59',
+    price: '₹89',
     credits: 10,
     pages: 10,
     highlight: false,
@@ -14,7 +14,7 @@ const PACKS = [
   },
   {
     id: 'popular',
-    price: '₹99',
+    price: '₹169',
     credits: 20,
     pages: 20,
     highlight: true,
@@ -23,7 +23,7 @@ const PACKS = [
   },
   {
     id: 'pro',
-    price: '₹199',
+    price: '₹319',
     credits: 40,
     pages: 40,
     highlight: false,

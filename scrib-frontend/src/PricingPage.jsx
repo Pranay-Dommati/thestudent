@@ -13,22 +13,22 @@ import customToast from './utils/customToast'
 const tiers = [
   {
     id: 'starter',
-    price: '₹59',
+    price: '₹89',
     credits: '10 credits',
     helper: '10 PDF pages',
     highlight: false,
   },
   {
     id: 'popular',
-    price: '₹99',
+    price: '₹169',
     credits: '20 credits',
     helper: '20 PDF pages',
-    tag: 'Best value — ₹4.95/page',
+    tag: 'Best value — ₹8.45/page',
     highlight: true,
   },
   {
     id: 'pro',
-    price: '₹199',
+    price: '₹319',
     credits: '40 credits',
     helper: '40 PDF pages',
     highlight: false,
@@ -102,7 +102,7 @@ const PricingPage = () => {
               "name": "Handwritten Notes Credits",
               "offers": {
                 "@type": "Offer",
-                "price": "99",
+                "price": "169",
                 "priceCurrency": "INR"
               }
             }

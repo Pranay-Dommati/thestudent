@@ -324,9 +324,9 @@ const ProfilePage = () => {
                 {/* Quick buy packs */}
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                   {[
-                    { pack: 'starter', label: '10 cr', price: '₹59' },
-                    { pack: 'popular', label: '20 cr', price: '₹99', highlight: true },
-                    { pack: 'pro', label: '40 cr', price: '₹199' },
+                    { pack: 'starter', label: '10 cr', price: '₹89' },
+                    { pack: 'popular', label: '20 cr', price: '₹169', highlight: true },
+                    { pack: 'pro', label: '40 cr', price: '₹319' },
                   ].map((item) => (
                     <div
                       key={item.pack}
