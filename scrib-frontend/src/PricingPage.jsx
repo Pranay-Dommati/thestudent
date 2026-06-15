@@ -98,8 +98,11 @@ const PricingPage = () => {
           {`
             {
               "@context": "https://schema.org",
-              "@type": "Product",
-              "name": "Handwritten Notes Credits",
+              "@type": "SoftwareApplication",
+              "name": "Scrib by EasyLearnova",
+              "applicationCategory": "EducationalApplication",
+              "operatingSystem": "WebBrowser",
+              "description": "AI-powered tool that converts your typed study topics into handwritten exam notes.",
               "offers": {
                 "@type": "Offer",
                 "price": "169",
