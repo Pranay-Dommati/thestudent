@@ -26,6 +26,10 @@ def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
         # ThreadPoolExecutor as_completed loop). Writes pages_done to the DB
         # immediately so the status endpoint can return live progress to the frontend.
         def _on_page_done(pages_done_count: int):
+            # The DB connection can go stale during the long AI generation (75s+ per batch).
+            # close_old_connections() recycles any timed-out connection before writing.
+            from django.db import close_old_connections
+            close_old_connections()
             StudyPack.objects.filter(
                 id=study_pack_id,
                 status=StudyPack.STATUS_GENERATING

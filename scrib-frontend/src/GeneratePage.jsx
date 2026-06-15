@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from './context/AuthContext'
@@ -73,6 +73,7 @@ const GeneratePage = () => {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [showNotice, setShowNotice] = useState(true)
   const [hideBanner, setHideBanner] = useState(false)
+  const overflowRef = useRef(null)
 
   // Sync active tab if URL changes
   useEffect(() => {
@@ -334,6 +335,12 @@ const GeneratePage = () => {
       setPasteText('')
       setAiGeneratedWarning(true)
       customToast.success('Topics organized successfully!')
+      // Auto-scroll to overflow section after a short delay so React re-renders first
+      setTimeout(() => {
+        if (parsedTopics.length > MAX_TOPICS && overflowRef.current) {
+          overflowRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }, 350)
     } catch (error) {
       console.error(error)
       customToast.error('Failed to organize topics using AI. Please try again.')
@@ -407,7 +414,7 @@ const GeneratePage = () => {
     if (isGenerating) return
 
     const sourceTopics = mode === 'paste' ? detectedTopics : topics
-    const cleanedTopics = sourceTopics.map((item) => item.trim()).filter(Boolean)
+    const cleanedTopics = sourceTopics.map((item) => item.trim()).filter(Boolean).slice(0, MAX_TOPICS)
 
     if (!cleanedTopics.length) {
       if (mode === 'manual' && newTopic.trim()) {
@@ -810,11 +817,16 @@ const GeneratePage = () => {
                       </button>
                     </div>
                   ) : (
-                    /* Limit reached row */
-                    <div className="mt-3 md:mt-0 flex items-center gap-3 rounded-xl border border-[#f3d9a9] bg-[#fdf9f0] md:bg-[#fdf9f0] px-3 py-3 md:px-4 md:py-3 shadow-sm md:shadow-none md:border-x-0 md:border-b-0 md:border-t md:rounded-none">
-                      <span className="text-[#b47a26] text-base pl-1">⚠</span>
+                    /* Limit reached row — hidden on mobile when overflow section already explains it */
+                    <div className={`mt-3 md:mt-0 flex items-center gap-2 rounded-xl border border-[#f3d9a9] bg-[#fdf9f0] px-3 py-2.5 shadow-sm md:shadow-none md:border-x-0 md:border-b-0 md:border-t md:rounded-none ${
+                      overflowTopics.length > 0 ? 'hidden md:flex' : 'flex'
+                    }`}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b47a26" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                      </svg>
                       <p className="flex-1 text-xs text-[#b47a26] font-medium">
-                        <span className="font-bold">8/8 topics — limit reached.</span> Generate this batch first, then start a new generation for more topics.
+                        <span className="font-bold">Limit reached (8/8).</span> Generate this batch, then start a new generation.
                       </p>
                     </div>
                   )}
@@ -825,7 +837,7 @@ const GeneratePage = () => {
 
                 {/* Overflow topics — shown dimmed when AI returns >8 topics */}
                 {overflowTopics.length > 0 && (
-                  <div className="mt-4">
+                  <div className="mt-4" ref={overflowRef}>
                     {/* Divider with next-batch label */}
                     <div className="flex items-center gap-3 mb-3">
                       <div className="flex-1 h-px bg-[#e2dbd2]" />
@@ -841,8 +853,9 @@ const GeneratePage = () => {
                         <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
                       </svg>
                       <span>
-                        <span className="font-bold">These {overflowTopics.length} topic{overflowTopics.length !== 1 ? 's' : ''} will not be included</span> in this generation (max 8 at a time).
-                        Generate the first 8 above, then come back and generate these as a separate batch.
+                        You can generate up to 8 topics at a time.{' '}
+                        <span className="font-semibold">Copy the {overflowTopics.length} remaining topic{overflowTopics.length !== 1 ? 's' : ''} below</span>{' '}
+                        and generate them as your next batch.
                       </span>
                     </div>
 
@@ -1148,14 +1161,28 @@ const GeneratePage = () => {
                     <div className="flex w-full flex-shrink-0 items-center justify-end gap-2 sm:w-auto">
                       {item._isPending || isGenerating ? (
                         <div className="flex flex-col items-end gap-1.5 px-2 min-w-[120px]">
-                          <span className="text-xs font-semibold text-[#7b756d]">
-                            {item.status === 'pending' ? '⏳ Queued...' : '⚙️ Generating...'}
+                          <span className="flex items-center gap-1.5 text-xs font-semibold text-[#7b756d]">
+                            {item.status === 'pending' ? (
+                              <>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#a39b92]">
+                                  <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+                                </svg>
+                                Queued...
+                              </>
+                            ) : (
+                              <>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin text-[#6366f1]">
+                                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                                </svg>
+                                Generating...
+                              </>
+                            )}
                           </span>
 
                           {/* Progress bar — shows per-image progress once pages_done is available */}
                           {(() => {
                             const done = item._pagesDone ?? 0
-                            const total = pages
+                            const total = item.total_pages ?? item._estimatedPages ?? 0
                             const pct = total > 0 ? Math.round((done / total) * 100) : 0
                             return (
                               <div className="w-full">

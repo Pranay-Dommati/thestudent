@@ -219,56 +219,7 @@ const App = () => {
         </div>
       </header>
 
-      {/* ── High-Traffic Notice Banner ───────────────────────────────── */}
-      {showNoticeBanner && (
-        <div
-          role="alert"
-          aria-live="polite"
-          className="relative z-40 w-full bg-[#fffbeb] border-b border-[#f0d070]"
-        >
-          {/* Subtle animated top-border accent */}
-          <div className="h-[3px] w-full bg-gradient-to-r from-[#f0c06a] via-[#f5a623] to-[#f0c06a] animate-pulse" />
 
-          <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 md:px-6">
-            {/* Icon */}
-            <span className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-[#fef3c7] border border-[#fcd34d]">
-              <svg
-                width="16" height="16" viewBox="0 0 24 24"
-                fill="none" stroke="#b45309" strokeWidth="2.2"
-                strokeLinecap="round" strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/>
-                <line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
-            </span>
-
-            {/* Message */}
-            <p className="flex-1 text-xs leading-relaxed text-[#92400e] md:text-sm">
-              <span className="font-semibold">⚠️ We're currently experiencing unusually high traffic,</span>
-              {' '}which may cause slower loading times across the website.{' '}
-              <span className="hidden sm:inline">Our team is actively working to improve performance and ensure a smoother experience for everyone. If a page takes longer than expected to load, please try again in a few moments.</span>
-              {' '}<span className="font-medium">Thank you for your patience and support. 🙏</span>
-            </p>
-
-            {/* Dismiss button */}
-            <button
-              onClick={() => {
-                setShowNoticeBanner(false)
-                sessionStorage.setItem('notice_banner_dismissed', 'true')
-              }}
-              aria-label="Dismiss notice"
-              className="flex-shrink-0 ml-2 flex h-7 w-7 items-center justify-center rounded-full text-[#92400e] hover:bg-[#fde68a] transition-colors"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
 
       <main>
         <section className="border-b border-[#e4ddd4]">
