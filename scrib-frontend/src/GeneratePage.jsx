@@ -33,11 +33,21 @@ const GeneratePage = () => {
   const { user, logout, isLoggedIn, loading } = useAuth()
   const posthog = usePostHog()
   const navigate = useNavigate()
-  const [mode, setMode] = useState('manual')
-  const [topics, setTopics] = useState([])
+  const [mode, setMode] = useState(() => sessionStorage.getItem('scrib_draft_mode') || 'manual')
+  const [topics, setTopics] = useState(() => {
+    const saved = sessionStorage.getItem('scrib_draft_topics')
+    return saved ? JSON.parse(saved) : []
+  })
   const [newTopic, setNewTopic] = useState('')
   const [highlightAddBtn, setHighlightAddBtn] = useState(false)
-  const [pasteText, setPasteText] = useState('')
+  const [pasteText, setPasteText] = useState(() => sessionStorage.getItem('scrib_draft_paste') || '')
+
+  // Sync draft state to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('scrib_draft_mode', mode)
+    sessionStorage.setItem('scrib_draft_topics', JSON.stringify(topics))
+    sessionStorage.setItem('scrib_draft_paste', pasteText)
+  }, [mode, topics, pasteText])
   const [isOrganizing, setIsOrganizing] = useState(false)
   const [isOrganized, setIsOrganized] = useState(false)
   const [aiGroups, setAiGroups] = useState([])
@@ -522,6 +532,10 @@ const GeneratePage = () => {
       setTimeout(() => {
         setHistoryItems(prev => prev.filter(item => item.id !== tempId))
         loadHistory()
+        // Clear draft state so the next generation starts fresh
+        setTopics([])
+        setPasteText('')
+        setMode('manual')
       }, 800)
     } catch (error) {
       // Remove the pending item if request fails
@@ -837,9 +851,9 @@ const GeneratePage = () => {
 
                 {/* Overflow topics — shown dimmed when AI returns >8 topics */}
                 {overflowTopics.length > 0 && (
-                  <div className="mt-4" ref={overflowRef}>
-                    {/* Divider with next-batch label */}
-                    <div className="flex items-center gap-3 mb-3">
+                  <div className="mt-4">
+                    {/* Divider with next-batch label — ref here so centering it shows active topics above */}
+                    <div ref={overflowRef} className="flex items-center gap-3 mb-3">
                       <div className="flex-1 h-px bg-[#e2dbd2]" />
                       <span className="text-[10px] font-bold tracking-wider uppercase text-[#a39b92] whitespace-nowrap px-1 text-center">
                         {overflowTopics.length} remaining — generate as next batch
