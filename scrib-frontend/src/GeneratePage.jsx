@@ -338,7 +338,7 @@ const GeneratePage = () => {
       // Auto-scroll to overflow section after a short delay so React re-renders first
       setTimeout(() => {
         if (parsedTopics.length > MAX_TOPICS && overflowRef.current) {
-          overflowRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          overflowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
         }
       }, 350)
     } catch (error) {

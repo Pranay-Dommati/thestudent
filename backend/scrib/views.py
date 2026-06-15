@@ -796,8 +796,11 @@ class StudyPackStatusView(APIView):
         try:
             pack = StudyPack.objects.get(pk=pack_id, user=request.user)
             elapsed_seconds = int((timezone.now() - pack.created_at).total_seconds())
-            # ~90s per page is the realistic estimate for OpenAI image generation
-            estimated_seconds = (pack.total_pages or 1) * 90
+            import math
+            # Generation is done in concurrent batches of 4 pages.
+            # Each batch takes roughly 90s for OpenAI image generation.
+            batches = math.ceil((pack.total_pages or 1) / 4)
+            estimated_seconds = batches * 90
             return Response({
                 'id': pack.id,
                 'status': pack.status,
