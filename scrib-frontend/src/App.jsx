@@ -6,7 +6,7 @@ import axiosInstance from './utils/axios'
 import { getInitials } from './utils/user'
 import MobileMenu from './components/MobileMenu'
 import BuyCreditsModal from './components/BuyCreditsModal'
-import FreeCreditsModal from './components/FreeCreditsModal'
+import PreviewPromoModal from './components/PreviewPromoModal'
 import PreviewCard from './components/PreviewCard'
 import { startPaymentFlow } from './services/paymentService'
 import customToast from './utils/customToast'
@@ -20,6 +20,14 @@ const fallbackPreviewStrip = [
 
 const pricingTiers = [
   {
+    id: 'try',
+    label: 'Rs 19',
+    note: '2 credits',
+    helper: '2 PDF pages',
+    priceTag: 'Try now',
+    highlight: false,
+  },
+  {
     id: 'starter',
     label: 'Rs 89',
     note: '10 credits',
@@ -31,6 +39,7 @@ const pricingTiers = [
     label: 'Rs 169',
     note: '20 credits',
     helper: '20 PDF pages',
+    tag: 'Most popular',
     highlight: true,
   },
   {
@@ -418,10 +427,10 @@ const App = () => {
                       tier.highlight ? 'border-2 border-[#6246ea] bg-white shadow-sm' : 'border border-[#e2dbd2] bg-white'
                     }`}
                   >
-                    {tier.highlight && (
+                    {tier.highlight && tier.tag && (
                       <span className="absolute -top-[14px] left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-[#efedfc] border-4 border-white px-2 py-0.5 text-[10px] font-bold text-[#6246ea] shadow-sm">
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.6H22l-6.1 4.5 2.3 7.5-6.2-4.6-6.2 4.6 2.3-7.5L2 9.6h7.6z"/></svg>
-                        Best value
+                        {tier.tag}
                       </span>
                     )}
                     
@@ -430,6 +439,13 @@ const App = () => {
                       <span className={`text-2xl font-bold leading-none tracking-tight ${tier.highlight ? 'text-[#6246ea]' : 'text-[#1f1f1f]'}`}>
                         {tier.label.replace('Rs ', '₹')}
                       </span>
+                      {tier.priceTag && (
+                        <div className="mt-1">
+                          <span className="inline-flex rounded-md bg-[#eef7df] px-1.5 py-0.5 text-[9px] font-semibold text-[#557a3f]">
+                            {tier.priceTag}
+                          </span>
+                        </div>
+                      )}
                       <span className="mt-1 text-[11px] leading-none text-[#8a847c]">/ pack</span>
                     </div>
 
@@ -470,7 +486,7 @@ const App = () => {
             <div className="hidden md:block">
               <p className="text-sm font-semibold">Credit packs</p>
               <p className="text-sm text-[#7b756d]">Pay only for what you generate. Credits never expire. Built to remain affordable while supporting AI generation and cloud processing.</p>
-              <div className="mt-6 grid gap-4 md:grid-cols-3">
+              <div className="mt-6 grid gap-4 md:grid-cols-4">
                 {pricingTiers.map((tier) => (
                   <div
                     key={`desktop-${tier.id}`}
@@ -478,21 +494,35 @@ const App = () => {
                       tier.highlight ? 'border-[1.5px] border-black shadow-sm' : 'border-[#e2dbd2]'
                     }`}
                   >
-                    {tier.highlight ? (
+                    {tier.highlight && tier.tag ? (
                       <span className="absolute -top-[10px] left-1/2 -translate-x-1/2 rounded-full bg-[#1a1a1a] ring-4 ring-white px-3 py-0.5 text-[11px] font-semibold text-[#f0c06a]">
-                        Best value
+                        {tier.tag}
                       </span>
                     ) : null}
                     
                     <div className="flex flex-col">
-                      <span className="text-4xl font-medium tracking-tight text-[#1f1f1f]">
-                        {tier.label.replace('Rs ', '₹')}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-4xl font-medium tracking-tight text-[#1f1f1f]">
+                          {tier.label.replace('Rs ', '₹')}
+                        </span>
+                        {tier.priceTag && (
+                          <span className="inline-flex rounded-md bg-[#eef7df] px-2 py-0.5 text-[11px] font-semibold text-[#557a3f]">
+                            {tier.priceTag}
+                          </span>
+                        )}
+                      </div>
                       <span className="mt-1 text-sm text-[#5f5a54]">/ pack</span>
                     </div>
 
                     <div className="mt-6 flex flex-col">
                       <span className="text-lg font-semibold text-[#1f1f1f]">{tier.note.split(' ')[0]} credits</span>
+                      {tier.tag && !tier.highlight ? (
+                        <div className="mt-1">
+                          <span className="inline-flex rounded-md bg-[#eef7df] px-1.5 py-0.5 text-[10px] font-semibold text-[#557a3f]">
+                            {tier.tag}
+                          </span>
+                        </div>
+                      ) : null}
                       <span className="mt-1 text-[13px] leading-snug text-[#5f5a54]">
                         {tier.helper}
                       </span>
@@ -541,8 +571,8 @@ const App = () => {
         />
       )}
 
-      {/* Free Credits Promo Modal for first-time visitors */}
-      <FreeCreditsModal isLoggedIn={isLoggedIn} loading={loading} />
+      {/* Preview Promo Modal */}
+      <PreviewPromoModal isLoggedIn={isLoggedIn} loading={loading} />
     </div>
   )
 }

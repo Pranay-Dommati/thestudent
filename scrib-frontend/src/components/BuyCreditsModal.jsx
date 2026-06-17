@@ -5,6 +5,15 @@ import customToast from '../utils/customToast'
 
 const PACKS = [
   {
+    id: 'try',
+    price: '₹19',
+    credits: 2,
+    pages: 2,
+    highlight: false,
+    label: 'Try',
+    priceTag: 'Try now',
+  },
+  {
     id: 'starter',
     price: '₹89',
     credits: 10,
@@ -19,7 +28,7 @@ const PACKS = [
     pages: 20,
     highlight: true,
     label: 'Popular',
-    tag: 'Best value',
+    tag: 'Most popular',
   },
   {
     id: 'pro',
@@ -123,9 +132,9 @@ const BuyCreditsModal = ({ onClose, onSuccess }) => {
                   ${isSelected ? 'ring-2 ring-[#1f1f1f] ring-offset-1' : ''}
                 `}
               >
-                {pack.highlight && (
+                {pack.highlight && pack.tag && (
                   <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-[#1f1f1f] px-2.5 py-0.5 text-[10px] font-semibold text-[#f0c06a] ring-4 ring-white">
-                    Best value
+                    {pack.tag}
                   </span>
                 )}
 
@@ -138,7 +147,7 @@ const BuyCreditsModal = ({ onClose, onSuccess }) => {
                   <div>
                     <p className="text-sm font-semibold text-[#1f1f1f]">
                       {pack.credits} credits
-                      {pack.tag && (
+                      {pack.tag && !pack.highlight && (
                         <span className="ml-2 rounded-md bg-[#eef7df] px-1.5 py-0.5 text-[10px] font-semibold text-[#557a3f]">
                           {pack.tag}
                         </span>
@@ -149,6 +158,11 @@ const BuyCreditsModal = ({ onClose, onSuccess }) => {
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  {pack.priceTag && (
+                    <span className="hidden sm:inline-flex rounded-md bg-[#eef7df] px-1.5 py-0.5 text-[10px] font-semibold text-[#557a3f]">
+                      {pack.priceTag}
+                    </span>
+                  )}
                   <span className="text-base font-semibold text-[#1f1f1f]">{pack.price}</span>
                   {isThisProcessing ? (
                     <svg className="h-4 w-4 animate-spin text-[#1f1f1f]" fill="none" viewBox="0 0 24 24">

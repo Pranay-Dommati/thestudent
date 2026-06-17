@@ -24,6 +24,7 @@ const ProfilePage = () => {
   const [paymentHistory, setPaymentHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [historyDisplayCount, setHistoryDisplayCount] = useState(5)
 
   const { user, logout, isLoggedIn, refreshUser } = useAuth()
 
@@ -302,28 +303,20 @@ const ProfilePage = () => {
             <div className="mt-6 space-y-4">
               {/* Credits card */}
               <div className="rounded-2xl border border-[#e2dbd2] bg-white px-6 py-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-sm font-semibold">Credits</h2>
-                    <p className="text-xs text-[#7b756d] mt-1">
-                      Current balance:{' '}
-                      <span className="font-semibold text-[#1f1f1f] text-base">{user?.credit_balance ?? 0}</span>{' '}
-                      credits
-                    </p>
-                    <p className="text-xs text-[#9a9289] mt-1">1 credit = 1 PDF page generated</p>
-                  </div>
-                  <button
-                    id="profile-buy-credits-btn"
-                    onClick={() => setShowBuyModal(true)}
-                    className="rounded-lg bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity"
-                  >
-                    + Buy credits
-                  </button>
+                <div>
+                  <h2 className="text-sm font-semibold">Credits</h2>
+                  <p className="text-xs text-[#7b756d] mt-1">
+                    Current balance:{' '}
+                    <span className="font-semibold text-[#1f1f1f] text-base">{user?.credit_balance ?? 0}</span>{' '}
+                    credits
+                  </p>
+                  <p className="text-xs text-[#9a9289] mt-1">1 credit = 1 PDF page generated</p>
                 </div>
 
                 {/* Quick buy packs */}
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4 sm:gap-4">
                   {[
+                    { pack: 'try', label: '2 cr', price: '₹19' },
                     { pack: 'starter', label: '10 cr', price: '₹89' },
                     { pack: 'popular', label: '20 cr', price: '₹169', highlight: true },
                     { pack: 'pro', label: '40 cr', price: '₹319' },
@@ -394,7 +387,7 @@ const ProfilePage = () => {
                           </td>
                         </tr>
                       ) : (
-                        paymentHistory.map((row) => (
+                        paymentHistory.slice(0, historyDisplayCount).map((row) => (
                           <tr key={row.id} className="border-t border-[#eee6dc]">
                             <td className="px-3 py-2.5">{formatDate(row.created_at)}</td>
                             <td className="px-3 py-2.5 font-medium">{row.credits_added} cr</td>
@@ -415,6 +408,16 @@ const ProfilePage = () => {
                       )}
                     </tbody>
                   </table>
+                  {paymentHistory.length > historyDisplayCount && (
+                    <div className="border-t border-[#eee6dc] bg-[#faf8f3] p-3 text-center">
+                      <button
+                        onClick={() => setHistoryDisplayCount(prev => prev + 5)}
+                        className="text-[11px] font-semibold text-[#1f1f1f] hover:underline"
+                      >
+                        Load more payments ↓
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

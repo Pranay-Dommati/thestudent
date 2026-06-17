@@ -12,6 +12,14 @@ import customToast from './utils/customToast'
 // Pack IDs must match the backend CREDIT_PACKS keys exactly
 const tiers = [
   {
+    id: 'try',
+    price: '₹19',
+    credits: '2 credits',
+    helper: '2 PDF pages',
+    priceTag: 'Try now',
+    highlight: false,
+  },
+  {
     id: 'starter',
     price: '₹89',
     credits: '10 credits',
@@ -23,7 +31,7 @@ const tiers = [
     price: '₹169',
     credits: '20 credits',
     helper: '20 PDF pages',
-    tag: 'Best value — ₹8.45/page',
+    tag: 'Most popular',
     highlight: true,
   },
   {
@@ -163,24 +171,16 @@ const PricingPage = () => {
       <main className="mx-auto max-w-6xl px-6 py-12">
         <div className="text-center px-4">
           <h1 className="text-2xl font-semibold md:text-3xl lg:text-4xl">Simple, pay-as-you-go pricing</h1>
-          <p className="mt-3 text-sm text-[#7b756d]">
-            No subscriptions. Buy credits once, use whenever. Credits never expire. Built to remain affordable while supporting AI generation and cloud processing.
-          </p>
+
         </div>
 
         {/* Trust banner — see before you buy */}
         {/* Mobile: compact single row */}
-        <div className="mt-6 flex items-center justify-between gap-2 rounded-xl border border-[#e2dbd2] bg-[#fdfcf9] px-3 py-2.5 sm:hidden">
-          <div className="flex items-center gap-2 min-w-0">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4e8c3a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-            <p className="text-[11px] text-[#5f5a54] truncate">New here? See the notes before buying</p>
-          </div>
+        <div className="mt-6 flex items-center justify-between rounded-xl border border-[#e2dbd2] bg-white px-4 py-3 sm:hidden">
+          <p className="text-[13px] text-[#1f1f1f]">New here? See notes before buying</p>
           <Link
             to="/previews"
-            className="flex-shrink-0 rounded-full border border-[#1f1f1f] px-3 py-1 text-[11px] font-semibold text-[#1f1f1f] hover:bg-[#1f1f1f] hover:text-white transition-colors"
+            className="flex-shrink-0 rounded-full border border-[#e2dbd2] bg-white px-3 py-1.5 text-[11px] font-medium text-[#1f1f1f] hover:bg-[#faf8f3] transition-colors"
           >
             Preview →
           </Link>
@@ -207,63 +207,89 @@ const PricingPage = () => {
           </Link>
         </div>
 
-        <div className="mt-8 grid gap-3 grid-cols-1 sm:grid-cols-3 md:grid-cols-3">
+        <div className="mt-8 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {tiers.map((tier) => (
             <div
               key={tier.id}
-              className={`relative flex flex-col rounded-2xl border bg-white p-6 ${
+              className={`relative flex flex-row sm:flex-col items-center sm:items-stretch justify-between sm:justify-start rounded-2xl border bg-white p-5 sm:p-6 ${
                 tier.highlight ? 'border-[1.5px] border-black shadow-sm' : 'border-[#e2dbd2]'
               }`}
             >
-              {tier.highlight ? (
-                <span className="absolute -top-[10px] left-1/2 -translate-x-1/2 rounded-full bg-[#1a1a1a] ring-4 ring-white px-3 py-0.5 text-[11px] font-semibold text-[#f0c06a]">
-                  Best value
+              {tier.highlight && tier.tag ? (
+                <span className="absolute -top-[10px] left-5 sm:left-1/2 sm:-translate-x-1/2 rounded-full bg-[#1a1a1a] ring-4 ring-white px-3 py-0.5 text-[11px] font-semibold text-[#f0c06a]">
+                  {tier.tag}
                 </span>
               ) : null}
 
-              <div className="flex flex-col">
-                <span className="text-4xl font-medium tracking-tight text-[#1f1f1f]">
-                  {tier.price}
-                </span>
-                <span className="mt-1 text-sm text-[#5f5a54]">/ pack</span>
-              </div>
+              {/* Left Side (Mobile) / Top Side (Desktop) */}
+              <div className="flex flex-col flex-1 sm:w-auto">
+                {/* Price */}
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="text-3xl sm:text-4xl font-medium tracking-tight text-[#1f1f1f]">
+                      {tier.price}
+                    </span>
+                    {tier.priceTag && (
+                      <span className="inline-flex rounded-md bg-[#eef7df] px-2 py-0.5 text-[11px] font-semibold text-[#557a3f]">
+                        {tier.priceTag}
+                      </span>
+                    )}
+                  </div>
+                  <span className="mt-1 hidden sm:block text-sm text-[#5f5a54]">/ pack</span>
+                </div>
 
-              <div className="mt-6 flex flex-col">
-                <span className="text-lg font-semibold text-[#1f1f1f]">{tier.credits}</span>
-                {tier.tag ? (
-                  <div className="mt-1">
-                    <span className="inline-flex rounded-md bg-[#eef7df] px-1.5 py-0.5 text-[10px] font-semibold text-[#557a3f]">
-                      {tier.tag}
+                {/* Credits */}
+                <div className="mt-1 sm:mt-6 flex flex-col">
+                  {/* Desktop version */}
+                  <div className="hidden sm:flex flex-col">
+                    <span className="text-lg font-semibold text-[#1f1f1f]">{tier.credits}</span>
+                    {tier.tag && !tier.highlight ? (
+                      <div className="mt-1">
+                        <span className="inline-flex rounded-md bg-[#eef7df] px-1.5 py-0.5 text-[10px] font-semibold text-[#557a3f]">
+                          {tier.tag}
+                        </span>
+                      </div>
+                    ) : null}
+                    <span className="mt-1 text-[13px] leading-snug text-[#5f5a54]">
+                      {tier.helper}
                     </span>
                   </div>
-                ) : null}
-                <span className="mt-1 text-[13px] leading-snug text-[#5f5a54]">
-                  {tier.helper}
-                </span>
+                  
+                  {/* Mobile version */}
+                  <div className="flex sm:hidden flex-col">
+                    <span className="text-[13px] text-[#9a9289]">
+                      {tier.credits} · {tier.helper}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div className="mt-auto pt-8">
+              {/* Right Side (Mobile) / Bottom Side (Desktop) */}
+              <div className="sm:mt-auto sm:pt-8 flex-shrink-0 ml-4 sm:ml-0">
                 <button
                   id={`pricing-buy-${tier.id}`}
                   onClick={() => handleBuyClick(tier.id)}
                   disabled={processingPack === tier.id}
-                  className={`mt-6 w-full rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                  className={`w-full sm:w-full rounded-lg px-5 sm:px-4 py-2 sm:py-2 text-sm font-semibold transition-all ${
                     tier.highlight
                       ? 'bg-[#1a1a1a] text-white hover:bg-[#333333]'
                       : 'border border-[#e2dbd2] bg-white text-[#1f1f1f] hover:bg-[#f7f4ee]'
                   } disabled:opacity-50`}
                 >
-                  {processingPack === tier.id ? 'Processing...' : isLoggedIn ? 'Buy pack' : 'Sign in to buy'}
+                  {processingPack === tier.id ? 'Processing...' : (
+                    <>
+                      <span className="sm:hidden">Buy</span>
+                      <span className="hidden sm:inline">{isLoggedIn ? 'Buy pack' : 'Sign in to buy'}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
           ))}
         </div>
 
-
-
-        <div className="mt-6 rounded-xl border border-[#e2dbd2] bg-[#faf8f3] px-4 py-3 text-xs text-[#6f6a63]">
-          Payments via UPI / Razorpay · Secure · Credits added instantly after payment · No auto-renewal, ever
+        <div className="mt-6 rounded-xl border border-[#e2dbd2] bg-[#faf8f3] px-4 py-4 text-center text-[12px] text-[#6f6a63]">
+          Payments via UPI / Razorpay · Secure · Credits added instantly · No auto-renewal, ever
         </div>
 
         <div className="mt-10">

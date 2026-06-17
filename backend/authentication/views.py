@@ -30,7 +30,7 @@ from .serializers import (
 # pyrefly: ignore [missing-import]
 from .models import User, EmailOTP, UserProduct
 
-SIGNUP_FREE_CREDITS = 2
+SIGNUP_FREE_CREDITS = 0  # Free credits on signup disabled
 
 def grant_signup_credits(user):
     """Award free signup credits to a newly activated user.
@@ -384,8 +384,8 @@ def otp_verify(request):
     if first_activation:
         user.is_active = True
         user.save(update_fields=['is_active'])
-        # Grant 2 free signup credits on first ever account activation
-        grant_signup_credits(user)
+        # Free signup credits disabled
+        # grant_signup_credits(user)
 
     # Issue tokens
     refresh = RefreshToken.for_user(user)
@@ -1253,8 +1253,8 @@ def google_auth_token(request):
                 )
                 created = True
                 logger.info(f"Google token auth: New user created - {email}")
-                # Grant 2 free signup credits for new Google users
-                grant_signup_credits(user)
+                # Free signup credits disabled
+                # grant_signup_credits(user)
             except Exception as e:
                 logger.error(f"Error creating user: {str(e)}")
                 return Response(

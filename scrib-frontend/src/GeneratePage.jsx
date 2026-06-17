@@ -646,8 +646,36 @@ const GeneratePage = () => {
                 </h1>
                 <p className="mt-1 md:mt-0 text-[13px] md:text-sm text-[#8a847c] md:text-[#7b756d] leading-relaxed">
                   <span className="md:hidden">Add topics below — each becomes one handwritten page in the PDF.</span>
-                  <span className="hidden md:inline">Type topics one by one, or paste your full syllabus - AI will organise it.</span>
+                  <span className="hidden md:inline">Type topics one by one, or paste your full syllabus — AI will organise it.</span>
                 </p>
+
+                {(!isLoggedIn || (!isLoadingHistory && creditBalance === 0 && historyItems.length === 0)) && (
+                   <div className="mt-4 rounded-xl border border-[#e2dbd2] bg-white px-4 py-2.5 shadow-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                         <div className="flex items-center gap-3">
+                            <div className="flex h-6 w-6 shrink-0 items-center justify-center text-[#b47a26]">
+                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                 <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path>
+                                 <path d="M5 3v4"></path>
+                                 <path d="M3 5h4"></path>
+                               </svg>
+                            </div>
+                            <div>
+                               <h3 className="text-sm font-bold text-[#1f1f1f]">Starter trial — 2 credits for ₹19</h3>
+                               <p className="text-xs text-[#8a847c] mt-0.5">Add up to 2 topics, then complete payment</p>
+                            </div>
+                         </div>
+                         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto mt-2 sm:mt-0">
+                            <Link to="/pricing" className="flex items-center justify-center rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] hover:bg-[#fcfbf9] transition-colors shadow-sm">
+                               See other packs
+                            </Link>
+                            <Link to="/pricing" className="flex items-center justify-center rounded-lg bg-[#1f1f1f] px-4 py-1.5 text-xs font-semibold text-white hover:bg-black transition-colors shadow-sm">
+                               Pay ₹19
+                            </Link>
+                         </div>
+                      </div>
+                   </div>
+                )}
                 {showNotice && (
                   <div className="hidden md:flex mt-3 items-start gap-3 rounded-lg bg-[#fcf9f4] border border-[#e2dbd2] p-3 text-xs text-[#5f5a54] relative pr-10">
                     <span className="flex items-start gap-2">
@@ -953,80 +981,82 @@ const GeneratePage = () => {
           </div>
 
           <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col md:static md:flex-row md:flex-wrap md:items-center justify-between gap-2 md:gap-4 border-t border-[#e2dbd2] md:border-[#eee6dc] bg-white md:bg-[#f7f4ee] px-5 py-3 md:py-4 md:px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] md:shadow-none">
-            {/* Mobile Top Row */}
-            {mode !== 'paste' && (
-              <div className="flex items-center justify-between md:hidden w-full mb-1">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-[#059669]" />
-                  <span className="text-sm font-medium text-[#5f5a54]">PDF · <span className="font-bold text-[#1f1f1f]">{baseTopics.length} pages</span></span>
+              {/* Mobile Top Row */}
+              {mode !== 'paste' && (
+                <div className="flex items-center justify-between md:hidden w-full mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[#059669]" />
+                    <span className="text-sm font-medium text-[#5f5a54]">PDF · <span className="font-bold text-[#1f1f1f]">{baseTopics.length} pages</span></span>
+                  </div>
+                  <span className="rounded-full bg-[#fdf2df] border border-[#f3d9a9] px-3 py-1 text-[11px] font-semibold text-[#b47a26]">
+                    {baseTopics.length} credits
+                  </span>
                 </div>
-                <span className="rounded-full bg-[#fdf2df] border border-[#f3d9a9] px-3 py-1 text-[11px] font-semibold text-[#b47a26]">
-                  {baseTopics.length} credits
-                </span>
-              </div>
-            )}
-
-            {/* Desktop Left Side */}
-            <div className="hidden md:block">
-              {mode !== 'paste' ? (
-                <>
-                  <p className="text-sm font-semibold">
-                    {baseTopics.length} credit{baseTopics.length !== 1 ? 's' : ''}
-                  </p>
-                  <p className="text-xs text-[#7b756d]">
-                    {isLoggedIn ? (
-                      <>
-                        {creditBalance} credits remaining{' '}
-                        <span className="ml-2 rounded-full bg-[#f2e6c9] px-2 py-0.5 text-[10px] font-semibold text-[#7a5a26]">
-                          {Math.max(creditBalance - baseTopics.length, 0)} after
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-[#a74c4c] font-medium">Sign up to start generating your custom notes!</span>
-                    )}
-                  </p>
-                </>
-              ) : (
-                <p className="text-xs text-[#7b756d]">
-                  {isLoggedIn ? `${creditBalance} credits available` : <span className="text-[#a74c4c] font-medium">Sign up to start generating your custom notes!</span>}
-                </p>
               )}
-            </div>
-            
-            <button
-              onClick={
-                !isLoggedIn 
-                  ? () => navigate('/login?next=/generate') 
-                  : (creditBalance < Math.max(1, baseTopics.length))
-                    ? () => navigate('/pricing')
-                    : handleGenerate
-              }
-              disabled={isGenerating || mode === 'paste' || isOrganizing}
-              className={`w-full md:w-auto rounded-xl px-5 py-2.5 md:py-2 text-sm md:text-bold font-bold transition-all ${
-                isGenerating || mode === 'paste' || isOrganizing
-                  ? 'border border-[#f0ece5] bg-transparent text-[#e0d9ce] md:border-none md:bg-[#e7e2db] md:text-[#b1aaa0]'
-                  : !isLoggedIn
-                    ? 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black hover:-translate-y-0.5'
-                    : 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black'
-              }`}
-            >
-              {isGenerating
-                  ? 'Generating...'
-                  : mode === 'paste'
-                    ? 'Organize topics first'
-                    : !isLoggedIn
-                      ? 'Sign up to Generate'
+
+              {/* Desktop Left Side */}
+              <div className="hidden md:block">
+                {mode !== 'paste' ? (
+                  <>
+                    <p className="text-sm font-semibold">
+                      {baseTopics.length} credit{baseTopics.length !== 1 ? 's' : ''}
+                    </p>
+                    <p className="text-xs text-[#7b756d]">
+                      {isLoggedIn ? (
+                        <>
+                          {creditBalance} credits remaining{' '}
+                          <span className="ml-2 rounded-full bg-[#f2e6c9] px-2 py-0.5 text-[10px] font-semibold text-[#7a5a26]">
+                            {Math.max(creditBalance - baseTopics.length, 0)} after
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[#a74c4c] font-medium">Sign up to start generating your custom notes!</span>
+                      )}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-[#7b756d]">
+                    {isLoggedIn ? `${creditBalance} credits available` : <span className="text-[#a74c4c] font-medium">Sign up to start generating your custom notes!</span>}
+                  </p>
+                )}
+              </div>
+              
+              <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                <button
+                  onClick={
+                    !isLoggedIn 
+                      ? () => navigate('/login?next=/generate') 
                       : (creditBalance < Math.max(1, baseTopics.length))
-                        ? 'Add credits to generate'
-                        : 'Generate PDF'}
-            </button>
-            
-            <p className="mt-0.5 text-center text-[11px] text-[#a39b92] md:hidden">
-               {mode !== 'paste' 
-                 ? (isLoggedIn ? `${Math.max(creditBalance - baseTopics.length, 0)} credits remaining after` : 'Sign up to generate notes')
-                 : (isLoggedIn ? `${creditBalance} credits available` : 'Sign up to generate notes')}
-            </p>
-          </div>
+                        ? () => navigate('/pricing')
+                        : handleGenerate
+                  }
+                  disabled={isGenerating || mode === 'paste' || isOrganizing}
+                  className={`w-full md:w-auto rounded-xl px-5 py-2.5 md:py-2 text-sm md:text-bold font-bold transition-all ${
+                    isGenerating || mode === 'paste' || isOrganizing
+                      ? 'border border-[#f0ece5] bg-transparent text-[#e0d9ce] md:border-none md:bg-[#e7e2db] md:text-[#b1aaa0]'
+                      : !isLoggedIn
+                        ? 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black hover:-translate-y-0.5'
+                        : 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black'
+                  }`}
+                >
+                  {isGenerating
+                      ? 'Generating...'
+                      : mode === 'paste'
+                        ? 'Organize topics first'
+                        : !isLoggedIn
+                          ? 'Sign up to Generate'
+                          : (creditBalance < Math.max(1, baseTopics.length))
+                            ? 'Add credits to generate'
+                            : 'Generate PDF'}
+                </button>
+                
+                <p className="mt-0.5 text-center text-[11px] text-[#a39b92] md:hidden">
+                   {mode !== 'paste' 
+                     ? (isLoggedIn ? `${Math.max(creditBalance - baseTopics.length, 0)} credits remaining after` : 'Sign up to generate notes')
+                     : (isLoggedIn ? `${creditBalance} credits available` : 'Sign up to generate notes')}
+                </p>
+              </div>
+            </div>
         </div>
         </>
         )}
