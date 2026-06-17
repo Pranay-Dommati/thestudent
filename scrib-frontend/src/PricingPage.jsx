@@ -69,7 +69,7 @@ const PricingPage = () => {
 
   const handleBuyClick = async (packId) => {
     if (!isLoggedIn) {
-      navigate('/login')
+      navigate('/login?next=/pricing')
       return
     }
     if (processingPack) return
@@ -85,6 +85,11 @@ const PricingPage = () => {
           `🎉 ${credits_added} credits added! New balance: ${credit_balance} credits`,
           { duration: 4000 },
         )
+        const params = new URLSearchParams(window.location.search)
+        const nextUrl = params.get('next')
+        if (nextUrl) {
+          navigate(nextUrl)
+        }
       },
       onFailure: (message) => {
         setProcessingPack(null)
@@ -156,10 +161,10 @@ const PricingPage = () => {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="hidden rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold md:inline-block">
+              <Link to="/login?next=/pricing" className="hidden rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold md:inline-block">
                 Log in
               </Link>
-              <Link to="/signup" className="hidden rounded-full border border-[#1f1f1f] bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white md:inline-block">
+              <Link to="/signup?next=/pricing" className="hidden rounded-full border border-[#1f1f1f] bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white md:inline-block">
                 Get started free
               </Link>
               <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />

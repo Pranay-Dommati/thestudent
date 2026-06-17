@@ -10,6 +10,8 @@ import Breadcrumb from './components/Breadcrumb'
 import MobileMenu from './components/MobileMenu'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 import { usePostHog } from '@posthog/react'
+import { useGoogleAuth } from './hooks/useGoogleAuth'
+import { startPaymentFlow } from './services/paymentService'
 
 const parseTopics = (text) => {
   if (!text) return []
@@ -30,9 +32,66 @@ const chunkTopics = (items, size) => {
 const MAX_TOPICS = 8
 
 const GeneratePage = () => {
-  const { user, logout, isLoggedIn, loading } = useAuth()
+  const { user, logout, isLoggedIn, loading, googleLogin, refreshUser } = useAuth()
   const posthog = usePostHog()
   const navigate = useNavigate()
+
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const { renderGoogleButton, isReady: googleReady } = useGoogleAuth(
+    async (credential) => {
+      const success = await googleLogin(credential)
+      if (success) {
+        setShowAuthModal(false)
+      }
+    },
+    (error) => {
+      customToast.error(error || 'Google login failed')
+    }
+  )
+
+  useEffect(() => {
+    if (showAuthModal && googleReady) {
+      setTimeout(() => {
+        if (document.getElementById('google-login-modal-btn')) {
+          renderGoogleButton('google-login-modal-btn')
+        }
+      }, 50)
+    }
+  }, [showAuthModal, googleReady, renderGoogleButton])
+
+  const handleAuthClick = () => {
+    setShowAuthModal(true)
+  }
+
+  const handlePayClick = async (packId) => {
+    if (!isLoggedIn) {
+      customToast.info('Please sign in first', { icon: '👋' })
+      setShowAuthModal(true)
+      return
+    }
+    if (processingPack) return
+    setProcessingPack(packId)
+
+    await startPaymentFlow({
+      pack: packId,
+      user,
+      onSuccess: async ({ credit_balance, credits_added }) => {
+        setProcessingPack(null)
+        await refreshUser?.()
+        customToast.success(
+          `🎉 ${credits_added} credits added! New balance: ${credit_balance} credits`,
+          { duration: 4000 },
+        )
+      },
+      onFailure: (message) => {
+        setProcessingPack(null)
+        customToast.error(message || 'Payment failed. Please try again.')
+      },
+      onDismiss: () => {
+        setProcessingPack(null)
+      },
+    })
+  }
   const [mode, setMode] = useState(() => sessionStorage.getItem('scrib_draft_mode') || 'manual')
   const [topics, setTopics] = useState(() => {
     const saved = sessionStorage.getItem('scrib_draft_topics')
@@ -665,13 +724,17 @@ const GeneratePage = () => {
                                <p className="text-xs text-[#8a847c] mt-0.5">Add up to 2 topics, then complete payment</p>
                             </div>
                          </div>
-                         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto mt-2 sm:mt-0">
-                            <Link to="/pricing" className="flex items-center justify-center rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] hover:bg-[#fcfbf9] transition-colors shadow-sm">
+                         <div className="flex flex-row gap-2 w-full md:w-auto mt-3 sm:mt-0">
+                            <Link to="/pricing" className="flex-1 md:flex-none flex items-center justify-center rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-[#1f1f1f] hover:bg-[#fcfbf9] transition-colors shadow-sm whitespace-nowrap">
                                See other packs
                             </Link>
-                            <Link to="/pricing" className="flex items-center justify-center rounded-lg bg-[#1f1f1f] px-4 py-1.5 text-xs font-semibold text-white hover:bg-black transition-colors shadow-sm">
-                               Pay ₹19
-                            </Link>
+                            <button 
+                              onClick={() => handlePayClick('try')}
+                              disabled={processingPack === 'try'}
+                              className="flex-1 md:flex-none flex items-center justify-center rounded-lg bg-[#1f1f1f] px-4 py-1.5 text-[11px] sm:text-xs font-semibold text-white hover:bg-black transition-colors shadow-sm disabled:opacity-70 whitespace-nowrap"
+                            >
+                               {processingPack === 'try' ? 'Processing...' : 'Pay ₹19'}
+                            </button>
                          </div>
                       </div>
                    </div>
@@ -1025,9 +1088,9 @@ const GeneratePage = () => {
                 <button
                   onClick={
                     !isLoggedIn 
-                      ? () => navigate('/login?next=/generate') 
+                      ? handleAuthClick
                       : (creditBalance < Math.max(1, baseTopics.length))
-                        ? () => navigate('/pricing')
+                        ? () => navigate('/pricing?next=/generate')
                         : handleGenerate
                   }
                   disabled={isGenerating || mode === 'paste' || isOrganizing}
@@ -1320,6 +1383,38 @@ const GeneratePage = () => {
                 Copy
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[#e2dbd2] bg-white p-6 shadow-xl relative text-center">
+            <button 
+              onClick={() => setShowAuthModal(false)}
+              className="absolute right-4 top-4 text-[#a39b92] hover:text-[#1f1f1f] transition-colors"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#9a9289]">Scrib</p>
+            <h3 className="mt-3 text-xl font-semibold text-[#1f1f1f]">Sign up to Generate</h3>
+            <p className="mt-1 text-sm text-[#7b756d]">Create an account to save your generated notes and get free credits.</p>
+            
+            <div className="mt-6 w-full flex justify-center">
+              <div id="google-login-modal-btn"></div>
+            </div>
+
+            <div className="my-5 flex items-center gap-3 text-xs text-[#9a9289]">
+              <span className="h-px flex-1 bg-[#eee6dc]" /> or <span className="h-px flex-1 bg-[#eee6dc]" />
+            </div>
+
+            <button
+              onClick={() => navigate('/login?next=/generate')}
+              className="w-full rounded-xl border border-[#e0d9ce] bg-white px-4 py-2.5 text-sm font-semibold text-[#1f1f1f] hover:bg-[#f7f4ee] transition-colors"
+            >
+              Continue with Email
+            </button>
           </div>
         </div>
       )}

@@ -71,6 +71,18 @@ export const useGoogleAuth = (onSuccess, onError) => {
     init()
   }, [clientId, onSuccess, onError])
 
+  const triggerPrompt = (onFallback) => {
+    if (!isReady || !window.google) {
+      if (onFallback) onFallback()
+      return
+    }
+    window.google.accounts.id.prompt((notification) => {
+      if (notification.isNotDisplayed()) {
+        if (onFallback) onFallback()
+      }
+    })
+  }
+
   const renderGoogleButton = (elementId) => {
     if (!isReady || !window.google) {
       customToast.error('Google Sign-In not ready. Please refresh the page.')
@@ -90,5 +102,5 @@ export const useGoogleAuth = (onSuccess, onError) => {
     }
   }
 
-  return { renderGoogleButton, isReady, isLoading }
+  return { renderGoogleButton, triggerPrompt, isReady, isLoading }
 }
