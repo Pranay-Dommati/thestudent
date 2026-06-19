@@ -14,7 +14,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # pyrefly: ignore [missing-import]
-from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction
+from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction, PromoCode, PromoCodeRedemption
 # pyrefly: ignore [missing-import]
 from .serializers import (
     PreviewNoteSerializer,
@@ -25,6 +25,10 @@ from .serializers import (
     GenerateStudyPackRequestSerializer,
     OrganizeTopicsRequestSerializer,
     ScribMeSerializer,
+    RedeemCouponSerializer,
+    PromoCodeSerializer,
+    PromoCodeListSerializer,
+    PromoCodeRedemptionSerializer,
 )
 # pyrefly: ignore [missing-import]
 from .services.cache import normalize_prompt, find_cached_note
@@ -1262,3 +1266,394 @@ class MyStudyPacksView(APIView):
         serializer = StudyPackSerializer(packs, many=True)
         return Response(serializer.data)
 
+
+# ─── Promo Code Views ─────────────────────────────────────────────────────────
+
+import random
+import string
+from django.utils import timezone
+from django.db.models import Count, Q
+
+
+def _generate_promo_code():
+    """Generate a unique SCRIB-XXXXXX code (6 random uppercase alphanumeric chars)."""
+    chars = string.ascii_uppercase + string.digits
+    for _ in range(20):  # retry up to 20 times to avoid collision
+        suffix = ''.join(random.choices(chars, k=6))
+        code = f'SCRIB-{suffix}'
+        if not PromoCode.objects.filter(code=code).exists():
+            return code
+    raise ValueError('Failed to generate a unique promo code after 20 attempts')
+
+
+class RedeemCouponView(APIView):
+    """
+    POST /api/scrib/redeem-coupon/
+
+    Authenticated users can redeem a promo code. Validation:
+    - Code must exist, be active, not expired, have remaining redemptions
+    - User must not have already redeemed this code
+    All credit changes happen inside an atomic transaction with select_for_update
+    to prevent race conditions.
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = RedeemCouponSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response('Invalid request', details=serializer.errors)
+
+        code_str = serializer.validated_data['code']
+        user_model = get_user_model()
+
+        try:
+            with transaction.atomic():
+                # Lock the promo code row to prevent concurrent redemption races
+                try:
+                    promo = PromoCode.objects.select_for_update().get(code=code_str)
+                except PromoCode.DoesNotExist:
+                    return error_response('Coupon not found.', status_code=404, code='coupon_not_found')
+
+                if not promo.is_active:
+                    return error_response('Coupon is no longer active.', status_code=400, code='coupon_inactive')
+
+                if timezone.now() > promo.expires_at:
+                    return error_response('Coupon expired.', status_code=400, code='coupon_expired')
+
+                if promo.times_redeemed >= promo.max_redemptions:
+                    return error_response('Coupon usage limit reached.', status_code=400, code='coupon_exhausted')
+
+                already_redeemed = PromoCodeRedemption.objects.filter(
+                    promo_code=promo, user=request.user
+                ).exists()
+                if already_redeemed:
+                    return error_response('You have already redeemed this coupon.', status_code=400, code='already_redeemed')
+
+                # All checks passed — apply the redemption
+                user = user_model.objects.get(pk=request.user.pk)
+
+                CreditTransaction.objects.create(
+                    user=user,
+                    direction=CreditTransaction.DIRECTION_CREDIT,
+                    credits=promo.credits_to_add,
+                    reason=CreditTransaction.REASON_PROMO,
+                )
+
+                promo.times_redeemed += 1
+                promo.save(update_fields=['times_redeemed'])
+
+                PromoCodeRedemption.objects.create(
+                    promo_code=promo,
+                    user=user,
+                    credits_added=promo.credits_to_add,
+                )
+
+        except Exception as exc:
+            logger.exception(f'[scrib] Promo redemption error for code={code_str}: {exc}')
+            return error_response('An error occurred. Please try again.', status_code=500)
+
+        new_balance = get_credit_balance(request.user)
+        return Response({
+            'success': True,
+            'message': f'Successfully redeemed coupon. {promo.credits_to_add} credits added to your account.',
+            'credits_added': promo.credits_to_add,
+            'campaign_name': promo.campaign_name,
+            'new_balance': new_balance,
+        }, status=200)
+
+
+class AdminPromoCodeListView(APIView):
+    """
+    GET  /api/scrib/admin/promo-codes/  — paginated list grouped by campaign
+    POST /api/scrib/admin/promo-codes/  — bulk-generate codes for a new campaign
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not is_admin_user(request.user):
+            return error_response('Forbidden', status_code=403, code='forbidden')
+
+        campaign = request.query_params.get('campaign', '').strip()
+        qs = PromoCode.objects.all()
+        if campaign:
+            qs = qs.filter(campaign_name__icontains=campaign)
+
+        serializer = PromoCodeListSerializer(qs, many=True)
+        return Response({'results': serializer.data, 'count': qs.count()})
+
+    def post(self, request):
+        if not is_admin_user(request.user):
+            return error_response('Forbidden', status_code=403, code='forbidden')
+
+        campaign_name = (request.data.get('campaign_name') or '').strip()
+        credits_to_add = request.data.get('credits_to_add', 5)
+        quantity = request.data.get('quantity', 1)
+        expires_at = request.data.get('expires_at')  # ISO datetime string
+        max_redemptions = request.data.get('max_redemptions', 1)
+
+        if not campaign_name:
+            return error_response('campaign_name is required')
+        try:
+            credits_to_add = int(credits_to_add)
+            quantity = int(quantity)
+            max_redemptions = int(max_redemptions)
+            if quantity < 1 or quantity > 500:
+                raise ValueError
+        except (ValueError, TypeError):
+            return error_response('Invalid quantity (1–500) or credits value')
+
+        if not expires_at:
+            return error_response('expires_at is required')
+        try:
+            from django.utils.dateparse import parse_datetime
+            expires_dt = parse_datetime(expires_at)
+            if expires_dt is None:
+                raise ValueError
+            # Handle naive datetimes
+            if timezone.is_naive(expires_dt):
+                expires_dt = timezone.make_aware(expires_dt)
+        except (ValueError, TypeError):
+            return error_response('Invalid expires_at format. Use ISO 8601.')
+
+        # Bulk-generate codes
+        created_codes = []
+        try:
+            with transaction.atomic():
+                for _ in range(quantity):
+                    code_str = _generate_promo_code()
+                    obj = PromoCode.objects.create(
+                        code=code_str,
+                        credits_to_add=credits_to_add,
+                        campaign_name=campaign_name,
+                        max_redemptions=max_redemptions,
+                        expires_at=expires_dt,
+                        is_active=True,
+                        created_by=request.user,
+                    )
+                    created_codes.append(obj)
+        except Exception as exc:
+            logger.exception(f'[scrib] Promo code bulk-create error: {exc}')
+            return error_response('Failed to generate codes. Please try again.', status_code=500)
+
+        return Response({
+            'success': True,
+            'created': quantity,
+            'campaign_name': campaign_name,
+            'codes': [c.code for c in created_codes],
+        }, status=201)
+
+
+class AdminPromoCodeDetailView(APIView):
+    """
+    GET /api/scrib/admin/promo-codes/<pk>/
+    Returns the promo code detail with all redemptions.
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        if not is_admin_user(request.user):
+            return error_response('Forbidden', status_code=403, code='forbidden')
+
+        try:
+            promo = PromoCode.objects.prefetch_related('redemptions__user').get(pk=pk)
+        except PromoCode.DoesNotExist:
+            return error_response('Promo code not found', status_code=404, code='not_found')
+
+        serializer = PromoCodeSerializer(promo)
+        return Response(serializer.data)
+
+
+class AdminPromoCodeStatsView(APIView):
+    """
+    GET /api/scrib/admin/promo-codes/stats/
+    Returns aggregate stats for the promo code dashboard.
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not is_admin_user(request.user):
+            return error_response('Forbidden', status_code=403, code='forbidden')
+
+        now = timezone.now()
+        total_codes = PromoCode.objects.count()
+        total_redeemed = PromoCodeRedemption.objects.count()
+        active_campaigns = PromoCode.objects.filter(
+            is_active=True, expires_at__gt=now
+        ).values('campaign_name').distinct().count()
+        total_remaining = sum(
+            max(p.max_redemptions - p.times_redeemed, 0)
+            for p in PromoCode.objects.filter(is_active=True, expires_at__gt=now)
+        )
+
+        # Campaign-level summary
+        from django.db.models import Sum as DSum, Max
+        campaigns = (
+            PromoCode.objects
+            .values('campaign_name', 'credits_to_add', 'expires_at')
+            .annotate(
+                total_generated=Count('id'),
+                total_redeemed=DSum('times_redeemed'),
+            )
+            .order_by('-expires_at')
+        )
+
+        campaign_data = []
+        for c in campaigns:
+            gen = c['total_generated'] or 0
+            red = c['total_redeemed'] or 0
+            remaining = gen - red
+            exp_dt = c['expires_at']
+            if timezone.is_naive(exp_dt):
+                exp_dt = timezone.make_aware(exp_dt)
+            is_active_camp = exp_dt > now
+            campaign_data.append({
+                'campaign_name': c['campaign_name'],
+                'credits_to_add': c['credits_to_add'],
+                'total_generated': gen,
+                'total_redeemed': red,
+                'remaining': max(remaining, 0),
+                'expires_at': exp_dt.isoformat(),
+                'status': 'Active' if is_active_camp else 'Expired',
+            })
+
+        return Response({
+            'total_codes': total_codes,
+            'total_redeemed': total_redeemed,
+            'active_campaigns': active_campaigns,
+            'total_remaining': total_remaining,
+            'campaigns': campaign_data,
+        })
+
+
+class AdminUserInsightsView(APIView):
+    """
+    GET /api/scrib/admin/user-insights/
+
+    Returns two annotated user lists for Scrib analytics:
+      1. paid_and_coupon  — users who completed at least one payment AND redeemed
+                            at least one promo code
+      2. generated_users  — users who generated at least one note or study pack
+                            (regardless of payment status)
+
+    Each user entry includes: id, email, full_name, join_date,
+    plus relevant counters (payments, notes, packs, coupons redeemed).
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not is_admin_user(request.user):
+            return error_response('Forbidden', status_code=403, code='forbidden')
+
+        from django.db.models import Count as DCount, Min, Max as DMax
+        User = get_user_model()
+
+        # ── 1. Users who paid (at least 1 paid Payment) AND redeemed a promo ──
+        paid_user_ids = set(
+            Payment.objects.filter(status=Payment.STATUS_PAID)
+            .values_list('user_id', flat=True)
+            .distinct()
+        )
+        coupon_user_ids = set(
+            PromoCodeRedemption.objects.values_list('user_id', flat=True).distinct()
+        )
+        paid_and_coupon_ids = paid_user_ids & coupon_user_ids
+
+        paid_and_coupon_qs = (
+            User.objects.filter(pk__in=paid_and_coupon_ids)
+            .annotate(
+                paid_payments=DCount(
+                    'scrib_payments',
+                    filter=Q(scrib_payments__status=Payment.STATUS_PAID),
+                    distinct=True,
+                ),
+                coupons_redeemed=DCount('promo_redemptions', distinct=True),
+                notes_generated=DCount('scrib_notes', distinct=True),
+                packs_generated=DCount('scrib_study_packs', distinct=True),
+            )
+            .order_by('email')
+            .values(
+                'id', 'email', 'full_name', 'date_joined',
+                'paid_payments', 'coupons_redeemed', 'notes_generated', 'packs_generated',
+            )
+        )
+
+        paid_and_coupon = []
+        for u in paid_and_coupon_qs:
+            paid_and_coupon.append({
+                'id': u['id'],
+                'email': u['email'],
+                'full_name': u.get('full_name') or '',
+                'date_joined': u['date_joined'].isoformat() if u['date_joined'] else None,
+                'paid_payments': u['paid_payments'],
+                'coupons_redeemed': u['coupons_redeemed'],
+                'notes_generated': u['notes_generated'],
+                'packs_generated': u['packs_generated'],
+                'total_generated': (u['notes_generated'] or 0) + (u['packs_generated'] or 0),
+            })
+
+        # ── 2. Users who generated at least one note OR study pack ──
+        note_user_ids = set(
+            GeneratedNote.objects.values_list('user_id', flat=True).distinct()
+        )
+        pack_user_ids = set(
+            StudyPack.objects.exclude(status=StudyPack.STATUS_FAILED)
+            .values_list('user_id', flat=True).distinct()
+        )
+        generated_ids = note_user_ids | pack_user_ids
+
+        generated_qs = (
+            User.objects.filter(pk__in=generated_ids)
+            .annotate(
+                notes_generated=DCount('scrib_notes', distinct=True),
+                packs_generated=DCount('scrib_study_packs', distinct=True),
+                coupons_redeemed=DCount('promo_redemptions', distinct=True),
+                paid_payments=DCount(
+                    'scrib_payments',
+                    filter=Q(scrib_payments__status=Payment.STATUS_PAID),
+                    distinct=True,
+                ),
+            )
+            .order_by('-notes_generated', '-packs_generated')
+            .values(
+                'id', 'email', 'full_name', 'date_joined',
+                'notes_generated', 'packs_generated', 'coupons_redeemed', 'paid_payments',
+            )
+        )
+
+        generated_users = []
+        for u in generated_qs:
+            generated_users.append({
+                'id': u['id'],
+                'email': u['email'],
+                'full_name': u.get('full_name') or '',
+                'date_joined': u['date_joined'].isoformat() if u['date_joined'] else None,
+                'notes_generated': u['notes_generated'],
+                'packs_generated': u['packs_generated'],
+                'total_generated': (u['notes_generated'] or 0) + (u['packs_generated'] or 0),
+                'coupons_redeemed': u['coupons_redeemed'],
+                'paid_payments': u['paid_payments'],
+                'has_paid': (u['paid_payments'] or 0) > 0,
+            })
+
+        return Response({
+            'paid_and_coupon': {
+                'count': len(paid_and_coupon),
+                'users': paid_and_coupon,
+            },
+            'generated_users': {
+                'count': len(generated_users),
+                'users': generated_users,
+            },
+            'total_packs_generated': StudyPack.objects.exclude(status=StudyPack.STATUS_FAILED).count(),
+            'total_paid_users': len(paid_user_ids),
+        })

@@ -27,4 +27,11 @@ urlpatterns = [
     
     # Support
     path('support/', views.ContactSupportView.as_view(), name='support'),
+
+    # Promo / Coupon codes
+    path('redeem-coupon/', views.RedeemCouponView.as_view(), name='redeem-coupon'),
+    path('admin/promo-codes/', views.AdminPromoCodeListView.as_view(), name='admin-promo-codes'),
+    path('admin/promo-codes/stats/', views.AdminPromoCodeStatsView.as_view(), name='admin-promo-codes-stats'),
+    path('admin/promo-codes/<int:pk>/', views.AdminPromoCodeDetailView.as_view(), name='admin-promo-code-detail'),
+    path('admin/user-insights/', views.AdminUserInsightsView.as_view(), name='admin-user-insights'),
 ]

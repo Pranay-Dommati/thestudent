@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
-import { FaThLarge, FaPlus, FaUsers, FaLock, FaBars, FaCommentDots, FaEnvelope, FaChartBar } from 'react-icons/fa';
+import { FaThLarge, FaPlus, FaUsers, FaLock, FaBars, FaCommentDots, FaEnvelope, FaChartBar, FaTicketAlt } from 'react-icons/fa';
 import AdminNav from '../layout/AdminNav';
 import AdminSidebar from '../layout/AdminSidebar';
 import AdminCourses from '../Courses/AdminCourses';
@@ -13,6 +13,7 @@ import CourseManagement from '../Courses/CourseManagement';
 import CourseForm from '../Courses/CourseForm';
 import EditCourse from '../Courses/EditCourse';
 import AdminLogin from '../AdminLogin';
+import ScribPromoAdmin from '../Scrib/ScribPromoAdmin';
 import authService from '../../../services/authService';
 
 const AdminDashboard = () => {
@@ -103,6 +104,12 @@ const AdminDashboard = () => {
       icon: FaChartBar,
       path: '/admin-p/analytics',
     },
+    {
+      id: 'scrib',
+      label: 'Scrib',
+      icon: FaTicketAlt,
+      path: '/admin-p/scrib',
+    },
     { 
       id: 'security',
       label: 'Security',
@@ -156,6 +163,7 @@ const AdminDashboard = () => {
               <Route path="feedbacks" element={<AdminFeedbacks isDarkMode={isDarkMode} />} />
               <Route path="newsletter" element={<AdminNewsletter isDarkMode={isDarkMode} />} />
               <Route path="analytics" element={<AdminAnalytics isDarkMode={isDarkMode} />} />
+              <Route path="scrib" element={<ScribPromoAdmin isDarkMode={isDarkMode} />} />
               <Route path="settings" element={<AdminSettings isDarkMode={isDarkMode} />} />
             </Routes>
               </div>

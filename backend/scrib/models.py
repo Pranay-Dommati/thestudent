@@ -166,12 +166,14 @@ class CreditTransaction(models.Model):
     REASON_GENERATION = 'generation'
     REASON_ADJUSTMENT = 'adjustment'
     REASON_REFUND = 'refund'
+    REASON_PROMO = 'promo'
 
     REASON_CHOICES = [
         (REASON_PAYMENT, 'Payment'),
         (REASON_GENERATION, 'Generation'),
         (REASON_ADJUSTMENT, 'Adjustment'),
         (REASON_REFUND, 'Refund'),
+        (REASON_PROMO, 'Promo Code'),
     ]
 
     user = models.ForeignKey(
@@ -213,3 +215,86 @@ class CreditTransaction(models.Model):
 
     def __str__(self):
         return f"{self.user_id} {self.direction} {self.credits}"
+
+
+class PromoCode(models.Model):
+    """A redeemable promo/coupon code for granting Scrib credits.
+
+    Use select_for_update() when incrementing times_redeemed to prevent
+    race conditions when two requests try to redeem the last slot simultaneously.
+    """
+
+    code = models.CharField(max_length=32, unique=True, db_index=True)
+    credits_to_add = models.PositiveIntegerField(default=5)
+    campaign_name = models.CharField(max_length=100)
+    max_redemptions = models.PositiveIntegerField(default=1)
+    times_redeemed = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_promo_codes',
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['code'], name='scrib_promo_code_idx'),
+            models.Index(fields=['campaign_name'], name='scrib_promo_campaign_idx'),
+            models.Index(fields=['is_active', 'expires_at'], name='scrib_promo_active_idx'),
+        ]
+
+    @property
+    def remaining_redemptions(self):
+        return max(self.max_redemptions - self.times_redeemed, 0)
+
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
+
+    @property
+    def status(self):
+        if not self.is_active:
+            return 'inactive'
+        if self.is_expired:
+            return 'expired'
+        if self.remaining_redemptions == 0:
+            return 'exhausted'
+        return 'active'
+
+    def __str__(self):
+        return f"{self.code} ({self.campaign_name})"
+
+
+class PromoCodeRedemption(models.Model):
+    """Tracks which user redeemed which promo code and when."""
+
+    promo_code = models.ForeignKey(
+        PromoCode,
+        on_delete=models.CASCADE,
+        related_name='redemptions',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='promo_redemptions',
+    )
+    credits_added = models.PositiveIntegerField()
+    redeemed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-redeemed_at']
+        # Prevent a user from redeeming the same code twice at the DB level
+        unique_together = [('promo_code', 'user')]
+        indexes = [
+            models.Index(fields=['promo_code', 'user'], name='scrib_rdem_code_user_idx'),
+            models.Index(fields=['user', 'redeemed_at'], name='scrib_rdem_user_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} redeemed {self.promo_code.code}"

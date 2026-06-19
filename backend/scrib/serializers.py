@@ -1,6 +1,6 @@
 from rest_framework import serializers
 # pyrefly: ignore [missing-import]
-from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction
+from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction, PromoCode, PromoCodeRedemption
 
 
 class PreviewNoteSerializer(serializers.ModelSerializer):
@@ -116,3 +116,48 @@ class ScribMeSerializer(serializers.Serializer):
     email = serializers.EmailField()
     full_name = serializers.CharField()
     credit_balance = serializers.IntegerField()
+
+
+class RedeemCouponSerializer(serializers.Serializer):
+    code = serializers.CharField(max_length=32, trim_whitespace=True)
+
+    def validate_code(self, value):
+        return value.upper().strip()
+
+
+class PromoCodeRedemptionSerializer(serializers.ModelSerializer):
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    user_name = serializers.CharField(source='user.full_name', read_only=True)
+
+    class Meta:
+        model = PromoCodeRedemption
+        fields = ['id', 'user_email', 'user_name', 'credits_added', 'redeemed_at']
+
+
+class PromoCodeSerializer(serializers.ModelSerializer):
+    remaining_redemptions = serializers.IntegerField(read_only=True)
+    status = serializers.CharField(read_only=True)
+    redemptions = PromoCodeRedemptionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PromoCode
+        fields = [
+            'id', 'code', 'credits_to_add', 'campaign_name',
+            'max_redemptions', 'times_redeemed', 'remaining_redemptions',
+            'is_active', 'expires_at', 'created_at', 'status',
+            'redemptions',
+        ]
+
+
+class PromoCodeListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for the campaign dashboard (no redemptions inline)."""
+    remaining_redemptions = serializers.IntegerField(read_only=True)
+    status = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = PromoCode
+        fields = [
+            'id', 'code', 'credits_to_add', 'campaign_name',
+            'max_redemptions', 'times_redeemed', 'remaining_redemptions',
+            'is_active', 'expires_at', 'created_at', 'status',
+        ]

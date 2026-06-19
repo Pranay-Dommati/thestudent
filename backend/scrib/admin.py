@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction
+from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction, PromoCode, PromoCodeRedemption
 
 
 @admin.register(PreviewNote)
@@ -45,3 +45,19 @@ class CreditTransactionAdmin(admin.ModelAdmin):
     list_filter = ('direction', 'reason')
     search_fields = ('user__email',)
     readonly_fields = ('created_at',)
+
+
+@admin.register(PromoCode)
+class PromoCodeAdmin(admin.ModelAdmin):
+    list_display = ('code', 'campaign_name', 'credits_to_add', 'times_redeemed', 'max_redemptions', 'is_active', 'expires_at', 'created_at')
+    list_filter = ('is_active', 'campaign_name')
+    search_fields = ('code', 'campaign_name')
+    readonly_fields = ('created_at', 'times_redeemed')
+
+
+@admin.register(PromoCodeRedemption)
+class PromoCodeRedemptionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'promo_code', 'user', 'credits_added', 'redeemed_at')
+    list_filter = ('promo_code__campaign_name',)
+    search_fields = ('promo_code__code', 'user__email')
+    readonly_fields = ('redeemed_at',)

@@ -10,6 +10,7 @@ import Breadcrumb from './components/Breadcrumb'
 import BuyCreditsModal from './components/BuyCreditsModal'
 import MobileMenu from './components/MobileMenu'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
+import RedeemCouponCard from './components/RedeemCouponCard'
 
 const toneColors = {
   blue: 'bg-[#7ba7ff]',
@@ -18,7 +19,7 @@ const toneColors = {
 }
 
 const DashboardPage = () => {
-  const { user, logout, isLoggedIn, loading } = useAuth()
+  const { user, logout, isLoggedIn, loading, refreshUser } = useAuth()
   const navigate = useNavigate()
   const [historyItems, setHistoryItems] = useState([])
   const [statsData, setStatsData] = useState({ pdfs: 0, creditsUsed: 0 })
@@ -182,6 +183,15 @@ const DashboardPage = () => {
             + Buy credits
           </button>
         </div>
+
+        {/* Redeem Coupon */}
+        {isLoggedIn && (
+          <RedeemCouponCard
+            onSuccess={async ({ new_balance }) => {
+              await refreshUser?.()
+            }}
+          />
+        )}
 
         <div className="mt-6 rounded-xl border border-[#e2dbd2] bg-white">
           <div className="flex items-center justify-between border-b border-[#eee6dc] px-4 py-3">
