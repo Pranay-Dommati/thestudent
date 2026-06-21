@@ -709,35 +709,43 @@ const GeneratePage = () => {
                 </p>
 
                 {(!isLoggedIn || (!isLoadingHistory && creditBalance === 0 && historyItems.length === 0)) && (
-                   <div className="mt-4 rounded-xl border border-[#e2dbd2] bg-white px-4 py-2.5 shadow-sm">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                         <div className="flex items-center gap-3">
-                            <div className="flex h-6 w-6 shrink-0 items-center justify-center text-[#b47a26]">
-                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                 <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path>
-                                 <path d="M5 3v4"></path>
-                                 <path d="M3 5h4"></path>
-                               </svg>
-                            </div>
-                            <div>
-                               <h3 className="text-sm font-bold text-[#1f1f1f]">Starter trial — 2 credits for ₹19</h3>
-                               <p className="text-xs text-[#8a847c] mt-0.5">Add up to 2 topics, then complete payment</p>
-                            </div>
-                         </div>
-                         <div className="flex flex-row gap-2 w-full md:w-auto mt-3 sm:mt-0">
-                            <Link to="/pricing" className="flex-1 md:flex-none flex items-center justify-center rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-[#1f1f1f] hover:bg-[#fcfbf9] transition-colors shadow-sm whitespace-nowrap">
-                               See other packs
-                            </Link>
-                            <button 
-                              onClick={() => handlePayClick('try')}
-                              disabled={processingPack === 'try'}
-                              className="flex-1 md:flex-none flex items-center justify-center rounded-lg bg-[#1f1f1f] px-4 py-1.5 text-[11px] sm:text-xs font-semibold text-white hover:bg-black transition-colors shadow-sm disabled:opacity-70 whitespace-nowrap"
-                            >
-                               {processingPack === 'try' ? 'Processing...' : 'Pay ₹19'}
-                            </button>
-                         </div>
-                      </div>
-                   </div>
+                   <div className="mt-4 rounded-xl border border-[#e2dbd2] bg-white px-3 py-2 md:px-4 md:py-2.5 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                       <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                          <div className="flex h-5 w-5 md:h-6 md:w-6 shrink-0 items-center justify-center text-[#b47a26]">
+                             <svg width="14" height="14" className="md:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                               <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path>
+                               <path d="M5 3v4"></path>
+                               <path d="M3 5h4"></path>
+                             </svg>
+                             <svg width="18" height="18" className="hidden md:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                               <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path>
+                               <path d="M5 3v4"></path>
+                               <path d="M3 5h4"></path>
+                             </svg>
+                          </div>
+                          <div className="min-w-0">
+                             {/* Mobile: short title only */}
+                             <h3 className="md:hidden text-xs font-bold text-[#1f1f1f] leading-snug">Try with 2 credits</h3>
+                             {/* Desktop: full title + subtitle */}
+                             <h3 className="hidden md:block text-sm font-bold text-[#1f1f1f]">Starter trial — 2 credits for ₹19</h3>
+                             <p className="hidden md:block text-xs text-[#8a847c] mt-0.5">Add up to 2 topics, then complete payment</p>
+                          </div>
+                       </div>
+                       <div className="flex flex-row gap-1.5 md:gap-2 shrink-0">
+                          <Link to="/pricing" className="flex items-center justify-center rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] hover:bg-[#fcfbf9] transition-colors shadow-sm whitespace-nowrap">
+                             Other packs
+                          </Link>
+                          <button 
+                            onClick={() => handlePayClick('try')}
+                            disabled={processingPack === 'try'}
+                            className="flex items-center justify-center rounded-lg bg-[#1f1f1f] px-3 py-1.5 md:px-4 text-xs font-semibold text-white hover:bg-black transition-colors shadow-sm disabled:opacity-70 whitespace-nowrap"
+                          >
+                             {processingPack === 'try' ? 'Processing...' : 'Try ₹19'}
+                          </button>
+                       </div>
+                    </div>
+                 </div>
                 )}
                 {showNotice && (
                   <div className="hidden md:flex mt-3 items-start gap-3 rounded-lg bg-[#fcf9f4] border border-[#e2dbd2] p-3 text-xs text-[#5f5a54] relative pr-10">
