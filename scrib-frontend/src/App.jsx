@@ -271,7 +271,7 @@ const App = () => {
                 <span className="h-1.5 w-1.5 rounded-full bg-[#6db05d]" /> Instant PDF generation
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#6db05d]" /> Built for students
+                <span className="h-1.5 w-1.5 rounded-full bg-[#6db05d]" /> Built for Teachers/Students
               </span>
             </div>
           </div>
