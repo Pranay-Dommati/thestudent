@@ -8,6 +8,7 @@ import MobileMenu from './components/MobileMenu'
 import BuyCreditsModal from './components/BuyCreditsModal'
 import { fetchPaymentHistory, startPaymentFlow } from './services/paymentService'
 import customToast from './utils/customToast'
+import RedeemCouponCard from './components/RedeemCouponCard'
 
 const sections = [
   { id: 'profile', label: 'Profile' },
@@ -257,6 +258,13 @@ const ProfilePage = () => {
           {/* Profile tab */}
           {activeSection === 'profile' ? (
             <div className="mt-6 space-y-4">
+              {/* Redeem Coupon */}
+              <RedeemCouponCard
+                onSuccess={async () => {
+                  await refreshUser?.()
+                }}
+              />
+
               <div className="rounded-2xl border border-[#e2dbd2] bg-white px-6 py-5">
                 <h2 className="text-sm font-semibold">Profile</h2>
                 <p className="mt-1 text-xs text-[#7b756d]">Update your name.</p>
@@ -293,7 +301,6 @@ const ProfilePage = () => {
                   Log out
                 </button>
               </div>
-
 
             </div>
           ) : null}
@@ -353,6 +360,13 @@ const ProfilePage = () => {
                   ))}
                 </div>
               </div>
+
+              {/* Redeem Coupon */}
+              <RedeemCouponCard
+                onSuccess={async () => {
+                  await refreshUser?.()
+                }}
+              />
 
               {/* Payment history */}
               <div className="rounded-2xl border border-[#e2dbd2] bg-white px-6 py-5">

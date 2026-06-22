@@ -6,7 +6,6 @@ import { getInitials } from './utils/user'
 import axiosInstance from './utils/axios'
 import { forceDownload } from './utils/download'
 import customToast from './utils/customToast'
-import Breadcrumb from './components/Breadcrumb'
 import BuyCreditsModal from './components/BuyCreditsModal'
 import MobileMenu from './components/MobileMenu'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
@@ -102,26 +101,32 @@ const DashboardPage = () => {
         <title>Dashboard - Scrib</title>
         <meta name="robots" content="noindex,nofollow" />
       </Helmet>
-      <header className="sticky top-0 z-50 border-b border-[#e2dbd2] bg-[#fcf9f4]/80 px-6 py-4 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
+      <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">
             <Link to="/" className="flex-shrink-0 hover:opacity-90 transition-opacity">
-              <img src="/scrib_favicon.svg" alt="Scrib" className="h-8 w-8 rounded-lg border border-[#e2dbd2] shadow-sm object-cover" />
+              <img src="/scrib_favicon.svg" alt="Scrib" className="h-9 w-9 rounded-lg border border-[#e2dbd2] shadow-sm object-cover" />
             </Link>
-            <Breadcrumb crumbs={[
-              { label: 'Home', to: '/' },
-              { label: 'Dashboard' },
-            ]} />
+            <div>
+              <p className="text-sm font-semibold">Scrib</p>
+              <p className="text-xs text-[#7b756d]">by EasyLearnova</p>
+            </div>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
             <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
+            <Link to="/generate" className="hover:text-[#1f1f1f]">Generate</Link>
             <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
-            <Link to="/generate?tab=history" className="hover:text-[#1f1f1f]">My Scribs</Link>
+            {isLoggedIn && (
+              <Link to="/generate?tab=history" className="hover:text-[#1f1f1f]">My Scribs</Link>
+            )}
           </nav>
           {loading ? (
             <HeaderAuthSkeleton />
           ) : isLoggedIn ? (
             <div className="flex items-center gap-2">
+              <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold sm:inline-flex">
+                Dashboard
+              </Link>
               <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
                 {user?.credit_balance ?? 0} credits
               </span>
@@ -136,11 +141,11 @@ const DashboardPage = () => {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="hidden sm:inline-flex rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
+              <Link to="/login" className="hidden sm:inline-flex rounded-full border border-[#d9d1c7] bg-white px-3 py-1.5 text-xs font-semibold md:px-4 md:py-2">
                 Log in
               </Link>
-              <Link to="/signup" className="rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white">
-                Get started free
+              <Link to="/signup" className="rounded-full bg-[#1f3a5f] px-3 py-1.5 text-xs font-semibold text-white md:px-4 md:py-2">
+                Get started
               </Link>
               <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
@@ -173,7 +178,7 @@ const DashboardPage = () => {
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#e2dbd2] bg-white px-4 py-3">
           <p className="text-sm text-[#6f6a63]">
-            Running low? <span className="font-semibold text-[#1f1f1f]">Top up credits</span> - starts at ₹89 for 10.
+            Running low? <span className="font-semibold text-[#1f1f1f]">Top up credits</span> - starts at ₹19 for 2.
           </p>
           <button
             id="dashboard-buy-credits-btn"
