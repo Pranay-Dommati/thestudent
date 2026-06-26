@@ -16,12 +16,42 @@ class ImageGenerationError(Exception):
 
 def _build_handwritten_prompt(topic):
     return (
-        "Create a detailed handwritten study note page on a plain white background (no lines, no grid, no ruled paper). "
-        "The writing should look like neat handwriting in blue or black ink on a blank white page. "
-        "Include a large clear title at the top, numbered sections with headings, bullet points, "
-        "diagrams or simple illustrations where relevant, short formulas if needed, and a clean layout. "
-        "The background must be pure white with no horizontal lines or notebook texture. "
-        f"Topic: {topic}."
+    "Create a detailed handwritten study note page on a pure white background "
+    "(no lines, no grid, no ruled paper, no notebook texture). "
+    "The page should resemble a high-quality scanned handwritten revision sheet. "
+    "The page is a square 1024×1024 canvas viewed directly from above. "
+    "Distribute content evenly across the page and utilize most of the available space while keeping comfortable margins. "
+    "Avoid concentrating too much content near the bottom of the page. "
+
+    "IMPORTANT LAYOUT RULES: "
+    "The entire note must fit naturally within a single square page. "
+    "Use the page area efficiently while ensuring all content stays comfortably within the visible boundaries. "
+    "Avoid unnecessary empty space. "
+    "Do not place text, formulas, diagrams, headings, or bullet points too close to the edges, especially the bottom edge. "
+    "Maintain consistent spacing between sections. "
+    "If the topic is lengthy, slightly condense explanations or omit less important details rather than overflowing content. "
+    "Never crop, truncate, or cut off any content. "
+
+    "STYLE: "
+    "Include a neat title at the top, moderately larger than section headings but not excessively large. "
+    "Use numbered sections with concise headings. "
+    "Prefer concise bullet points over long paragraphs. "
+    "Handwriting should be neat, medium-sized, readable, and naturally spaced. "
+
+    "COLOR SCHEME: "
+    "Use a visually pleasing but restrained handwritten color scheme. "
+    "Write most body text in dark blue or black ink. "
+    "Use purple, magenta, or dark blue ink for section headings. "
+    "Use green or teal outlines for boxes, important formulas, and diagrams when appropriate. "
+    "Use accent colors sparingly to improve readability and visual hierarchy, similar to high-quality student revision notes. "
+    "Avoid making the entire page monochromatic. "
+    "The page should remain professional, educational, and naturally handwritten rather than decorative. "
+
+    "VISUALS: "
+    "Include small neat diagrams, illustrations, or boxed formulas only when they add educational value. "
+    "Boxes and diagrams should be clean, compact, and integrated naturally into the layout. "
+
+    f"Topic: {topic}."
     )
 
 
