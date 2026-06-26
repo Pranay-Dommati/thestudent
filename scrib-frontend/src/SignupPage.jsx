@@ -18,7 +18,7 @@ const SignupPage = () => {
   const [otpOpen, setOtpOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const location = useLocation()
-  const nextUrl = new URLSearchParams(location.search).get('next') || '/'
+  const nextUrl = new URLSearchParams(location.search).get('next') || '/generate'
 
   useEffect(() => {
     if (isLoggedIn) {

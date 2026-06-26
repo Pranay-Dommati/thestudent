@@ -30,23 +30,36 @@ from .serializers import (
 # pyrefly: ignore [missing-import]
 from .models import User, EmailOTP, UserProduct
 
-SIGNUP_FREE_CREDITS = 0  # Free credits on signup disabled
+SIGNUP_FREE_CREDITS = 1  # 1 free credit awarded on new user signup
 
 def grant_signup_credits(user):
-    """Award free signup credits to a newly activated user.
+    """Award 1 free credit to a newly activated user.
     Safe to import from any view — uses lazy import to avoid circular deps.
-    Idempotent: only adds credits via CreditTransaction; balance is computed
-    from transactions so calling this once per signup is sufficient.
+    Idempotent: checks for an existing signup-credit transaction first so
+    calling this multiple times (e.g. both Google callback flows) never
+    double-grants credits.
     """
+    if SIGNUP_FREE_CREDITS <= 0:
+        return
     try:
         from scrib.models import CreditTransaction
+        # Idempotency guard — only grant once per user
+        already_granted = CreditTransaction.objects.filter(
+            user=user,
+            direction=CreditTransaction.DIRECTION_CREDIT,
+            reason=CreditTransaction.REASON_ADJUSTMENT,
+            credits=SIGNUP_FREE_CREDITS,
+        ).exists()
+        if already_granted:
+            logger.info(f"Signup credit already granted to {user.email} — skipping")
+            return
         CreditTransaction.objects.create(
             user=user,
             direction=CreditTransaction.DIRECTION_CREDIT,
             credits=SIGNUP_FREE_CREDITS,
             reason=CreditTransaction.REASON_ADJUSTMENT,
         )
-        logger.info(f"Granted {SIGNUP_FREE_CREDITS} signup credits to new user {user.email}")
+        logger.info(f"Granted {SIGNUP_FREE_CREDITS} free signup credit to new user {user.email}")
     except Exception as exc:
         # Non-fatal: log but don't block signup
         logger.error(f"Failed to grant signup credits to {user.email}: {exc}")
@@ -384,8 +397,8 @@ def otp_verify(request):
     if first_activation:
         user.is_active = True
         user.save(update_fields=['is_active'])
-        # Free signup credits disabled
-        # grant_signup_credits(user)
+        # Grant 1 free credit to new signups
+        grant_signup_credits(user)
 
     # Issue tokens
     refresh = RefreshToken.for_user(user)
@@ -1099,6 +1112,7 @@ def google_auth_callback(request):
                 )
                 created = True
                 logger.info(f"Google Auth Token: New user created - {email}")
+                grant_signup_credits(user)
             except Exception as e:
                 logger.error(f"Error creating user from token: {str(e)}")
                 return Response(
@@ -1253,8 +1267,7 @@ def google_auth_token(request):
                 )
                 created = True
                 logger.info(f"Google token auth: New user created - {email}")
-                # Free signup credits disabled
-                # grant_signup_credits(user)
+                grant_signup_credits(user)
             except Exception as e:
                 logger.error(f"Error creating user: {str(e)}")
                 return Response(

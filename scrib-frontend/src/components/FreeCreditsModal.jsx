@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-const STORAGE_KEY = 'scrib_promo_modal_seen'
+const STORAGE_KEY = 'scrib_free1credit_modal_seen'
 
 const FreeCreditsModal = ({ isLoggedIn, loading }) => {
   const [visible, setVisible] = useState(false)
@@ -61,12 +61,12 @@ const FreeCreditsModal = ({ isLoggedIn, loading }) => {
 
           {/* Heading */}
           <h2 className="mt-5 text-xl font-bold text-[#1f1f1f]">
-            Get your first <span className="text-[#557a3f]">2 free credits</span>
+            Get your first <span className="text-[#557a3f]">free credit</span> 🎁
           </h2>
 
           {/* Description */}
           <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-[#6f6a63]">
-            Sign up now and get <strong>2 free credits</strong> to generate your own custom handwritten notes — no card needed.
+            Sign up free and get <strong>1 free credit</strong> to generate your own custom handwritten notes — no card needed.
           </p>
 
           {/* Feature pills */}
@@ -88,7 +88,7 @@ const FreeCreditsModal = ({ isLoggedIn, loading }) => {
             onClick={dismiss}
             className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#1f1f1f] px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-[#333] hover:shadow-lg"
           >
-            Sign up & claim your free credits
+            Sign up & get your free credit
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="5" y1="12" x2="19" y2="12" />
               <polyline points="12 5 19 12 12 19" />
