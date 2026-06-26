@@ -286,7 +286,7 @@ class OrganizeTopicsView(APIView):
         )
 
         try:
-            response_text = call_scrib_vertex_ai(prompt)
+            response_text = call_scrib_vertex_ai(prompt, response_mime_type='application/json')
             
             # Clean up the markdown if present
             if response_text.startswith('```json'):
@@ -337,6 +337,9 @@ class OrganizeTopicsView(APIView):
 class ParseSyllabusView(APIView):
     permission_classes = [AllowAny]
 
+    # Maximum number of Vertex AI retries on malformed JSON
+    MAX_RETRIES = 2
+
     def post(self, request):
         syllabus = request.data.get('syllabus')
         if not syllabus:
@@ -350,22 +353,108 @@ class ParseSyllabusView(APIView):
             f"Syllabus:\n{syllabus}"
         )
         
+        last_error = None
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            try:
+                logger.info("[SCRIB API] /parse-syllabus/ called - sending to Vertex AI (attempt %d/%d)...",
+                            attempt, self.MAX_RETRIES)
+                response_text = call_scrib_vertex_ai(
+                    prompt,
+                    response_mime_type='application/json',
+                )
+                
+                # Clean up the markdown if present (shouldn't happen with JSON mode, but defensive)
+                if response_text.startswith('```json'):
+                    response_text = response_text[7:-3].strip()
+                elif response_text.startswith('```'):
+                    response_text = response_text[3:-3].strip()
+                
+                try:
+                    parsed = json.loads(response_text)
+                except json.JSONDecodeError as json_err:
+                    logger.warning(
+                        "[SCRIB API] JSON parse failed (attempt %d): %s — trying repair. "
+                        "Raw response (last 200 chars): …%s",
+                        attempt, str(json_err), response_text[-200:] if response_text else '<empty>'
+                    )
+                    parsed = self._repair_json(response_text)
+
+                # Validate the structure — must be a list of strings
+                if not isinstance(parsed, list):
+                    raise ValueError(f"Expected a JSON array, got {type(parsed).__name__}")
+
+                logger.info("[SCRIB API] SUCCESS - Vertex AI parsed %d topics (attempt %d). NO FALLBACK USED.",
+                            len(parsed), attempt)
+                return Response(parsed)
+
+            except Exception as e:
+                last_error = e
+                logger.error("[SCRIB API] Attempt %d/%d FAILED - %s: %s",
+                             attempt, self.MAX_RETRIES, type(e).__name__, str(e))
+                if attempt < self.MAX_RETRIES:
+                    import time
+                    time.sleep(1)  # Brief pause before retry
+
+        # All retries exhausted
+        logger.error("[SCRIB API] All %d attempts failed for /parse-syllabus/. Last error: %s",
+                     self.MAX_RETRIES, str(last_error))
+        return error_response(f"Failed to parse syllabus: {str(last_error)}", status_code=500)
+
+    @staticmethod
+    def _repair_json(text):
+        """Attempt to repair truncated JSON from Gemini.
+
+        Common failure modes:
+        - Unterminated string: ``[..."topic one", "topic tw``
+        - Missing closing bracket: ``[..."topic one", "topic two"``
+        - Trailing comma: ``[..."topic two",]``
+        """
+        if not text or not text.strip():
+            raise ValueError("Empty AI response — cannot repair")
+
+        text = text.strip()
+
+        # Ensure it starts with '['
+        bracket_pos = text.find('[')
+        if bracket_pos == -1:
+            raise ValueError("No JSON array found in response")
+        text = text[bracket_pos:]
+
+        # Try parsing as-is first
         try:
-            logger.info("[SCRIB API] /parse-syllabus/ called - sending to Vertex AI...")
-            response_text = call_scrib_vertex_ai(prompt)
-            
-            # Clean up the markdown if present
-            if response_text.startswith('```json'):
-                response_text = response_text[7:-3].strip()
-            elif response_text.startswith('```'):
-                response_text = response_text[3:-3].strip()
-            
-            parsed = json.loads(response_text)
-            logger.info(f"[SCRIB API] SUCCESS - Vertex AI parsed {len(parsed)} topics. NO FALLBACK USED.")
-            return Response(parsed)
-        except Exception as e:
-            logger.error(f"[SCRIB API] FAILED - Vertex AI error: {str(e)}")
-            return error_response(f"Failed to parse syllabus: {str(e)}", status_code=500)
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        # Step 1: If the last character is inside an unterminated string,
+        #         find the last complete string entry.
+        # Strategy: find the last complete `"..."` and cut after it, close the array.
+        last_complete_quote = None
+        in_string = False
+        escape = False
+        for i, ch in enumerate(text):
+            if escape:
+                escape = False
+                continue
+            if ch == '\\':
+                escape = True
+                continue
+            if ch == '"':
+                if in_string:
+                    last_complete_quote = i  # End of a complete string
+                in_string = not in_string
+
+        if last_complete_quote is not None:
+            # Cut after the last complete string, strip trailing comma, close array
+            repaired = text[:last_complete_quote + 1].rstrip().rstrip(',') + '\n]'
+            try:
+                result = json.loads(repaired)
+                logger.info("[SCRIB API] JSON repair succeeded — recovered %d topics", len(result))
+                return result
+            except json.JSONDecodeError:
+                pass
+
+        raise ValueError(f"JSON repair failed. Raw text starts with: {text[:100]}")
 
 class ModerateTopicsView(APIView):
     permission_classes = [AllowAny]
@@ -383,7 +472,7 @@ class ModerateTopicsView(APIView):
         )
         
         try:
-            response_text = call_scrib_vertex_ai(prompt)
+            response_text = call_scrib_vertex_ai(prompt, response_mime_type='application/json')
             
             # Clean up the markdown if present
             if response_text.startswith('```json'):

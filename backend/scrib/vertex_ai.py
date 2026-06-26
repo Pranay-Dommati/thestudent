@@ -46,7 +46,21 @@ def _setup_credentials():
     )
 
 
-def call_scrib_vertex_ai(prompt):
+def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=65536):
+    """Call Vertex AI Gemini and return the response text.
+
+    Parameters
+    ----------
+    prompt : str
+        The prompt to send.
+    response_mime_type : str | None
+        If set (e.g. ``'application/json'``), Gemini is forced to return
+        valid output in that format — dramatically reducing truncation and
+        markdown-wrapping issues.
+    max_output_tokens : int
+        Maximum tokens in the response.  Default 65 536 (Gemini 2.5 Flash
+        supports up to 65 536 output tokens).
+    """
     _setup_credentials()
 
     logger.info("[SCRIB AI] *** USING GOOGLE VERTEX AI ***")
@@ -59,10 +73,22 @@ def call_scrib_vertex_ai(prompt):
         location="us-central1",
     )
 
+    # Build generation config — always include max_output_tokens to avoid
+    # silent truncation at the default limit.
+    from google.genai import types as genai_types
+
+    gen_config = genai_types.GenerateContentConfig(
+        max_output_tokens=max_output_tokens,
+    )
+    if response_mime_type:
+        gen_config.response_mime_type = response_mime_type
+
     response = client.models.generate_content(
         model=MODEL_NAME,
-        contents=prompt
+        contents=prompt,
+        config=gen_config,
     )
 
     logger.info(f"[SCRIB AI] SUCCESS - Response received from Vertex AI ({MODEL_NAME}). No fallback used.")
     return response.text
+
