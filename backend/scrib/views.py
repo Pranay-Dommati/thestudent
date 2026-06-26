@@ -1141,6 +1141,75 @@ class StudyPackPdfView(APIView):
         return Response({'share_token': str(pack.share_token)})
 
 
+class AdminStudyPackPdfView(APIView):
+    """
+    GET /api/scrib/admin/packs/<pack_id>/pdf/
+
+    Admin-only version of StudyPackPdfView — generates a fresh presigned URL
+    for ANY study pack regardless of owner.  Returns JSON with a `pdf_url` key
+    so the frontend can load it without a redirect.
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pack_id):
+        logger.info('[admin-pdf] Received request for pack_id=%s by user=%s (is_staff=%s, is_superuser=%s)',
+                     pack_id, request.user.email, request.user.is_staff, request.user.is_superuser)
+
+        if not is_admin_user(request.user):
+            logger.warning('[admin-pdf] Rejected: user %s is not admin', request.user.email)
+            return error_response('Forbidden', status_code=403, code='forbidden')
+
+        pack = StudyPack.objects.filter(pk=pack_id).first()
+        if not pack:
+            logger.warning('[admin-pdf] Pack id=%s not found in database', pack_id)
+            return error_response('Study pack not found', status_code=404, code='not_found')
+
+        logger.info('[admin-pdf] Found pack id=%s title="%s" s3_key=%s pdf_url=%s',
+                     pack_id, pack.title, bool(pack.s3_key), bool(pack.pdf_url))
+
+        if not pack.s3_key:
+            # Older packs stored a full URL — return it directly.
+            if pack.pdf_url:
+                logger.info('[admin-pdf] No s3_key, falling back to stored pdf_url for pack %s', pack_id)
+                return Response({'pdf_url': pack.pdf_url})
+            logger.warning('[admin-pdf] Pack %s has no s3_key and no pdf_url', pack_id)
+            return error_response('PDF not available for this pack', status_code=404, code='not_found')
+
+        import boto3
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
+        region = getattr(settings, 'AWS_S3_REGION_NAME', 'ap-south-1')
+        access_key = getattr(settings, 'SCRIB_S3_ACCESS_KEY_ID', '')
+        secret_key = getattr(settings, 'SCRIB_S3_SECRET_ACCESS_KEY', '')
+
+        if not bucket or not access_key or not secret_key:
+            logger.error('[admin-pdf] Storage not configured: bucket=%s access_key=%s secret_key=%s',
+                         bool(bucket), bool(access_key), bool(secret_key))
+            return error_response('Storage not configured', status_code=503, code='storage_unavailable')
+
+        try:
+            s3 = boto3.client(
+                's3',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=region,
+            )
+            fresh_url = s3.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': bucket, 'Key': pack.s3_key},
+                ExpiresIn=604800,  # 7 days
+            )
+            logger.info('[admin-pdf] Generated fresh presigned URL for pack %s (key=%s)', pack_id, pack.s3_key)
+        except (BotoCoreError, ClientError) as exc:
+            logger.error('[admin-pdf] presign failed for pack %s: %s', pack_id, exc)
+            return error_response('Could not generate PDF link', status_code=503, code='storage_unavailable')
+
+        return Response({'pdf_url': fresh_url})
+
+
 class StudyPackShareView(APIView):
     """Public endpoint — no authentication required.
 
@@ -1149,6 +1218,7 @@ class StudyPackShareView(APIView):
     regenerate the presigned URL on every request rather than relying on an
     expiring stored URL.
     """
+
 
     authentication_classes = []
     permission_classes = []
@@ -1563,6 +1633,15 @@ class AdminUserInsightsView(APIView):
             .values_list('user_id', flat=True)
             .distinct()
         )
+
+        # Users who have paid >= 2 times (repeating / returning payers)
+        repeat_paid_user_ids = set(
+            Payment.objects.filter(status=Payment.STATUS_PAID)
+            .values('user_id')
+            .annotate(pay_count=DCount('id'))
+            .filter(pay_count__gte=2)
+            .values_list('user_id', flat=True)
+        )
         coupon_user_ids = set(
             PromoCodeRedemption.objects.values_list('user_id', flat=True).distinct()
         )
@@ -1656,4 +1735,283 @@ class AdminUserInsightsView(APIView):
             },
             'total_packs_generated': StudyPack.objects.exclude(status=StudyPack.STATUS_FAILED).count(),
             'total_paid_users': len(paid_user_ids),
+            'repeat_paid_users': len(repeat_paid_user_ids),
         })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Paid Users Analytics  (Phase 1)
+# GET /api/scrib/admin/paid-analytics/
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AdminPaidUsersAnalyticsView(APIView):
+    """
+    Returns a comprehensive analytics payload for all users who have made
+    at least one successful (STATUS_PAID) payment.
+
+    Sections returned
+    -----------------
+    summary          — aggregate KPIs
+    cohorts          — ₹19 trial cohort + coupon cohort
+    paid_users       — per-user table rows with embedded study-pack history
+    leaderboards     — top-10 revenue / repeat / credit-consumers
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    # ₹19 trial pack amount in paise (must match CREDIT_PACKS['try'])
+    TRIAL_AMOUNT_PAISE = 1900
+
+    def get(self, request):
+        if not is_admin_user(request.user):
+            return error_response('Forbidden', status_code=403, code='forbidden')
+
+        from django.db.models import Count as DCount, Max as DMax, Min as DMin
+
+        User = get_user_model()
+
+        # ── 1. All paid Payment rows ──────────────────────────────────────────
+        paid_qs = Payment.objects.filter(status=Payment.STATUS_PAID)
+
+        # Per-user aggregates from payments
+        per_user_pay = list(
+            paid_qs
+            .values('user_id')
+            .annotate(
+                pay_count=DCount('id'),
+                total_revenue_paise=Sum('amount'),
+                total_credits_bought=Sum('credits_added'),
+                first_payment=DMin('created_at'),
+                last_payment=DMax('created_at'),
+            )
+        )
+        # Build lookup by user_id
+        pay_map = {r['user_id']: r for r in per_user_pay}
+        paid_user_ids = list(pay_map.keys())
+
+        if not paid_user_ids:
+            return Response({
+                'summary': {
+                    'total_paid_users': 0,
+                    'repeat_payers': 0,
+                    'three_plus_payers': 0,
+                    'avg_revenue_per_user_inr': 0,
+                    'avg_credits_per_user': 0,
+                },
+                'cohorts': {'trial': {}, 'coupon': {}},
+                'paid_users': [],
+                'leaderboards': {'top_revenue': [], 'top_repeat': [], 'top_credits': []},
+            })
+
+        # ── 2. Credits consumed per user (DEBIT transactions) ────────────────
+        debit_map = {
+            r['user_id']: r['total']
+            for r in CreditTransaction.objects.filter(
+                user_id__in=paid_user_ids,
+                direction=CreditTransaction.DIRECTION_DEBIT,
+            ).values('user_id').annotate(total=Sum('credits'))
+        }
+
+        # Credits received (CREDIT transactions — payments + promos)
+        credit_map = {
+            r['user_id']: r['total']
+            for r in CreditTransaction.objects.filter(
+                user_id__in=paid_user_ids,
+                direction=CreditTransaction.DIRECTION_CREDIT,
+            ).values('user_id').annotate(total=Sum('credits'))
+        }
+
+        # ── 3. Study packs per user ───────────────────────────────────────────
+        packs_per_user = {}
+        for pack in (
+            StudyPack.objects
+            .filter(user_id__in=paid_user_ids)
+            .exclude(status=StudyPack.STATUS_FAILED)
+            .order_by('-created_at')
+            .values('id', 'user_id', 'title', 'created_at', 'credits_used',
+                    'status', 'pdf_url', 's3_key', 'share_token', 'total_pages')
+        ):
+            packs_per_user.setdefault(pack['user_id'], []).append(pack)
+
+        # ── 4. Last active (max of last note, pack, or payment) ───────────────
+        last_note = {
+            r['user_id']: r['last']
+            for r in GeneratedNote.objects.filter(user_id__in=paid_user_ids)
+            .values('user_id').annotate(last=DMax('created_at'))
+        }
+        last_pack = {
+            r['user_id']: r['last']
+            for r in StudyPack.objects.filter(user_id__in=paid_user_ids)
+            .exclude(status=StudyPack.STATUS_FAILED)
+            .values('user_id').annotate(last=DMax('created_at'))
+        }
+
+        # ── 5. User display info ──────────────────────────────────────────────
+        user_info = {
+            u.pk: u
+            for u in User.objects.filter(pk__in=paid_user_ids).only('id', 'email', 'full_name', 'date_joined')
+        }
+
+        # ── 6. Coupon users ───────────────────────────────────────────────────
+        coupon_user_ids_set = set(
+            PromoCodeRedemption.objects.values_list('user_id', flat=True).distinct()
+        )
+
+        # Which payments were trial payments (₹19) per user
+        trial_user_ids_set = set(
+            Payment.objects.filter(
+                status=Payment.STATUS_PAID,
+                amount=self.TRIAL_AMOUNT_PAISE,
+            ).values_list('user_id', flat=True).distinct()
+        )
+
+        # ── 7. Build per-user rows ────────────────────────────────────────────
+        rows = []
+        for uid in paid_user_ids:
+            p = pay_map[uid]
+            user = user_info.get(uid)
+            if not user:
+                continue
+
+            credits_bought = p['total_credits_bought'] or 0
+            credits_in = credit_map.get(uid, 0) or 0
+            credits_out = debit_map.get(uid, 0) or 0
+            credits_remaining = max(credits_in - credits_out, 0)
+
+            # Last active = max of last note, pack, or payment
+            candidates = [
+                last_note.get(uid),
+                last_pack.get(uid),
+                p['last_payment'],
+            ]
+            last_active = max((c for c in candidates if c), default=None)
+
+            # Pack rows for this user
+            user_packs = []
+            for pk in packs_per_user.get(uid, []):
+                user_packs.append({
+                    'id': pk['id'],
+                    'title': pk['title'],
+                    'status': pk['status'],
+                    'total_pages': pk['total_pages'],
+                    'credits_used': pk['credits_used'],
+                    'created_at': pk['created_at'].isoformat() if pk['created_at'] else None,
+                    'pdf_url': pk['pdf_url'] or None,
+                    'share_token': str(pk['share_token']) if pk['share_token'] else None,
+                })
+
+            rows.append({
+                'id': uid,
+                'email': user.email,
+                'full_name': user.full_name or '',
+                'date_joined': user.date_joined.isoformat() if user.date_joined else None,
+                # payment stats
+                'payment_count': p['pay_count'],
+                'total_revenue_paise': p['total_revenue_paise'] or 0,
+                'total_revenue_inr': round((p['total_revenue_paise'] or 0) / 100, 2),
+                # credit stats
+                'credits_purchased': credits_bought,
+                'credits_remaining': credits_remaining,
+                'credits_spent': credits_out,
+                # generation stats
+                'study_packs_count': len(user_packs),
+                'packs': user_packs,
+                # activity
+                'last_active': last_active.isoformat() if last_active else None,
+                'first_payment': p['first_payment'].isoformat() if p['first_payment'] else None,
+                # cohort flags
+                'has_coupon': uid in coupon_user_ids_set,
+                'has_trial': uid in trial_user_ids_set,
+            })
+
+        # ── 8. Summary KPIs ───────────────────────────────────────────────────
+        total_paid = len(rows)
+        repeat_payers = sum(1 for r in rows if r['payment_count'] >= 2)
+        three_plus = sum(1 for r in rows if r['payment_count'] >= 3)
+        total_rev = sum(r['total_revenue_paise'] for r in rows)
+        total_credits_all = sum(r['credits_purchased'] for r in rows)
+
+        avg_rev_inr = round((total_rev / total_paid / 100), 2) if total_paid else 0
+        avg_credits = round(total_credits_all / total_paid, 1) if total_paid else 0
+
+        # ── 9. ₹19 Trial Cohort ──────────────────────────────────────────────
+        trial_rows = [r for r in rows if r['has_trial']]
+        trial_total = len(trial_rows)
+        trial_2nd = sum(1 for r in trial_rows if r['payment_count'] >= 2)
+        trial_3rd = sum(1 for r in trial_rows if r['payment_count'] >= 3)
+        trial_rev = sum(r['total_revenue_paise'] for r in trial_rows)
+        avg_trial_rev = round(trial_rev / trial_total / 100, 2) if trial_total else 0
+
+        trial_cohort = {
+            'trial_buyers': trial_total,
+            'conversion_to_2nd_pct': round(trial_2nd * 100 / trial_total, 1) if trial_total else 0,
+            'conversion_to_3rd_pct': round(trial_3rd * 100 / trial_total, 1) if trial_total else 0,
+            'avg_revenue_inr': avg_trial_rev,
+        }
+
+        # ── 10. Coupon Cohort ────────────────────────────────────────────────
+        all_coupon_user_ids = set(
+            PromoCodeRedemption.objects.values_list('user_id', flat=True).distinct()
+        )
+        coupon_total = len(all_coupon_user_ids)
+        coupon_paid_ids = all_coupon_user_ids & set(paid_user_ids)
+        coupon_repeat_ids = {uid for uid in coupon_paid_ids if pay_map[uid]['pay_count'] >= 2}
+        coupon_paid_rows = [r for r in rows if r['id'] in coupon_paid_ids]
+        coupon_rev = sum(r['total_revenue_paise'] for r in coupon_paid_rows)
+        avg_coupon_rev = round(coupon_rev / len(coupon_paid_rows) / 100, 2) if coupon_paid_rows else 0
+
+        coupon_cohort = {
+            'coupon_users': coupon_total,
+            'coupon_to_paid_pct': round(len(coupon_paid_ids) * 100 / coupon_total, 1) if coupon_total else 0,
+            'coupon_to_repeat_pct': round(len(coupon_repeat_ids) * 100 / coupon_total, 1) if coupon_total else 0,
+            'avg_revenue_inr': avg_coupon_rev,
+        }
+
+        # ── 11. Leaderboards ─────────────────────────────────────────────────
+        def leaderboard_entry(r, rank):
+            return {
+                'rank': rank,
+                'id': r['id'],
+                'email': r['email'],
+                'full_name': r['full_name'],
+                'payment_count': r['payment_count'],
+                'total_revenue_inr': r['total_revenue_inr'],
+                'credits_purchased': r['credits_purchased'],
+                'credits_spent': r['credits_spent'],
+                'study_packs_count': r['study_packs_count'],
+            }
+
+        top_revenue = [
+            leaderboard_entry(r, i + 1)
+            for i, r in enumerate(sorted(rows, key=lambda x: x['total_revenue_paise'], reverse=True)[:10])
+        ]
+        top_repeat = [
+            leaderboard_entry(r, i + 1)
+            for i, r in enumerate(sorted(rows, key=lambda x: x['payment_count'], reverse=True)[:10])
+        ]
+        top_credits = [
+            leaderboard_entry(r, i + 1)
+            for i, r in enumerate(sorted(rows, key=lambda x: x['credits_spent'], reverse=True)[:10])
+        ]
+
+        return Response({
+            'summary': {
+                'total_paid_users': total_paid,
+                'repeat_payers': repeat_payers,
+                'three_plus_payers': three_plus,
+                'avg_revenue_per_user_inr': avg_rev_inr,
+                'avg_credits_per_user': avg_credits,
+            },
+            'cohorts': {
+                'trial': trial_cohort,
+                'coupon': coupon_cohort,
+            },
+            'paid_users': rows,
+            'leaderboards': {
+                'top_revenue': top_revenue,
+                'top_repeat': top_repeat,
+                'top_credits': top_credits,
+            },
+        })
+

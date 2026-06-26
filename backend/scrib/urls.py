@@ -34,4 +34,6 @@ urlpatterns = [
     path('admin/promo-codes/stats/', views.AdminPromoCodeStatsView.as_view(), name='admin-promo-codes-stats'),
     path('admin/promo-codes/<int:pk>/', views.AdminPromoCodeDetailView.as_view(), name='admin-promo-code-detail'),
     path('admin/user-insights/', views.AdminUserInsightsView.as_view(), name='admin-user-insights'),
+    path('admin/paid-analytics/', views.AdminPaidUsersAnalyticsView.as_view(), name='admin-paid-analytics'),
+    path('admin/packs/<int:pack_id>/pdf/', views.AdminStudyPackPdfView.as_view(), name='admin-pack-pdf'),
 ]

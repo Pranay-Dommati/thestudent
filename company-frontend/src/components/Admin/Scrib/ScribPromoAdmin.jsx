@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FaTicketAlt, FaPlus, FaArrowLeft, FaSearch, FaCopy, FaCheck, FaUsers, FaFileAlt, FaCreditCard, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { FaTicketAlt, FaPlus, FaArrowLeft, FaSearch, FaCopy, FaCheck, FaUsers, FaFileAlt, FaCreditCard, FaChevronDown, FaChevronUp, FaChartBar } from 'react-icons/fa';
 import authService from '../../../services/authService';
+import ScribPaidAnalytics from './ScribPaidAnalytics';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -406,6 +407,7 @@ const StatsBar = ({ stats, isDarkMode }) => {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const ScribPromoAdmin = ({ isDarkMode = false }) => {
+  const [activeTab, setActiveTab] = useState('promo');
   const [view, setView] = useState('dashboard');
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -494,8 +496,41 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
     { key: 'date_joined', label: 'Joined', render: (u) => formatDate(u.date_joined) },
   ];
 
+  const tabBase = 'flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-colors';
+  const tabActive = isDarkMode
+    ? 'bg-gray-700 text-white'
+    : 'bg-white text-gray-900 shadow-sm';
+  const tabInactive = isDarkMode
+    ? 'text-gray-400 hover:text-gray-200'
+    : 'text-gray-500 hover:text-gray-700';
+
   return (
     <div className="space-y-6">
+      {/* ── Tab Bar ── */}
+      <div className={`flex gap-1 p-1 rounded-xl w-fit ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+        <button
+          id="tab-promo-codes"
+          onClick={() => { setActiveTab('promo'); setView('dashboard'); }}
+          className={`${tabBase} ${activeTab === 'promo' ? tabActive : tabInactive}`}
+        >
+          <FaTicketAlt className="h-3.5 w-3.5" /> Promo Codes
+        </button>
+        <button
+          id="tab-paid-analytics"
+          onClick={() => setActiveTab('analytics')}
+          className={`${tabBase} ${activeTab === 'analytics' ? tabActive : tabInactive}`}
+        >
+          <FaChartBar className="h-3.5 w-3.5" /> Paid Analytics
+        </button>
+      </div>
+
+      {/* ── Paid Analytics tab ── */}
+      {activeTab === 'analytics' && (
+        <ScribPaidAnalytics isDarkMode={isDarkMode} />
+      )}
+
+      {/* ── Promo Codes tab ── */}
+      {activeTab === 'promo' && <>
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
         <div>
@@ -537,7 +572,7 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
               <StatsBar stats={stats} isDarkMode={isDarkMode} />
 
               {/* Secondary stats row — from user-insights */}
-              <div className="grid grid-cols-2 gap-4 mb-6 -mt-2">
+              <div className="grid grid-cols-3 gap-4 mb-6 -mt-2">
                 <div className={`p-4 rounded-xl shadow-sm border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
                   <div className={`text-2xl font-bold text-purple-600`}>
                     {loadingInsights ? <span className="text-gray-300 animate-pulse">…</span> : (insights?.total_packs_generated ?? '—')}
@@ -549,6 +584,12 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
                     {loadingInsights ? <span className="text-gray-300 animate-pulse">…</span> : (insights?.total_paid_users ?? '—')}
                   </div>
                   <div className={`text-sm mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Paid Users</div>
+                </div>
+                <div className={`p-4 rounded-xl shadow-sm border ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+                  <div className={`text-2xl font-bold text-orange-500`}>
+                    {loadingInsights ? <span className="text-gray-300 animate-pulse">…</span> : (insights?.repeat_paid_users ?? '—')}
+                  </div>
+                  <div className={`text-sm mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Repeat Payers (≥ 2×)</div>
                 </div>
               </div>
 
@@ -607,6 +648,7 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
       {view === 'detail' && (
         <CouponDetailView campaignName={detailCampaign} codes={detailCodes} loadingCodes={loadingCodes} isDarkMode={isDarkMode} onBack={() => setView('dashboard')} />
       )}
+      </>}
     </div>
   );
 };
