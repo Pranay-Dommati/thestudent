@@ -77,7 +77,7 @@ const GeneratePage = () => {
     })
   }
   const MAX_PAGES = 8
-  const MAX_TOPICS_PER_PAGE = 3
+  const MAX_TOPICS_PER_PAGE = 2
 
   const [mode, setMode] = useState(() => sessionStorage.getItem('scrib_draft_mode') || 'manual')
 
@@ -676,7 +676,7 @@ const GeneratePage = () => {
                   <svg className="mt-0.5 shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
                   </svg>
-                  <span>We recommend <strong>1–2 topics per page</strong> for detailed notes. Up to 3 concise topics can fit comfortably on a single page.</span>
+                  <span>We recommend <strong>1 topic per page</strong> for detailed notes. Up to 2 concise topics can fit comfortably on a single page.</span>
                 </div>
               </div>
 
@@ -786,7 +786,7 @@ const GeneratePage = () => {
                             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                             <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                           </svg>
-                          Max 3 topics per page
+                          Max 2 topics per page
                         </span>
                       )}
                     </div>

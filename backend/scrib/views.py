@@ -107,12 +107,12 @@ def _extract_gemini_text(response_data):
 
 
 def _build_groups_fallback(topics):
-    """Naive fallback: pack topics into pages of up to 3 each.
+    """Naive fallback: pack topics into pages of up to 2 each.
     Returns v2 page dicts: {'topics': [{'name': ..., 'instruction': ''}, ...]}.
     """
     pages = []
-    for i in range(0, len(topics), 3):
-        chunk = topics[i:i + 3]
+    for i in range(0, len(topics), 2):
+        chunk = topics[i:i + 2]
         pages.append({
             'topics': [{'name': str(t).strip(), 'instruction': ''} for t in chunk if str(t).strip()]
         })
@@ -347,17 +347,17 @@ class OrganizeTopicsView(APIView):
             for t in topics:
                 key = t.lower()
                 ordered_enriched.append(name_map.get(key, {'name': t, 'estimated_complexity': 40, 'cluster': 'general'}))
-            pages = _pack_topics_into_pages(ordered_enriched, capacity=90, max_per_page=3)
+            pages = _pack_topics_into_pages(ordered_enriched, capacity=90, max_per_page=2)
         else:
-            # Fallback: naive 3-per-page chunking
+            # Fallback: naive 2-per-page chunking
             pages = _build_groups_fallback(topics)
 
-        # Ensure no page exceeds 3 topics (safety cap)
+        # Ensure no page exceeds 2 topics (safety cap)
         capped_pages = []
         for p in pages:
             page_topics = p.get('topics', [])
-            for i in range(0, max(len(page_topics), 1), 3):
-                chunk = page_topics[i:i + 3]
+            for i in range(0, max(len(page_topics), 1), 2):
+                chunk = page_topics[i:i + 2]
                 if chunk:
                     capped_pages.append({'topics': chunk})
         pages = capped_pages
