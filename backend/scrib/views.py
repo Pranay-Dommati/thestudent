@@ -311,8 +311,8 @@ class OrganizeTopicsView(APIView):
     This is more reliable than asking LLM to group directly:
     no hallucinations, no reprompting, easy to tune.
     """
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = OrganizeTopicsRequestSerializer(data=request.data)
