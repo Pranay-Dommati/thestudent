@@ -107,18 +107,90 @@ def _extract_gemini_text(response_data):
 
 
 def _build_groups_fallback(topics):
-    groups = []
-    page_number = 1
+    """Naive fallback: pack topics into pages of up to 3 each.
+    Returns v2 page dicts: {'topics': [{'name': ..., 'instruction': ''}, ...]}.
+    """
+    pages = []
     for i in range(0, len(topics), 3):
         chunk = topics[i:i + 3]
-        title = chunk[0][:40] if chunk else f"Page {page_number}"
-        groups.append({
-            'page_number': page_number,
-            'title': title or f"Page {page_number}",
-            'topics': chunk,
+        pages.append({
+            'topics': [{'name': str(t).strip(), 'instruction': ''} for t in chunk if str(t).strip()]
         })
-        page_number += 1
-    return groups
+    return [p for p in pages if p['topics']]
+
+
+# ─── NEW: Enrichment-based packing ───────────────────────────────────────────
+
+def _pack_topics_into_pages(enriched_topics, capacity=90, max_per_page=3):
+    """Deterministic backend packer.
+
+    Takes AI-enriched topics (list of dicts with 'name', 'estimated_complexity',
+    'cluster') and packs them into pages using three closure rules:
+    1. Cluster mismatch  — new page if topic belongs to a different cluster
+    2. Complexity overflow — new page if cumulative complexity exceeds capacity
+    3. Count cap         — new page if current page already has max_per_page topics
+
+    Returns list of v2 page dicts.
+    """
+    pages = []
+    current_topics = []
+    current_complexity = 0
+    current_cluster = None
+
+    for topic in enriched_topics:
+        name = (topic.get('name') or '').strip()
+        if not name:
+            continue
+        complexity = int(topic.get('estimated_complexity') or 40)  # default: medium
+        cluster = (topic.get('cluster') or 'general').lower()
+
+        cluster_mismatch = (current_cluster is not None and cluster != current_cluster)
+        complexity_overflow = (current_complexity + complexity > capacity)
+        count_cap = (len(current_topics) >= max_per_page)
+
+        if (cluster_mismatch or complexity_overflow or count_cap) and current_topics:
+            pages.append({'topics': [
+                {'name': t['name'], 'instruction': ''} for t in current_topics
+            ]})
+            current_topics = []
+            current_complexity = 0
+            current_cluster = None
+
+        current_topics.append({'name': name, 'estimated_complexity': complexity, 'cluster': cluster})
+        current_complexity += complexity
+        if current_cluster is None:
+            current_cluster = cluster
+
+    if current_topics:
+        pages.append({'topics': [
+            {'name': t['name'], 'instruction': ''} for t in current_topics
+        ]})
+
+    return pages
+
+
+def _build_enrichment_prompt(topics):
+    """Build the Vertex AI prompt for Step 1: topic enrichment."""
+    return (
+        "You are an academic content analyser. "
+        "For each topic below, estimate its complexity on a 0-100 scale and assign a subject cluster.\n\n"
+        "Complexity scale:\n"
+        "  0-30  = Small (e.g. single definition, short list)\n"
+        "  30-60 = Medium (e.g. multi-step concept, one diagram)\n"
+        "  60-90 = Large (e.g. lifecycle, multi-part algorithm, many formulas)\n"
+        "  90+   = Huge (e.g. entire protocol, very broad topic)\n\n"
+        "Rules:\n"
+        "1. Every topic must appear exactly once in the output.\n"
+        "2. 'cluster' must be a short 1-3 word label grouping related topics (e.g. 'Android Intents', 'DBMS Normalisation').\n"
+        "3. Unrelated topics must get different clusters.\n"
+        "4. Return ONLY a valid JSON array. No markdown. No explanation.\n\n"
+        "Output format:\n"
+        "[\n"
+        "  {\"name\": \"Explicit Intent\", \"estimated_complexity\": 25, \"cluster\": \"Android Intents\"},\n"
+        "  ...\n"
+        "]\n\n"
+        f"Topics:\n{json.dumps(topics, ensure_ascii=True)}\n"
+    )
 
 
 DOMAIN_KEYWORDS = {
@@ -232,6 +304,13 @@ def _split_groups_by_domain(groups, topics_order):
 
 
 class OrganizeTopicsView(APIView):
+    """Two-step AI organization pipeline:
+    Step 1 — LLM enriches topics (complexity + cluster, no grouping).
+    Step 2 — Deterministic Python packs topics into pages.
+
+    This is more reliable than asking LLM to group directly:
+    no hallucinations, no reprompting, easy to tune.
+    """
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -244,94 +323,61 @@ class OrganizeTopicsView(APIView):
         if not topics:
             return error_response('Provide at least one topic')
 
-        key_preview = (settings.GEMINI_API_KEY or '')
-        if not key_preview:
-            print("[scrib] GEMINI_API_KEY missing in settings")
-        else:
-            print(f"[scrib] GEMINI_API_KEY loaded (len={len(key_preview)})")
-        # Debug log can be removed later if needed
-
-        prompt = (
-            "You are an expert academic curriculum organizer. Your task is to accurately cluster a list of study topics into handwritten note pages.\n\n"
-            "CRITICAL CONSTRAINT:\n"
-            "ONLY cluster topics if they belong to the exact same subject and are conceptually contiguous (e.g., 'Binary Search Trees' and 'Graph Theory' can be grouped under Data Structures; 'Cell Division' and 'Genetics' under Biology).\n"
-            "DO NOT group fundamentally different subjects (e.g., 'English Grammar' and 'Data Structures', or 'History' and 'Mathematics'). If topics are unrelated, they MUST be put on separate pages, even if that results in 1 topic per page.\n\n"
-            "RULES:\n"
-            "1. Every topic provided must appear exactly once.\n"
-            "2. Do not omit any topic, and do not make up or invent new topics.\n"
-            "3. Each page can contain between 1 and 4 topics MAXIMUM.\n"
-            "4. Never hallucinate connections to save space. Unrelated concepts mean separate pages.\n"
-            "5. Produce a short, accurate page title (1 to 5 words) that summarizes the page's exact contents.\n\n"
-            "RETURN FORMAT:\n"
-            "Return ONLY a clean, parseable JSON object. Do not include markdown code block syntax (like ```json), explanations, or extra text.\n\n"
-            "{\n"
-            "  \"groups\": [\n"
-            "    {\n"
-            "      \"page_number\": 1,\n"
-            "      \"title\": \"Foundations\",\n"
-            "      \"topics\": [\n"
-            "        \"Cloud Computing\",\n"
-            "        \"Virtualization\"\n"
-            "      ]\n"
-            "    }\n"
-            "  ],\n"
-            "  \"total_pages\": 1,\n"
-            "  \"credit_savings\": {\n"
-            "    \"original_topics\": 2,\n"
-            "    \"optimized_pages\": 1,\n"
-            "    \"credits_saved\": 1\n"
-            "  }\n"
-            "}\n\n"
-            f"TOPICS:\n{json.dumps(topics, ensure_ascii=True)}\n"
-        )
-
+        # ── Step 1: LLM enrichment ──────────────────────────────────────────
+        prompt = _build_enrichment_prompt(topics)
+        enriched = None
         try:
             response_text = call_scrib_vertex_ai(prompt, response_mime_type='application/json')
-            
-            # Clean up the markdown if present
             if response_text.startswith('```json'):
                 response_text = response_text[7:-3].strip()
             elif response_text.startswith('```'):
                 response_text = response_text[3:-3].strip()
-                
-            parsed = json.loads(response_text)
+            enriched = json.loads(response_text)
+            if not isinstance(enriched, list):
+                enriched = None
         except Exception as exc:
-            groups = _build_groups_fallback(topics)
-            groups = _split_groups_by_domain(groups, topics)
-            return Response({
-                'groups': groups,
-                'total_pages': len(groups),
-                'credit_savings': {
-                    'original_topics': len(topics),
-                    'optimized_pages': len(groups),
-                    'credits_saved': max(len(topics) - len(groups), 0),
-                },
-                'source': 'fallback',
-                'message': str(exc),
-            })
+            logger.warning(f'[scrib] Topic enrichment failed ({exc}), falling back to naive packing')
+            enriched = None
 
-        groups = parsed.get('groups') if isinstance(parsed, dict) else None
-        if not isinstance(groups, list) or not groups:
-            groups = _build_groups_fallback(topics)
-        groups = _split_groups_by_domain(groups, topics)
+        # ── Step 2: Backend packing ────────────────────────────────────────
+        if enriched:
+            # Preserve user's original topic order (LLM may reorder)
+            name_map = {e.get('name', '').strip().lower(): e for e in enriched if isinstance(e, dict)}
+            ordered_enriched = []
+            for t in topics:
+                key = t.lower()
+                ordered_enriched.append(name_map.get(key, {'name': t, 'estimated_complexity': 40, 'cluster': 'general'}))
+            pages = _pack_topics_into_pages(ordered_enriched, capacity=90, max_per_page=3)
+        else:
+            # Fallback: naive 3-per-page chunking
+            pages = _build_groups_fallback(topics)
 
-        total_pages = len(groups)
+        # Ensure no page exceeds 3 topics (safety cap)
+        capped_pages = []
+        for p in pages:
+            page_topics = p.get('topics', [])
+            for i in range(0, max(len(page_topics), 1), 3):
+                chunk = page_topics[i:i + 3]
+                if chunk:
+                    capped_pages.append({'topics': chunk})
+        pages = capped_pages
 
-        credit_savings = parsed.get('credit_savings') if isinstance(parsed, dict) else None
+        total_pages = len(pages)
         credit_savings = {
             'original_topics': len(topics),
             'optimized_pages': total_pages,
             'credits_saved': max(len(topics) - total_pages, 0),
         }
 
-        for group in groups:
-            print(f"[scrib] group page {group.get('page_number')}: {group.get('title')} -> {group.get('topics')}")
+        for i, page in enumerate(pages):
+            topic_names = [t.get('name') for t in page.get('topics', [])]
+            logger.info(f'[scrib] Organized page {i+1}: {topic_names}')
 
         return Response({
-            'groups': groups,
+            'groups': pages,
             'total_pages': total_pages,
             'credit_savings': credit_savings,
-            'source': 'vertex_ai',
+            'source': 'vertex_ai' if enriched else 'fallback',
         })
 
 class ParseSyllabusView(APIView):
@@ -489,22 +535,50 @@ class ModerateTopicsView(APIView):
 
 
 def parse_topics_from_request(data):
-    topics = data.get('topics') or []
-    pages = data.get('pages') or []
+    """Parse pages from the request body. Supports both v1 (flat list) and v2 (page dicts).
 
-    if pages:
+    v1 (old):  pages = [["topic1", "topic2"], ["topic3"]]
+               topics = ["topic1", "topic2"]
+    v2 (new):  pages = [{"topics": [{"name": "t1", "instruction": ""}, ...]}, ...]
+
+    Always returns a list of v2 page dicts.
+    """
+    raw_pages = data.get('pages') or []
+    topics = data.get('topics') or []
+
+    if raw_pages:
         parsed_pages = []
-        for entry in pages:
-            if isinstance(entry, (list, tuple)):
-                page_topics = [str(item).strip() for item in entry if str(item).strip()]
+        for entry in raw_pages:
+            if isinstance(entry, dict) and 'topics' in entry:
+                # v2 page dict — normalize topics inside
+                raw_topics = entry.get('topics') or []
+                page_topics = []
+                for t in raw_topics:
+                    if isinstance(t, dict):
+                        name = (t.get('name') or '').strip()
+                        instruction = (t.get('instruction') or '').strip()
+                    else:
+                        name = str(t).strip()
+                        instruction = ''
+                    if name:
+                        page_topics.append({'name': name, 'instruction': instruction})
+                if page_topics:
+                    parsed_pages.append({'topics': page_topics})
+            elif isinstance(entry, (list, tuple)):
+                # v1 list of strings
+                page_topics = [{'name': str(t).strip(), 'instruction': ''} for t in entry if str(t).strip()]
+                if page_topics:
+                    parsed_pages.append({'topics': page_topics})
             else:
-                page_topics = [str(entry).strip()] if str(entry).strip() else []
-            if page_topics:
-                parsed_pages.append(page_topics)
+                # v1 bare string
+                name = str(entry).strip()
+                if name:
+                    parsed_pages.append({'topics': [{'name': name, 'instruction': ''}]})
         return parsed_pages
 
     if isinstance(topics, (list, tuple)) and topics:
-        return [[str(item).strip()] for item in topics if str(item).strip()]
+        # Legacy: treat each topic as its own page
+        return [{'topics': [{'name': str(t).strip(), 'instruction': ''}]} for t in topics if str(t).strip()]
 
     topics_text = data.get('topics_text') or ''
     if isinstance(topics_text, str) and topics_text.strip():
@@ -1856,12 +1930,31 @@ class AdminPaidUsersAnalyticsView(APIView):
         if not is_admin_user(request.user):
             return error_response('Forbidden', status_code=403, code='forbidden')
 
+        from django.utils import timezone
+        import datetime
         from django.db.models import Count as DCount, Max as DMax, Min as DMin
 
         User = get_user_model()
+        
+        start_date_str = request.query_params.get('start_date')
+        end_date_str = request.query_params.get('end_date')
+
+        if start_date_str and end_date_str:
+            try:
+                start_date = timezone.make_aware(datetime.datetime.strptime(start_date_str, '%Y-%m-%d'))
+                end_date = timezone.make_aware(datetime.datetime.strptime(end_date_str, '%Y-%m-%d')) + datetime.timedelta(days=1) - datetime.timedelta(microseconds=1)
+            except ValueError:
+                return error_response('Invalid date format. Use YYYY-MM-DD.', status_code=400)
+        else:
+            end_date = timezone.now()
+            start_date = end_date - datetime.timedelta(days=28)
 
         # ── 1. All paid Payment rows ──────────────────────────────────────────
-        paid_qs = Payment.objects.filter(status=Payment.STATUS_PAID)
+        paid_qs = Payment.objects.filter(
+            status=Payment.STATUS_PAID,
+            created_at__gte=start_date,
+            created_at__lte=end_date
+        )
 
         # Per-user aggregates from payments
         per_user_pay = list(
@@ -2084,6 +2177,20 @@ class AdminPaidUsersAnalyticsView(APIView):
             for i, r in enumerate(sorted(rows, key=lambda x: x['credits_spent'], reverse=True)[:10])
         ]
 
+        recent_packs_qs = StudyPack.objects.select_related('user').order_by('-created_at')[:5]
+        recent_packs = [
+            {
+                'id': rp.id,
+                'title': rp.title,
+                'email': rp.user.email,
+                'created_at': rp.created_at.isoformat() if rp.created_at else None,
+                'status': rp.status,
+                'total_pages': rp.total_pages,
+                'share_token': str(rp.share_token) if rp.share_token else None,
+            }
+            for rp in recent_packs_qs
+        ]
+
         return Response({
             'summary': {
                 'total_paid_users': total_paid,
@@ -2091,6 +2198,7 @@ class AdminPaidUsersAnalyticsView(APIView):
                 'three_plus_payers': three_plus,
                 'avg_revenue_per_user_inr': avg_rev_inr,
                 'avg_credits_per_user': avg_credits,
+                'total_revenue_inr': round(total_rev / 100, 2),
             },
             'cohorts': {
                 'trial': trial_cohort,
@@ -2102,5 +2210,6 @@ class AdminPaidUsersAnalyticsView(APIView):
                 'top_repeat': top_repeat,
                 'top_credits': top_credits,
             },
+            'recent_packs': recent_packs,
         })
 

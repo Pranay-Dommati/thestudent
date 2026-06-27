@@ -11,7 +11,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 # pyrefly: ignore [missing-import]
-from .image_generation import generate_handwritten_image_bytes, ImageGenerationError
+from .image_generation import generate_handwritten_image_bytes_page, ImageGenerationError
 
 logger = logging.getLogger(__name__)
 
@@ -139,11 +139,32 @@ def _save_pdf_bytes(pdf_fileobj, user_id=None):
 # PDF canvas helpers
 # ──────────────────────────────────────────────
 
-def _topics_to_prompt(topics):
-    clean = [str(item).strip() for item in topics if str(item).strip()]
-    if not clean:
-        return 'General study notes'
-    return ', '.join(clean)
+def _normalize_page(entry) -> dict:
+    """Normalize a page entry to the v2 page dict format.
+
+    Accepts:
+      - v2 dict:  {'topics': [{'name': '...', 'instruction': ''}, ...]}
+      - v1 list:  ['topic1', 'topic2']  (old format stored in DB)
+      - v1 str:   'topic1'             (very old single-string format)
+    """
+    if isinstance(entry, dict):
+        # Already v2 — ensure topics are dicts
+        raw_topics = entry.get('topics') or []
+        topics = []
+        for t in raw_topics:
+            if isinstance(t, dict):
+                topics.append({'name': (t.get('name') or '').strip(), 'instruction': (t.get('instruction') or '').strip()})
+            else:
+                topics.append({'name': str(t).strip(), 'instruction': ''})
+        return {'topics': [t for t in topics if t['name']]}
+
+    if isinstance(entry, (list, tuple)):
+        # v1 list format
+        return {'topics': [{'name': str(t).strip(), 'instruction': ''} for t in entry if str(t).strip()]}
+
+    # v1 single string
+    name = str(entry).strip()
+    return {'topics': [{'name': name, 'instruction': ''}]} if name else {'topics': []}
 
 
 def _append_images_to_canvas(pdf_canvas, buffer, images):
@@ -216,17 +237,20 @@ def generate_study_pack_pdf(pages, title, user_id=None, progress_callback=None):
         pdf_canvas.setAuthor('Scrib by EasyLearnova')
         pdf_canvas.setKeywords(f"{title} notes, handwritten notes, exam pdf, revision notes")
 
-    def _generate_single_page(index, page_topics):
+    def _generate_single_page(index, page_entry):
         """Generate one page image with retry on rate-limit / timeout errors."""
-        prompt = _topics_to_prompt(page_topics)
+        page = _normalize_page(page_entry)
+        if not page.get('topics'):
+            page = {'topics': [{'name': 'General study notes', 'instruction': ''}]}
         max_retries = 3
         for attempt in range(max_retries):
             page_start = time.time()
             try:
+                topic_names = ', '.join(t.get('name', '') for t in page['topics'])
                 logger.info(
-                    f'[scrib]   Page {index+1}/{total_pages} — sending to OpenAI (attempt {attempt+1})...'
+                    f'[scrib]   Page {index+1}/{total_pages} — sending to OpenAI (attempt {attempt+1}): [{topic_names}]'
                 )
-                image_bytes = generate_handwritten_image_bytes(prompt)
+                image_bytes = generate_handwritten_image_bytes_page(page)
                 elapsed = time.time() - page_start
                 logger.info(
                     f'[scrib]   Page {index+1}/{total_pages} — DONE in {elapsed:.1f}s '

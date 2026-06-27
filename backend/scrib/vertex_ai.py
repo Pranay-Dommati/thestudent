@@ -6,7 +6,7 @@ from google import genai
 from django.conf import settings
 
 logger = logging.getLogger('scrib')
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "gemini-2.5-flash-lite"
 
 def _setup_credentials():
     """
@@ -46,7 +46,7 @@ def _setup_credentials():
     )
 
 
-def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=65536):
+def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=65535):
     """Call Vertex AI Gemini and return the response text.
 
     Parameters
@@ -58,8 +58,8 @@ def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=6
         valid output in that format — dramatically reducing truncation and
         markdown-wrapping issues.
     max_output_tokens : int
-        Maximum tokens in the response.  Default 65 536 (Gemini 2.5 Flash
-        supports up to 65 536 output tokens).
+        Maximum tokens in the response.  Default 65 535 (Gemini 2.5 Flash Lite
+        supports up to 65 536 output tokens exclusive).
     """
     _setup_credentials()
 

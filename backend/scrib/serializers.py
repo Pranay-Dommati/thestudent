@@ -99,7 +99,6 @@ class GenerateStudyPackRequestSerializer(serializers.Serializer):
         required=False,
     )
     pages = serializers.ListField(
-        child=serializers.ListField(child=serializers.CharField(max_length=255)),
         required=False,
     )
 

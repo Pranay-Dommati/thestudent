@@ -1,5 +1,4 @@
 import base64
-import uuid
 import logging
 
 import requests
@@ -14,46 +13,76 @@ class ImageGenerationError(Exception):
     pass
 
 
-def _build_handwritten_prompt(topic):
+# ──────────────────────────────────────────────
+# Modular prompt architecture
+# ──────────────────────────────────────────────
+
+def build_layout_context(page: dict) -> str:
+    """Build the topic/instruction context portion of the prompt.
+
+    Translates backend packing decisions into layout instructions that
+    GPT-image-2 can act on directly — no abstract complexity scores.
+    """
+    topics = page.get("topics", [])
+
+    lines = ["Topics to include on this page:"]
+    for i, t in enumerate(topics, 1):
+        if isinstance(t, dict):
+            name = (t.get("name") or "").strip()
+            instruction = (t.get("instruction") or "").strip()
+        else:
+            name = str(t).strip()
+            instruction = ""
+
+        if not name:
+            continue
+
+        lines.append(f"\n{i}. {name}")
+        if instruction:
+            lines.append(f"   Instruction: {instruction}")
+
+    n = len([t for t in topics if (t.get("name") if isinstance(t, dict) else str(t)).strip()])
+
+    if n >= 2:
+        lines.append(
+            "\nThis page contains multiple topics. "
+            "Allocate roughly equal space to each topic. "
+            "Keep explanations concise. "
+            "Prefer bullet points over paragraphs. "
+            "Include small diagrams only when educationally useful."
+        )
+    else:
+        lines.append(
+            "\nThis page contains a single topic. "
+            "Use most of the page area. "
+            "Provide deeper explanations, examples, diagrams and formulas where appropriate."
+        )
+
+    return "\n".join(lines)
+
+
+def build_visual_prompt():
     return (
-    "Create a detailed handwritten study note page on a pure white background "
-    "(no lines, no grid, no ruled paper, no notebook texture). "
-    "The page should resemble a high-quality scanned handwritten revision sheet. "
-    "The page is a square 1024×1024 canvas viewed directly from above. "
-    "Distribute content evenly across the page and utilize most of the available space while keeping comfortable margins. "
-    "Avoid concentrating too much content near the bottom of the page. "
+    "Generate a handwritten study notes image for the given topic "
+    "on a clean white page. "
+    "Keep the notes brief, loosely spaced, and easy to read — "
+    "do not fill every space on the page."
+)
 
-    "IMPORTANT LAYOUT RULES: "
-    "The entire note must fit naturally within a single square page. "
-    "Use the page area efficiently while ensuring all content stays comfortably within the visible boundaries. "
-    "Avoid unnecessary empty space. "
-    "Do not place text, formulas, diagrams, headings, or bullet points too close to the edges, especially the bottom edge. "
-    "Maintain consistent spacing between sections. "
-    "If the topic is lengthy, slightly condense explanations or omit less important details rather than overflowing content. "
-    "Never crop, truncate, or cut off any content. "
+def build_prompt(page: dict) -> str:
+    """Merge visual style + layout context into the final prompt.
 
-    "STYLE: "
-    "Include a neat title at the top, moderately larger than section headings but not excessively large. "
-    "Use numbered sections with concise headings. "
-    "Prefer concise bullet points over long paragraphs. "
-    "Handwriting should be neat, medium-sized, readable, and naturally spaced. "
+    Args:
+        page: dict with 'topics' list of {'name': str, 'instruction': str}
+    """
+    visual = build_visual_prompt()
+    context = build_layout_context(page)
+    return visual + "\n\n" + context
 
-    "COLOR SCHEME: "
-    "Use a visually pleasing but restrained handwritten color scheme. "
-    "Write most body text in dark blue or black ink. "
-    "Use purple, magenta, or dark blue ink for section headings. "
-    "Use green or teal outlines for boxes, important formulas, and diagrams when appropriate. "
-    "Use accent colors sparingly to improve readability and visual hierarchy, similar to high-quality student revision notes. "
-    "Avoid making the entire page monochromatic. "
-    "The page should remain professional, educational, and naturally handwritten rather than decorative. "
 
-    "VISUALS: "
-    "Include small neat diagrams, illustrations, or boxed formulas only when they add educational value. "
-    "Boxes and diagrams should be clean, compact, and integrated naturally into the layout. "
-
-    f"Topic: {topic}."
-    )
-
+# ──────────────────────────────────────────────
+# OpenAI image generation
+# ──────────────────────────────────────────────
 
 def _openai_image_bytes(prompt):
     if getattr(settings, 'SCRIB_FAKE_GENERATION', False):
@@ -65,7 +94,6 @@ def _openai_image_bytes(prompt):
         raise ImageGenerationError('OPENAI_API_KEY is not configured')
 
     # gpt-image-2 returns b64_json by default and does NOT accept response_format.
-    # DALL-E 2/3 accept response_format but gpt-image-2 rejects it as unknown.
     payload = {
         'model': settings.OPENAI_IMAGE_MODEL,
         'prompt': prompt,
@@ -123,31 +151,49 @@ def _openai_image_bytes(prompt):
     raise ImageGenerationError('Image generation returned no b64_json and no url')
 
 
+# ──────────────────────────────────────────────
+# Storage helpers
+# ──────────────────────────────────────────────
+
 def _save_image_bytes(image_bytes):
     """Save image locally for testing generation without S3."""
     import uuid as _uuid
-    from django.core.files.base import ContentFile
-    from django.core.files.storage import default_storage
     filename = f"scrib/notes/{_uuid.uuid4().hex}.png"
     content = ContentFile(image_bytes)
     saved_path = default_storage.save(filename, content)
-    
-    # In development, the URL might not be fully qualified, so we return the path 
-    # to be combined with the request host in the view.
     return default_storage.url(saved_path)
 
 
-def generate_handwritten_note(prompt):
-    full_prompt = _build_handwritten_prompt(prompt)
-    image_bytes = _openai_image_bytes(full_prompt)
+# ──────────────────────────────────────────────
+# Public API — new page-based interface
+# ──────────────────────────────────────────────
+
+def generate_handwritten_image_bytes_page(page: dict) -> bytes:
+    """Generate image bytes for a page object.
+
+    Args:
+        page: dict with 'topics': [{'name': str, 'instruction': str}, ...]
+    """
+    return _openai_image_bytes(build_prompt(page))
+
+
+# ──────────────────────────────────────────────
+# Legacy API — kept for backward compatibility
+# ──────────────────────────────────────────────
+
+def generate_handwritten_image_bytes(topic: str) -> bytes:
+    """Legacy single-topic wrapper. Wraps into a page dict internally."""
+    page = {"topics": [{"name": str(topic), "instruction": ""}]}
+    return generate_handwritten_image_bytes_page(page)
+
+
+def generate_handwritten_note(prompt: str) -> dict:
+    """Legacy single-topic function. Kept for backward compat."""
+    page = {"topics": [{"name": str(prompt), "instruction": ""}]}
+    image_bytes = generate_handwritten_image_bytes_page(page)
     image_url = _save_image_bytes(image_bytes)
     return {
         'image_url': image_url,
         'model': settings.OPENAI_IMAGE_MODEL,
         'bytes': image_bytes,
     }
-
-
-def generate_handwritten_image_bytes(topic):
-    full_prompt = _build_handwritten_prompt(topic)
-    return _openai_image_bytes(full_prompt)

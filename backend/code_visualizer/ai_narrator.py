@@ -153,7 +153,7 @@ class AINarrator:
             try:
                 self.client = genai.Client(api_key=GEMINI_API_KEY)
                 self.is_available = True
-                print("[SUCCESS] AI Narrator initialized with Gemini 2.5 Flash")
+                print("[SUCCESS] AI Narrator initialized with Gemini 2.5 Flash Lite")
             except Exception as e:
                 print(f"[WARNING] AI Narrator initialization failed: {e}")
                 self.is_available = False
@@ -337,7 +337,7 @@ class AINarrator:
         # ===== CALL AI - NO TRY/EXCEPT =====
         # If this fails, we WANT to see the error
         response = self.client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.5-flash-lite',
             contents=prompt,
             config=types.GenerateContentConfig(
                 system_instruction=NARRATOR_SYSTEM_PROMPT,

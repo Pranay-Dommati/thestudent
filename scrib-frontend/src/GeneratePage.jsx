@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from './context/AuthContext'
@@ -13,23 +13,7 @@ import { usePostHog } from '@posthog/react'
 import { useGoogleAuth } from './hooks/useGoogleAuth'
 import { startPaymentFlow } from './services/paymentService'
 
-const parseTopics = (text) => {
-  if (!text) return []
-  return text
-    .split(/\n|,/)
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
 
-const chunkTopics = (items, size) => {
-  const chunks = []
-  for (let i = 0; i < items.length; i += size) {
-    chunks.push(items.slice(i, i + size))
-  }
-  return chunks
-}
-
-const MAX_TOPICS = 8
 
 const GeneratePage = () => {
   const { user, logout, isLoggedIn, loading, googleLogin, refreshUser } = useAuth()
@@ -92,42 +76,40 @@ const GeneratePage = () => {
       },
     })
   }
+  const MAX_PAGES = 8
+  const MAX_TOPICS_PER_PAGE = 3
+
   const [mode, setMode] = useState(() => sessionStorage.getItem('scrib_draft_mode') || 'manual')
-  const [topics, setTopics] = useState(() => {
-    const saved = sessionStorage.getItem('scrib_draft_topics')
-    return saved ? JSON.parse(saved) : []
+
+  // v2 state: array of page objects {topics: [{name, instruction}]}
+  const [pages, setPages] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('scrib_draft_pages_v2')
+      return saved ? JSON.parse(saved) : [{ topics: [{ name: '', instruction: '' }] }]
+    } catch { return [{ topics: [{ name: '', instruction: '' }] }] }
   })
-  const [newTopic, setNewTopic] = useState('')
-  const [highlightAddBtn, setHighlightAddBtn] = useState(false)
   const [pasteText, setPasteText] = useState(() => sessionStorage.getItem('scrib_draft_paste') || '')
+  const [remainingTopics, setRemainingTopics] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('scrib_draft_remaining')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
 
   // Sync draft state to sessionStorage
   useEffect(() => {
     sessionStorage.setItem('scrib_draft_mode', mode)
-    sessionStorage.setItem('scrib_draft_topics', JSON.stringify(topics))
+    sessionStorage.setItem('scrib_draft_pages_v2', JSON.stringify(pages))
     sessionStorage.setItem('scrib_draft_paste', pasteText)
-  }, [mode, topics, pasteText])
+    sessionStorage.setItem('scrib_draft_remaining', JSON.stringify(remainingTopics))
+  }, [mode, pages, pasteText, remainingTopics])
   const [isOrganizing, setIsOrganizing] = useState(false)
-  const [isOrganized, setIsOrganized] = useState(false)
-  const [aiGroups, setAiGroups] = useState([])
-  const [aiMeta, setAiMeta] = useState(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [latestCreditBalance, setLatestCreditBalance] = useState(null)
-  const [showBuyModal, setShowBuyModal] = useState(false)
   const [processingPack, setProcessingPack] = useState(null)
-  
-  // Loading states for actions
   const [loadingItemId, setLoadingItemId] = useState(null)
   const [downloadingItemId, setDownloadingItemId] = useState(null)
-  
-  const [generatedNote, setGeneratedNote] = useState(null)
-  const [generatedPack, setGeneratedPack] = useState(null)
-  const [generationNotice, setGenerationNotice] = useState('')
-  const [dragGroup, setDragGroup] = useState(null)
-  const [editingIndex, setEditingIndex] = useState(null)
   const [invalidTopics, setInvalidTopics] = useState([])
-  const [addingToGroupIndex, setAddingToGroupIndex] = useState(null)
-  const [newGroupTopic, setNewGroupTopic] = useState('')
   const [aiGeneratedWarning, setAiGeneratedWarning] = useState(false)
   const location = useLocation()
   
@@ -139,10 +121,7 @@ const GeneratePage = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [openDropdownId, setOpenDropdownId] = useState(null)
   const [shareModalData, setShareModalData] = useState(null)
-  const [imageLoaded, setImageLoaded] = useState(false)
-  const [showNotice, setShowNotice] = useState(true)
   const [hideBanner, setHideBanner] = useState(false)
-  const overflowRef = useRef(null)
 
   // Sync active tab if URL changes
   useEffect(() => {
@@ -378,7 +357,6 @@ const GeneratePage = () => {
   }, [location.state])
 
 
-  const detectedTopics = useMemo(() => parseTopics(pasteText), [pasteText])
 
   const handleOrganizeTopics = async () => {
     const trimmed = pasteText.trim()
@@ -386,33 +364,33 @@ const GeneratePage = () => {
       customToast.error('Please paste some syllabus text first.')
       return
     }
-
     setIsOrganizing(true)
     try {
-      const response = await axiosInstance.post('/scrib/parse-syllabus/', {
-        syllabus: trimmed
-      })
-      
-      const parsedTopics = response.data
-      
-      if (!Array.isArray(parsedTopics) || !parsedTopics.length) {
-         throw new Error('AI returned an empty or invalid array')
-      }
+      // Step 1: Parse raw topics from pasted text
+      const parseRes = await axiosInstance.post('/scrib/parse-syllabus/', { syllabus: trimmed })
+      const rawTopics = parseRes.data
+      if (!Array.isArray(rawTopics) || !rawTopics.length) throw new Error('No topics found')
 
-      setTopics(parsedTopics)
+      // Step 2: Enrich + pack via organize-topics (2-step pipeline)
+      const organizeRes = await axiosInstance.post('/scrib/organize-topics/', { topics: rawTopics })
+      const groups = organizeRes.data?.groups
+      if (!Array.isArray(groups) || !groups.length) throw new Error('Empty groups')
+
+      // groups is already v2 format: [{topics: [{name, instruction}]}, ...]
+      // Cap at MAX_PAGES
+      const organized = groups.slice(0, MAX_PAGES)
+      setPages(organized)
+      
+      const extraGroups = groups.slice(MAX_PAGES)
+      const extraTopics = extraGroups.flatMap(g => g.topics.map(t => t.name))
+      setRemainingTopics(extraTopics)
       setMode('manual')
       setPasteText('')
       setAiGeneratedWarning(true)
-      customToast.success('Topics organized successfully!')
-      // Auto-scroll to overflow section after a short delay so React re-renders first
-      setTimeout(() => {
-        if (parsedTopics.length > MAX_TOPICS && overflowRef.current) {
-          overflowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
-      }, 350)
+      customToast.success(`Organized into ${organized.length} page${organized.length !== 1 ? 's' : ''}!`)
     } catch (error) {
       console.error(error)
-      customToast.error('Failed to organize topics using AI. Please try again.')
+      customToast.error('Failed to organize topics. Please try again.')
     } finally {
       setIsOrganizing(false)
     }
@@ -422,99 +400,75 @@ const GeneratePage = () => {
     const params = new URLSearchParams(location.search)
     const incoming = params.get('topic')
     if (!incoming) return
-    const parsed = parseTopics(incoming)
-    if (parsed.length) {
+    const names = incoming.split(/\n|,/).map(s => s.trim()).filter(Boolean)
+    if (names.length) {
       setMode('manual')
-      setTopics(parsed)
+      setPages([{ topics: names.map(n => ({ name: n, instruction: '' })) }])
     }
   }, [location.search])
 
-  const handleAddTopic = () => {
-    const trimmed = newTopic.trim()
-    if (!trimmed) return
-    if (topics.length >= MAX_TOPICS) {
-      customToast.error(`Max ${MAX_TOPICS} topics per generation. Generate this batch first, then add more.`, { id: 'max-topics', duration: 4000 })
-      return
-    }
-    setTopics((prev) => [...prev, trimmed])
-    setNewTopic('')
-    setInvalidTopics([])
+  // ── Page builder helpers ────────────────────────────────────────────────
+  const validPages = pages
+    .map(p => ({ ...p, topics: (p.topics || []).filter(t => t.name.trim()) }))
+    .filter(p => p.topics.length > 0)
+
+  const addPage = () => {
+    if (pages.length >= MAX_PAGES) return
+    setPages(prev => [...prev, { topics: [{ name: '', instruction: '' }] }])
   }
 
-  const handleTopicChange = (value, index) => {
-    setTopics((prev) => prev.map((item, idx) => (idx === index ? value : item)))
-    setInvalidTopics([])
+  const removePage = (pi) => {
+    setPages(prev => prev.length === 1 ? [{ topics: [{ name: '', instruction: '' }] }] : prev.filter((_, i) => i !== pi))
   }
 
-  const handleRemoveTopic = (index) => {
-    setTopics((prev) => prev.filter((_, idx) => idx !== index))
-    setInvalidTopics([])
+  const addTopicToPage = (pi) => {
+    setPages(prev => prev.map((p, i) => {
+      if (i !== pi || p.topics.length >= MAX_TOPICS_PER_PAGE) return p
+      return { ...p, topics: [...p.topics, { name: '', instruction: '' }] }
+    }))
   }
 
-  const handleEditTopic = (event) => {
-    const row = event.currentTarget.closest('[data-topic-row]')
-    const input = row ? row.querySelector('input') : null
-    const index = row ? Number.parseInt(row.dataset.topicIndex, 10) : null
-    if (Number.isInteger(index)) {
-      setEditingIndex(index)
-    }
-    if (input) {
-      input.focus()
-      input.select()
-    }
+  const removeTopicFromPage = (pi, ti) => {
+    setPages(prev => prev.map((p, i) => {
+      if (i !== pi) return p
+      const filtered = p.topics.filter((_, j) => j !== ti)
+      return { ...p, topics: filtered.length ? filtered : [{ name: '', instruction: '' }] }
+    }))
   }
 
-  const baseTopics = useMemo(
-    () => (mode === 'paste' ? detectedTopics : topics).map((item) => item.trim()).filter(Boolean).slice(0, MAX_TOPICS),
-    [mode, detectedTopics, topics],
-  )
-
-  const overflowTopics = useMemo(
-    () => (mode === 'paste' ? detectedTopics : topics).map((item) => item.trim()).filter(Boolean).slice(MAX_TOPICS),
-    [mode, detectedTopics, topics],
-  )
+  const updateTopicField = (pi, ti, field, value) => {
+    setPages(prev => prev.map((p, i) => {
+      if (i !== pi) return p
+      return { ...p, topics: p.topics.map((t, j) => j === ti ? { ...t, [field]: value } : t) }
+    }))
+  }
 
   const handleGenerate = async () => {
     if (!isLoggedIn) {
       customToast.error('Please log in to generate notes.', { id: 'gen-login' })
       return
     }
-
     if (isGenerating) return
 
-    const sourceTopics = mode === 'paste' ? detectedTopics : topics
-    const cleanedTopics = sourceTopics.map((item) => item.trim()).filter(Boolean).slice(0, MAX_TOPICS)
-
-    if (!cleanedTopics.length) {
-      if (mode === 'manual' && newTopic.trim()) {
-        customToast.error('Please click "Add" to confirm your topic first.', { id: 'gen-error' })
-        setHighlightAddBtn(true)
-        setTimeout(() => setHighlightAddBtn(false), 2000)
-      } else {
-        customToast.error('Add at least one topic to generate a note.', { id: 'gen-error' })
-      }
+    if (!validPages.length) {
+      customToast.error('Add at least one topic to generate.', { id: 'gen-error' })
       return
     }
 
     setIsGenerating(true)
 
+    // Flatten all topic names for moderation check
+    const allTopicNames = validPages.flatMap(p => p.topics.map(t => t.name))
+
     // Moderation Check
     try {
-      const response = await axiosInstance.post('/scrib/moderate-topics/', {
-        topics: cleanedTopics
-      })
-      
+      const response = await axiosInstance.post('/scrib/moderate-topics/', { topics: allTopicNames })
       const moderationFlags = response.data.moderation || []
       const isValid = moderationFlags.every((flag) => flag === true)
-
       if (!isValid) {
-        const badTopics = cleanedTopics.filter((_, idx) => moderationFlags[idx] === false)
-        if (mode === 'paste') {
-          setTopics(cleanedTopics)
-          setMode('manual')
-        }
-        setInvalidTopics(badTopics.length > 0 ? badTopics : cleanedTopics)
-        customToast.error('One or more topics violate our content policy (NSFW/Hate Speech). Please revise your topics.', { id: 'gen-error', duration: 5000 })
+        const badTopics = allTopicNames.filter((_, idx) => moderationFlags[idx] === false)
+        setInvalidTopics(badTopics.length > 0 ? badTopics : allTopicNames)
+        customToast.error('One or more topics violate our content policy. Please revise.', { id: 'gen-error', duration: 5000 })
         setIsGenerating(false)
         return
       }
@@ -522,96 +476,67 @@ const GeneratePage = () => {
       console.error('Moderation check failed', err)
     }
 
-    setGeneratedNote(null)
-    setGeneratedPack(null)
-    setGenerationNotice('')
-    setImageLoaded(false)
 
-    const packTitle = cleanedTopics.length === 1 
-      ? cleanedTopics[0] 
-      : `${cleanedTopics[0]} +${cleanedTopics.length - 1}`
-
-    const creditsNeeded = cleanedTopics.length
+    const creditsNeeded = validPages.length
     const currentCredits = latestCreditBalance ?? user?.credit_balance ?? 0
-
     if (currentCredits < creditsNeeded) {
-      customToast.error('Please add credits first to generate this note.', { id: 'gen-error' })
+      customToast.error('Please add credits first.', { id: 'gen-error' })
       navigate('/pricing')
       return
     }
 
-    // Switch to history tab immediately and add a pending item
+    const firstTopicName = validPages[0]?.topics[0]?.name || 'Study Pack'
+    const packTitle = validPages.length === 1
+      ? firstTopicName
+      : `${firstTopicName} +${validPages.length - 1}`
+
     setActiveTab('history')
     const tempId = `pending-${Date.now()}`
-    const tempItem = {
-      id: tempId,
-      type: 'pack',
-      name: packTitle,
-      created_at: new Date().toISOString(),
-      status: 'pending',
-      total_pages: cleanedTopics.length,
-      credits_used: cleanedTopics.length,
-      _displayDate: 'Generating...',
-      _isPending: true
-    }
-    setHistoryItems((prev) => [tempItem, ...prev])
+    setHistoryItems(prev => [{
+      id: tempId, type: 'pack', name: packTitle,
+      created_at: new Date().toISOString(), status: 'pending',
+      total_pages: validPages.length, credits_used: creditsNeeded,
+      _displayDate: 'Generating...', _isPending: true
+    }, ...prev])
 
     posthog?.capture('note_generation_started', {
-      topic_count: cleanedTopics.length,
-      credits_cost: cleanedTopics.length,
-      pack_title: packTitle,
+      page_count: validPages.length, credits_cost: creditsNeeded, pack_title: packTitle,
     })
 
     try {
-      // One topic per page
-      const pages = cleanedTopics.map(topic => [topic])
-      const payload = { title: packTitle, pages }
-
-      // Request notification permission if they haven't yet
+      // v2 payload: pages array of page objects
+      const payload = { title: packTitle, pages: validPages }
       requestNotificationPermission()
-
       const response = await axiosInstance.post('/scrib/generate-study-pack/', payload)
       const data = response.data || {}
 
-      if (typeof data.credit_balance === 'number') {
-        setLatestCreditBalance(data.credit_balance)
-      }
+      if (typeof data.credit_balance === 'number') setLatestCreditBalance(data.credit_balance)
 
       posthog?.capture('note_generation_completed', {
-        topic_count: cleanedTopics.length,
-        credits_used: cleanedTopics.length,
-        pack_title: packTitle,
+        page_count: validPages.length, credits_used: creditsNeeded, pack_title: packTitle,
       })
 
-      // Now it returns 202 Accepted instantly
-      customToast.success('Generation started! We will notify you when it is ready.')
+      customToast.success('Generation started! We\'ll notify you when it\'s ready.')
       setHideBanner(false)
-      // Small delay to ensure the backend has committed the new pack
-      // before we refresh the history list
       setTimeout(() => {
         setHistoryItems(prev => prev.filter(item => item.id !== tempId))
         loadHistory()
-        // Clear draft state so the next generation starts fresh
-        setTopics([])
+        // Reset to blank page
+        setPages([{ topics: [{ name: '', instruction: '' }] }])
         setPasteText('')
         setMode('manual')
       }, 800)
     } catch (error) {
-      // Remove the pending item if request fails
       setHistoryItems(prev => prev.filter(item => item.id !== tempId))
-      setActiveTab('generate') // Switch back to generate tab so they aren't stuck on history
-
+      setActiveTab('generate')
       posthog?.capture('note_generation_failed', {
-        topic_count: cleanedTopics.length,
-        error_status: error?.response?.status,
+        page_count: validPages.length, error_status: error?.response?.status,
       })
-
       if (error?.response?.status === 402) {
-        customToast.error('Please add credits first to generate this note.', { id: 'gen-error' })
+        customToast.error('Please add credits first.', { id: 'gen-error' })
         navigate('/pricing')
       } else {
-        const message = error?.response?.data?.message || 'Generation failed. Please try again.'
-        customToast.error(message, { id: 'gen-error' })
+        customToast.error(error?.response?.data?.message || 'Generation failed. Please try again.', { id: 'gen-error' })
       }
     } finally {
       setIsGenerating(false)
@@ -747,28 +672,16 @@ const GeneratePage = () => {
                     </div>
                  </div>
                 )}
-                {showNotice && (
-                  <div className="hidden md:flex mt-3 items-start gap-3 rounded-lg bg-[#fcf9f4] border border-[#e2dbd2] p-3 text-xs text-[#5f5a54] relative pr-10">
-                    <span className="flex items-start gap-2">
-                      <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#8a847c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M12 16v-4" />
-                        <path d="M12 8h.01" />
-                      </svg>
-                      Every topic added becomes a separate page in the PDF and costs 1 credit.
-                    </span>
-                    <button onClick={() => setShowNotice(false)} className="absolute right-3.5 top-3 text-[#a39b92] hover:text-[#1f1f1f]">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
+                <div className="hidden md:flex mt-3 items-start gap-2 rounded-xl border border-[#dde8c3] bg-[#f4f9eb] px-3 py-2.5 text-xs text-[#4a6e30]">
+                  <svg className="mt-0.5 shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
+                  </svg>
+                  <span>We recommend <strong>1–2 topics per page</strong> for detailed notes. Up to 3 concise topics can fit comfortably on a single page.</span>
+                </div>
               </div>
 
           <div className="px-1 py-4 md:px-6 md:py-5">
-            <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 mb-6 md:mb-0">
+            <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 mb-5">
               <button
                 onClick={() => setMode('manual')}
                 className={`rounded-xl md:rounded-full border px-4 py-3 md:py-2 text-sm md:text-xs font-medium md:font-semibold transition-colors ${
@@ -777,7 +690,7 @@ const GeneratePage = () => {
                     : 'border-[#d9d1c7] bg-white text-[#5f5a54] hover:bg-[#f5f2ec]'
                 }`}
               >
-                Add topics
+                Build manually
               </button>
               <button
                 onClick={() => setMode('paste')}
@@ -792,312 +705,237 @@ const GeneratePage = () => {
             </div>
 
             {mode === 'manual' ? (
-              <>
-                <div className="mb-3 md:hidden flex items-center justify-between mt-4">
-                  <span className="text-[11px] font-bold tracking-widest text-[#a39b92] uppercase">
-                    TOPICS · {Math.min(topics.length, MAX_TOPICS)}/{MAX_TOPICS}
-                  </span>
-                  {topics.length >= MAX_TOPICS && (
-                    <span className="rounded-full bg-[#fdf2df] border border-[#f3d9a9] px-2 py-0.5 text-[10px] font-bold text-[#b47a26]">
-                      Limit reached
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-0 md:mt-4 flex flex-col gap-3 md:gap-0 md:rounded-xl md:border md:border-[#ded6cc]">
-                  {topics.slice(0, MAX_TOPICS).map((topic, index) => (
-                    <div
-                      key={`topic-${index}`}
-                      className={`flex items-center gap-3 rounded-xl md:rounded-none border md:border-x-0 md:border-t-0 md:border-b p-3 md:px-4 md:py-3 last:border-b-0 shadow-sm md:shadow-none ${
-                        invalidTopics.includes(topic.trim())
-                          ? 'border-red-500 bg-red-50 md:border-red-500'
-                          : 'border-[#e2dbd2] md:border-[#efe7dd] bg-white md:bg-transparent'
-                      }`}
-                      data-topic-row
-                      data-topic-index={index}
-                    >
-                      <span className="flex h-7 w-7 md:h-6 md:w-6 shrink-0 items-center justify-center rounded-lg md:rounded-full bg-[#f5f2ec] md:bg-transparent md:border md:border-[#d9d1c7] text-xs font-semibold md:font-medium text-[#8a847c] md:text-[#6b655d]">
-                        {index + 1}
-                      </span>
-                      <input
-                        id={`topic-input-${index}`}
-                        className={`w-full text-sm outline-none cursor-pointer ${
-                          editingIndex === index
-                            ? 'rounded-md border border-[#e0d9ce] bg-white px-2 py-1 text-[#1f1f1f] cursor-text'
-                            : 'border-none bg-transparent text-[#6b655d]'
-                        }`}
-                        value={topic}
-                        onChange={(event) => handleTopicChange(event.target.value, index)}
-                        onFocus={() => {
-                          if (editingIndex !== index) setEditingIndex(index)
-                        }}
-                        onBlur={(e) => {
-                          const row = e.currentTarget.closest('[data-topic-row]')
-                          if (row && row.contains(e.relatedTarget)) return
-                          setEditingIndex(null)
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            setEditingIndex(null)
-                          }
-                          if (event.key === 'Escape') {
-                            setEditingIndex(null)
-                          }
-                        }}
-                      />
-                      <div className="flex items-center gap-2">
-                        {editingIndex === index ? (
-                          <button
-                            type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setEditingIndex(null)
-                            }}
-                            className="rounded-full border border-[#1f1f1f] bg-[#1f1f1f] p-1 text-white flex-shrink-0"
-                            aria-label="Save topic"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setEditingIndex(index)
-                              setTimeout(() => {
-                                document.getElementById(`topic-input-${index}`)?.focus()
-                              }, 0)
-                            }}
-                            className="p-1 text-[#a39b92] transition-colors hover:text-[#1f1f1f] rounded-full border border-[#e0d9ce] bg-white flex-shrink-0"
-                            aria-label="Edit topic"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M12 20h9" />
-                              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                            </svg>
-                          </button>
-                        )}
+              <div className="flex flex-col gap-4">
+                {pages.map((page, pi) => (
+                  <div key={pi} className="rounded-xl border border-[#e2dbd2] bg-white overflow-hidden shadow-sm">
+                    {/* Page header */}
+                    <div className="flex items-center justify-between border-b border-[#eee6dc] bg-[#faf8f4] px-4 py-2.5">
+                      <span className="text-xs font-bold text-[#7b756d] uppercase tracking-wider">Page {pi + 1}</span>
+                      {pages.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => handleRemoveTopic(index)}
-                          className="p-1 text-[#a39b92] transition-colors hover:text-[#dc2626] md:rounded-full md:border md:border-[#e0d9ce] md:bg-white"
-                          aria-label="Remove topic"
+                          onClick={() => removePage(pi)}
+                          className="text-[#a39b92] hover:text-[#dc2626] transition-colors text-xs flex items-center gap-1"
                         >
-                          <svg className="md:hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
                           </svg>
-                          <svg className="hidden md:block" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="9" />
-                            <line x1="8" y1="12" x2="16" y2="12" />
-                          </svg>
+                          Remove page
                         </button>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Add row — hidden when at limit */}
-                  {topics.length < MAX_TOPICS ? (
-                    <div className="mt-3 md:mt-0 flex items-center gap-3 rounded-xl border border-dashed border-[#d9d1c7] md:border-solid md:border-x-0 md:border-b-0 md:border-t md:border-[#efe7dd] bg-white md:bg-transparent px-3 py-3 md:px-4 md:py-3 shadow-sm md:shadow-none">
-                      <span className="text-[#a39b92] md:text-[#1f1f1f] text-base font-medium md:font-normal pl-1 pr-1">+</span>
-                      <input
-                        className="flex-1 bg-transparent py-2 md:p-0 text-sm md:text-xs text-[#1f1f1f] outline-none placeholder:text-[#a39b92]"
-                        placeholder={topics.length === 0 ? 'Add a topic...' : 'Add another topic...'}
-                        value={newTopic}
-                        onChange={(event) => setNewTopic(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault()
-                            handleAddTopic()
-                          }
-                        }}
-                      />
-                      <button
-                        onClick={handleAddTopic}
-                        className={`rounded-lg md:rounded-full border px-4 py-2 md:px-3 md:py-1 text-sm md:text-xs font-medium md:font-semibold transition-all duration-300 ${
-                          highlightAddBtn
-                            ? 'border-red-500 bg-red-50 text-red-600 shadow-[0_0_10px_rgba(239,68,68,0.5)] scale-110'
-                            : newTopic.trim()
-                              ? 'border-[#1f1f1f] bg-[#1f1f1f] text-white md:border-[#d9d1c7] md:bg-white md:text-[#1f1f1f]'
-                              : 'border-[#f0ece5] md:border-[#d9d1c7] bg-transparent md:bg-white text-[#cfc7bd] md:text-[#5a554f]'
-                        }`}
-                      >
-                        Add
-                      </button>
-                    </div>
-                  ) : (
-                    /* Limit reached row — hidden on mobile when overflow section already explains it */
-                    <div className={`mt-3 md:mt-0 flex items-center gap-2 rounded-xl border border-[#f3d9a9] bg-[#fdf9f0] px-3 py-2.5 shadow-sm md:shadow-none md:border-x-0 md:border-b-0 md:border-t md:rounded-none ${
-                      overflowTopics.length > 0 ? 'hidden md:flex' : 'flex'
-                    }`}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b47a26" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                      </svg>
-                      <p className="flex-1 text-xs text-[#b47a26] font-medium">
-                        <span className="font-bold">Limit reached (8/8).</span> Generate this batch, then start a new generation.
-                      </p>
-                    </div>
-                  )}
-                </div>
-                {aiGeneratedWarning && (
-                  <p className="mt-2 text-xs text-[#8a847c]">AI makes mistakes so recheck once.</p>
-                )}
-
-                {/* Overflow topics — shown dimmed when AI returns >8 topics */}
-                {overflowTopics.length > 0 && (
-                  <div className="mt-4">
-                    {/* Divider with next-batch label — ref here so centering it shows active topics above */}
-                    <div ref={overflowRef} className="flex items-center gap-3 mb-3">
-                      <div className="flex-1 h-px bg-[#e2dbd2]" />
-                      <span className="text-[10px] font-bold tracking-wider uppercase text-[#a39b92] whitespace-nowrap px-1 text-center">
-                        {overflowTopics.length} remaining — generate as next batch
-                      </span>
-                      <div className="flex-1 h-px bg-[#e2dbd2]" />
+                      )}
                     </div>
 
-                    {/* Info banner */}
-                    <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-[#dbe8c3] bg-[#eef7df] px-3 py-2.5 text-xs text-[#557a3f]">
-                      <svg className="mt-0.5 shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
-                      </svg>
-                      <span>
-                        You can generate up to 8 topics at a time.{' '}
-                        <span className="font-semibold">Copy the {overflowTopics.length} remaining topic{overflowTopics.length !== 1 ? 's' : ''} below</span>{' '}
-                        and generate them as your next batch.
-                      </span>
-                    </div>
-
-                    {/* Copy remaining button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(overflowTopics.join(', '))
-                        customToast.success('Remaining topics copied! Paste them in your next generation.', { duration: 4000 })
-                      }}
-                      className="mb-3 flex items-center gap-1.5 rounded-full border border-[#d9d1c7] bg-white px-3 py-1.5 text-xs font-semibold text-[#5f5a54] hover:bg-[#f5f2ec] transition-colors"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                      </svg>
-                      Copy remaining {overflowTopics.length} topics
-                    </button>
-
-                    {/* Dimmed overflow topic list */}
-                    <div className="flex flex-col gap-2 opacity-40 select-none pointer-events-none">
-                      {overflowTopics.map((topic, i) => (
-                        <div
-                          key={`overflow-${i}`}
-                          className="flex items-center gap-3 rounded-xl border border-[#e2dbd2] bg-white px-3 py-2.5 md:px-4 md:py-3"
-                        >
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#d9d1c7] text-xs font-medium text-[#8a847c]">
-                            {MAX_TOPICS + i + 1}
-                          </span>
-                          <span className="flex-1 text-sm text-[#6b655d] line-clamp-1">{topic}</span>
-                          <span className="rounded-full bg-[#f5f2ec] px-2 py-0.5 text-[9px] font-bold tracking-wider text-[#a39b92] uppercase whitespace-nowrap">
-                            Next batch
-                          </span>
+                    {/* Topics */}
+                    <div className="divide-y divide-[#f0ece5]">
+                      {page.topics.map((topic, ti) => (
+                        <div key={ti} className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#f0ece5] text-[10px] font-semibold text-[#7b756d]">{ti + 1}</span>
+                            <input
+                              className={`flex-1 rounded-lg border px-2.5 py-1.5 text-sm outline-none transition-colors ${
+                                invalidTopics.includes(topic.name.trim())
+                                  ? 'border-red-400 bg-red-50 focus:border-red-500'
+                                  : 'border-[#e0d9ce] bg-white focus:border-[#9b93e7] focus:ring-1 focus:ring-[#9b93e7]/20'
+                              }`}
+                              placeholder={ti === 0 ? 'Topic name...' : 'Another topic...'}
+                              value={topic.name}
+                              onChange={e => updateTopicField(pi, ti, 'name', e.target.value)}
+                            />
+                            {page.topics.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeTopicFromPage(pi, ti)}
+                                className="text-[#c0b8b0] hover:text-[#dc2626] transition-colors"
+                                aria-label="Remove topic"
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                          <div className="mt-1.5 ml-7">
+                            <input
+                              className="w-full rounded-lg border border-[#e2dbd2] bg-white px-2.5 py-1.5 text-xs text-[#5f5a54] outline-none placeholder:text-[#a39b92] focus:border-[#9b93e7] focus:ring-1 focus:ring-[#9b93e7]/20 transition-all shadow-sm"
+                              placeholder="Optional instruction (e.g. Examples only, Definitions only...)"
+                              value={topic.instruction}
+                              onChange={e => updateTopicField(pi, ti, 'instruction', e.target.value)}
+                            />
+                          </div>
                         </div>
                       ))}
                     </div>
+
+                    {/* Add topic to page */}
+                    <div className="px-4 py-2.5 border-t border-[#f0ece5] bg-[#fdfcfa] flex justify-end">
+                      {page.topics.length < MAX_TOPICS_PER_PAGE ? (
+                        <button
+                          type="button"
+                          onClick={() => addTopicToPage(pi)}
+                          className="flex items-center gap-1.5 rounded-lg border border-[#d9d1c7] bg-white px-3 py-1.5 text-xs font-semibold text-[#5f5a54] hover:border-[#9b93e7] hover:text-[#5a52a0] hover:bg-[#f7f5ff] transition-all shadow-sm"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                          </svg>
+                          Add topic
+                          <span className="text-[#b0a9a0] font-normal">({page.topics.length}/{MAX_TOPICS_PER_PAGE})</span>
+                        </button>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-xs text-[#b47a26] font-medium">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                          </svg>
+                          Max 3 topics per page
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add page button */}
+                {pages.length < MAX_PAGES ? (
+                  <button
+                    type="button"
+                    onClick={addPage}
+                    className="flex items-center gap-2 rounded-xl border-2 border-dashed border-[#d9d1c7] px-4 py-3 text-sm text-[#7b756d] hover:border-[#9b93e7] hover:text-[#5a52a0] hover:bg-[#f7f5ff] transition-all font-medium w-full justify-center"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Add page
+                    <span className="text-xs text-[#b0a9a0]">({pages.length}/{MAX_PAGES})</span>
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 rounded-xl border border-[#f3d9a9] bg-[#fdf9f0] px-4 py-3 text-xs text-[#b47a26] font-medium">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                      </svg>
+                      Max 8 pages per generation. Generate this batch first.
+                    </div>
+                    
+                    {remainingTopics.length > 0 && (
+                      <div className="rounded-xl border border-[#e6e2db] bg-[#f9f7f2] p-4 mt-2 shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-[11px] font-semibold tracking-wide text-[#5f5a54] uppercase">
+                            Remaining Excluded Topics ({remainingTopics.length})
+                          </p>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(remainingTopics.join('\n'))
+                              customToast.success('Copied to clipboard!')
+                            }}
+                            className="text-[11px] font-medium text-[#7a746d] hover:text-[#1f1f1f] flex items-center gap-1.5 transition-colors bg-white px-2.5 py-1.5 rounded border border-[#e6e2db] shadow-sm"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Copy for next batch
+                          </button>
+                        </div>
+                        <p className="text-xs text-[#807a73] leading-relaxed max-h-32 overflow-y-auto">
+                          {remainingTopics.join(', ')}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
-              </>
+                {aiGeneratedWarning && (
+                  <p className="text-xs text-[#8a847c] text-center">AI organized these — review and edit before generating.</p>
+                )}
+              </div>
             ) : (
-              <div className="mt-4 rounded-xl border border-[#ded6cc] bg-white md:bg-[#faf8f3] p-4 shadow-sm md:shadow-none">
+              <div className="rounded-xl border border-[#ded6cc] bg-white p-4 shadow-sm">
                 <p className="mb-2 text-xs font-semibold text-[#5f5a54] tracking-wide">
-                  Please add your syllabus topics as comma separated values
+                  Paste your syllabus topics — one per line or comma separated
                 </p>
                 <textarea
                   className="min-h-[120px] w-full resize-none border-none bg-transparent text-sm outline-none"
-                  placeholder="e.g. Blockchain, Cryptography, Merkle Trees, Digital Signatures..."
+                  placeholder="e.g. Explicit Intents, Implicit Intents, Activity Lifecycle, Fragments..."
                   value={pasteText}
-                  onChange={(event) => { setPasteText(event.target.value); setInvalidTopics([]); }}
+                  onChange={e => { setPasteText(e.target.value); setInvalidTopics([]) }}
                 />
                 {pasteText && (
                   <div className="mt-4 flex justify-end">
                     <button
                       onClick={handleOrganizeTopics}
                       disabled={isOrganizing}
-                      className="rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                      className="rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
                     >
-                      {isOrganizing ? 'Organizing...' : 'Organize topics'}
+                      {isOrganizing && (
+                        <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                      )}
+                      {isOrganizing ? 'Organizing...' : '✦ Organize with AI'}
                     </button>
                   </div>
                 )}
               </div>
             )}
 
-            {mode === 'manual' ? (
-              <>
-                <div className="mt-3 hidden md:flex flex-wrap items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-4 text-[#6f6a63]">
-                    <span className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-[#6db05d]" />
-                      Output:{' '}
-                      <span className="font-semibold text-[#1f1f1f]">
-                        PDF - {baseTopics.length} page{baseTopics.length !== 1 ? 's' : ''}
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              </>
-            ) : null}
+            <div className="mt-3 hidden md:flex items-center gap-3 text-xs text-[#6f6a63]">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#6db05d]" />
+                Output: <span className="font-semibold text-[#1f1f1f]">PDF — {validPages.length} page{validPages.length !== 1 ? 's' : ''}</span>
+              </span>
+              {validPages.length > 0 && (
+                <span className="text-[#a39b92]">·</span>
+              )}
+              <span>{validPages.length} credit{validPages.length !== 1 ? 's' : ''} required</span>
+            </div>
 
           </div>
 
           <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col md:static md:flex-row md:flex-wrap md:items-center justify-between gap-2 md:gap-4 border-t border-[#e2dbd2] md:border-[#eee6dc] bg-white md:bg-[#f7f4ee] px-5 py-3 md:py-4 md:px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] md:shadow-none">
-              {/* Mobile Top Row */}
               {mode !== 'paste' && (
                 <div className="flex items-center justify-between md:hidden w-full mb-1">
                   <div className="flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-[#059669]" />
-                    <span className="text-sm font-medium text-[#5f5a54]">PDF · <span className="font-bold text-[#1f1f1f]">{baseTopics.length} pages</span></span>
+                    <span className="text-sm font-medium text-[#5f5a54]">PDF · <span className="font-bold text-[#1f1f1f]">{validPages.length} pages</span></span>
                   </div>
                   <span className="rounded-full bg-[#fdf2df] border border-[#f3d9a9] px-3 py-1 text-[11px] font-semibold text-[#b47a26]">
-                    {baseTopics.length} credits
+                    {validPages.length} credits
                   </span>
                 </div>
               )}
 
-              {/* Desktop Left Side */}
               <div className="hidden md:block">
                 {mode !== 'paste' ? (
                   <>
                     <p className="text-sm font-semibold">
-                      {baseTopics.length} credit{baseTopics.length !== 1 ? 's' : ''}
+                      {validPages.length} credit{validPages.length !== 1 ? 's' : ''}
                     </p>
                     <p className="text-xs text-[#7b756d]">
                       {isLoggedIn ? (
                         <>
                           {creditBalance} credits remaining{' '}
                           <span className="ml-2 rounded-full bg-[#f2e6c9] px-2 py-0.5 text-[10px] font-semibold text-[#7a5a26]">
-                            {Math.max(creditBalance - baseTopics.length, 0)} after
+                            {Math.max(creditBalance - validPages.length, 0)} after
                           </span>
                         </>
                       ) : (
-                        <span className="text-[#a74c4c] font-medium">Sign up to start generating your custom notes!</span>
+                        <span className="text-[#a74c4c] font-medium">Sign up to start generating!</span>
                       )}
                     </p>
                   </>
                 ) : (
                   <p className="text-xs text-[#7b756d]">
-                    {isLoggedIn ? `${creditBalance} credits available` : <span className="text-[#a74c4c] font-medium">Sign up to start generating your custom notes!</span>}
+                    {isLoggedIn ? `${creditBalance} credits available` : <span className="text-[#a74c4c] font-medium">Sign up to start generating!</span>}
                   </p>
                 )}
               </div>
-              
+
               <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
                 <button
                   onClick={
-                    !isLoggedIn 
+                    !isLoggedIn
                       ? handleAuthClick
-                      : (creditBalance < Math.max(1, baseTopics.length))
+                      : (creditBalance < Math.max(1, validPages.length))
                         ? () => navigate('/pricing?next=/generate')
                         : handleGenerate
                   }
@@ -1111,20 +949,20 @@ const GeneratePage = () => {
                   }`}
                 >
                   {isGenerating
-                      ? 'Generating...'
-                      : mode === 'paste'
-                        ? 'Organize topics first'
-                        : !isLoggedIn
-                          ? 'Sign up to Generate'
-                          : (creditBalance < Math.max(1, baseTopics.length))
-                            ? 'Add credits to generate'
-                            : 'Generate PDF'}
+                    ? 'Generating...'
+                    : mode === 'paste'
+                      ? 'Organize topics first'
+                      : !isLoggedIn
+                        ? 'Sign up to Generate'
+                        : (creditBalance < Math.max(1, validPages.length))
+                          ? 'Add credits to generate'
+                          : 'Generate PDF'}
                 </button>
-                
+
                 <p className="mt-0.5 text-center text-[11px] text-[#a39b92] md:hidden">
-                   {mode !== 'paste' 
-                     ? (isLoggedIn ? `${Math.max(creditBalance - baseTopics.length, 0)} credits remaining after` : 'Sign up to generate notes')
-                     : (isLoggedIn ? `${creditBalance} credits available` : 'Sign up to generate notes')}
+                  {mode !== 'paste'
+                    ? (isLoggedIn ? `${Math.max(creditBalance - validPages.length, 0)} credits remaining after` : 'Sign up to generate notes')
+                    : (isLoggedIn ? `${creditBalance} credits available` : 'Sign up to generate notes')}
                 </p>
               </div>
             </div>
