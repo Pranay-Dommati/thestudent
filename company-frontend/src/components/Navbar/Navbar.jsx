@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { HiOutlineAcademicCap, HiOutlineCode, HiMenu, HiX } from 'react-icons/hi';
+import { HiOutlineAcademicCap, HiOutlineCode, HiOutlineDocumentText, HiMenu, HiX } from 'react-icons/hi';
 import { AnimatePresence, motion } from 'framer-motion';
 
 /**
- * Navbar V3 - Minimal "Company" Navbar
- * Desktop: Simple Links.
- * Mobile: Logo + Hamburger -> Right Side Drawer.
+ * Navbar V4 - Scrib-first Navbar
+ * Desktop: Scrib (primary), Courses, Code Visualizer.
+ * Mobile: Logo + Hamburger → Right Side Drawer.
  */
 const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -41,6 +41,15 @@ const Navbar = () => {
 
                     {/* Desktop Navigation */}
                     <div className="hidden md:flex items-center gap-8">
+                        <a
+                            href="https://scrib.easylearnova.com"
+                            className="flex items-center gap-2 text-sm font-semibold text-slate-900 hover:text-amber-600 transition-colors"
+                        >
+                            <HiOutlineDocumentText className="w-5 h-5" />
+                            Scrib
+                            <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full uppercase tracking-wider">New</span>
+                        </a>
+
                         <a
                             href="https://courses.easylearnova.com"
                             className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors"
@@ -103,8 +112,16 @@ const Navbar = () => {
                                     </button>
                                 </div>
 
-                                <div className="space-y-4 flex-1">
+                                <div className="space-y-3 flex-1">
                                     <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Products</div>
+                                    <a
+                                        href="https://scrib.easylearnova.com"
+                                        className="flex items-center gap-4 p-4 rounded-xl bg-slate-900 text-white font-semibold"
+                                    >
+                                        <HiOutlineDocumentText className="w-6 h-6 text-amber-300" />
+                                        <span>Scrib</span>
+                                        <span className="ml-auto text-[10px] font-bold bg-amber-400 text-slate-900 px-2 py-0.5 rounded-full uppercase">New</span>
+                                    </a>
                                     <a
                                         href="https://courses.easylearnova.com"
                                         className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 text-slate-900 font-semibold active:bg-slate-100"

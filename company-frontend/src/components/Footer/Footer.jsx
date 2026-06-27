@@ -1,10 +1,9 @@
 import { Link } from 'react-router-dom';
 
 /**
- * Footer - V3
- * Minimal, Adult.
- * Links only: Courses, Code Visualizer, Privacy, Terms.
- * Removed: About, Contact (per user request).
+ * Footer - V4
+ * Scrib added as primary product link.
+ * Order: Scrib, Courses, Code Visualizer, Privacy, Terms.
  */
 const Footer = () => {
     return (
@@ -19,6 +18,7 @@ const Footer = () => {
 
                     {/* Minimal Links */}
                     <nav className="flex flex-wrap justify-center gap-8 text-sm font-medium text-slate-600">
+                        <a href="https://scrib.easylearnova.com" className="hover:text-slate-900 transition-colors">Scrib</a>
                         <a href="https://courses.easylearnova.com" className="hover:text-slate-900 transition-colors">Courses</a>
                         <a href="https://codevisualizer.easylearnova.com" className="hover:text-slate-900 transition-colors">Code Visualizer</a>
                         <Link to="/privacy-policy" className="hover:text-slate-900 transition-colors">Privacy</Link>

@@ -2,12 +2,9 @@ import {
     HeroSection,
     ProblemsSection,
     TwoProductsSection,
-    // DifferentiatorsSection, // Re-exported but checking if needed in import list if separate file used? 
-    // Wait, I need to make sure I import the new LearningPathsSection.
     FounderSection,
     CTASection
 } from './sections';
-// Need to add LearningPathsSection and DifferentiatorsSection to sections/index.js first
 import LearningPathsSection from './sections/LearningPathsSection';
 import DifferentiatorsSection from './sections/DifferentiatorsSection';
 
@@ -15,26 +12,26 @@ import Footer from '../Footer/Footer';
 import SEO from '../SEO/SEO';
 
 /**
- * HomePage - V3
- * "Learning Systems Company"
+ * HomePage - V4
+ * "Scrib-first" — Scrib is the flagship product.
  * 
  * Order:
- * 1. Hero (No Animation)
- * 2. Problem Split (Fade+Slide)
- * 3. Two Core Products (Staggered)
- * 4. Learning Paths Context (Fade)
- * 5. Differentiators (Fade list)
- * 6. Founder's Truth (Fade)
- * 7. Final Navigation (Fade+Slide)
+ * 1. Hero (Scrib-first CTA + secondary product pills)
+ * 2. Problems (Scrib problem/solution)
+ * 3. How It Works (3-step Scrib flow)
+ * 4. Products (Scrib flagship card + Courses + Code Visualizer)
+ * 5. Differentiators (Why Scrib is different)
+ * 6. Founder's Truth (Updated philosophy)
+ * 7. Final Navigation (Scrib-first CTA)
  * 8. Footer (Static)
  */
 const HomePage = () => {
     return (
         <>
             <SEO
-                title="EasyLearnova - Focused Learning Systems for School & Engineering"
-                description="EasyLearnova builds focused learning systems. Syllabus-aligned courses for school students and visual mental models for engineering students."
-                keywords="EasyLearnova, school courses, engineering learning, code visualization, syllabus aligned, visual learning"
+                title="EasyLearnova – AI Handwritten Exam Notes, School Courses & Code Visualizer"
+                description="EasyLearnova builds focused learning tools. Scrib generates AI handwritten exam notes PDFs instantly. Also: syllabus-aligned school courses and visual code understanding for engineers."
+                keywords="Scrib, EasyLearnova, AI handwritten notes, exam notes PDF, handwritten notes generator, school courses, code visualizer, study tools"
                 canonical="https://easylearnova.com/"
             />
 
@@ -42,9 +39,9 @@ const HomePage = () => {
 
             <ProblemsSection />
 
-            <TwoProductsSection />
-
             <LearningPathsSection />
+
+            <TwoProductsSection />
 
             <DifferentiatorsSection />
 

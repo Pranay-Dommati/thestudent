@@ -1,12 +1,10 @@
-import { Link } from 'react-router-dom';
-import { HiAcademicCap, HiCode } from 'react-icons/hi';
+import { HiAcademicCap, HiCode, HiArrowRight } from 'react-icons/hi';
 import { AnimatedSection } from '../animations';
 
 /**
- * Hero Section - V3
- * "Learning Systems Company" positioning.
- * No AI hype. Clear, product-first routing.
- * Replaced emojis with icons.
+ * Hero Section - V4
+ * Scrib-first positioning. Scrib is the flagship product.
+ * Mobile: fully left-aligned. Desktop: centered.
  */
 const HeroSection = () => {
     return (
@@ -19,70 +17,113 @@ const HeroSection = () => {
                 }} />
             </div>
 
+            {/* SEO: Screen-reader-only H1 for crawlers */}
+            <h1 className="sr-only">
+                EasyLearnova – AI-powered learning tools including Scrib handwritten notes generator, school courses, and code visualizer
+            </h1>
+
             <div className="container mx-auto px-6 py-20 relative z-10">
-                <div className="max-w-4xl mx-auto text-center sm:text-center text-left">
 
-                    {/* SEO: Screen-reader-only H1 for crawlers - always visible in DOM */}
-                    <h1 className="sr-only">
-                        EasyLearnova – Focused Learning Systems for School Students and Engineers
-                    </h1>
-
-                    {/* Main heading: Distinct Mobile vs Desktop Layouts */}
-
-                    {/* MOBILE: Industry Standard Structure (Left aligned, 3 layers) */}
-                    <div className="sm:hidden text-left">
-                        {/* 1. Headline */}
-                        <h2 className="text-4xl font-bold text-slate-900 leading-tight mb-6">
-                            Structured Learning,<br />Built for Students.
-                        </h2>
-
-                        {/* 2. Scope Block (Compact List) */}
-                        <ul className="text-base text-slate-600 space-y-2 mb-4">
-                            <li className="flex items-start gap-2">
-                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                                Syllabus-aligned courses for schools
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-                                Visual code understanding for engineers
-                            </li>
-                        </ul>
-
-                        {/* 3. Tagline (Brand Statement) */}
-                        <p className="text-sm text-slate-500 font-medium mb-8 leading-relaxed">
-                            EasyLearnova builds focused learning systems for real understanding.
-                        </p>
+                {/* ── MOBILE layout (left-aligned throughout) ── */}
+                <div className="sm:hidden text-left max-w-lg">
+                    <div className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-4 py-1.5 mb-8">
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-sm font-medium text-slate-600">New from EasyLearnova</span>
                     </div>
 
-                    {/* DESKTOP: Balanced (Equal Weight) */}
-                    <h2 className="hidden sm:block text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] mb-8 tracking-wide">
-                        <span className="block">Structured Learning for School Students.</span>
-                        <span className="block">Visual Code Understanding for Engineers.</span>
+                    <h2 className="text-4xl font-bold text-slate-900 leading-tight mb-4">
+                        AI Handwritten<br />Exam Notes,<br />Instantly.
                     </h2>
-
-                    {/* Subheading (Desktop Only now, since Mobile has its own Tagline) */}
-                    <p className="hidden sm:block text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto mb-10 leading-relaxed font-normal">
-                        EasyLearnova builds focused learning systems for real understanding.
+                    <p className="text-base text-slate-500 mb-2 leading-relaxed">
+                        Type any topic. Get a ready-to-print handwritten PDF in seconds.
+                    </p>
+                    <p className="text-sm text-slate-400 font-medium mb-8">
+                        Introducing <span className="text-slate-700 font-semibold">Scrib</span> — our flagship AI product.
                     </p>
 
-                    {/* CTA Buttons - Mobile: Vertical Stack, Desktop: Horizontal */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-6">
+                    <a
+                        href="https://scrib.easylearnova.com"
+                        className="w-full py-4 px-8 bg-slate-900 text-white font-semibold rounded-2xl flex items-center justify-center gap-3 shadow-lg active:scale-[0.98] transition-transform mb-10"
+                    >
+                        Try Scrib Free
+                        <HiArrowRight className="w-5 h-5" />
+                    </a>
+
+                    {/* Secondary products — left-aligned */}
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-3">Also from EasyLearnova</p>
+                    <div className="flex items-center gap-3 flex-wrap">
                         <a
                             href="https://courses.easylearnova.com"
-                            className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white font-medium rounded-2xl sm:rounded-lg hover:scale-[1.02] transition-transform duration-200 flex items-center justify-center gap-3 shadow-lg group"
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-200 bg-white hover:border-blue-300 hover:text-blue-600 transition-colors text-xs font-medium"
                         >
-                            <HiAcademicCap className="w-6 h-6 sm:w-5 sm:h-5 text-blue-200" />
-                            <span className="text-lg sm:text-base">School Courses</span>
+                            <HiAcademicCap className="w-4 h-4 text-blue-500" />
+                            School Courses
                         </a>
                         <a
                             href="https://codevisualizer.easylearnova.com"
-                            className="w-full sm:w-auto px-8 py-4 bg-white text-slate-900 font-medium rounded-2xl sm:rounded-lg border border-slate-200 hover:border-slate-300 hover:scale-[1.02] transition-all duration-200 shadow-sm flex items-center justify-center gap-3"
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-200 bg-white hover:border-purple-300 hover:text-purple-600 transition-colors text-xs font-medium"
                         >
-                            <HiCode className="w-6 h-6 sm:w-5 sm:h-5 text-purple-600" />
-                            <span className="text-lg sm:text-base">Code Visualizer</span>
+                            <HiCode className="w-4 h-4 text-purple-500" />
+                            Code Visualizer
                         </a>
                     </div>
                 </div>
+
+                {/* ── DESKTOP layout (centered) ── */}
+                <div className="hidden sm:block max-w-4xl mx-auto text-center">
+                    <div className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-4 py-1.5 mb-8">
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-sm font-medium text-slate-600">New from EasyLearnova</span>
+                    </div>
+
+                    <h2 className="text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] mb-6 tracking-tight">
+                        <span className="block">AI Handwritten Exam Notes,</span>
+                        <span className="block text-slate-500">Generated in Seconds.</span>
+                    </h2>
+
+                    <p className="text-xl text-slate-600 max-w-2xl mx-auto mb-4 leading-relaxed">
+                        Type any topic. Get a beautifully handwritten PDF — exam-ready, instantly.
+                    </p>
+                    <p className="text-base text-slate-400 font-medium mb-10">
+                        Introducing <span className="text-slate-700 font-semibold">Scrib</span> — our flagship AI product by EasyLearnova.
+                    </p>
+
+                    <div className="flex items-center justify-center gap-4 mb-14">
+                        <a
+                            href="https://scrib.easylearnova.com"
+                            className="px-8 py-4 bg-slate-900 text-white font-semibold rounded-lg hover:scale-[1.02] transition-transform duration-200 flex items-center gap-3 shadow-lg"
+                        >
+                            Try Scrib Free
+                            <HiArrowRight className="w-5 h-5" />
+                        </a>
+                        <a
+                            href="https://scrib.easylearnova.com/previews"
+                            className="px-8 py-4 bg-white text-slate-700 font-medium rounded-lg border border-slate-200 hover:border-slate-300 hover:scale-[1.02] transition-all duration-200 shadow-sm flex items-center gap-2"
+                        >
+                            Browse free previews
+                        </a>
+                    </div>
+
+                    {/* Secondary products — centered */}
+                    <div className="flex items-center justify-center gap-3 flex-wrap">
+                        <span className="font-medium text-slate-400 text-sm">Also from EasyLearnova:</span>
+                        <a
+                            href="https://courses.easylearnova.com"
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-200 bg-white hover:border-blue-300 hover:text-blue-600 transition-colors text-xs font-medium"
+                        >
+                            <HiAcademicCap className="w-4 h-4 text-blue-500" />
+                            School Courses
+                        </a>
+                        <a
+                            href="https://codevisualizer.easylearnova.com"
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-200 bg-white hover:border-purple-300 hover:text-purple-600 transition-colors text-xs font-medium"
+                        >
+                            <HiCode className="w-4 h-4 text-purple-500" />
+                            Code Visualizer
+                        </a>
+                    </div>
+                </div>
+
             </div>
 
             {/* Fade to content */}
