@@ -6,11 +6,11 @@ import axiosInstance from './utils/axios'
 import { getInitials } from './utils/user'
 import MobileMenu from './components/MobileMenu'
 import BuyCreditsModal from './components/BuyCreditsModal'
-import PreviewPromoModal from './components/PreviewPromoModal'
 import PreviewCard from './components/PreviewCard'
 import { startPaymentFlow } from './services/paymentService'
 import customToast from './utils/customToast'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
+import FreeCreditsModal from './components/FreeCreditsModal'
 
 const fallbackPreviewStrip = [
   { id: 'osi-model', title: 'OSI Model', pdfUrl: null },
@@ -151,6 +151,7 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-[#fcf9f4] text-[#1f1f1f] font-sans overflow-x-hidden selection:bg-[#d9d1c7] selection:text-[#1f1f1f]">
+      <FreeCreditsModal isLoggedIn={isLoggedIn} loading={loading} />
       <Helmet>
         <title>Scrib by EasyLearnova – AI Handwritten Exam Notes Generator</title>
         <meta name="description" content="Generate handwritten exam notes PDFs instantly using AI. Browse free previews or create custom handwritten notes for any topic in seconds." />
@@ -571,8 +572,6 @@ const App = () => {
         />
       )}
 
-      {/* Preview Promo Modal */}
-      <PreviewPromoModal isLoggedIn={isLoggedIn} loading={loading} />
     </div>
   )
 }

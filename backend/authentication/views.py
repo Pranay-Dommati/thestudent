@@ -30,7 +30,7 @@ from .serializers import (
 # pyrefly: ignore [missing-import]
 from .models import User, EmailOTP, UserProduct
 
-SIGNUP_FREE_CREDITS = 0  # Free credit cohort disabled — using preview funnel instead
+SIGNUP_FREE_CREDITS = 1  # Free credit cohort — new users get 1 credit on signup
 
 def grant_signup_credits(user):
     """Award 1 free credit to a newly activated user.
