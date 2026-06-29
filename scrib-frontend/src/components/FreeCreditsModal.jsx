@@ -84,7 +84,7 @@ const FreeCreditsModal = ({ isLoggedIn, loading }) => {
 
           {/* CTA button */}
           <Link
-            to="/signup?next=/generate"
+            to="/signup"
             onClick={dismiss}
             className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#1f1f1f] px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-[#333] hover:shadow-lg"
           >
@@ -98,7 +98,7 @@ const FreeCreditsModal = ({ isLoggedIn, loading }) => {
           {/* Secondary link */}
           <p className="mt-3 text-xs text-[#9a9289]">
             Already have an account?{' '}
-            <Link to="/login?next=/generate" onClick={dismiss} className="font-semibold text-[#1f1f1f] underline decoration-[#d9d1c7] underline-offset-2 hover:decoration-[#1f1f1f]">
+            <Link to="/login" onClick={dismiss} className="font-semibold text-[#1f1f1f] underline decoration-[#d9d1c7] underline-offset-2 hover:decoration-[#1f1f1f]">
               Log in
             </Link>
           </p>
