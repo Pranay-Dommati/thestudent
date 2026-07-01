@@ -36,4 +36,8 @@ urlpatterns = [
     path('admin/user-insights/', views.AdminUserInsightsView.as_view(), name='admin-user-insights'),
     path('admin/paid-analytics/', views.AdminPaidUsersAnalyticsView.as_view(), name='admin-paid-analytics'),
     path('admin/packs/<int:pack_id>/pdf/', views.AdminStudyPackPdfView.as_view(), name='admin-pack-pdf'),
+
+    # Cohort config
+    path('config/', views.ScribConfigPublicView.as_view(), name='scrib-config-public'),
+    path('admin/config/', views.AdminScribConfigView.as_view(), name='admin-scrib-config'),
 ]

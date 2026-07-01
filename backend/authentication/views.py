@@ -30,39 +30,53 @@ from .serializers import (
 # pyrefly: ignore [missing-import]
 from .models import User, EmailOTP, UserProduct
 
-SIGNUP_FREE_CREDITS = 0  # Free credit cohort disabled — using preview funnel instead
+
 
 def grant_signup_credits(user):
     """Award 1 free credit to a newly activated user.
-    Safe to import from any view — uses lazy import to avoid circular deps.
-    Idempotent: checks for an existing signup-credit transaction first so
-    calling this multiple times (e.g. both Google callback flows) never
-    double-grants credits.
+
+    Credits are ONLY granted when ALL of the following are true:
+      1. config.cohort == 'free_credit'  (Cohort B is active)
+      2. config.give_free_credit_on_signup is True
+
+    Reads both fields from ScribConfig at call time so the admin toggle
+    takes effect immediately without any code deploy.
+
+    Safe to call multiple times — idempotent via REASON_SIGNUP_BONUS check.
     """
-    if SIGNUP_FREE_CREDITS <= 0:
-        return
     try:
-        from scrib.models import CreditTransaction
-        # Idempotency guard — only grant once per user
+        from scrib.models import CreditTransaction, ScribConfig
+        config = ScribConfig.get()
+
+        # Both conditions must be true: Cohort B must be active AND the toggle must be ON
+        if config.cohort != ScribConfig.COHORT_FREE_CREDIT or not config.give_free_credit_on_signup:
+            logger.info(
+                f"Signup bonus skipped for {user.email} "
+                f"(cohort={config.cohort}, give_free_credit={config.give_free_credit_on_signup})"
+            )
+            return
+
+        # Idempotency guard — only grant once per user (no account deletion so this is one-time)
         already_granted = CreditTransaction.objects.filter(
             user=user,
             direction=CreditTransaction.DIRECTION_CREDIT,
-            reason=CreditTransaction.REASON_ADJUSTMENT,
-            credits=SIGNUP_FREE_CREDITS,
+            reason=CreditTransaction.REASON_SIGNUP_BONUS,
         ).exists()
         if already_granted:
-            logger.info(f"Signup credit already granted to {user.email} — skipping")
+            logger.info(f"Signup bonus already granted to {user.email} — skipping")
             return
+
         CreditTransaction.objects.create(
             user=user,
             direction=CreditTransaction.DIRECTION_CREDIT,
-            credits=SIGNUP_FREE_CREDITS,
-            reason=CreditTransaction.REASON_ADJUSTMENT,
+            credits=1,
+            reason=CreditTransaction.REASON_SIGNUP_BONUS,
         )
-        logger.info(f"Granted {SIGNUP_FREE_CREDITS} free signup credit to new user {user.email}")
+        logger.info(f"Granted 1 free signup credit to new user {user.email}")
     except Exception as exc:
         # Non-fatal: log but don't block signup
         logger.error(f"Failed to grant signup credits to {user.email}: {exc}")
+
 
 # Import database retry utilities for handling remote MySQL (Hostinger) connection issues
 from backend.db_utils import db_retry_on_connection_error

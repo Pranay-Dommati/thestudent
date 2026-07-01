@@ -14,7 +14,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # pyrefly: ignore [missing-import]
-from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction, PromoCode, PromoCodeRedemption
+from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction, PromoCode, PromoCodeRedemption, ScribConfig
 # pyrefly: ignore [missing-import]
 from .serializers import (
     PreviewNoteSerializer,
@@ -2213,3 +2213,86 @@ class AdminPaidUsersAnalyticsView(APIView):
             'recent_packs': recent_packs,
         })
 
+
+# ─── Scrib Config (Cohort Toggle) ────────────────────────────────────────────
+
+class ScribConfigPublicView(APIView):
+    """GET /api/scrib/config/  — public, no auth required.
+
+    Returns the active cohort so the scrib SPA can decide which
+    landing modal to show without a code deploy.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        config = ScribConfig.get()
+        return Response({
+            'cohort': config.cohort,
+            'give_free_credit_on_signup': config.give_free_credit_on_signup,
+        })
+
+
+class AdminScribConfigView(APIView):
+    """GET / PATCH /api/scrib/admin/config/  — superuser only.
+
+    Allows the admin panel to read and update the active cohort
+    and the free-credit-on-signup toggle.
+    """
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def _check_superuser(self, request):
+        if not request.user.is_superuser:
+            return Response({'error': 'Admin access required.'}, status=403)
+        return None
+
+    def get(self, request):
+        denied = self._check_superuser(request)
+        if denied:
+            return denied
+        config = ScribConfig.get()
+        return Response({
+            'cohort': config.cohort,
+            'give_free_credit_on_signup': config.give_free_credit_on_signup,
+            'updated_at': config.updated_at,
+        })
+
+    def patch(self, request):
+        denied = self._check_superuser(request)
+        if denied:
+            return denied
+
+        config = ScribConfig.get()
+        changed = False
+
+        cohort = request.data.get('cohort')
+        if cohort is not None:
+            valid_cohorts = [ScribConfig.COHORT_PREVIEW, ScribConfig.COHORT_FREE_CREDIT]
+            if cohort not in valid_cohorts:
+                return Response(
+                    {'error': f'Invalid cohort. Must be one of: {valid_cohorts}'},
+                    status=400,
+                )
+            config.cohort = cohort
+            changed = True
+
+        give_free = request.data.get('give_free_credit_on_signup')
+        if give_free is not None:
+            if not isinstance(give_free, bool):
+                return Response({'error': 'give_free_credit_on_signup must be a boolean.'}, status=400)
+            config.give_free_credit_on_signup = give_free
+            changed = True
+
+        if changed:
+            config.save()
+            logger.info(
+                f"Admin {request.user.email} updated ScribConfig: "
+                f"cohort={config.cohort}, give_free_credit={config.give_free_credit_on_signup}"
+            )
+
+        return Response({
+            'cohort': config.cohort,
+            'give_free_credit_on_signup': config.give_free_credit_on_signup,
+            'updated_at': config.updated_at,
+        })

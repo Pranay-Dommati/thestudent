@@ -7,6 +7,7 @@ import { getInitials } from './utils/user'
 import MobileMenu from './components/MobileMenu'
 import BuyCreditsModal from './components/BuyCreditsModal'
 import PreviewPromoModal from './components/PreviewPromoModal'
+import FreeCreditsModal from './components/FreeCreditsModal'
 import PreviewCard from './components/PreviewCard'
 import { startPaymentFlow } from './services/paymentService'
 import customToast from './utils/customToast'
@@ -65,6 +66,8 @@ const App = () => {
     // Don't show again if user already dismissed it this session
     return sessionStorage.getItem('notice_banner_dismissed') !== 'true'
   })
+  // Cohort A = 'preview' (PreviewPromoModal), Cohort B = 'free_credit' (FreeCreditsModal)
+  const [scribCohort, setScribCohort] = useState('preview')
   const navigate = useNavigate()
 
   const handleBuyClick = async (packId) => {
@@ -95,6 +98,19 @@ const App = () => {
       },
     })
   }
+
+  useEffect(() => {
+    // Fetch active cohort from backend to decide which landing modal to show
+    axiosInstance.get('/scrib/config/')
+      .then(res => {
+        if (res.data?.cohort) {
+          setScribCohort(res.data.cohort)
+        }
+      })
+      .catch(() => {
+        // Non-fatal: silently fall back to 'preview' cohort (default)
+      })
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -571,8 +587,11 @@ const App = () => {
         />
       )}
 
-      {/* Preview Promo Modal */}
-      <PreviewPromoModal isLoggedIn={isLoggedIn} loading={loading} />
+      {/* Landing Modal — cohort-controlled */}
+      {scribCohort === 'free_credit'
+        ? <FreeCreditsModal isLoggedIn={isLoggedIn} loading={loading} />
+        : <PreviewPromoModal isLoggedIn={isLoggedIn} loading={loading} />
+      }
     </div>
   )
 }

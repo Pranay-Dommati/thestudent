@@ -418,6 +418,13 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
   // User insight state
   const [insights, setInsights] = useState(null);
   const [loadingInsights, setLoadingInsights] = useState(true);
+  // Cohort toggle state
+  const [cohort, setCohort] = useState('preview');
+  const [giveFreeCredit, setGiveFreeCredit] = useState(false);
+  const [cohortLoading, setCohortLoading] = useState(true);
+  const [cohortSaving, setCohortSaving] = useState(false);
+  const [cohortSaved, setCohortSaved] = useState(false);
+  const [cohortError, setCohortError] = useState('');
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -444,10 +451,42 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
     }
   }, []);
 
+  const fetchCohortConfig = useCallback(async () => {
+    setCohortLoading(true);
+    try {
+      const res = await authService.makeAuthenticatedRequest('/scrib/admin/config/');
+      setCohort(res.data.cohort);
+      setGiveFreeCredit(res.data.give_free_credit_on_signup);
+    } catch {
+      setCohortError('Failed to load cohort config.');
+    } finally {
+      setCohortLoading(false);
+    }
+  }, []);
+
+  const saveCohortConfig = async () => {
+    setCohortSaving(true);
+    setCohortSaved(false);
+    setCohortError('');
+    try {
+      await authService.makeAuthenticatedRequest('/scrib/admin/config/', {
+        method: 'PATCH',
+        body: { cohort, give_free_credit_on_signup: giveFreeCredit },
+      });
+      setCohortSaved(true);
+      setTimeout(() => setCohortSaved(false), 3000);
+    } catch {
+      setCohortError('Failed to save config. Please try again.');
+    } finally {
+      setCohortSaving(false);
+    }
+  };
+
   useEffect(() => {
     fetchStats();
     fetchInsights();
-  }, [fetchStats, fetchInsights]);
+    fetchCohortConfig();
+  }, [fetchStats, fetchInsights, fetchCohortConfig]);
 
   const handleSelectCampaign = async (campaignName) => {
     setDetailCampaign(campaignName);
@@ -522,7 +561,151 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
         >
           <FaChartBar className="h-3.5 w-3.5" /> Paid Analytics
         </button>
+        <button
+          id="tab-cohort-toggle"
+          onClick={() => setActiveTab('cohort')}
+          className={`${tabBase} ${activeTab === 'cohort' ? tabActive : tabInactive}`}
+        >
+          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Cohort
+        </button>
       </div>
+
+      {/* ── Cohort Toggle tab ── */}
+      {activeTab === 'cohort' && (
+        <div className={`rounded-xl shadow-sm border p-6 max-w-2xl ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+          <div className="flex items-center gap-3 mb-1">
+            <div className={`flex h-10 w-10 items-center justify-center rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-indigo-50'}`}>
+              <svg className="h-5 w-5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div>
+              <h3 className={`font-bold text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Landing Modal Cohort</h3>
+              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Controls which modal new visitors see on the Scrib homepage</p>
+            </div>
+          </div>
+
+          {cohortLoading ? (
+            <div className={`mt-6 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Loading config…</div>
+          ) : (
+            <>
+              {cohortError && (
+                <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-700">{cohortError}</div>
+              )}
+
+              {/* Cohort selector cards */}
+              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                {/* Cohort A */}
+                <button
+                  id="cohort-select-preview"
+                  onClick={() => setCohort('preview')}
+                  className={`text-left rounded-xl border-2 p-4 transition-all ${
+                    cohort === 'preview'
+                      ? 'border-indigo-500 bg-indigo-50'
+                      : isDarkMode ? 'border-gray-600 hover:border-gray-500' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs font-bold uppercase tracking-wider ${
+                      cohort === 'preview' ? 'text-indigo-600' : isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                    }`}>Cohort A</span>
+                    {cohort === 'preview' && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">● Active</span>
+                    )}
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef7df] border border-[#dbe8c3] mb-2">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4e8c3a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </div>
+                  <p className={`font-semibold text-sm mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Preview Modal</p>
+                  <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Shows "See exactly what you're paying for." Directs users to browse 50+ free preview notes.
+                  </p>
+                </button>
+
+                {/* Cohort B */}
+                <button
+                  id="cohort-select-free-credit"
+                  onClick={() => setCohort('free_credit')}
+                  className={`text-left rounded-xl border-2 p-4 transition-all ${
+                    cohort === 'free_credit'
+                      ? 'border-amber-500 bg-amber-50'
+                      : isDarkMode ? 'border-gray-600 hover:border-gray-500' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs font-bold uppercase tracking-wider ${
+                      cohort === 'free_credit' ? 'text-amber-600' : isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                    }`}>Cohort B</span>
+                    {cohort === 'free_credit' && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">● Active</span>
+                    )}
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef7df] border border-[#dbe8c3] mb-2">
+                    <span className="text-xl">🎁</span>
+                  </div>
+                  <p className={`font-semibold text-sm mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Free Credit Modal</p>
+                  <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Shows "Get your first free credit 🎁". Encourages new users to sign up and try generating.
+                  </p>
+                </button>
+              </div>
+
+              {/* Sub-toggle: Give real credit on signup */}
+              <div className={`mt-5 rounded-xl border p-4 transition-all ${
+                cohort === 'free_credit'
+                  ? isDarkMode ? 'border-amber-700 bg-amber-900/20' : 'border-amber-200 bg-amber-50'
+                  : isDarkMode ? 'border-gray-700 opacity-40' : 'border-gray-100 opacity-40'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Actually grant the free credit on signup</p>
+                    <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      When ON, new users get +1 credit automatically after email verification. Only applies to Cohort B.
+                    </p>
+                  </div>
+                  <button
+                    id="toggle-give-free-credit"
+                    onClick={() => cohort === 'free_credit' && setGiveFreeCredit(v => !v)}
+                    disabled={cohort !== 'free_credit'}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${
+                      giveFreeCredit && cohort === 'free_credit' ? 'bg-amber-500' : isDarkMode ? 'bg-gray-600' : 'bg-gray-200'
+                    }`}
+                    aria-label="Toggle give free credit"
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                      giveFreeCredit && cohort === 'free_credit' ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+                {giveFreeCredit && cohort === 'free_credit' && (
+                  <p className="mt-2 text-xs text-amber-700 font-medium">
+                    ⚡ Credit granted at first signup (OTP email or Google) — once per user, automatically.
+                  </p>
+                )}
+              </div>
+
+              {/* Save button */}
+              <div className="mt-5 flex items-center gap-3">
+                <button
+                  id="save-cohort-config"
+                  onClick={saveCohortConfig}
+                  disabled={cohortSaving}
+                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                >
+                  {cohortSaving ? (
+                    <><svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Saving…</>
+                  ) : 'Save changes'}
+                </button>
+                {cohortSaved && (
+                  <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
+                    <FaCheck className="h-3.5 w-3.5" /> Saved!
+                  </span>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Paid Analytics tab ── */}
       {activeTab === 'analytics' && (

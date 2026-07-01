@@ -167,6 +167,7 @@ class CreditTransaction(models.Model):
     REASON_ADJUSTMENT = 'adjustment'
     REASON_REFUND = 'refund'
     REASON_PROMO = 'promo'
+    REASON_SIGNUP_BONUS = 'signup_bonus'
 
     REASON_CHOICES = [
         (REASON_PAYMENT, 'Payment'),
@@ -174,6 +175,7 @@ class CreditTransaction(models.Model):
         (REASON_ADJUSTMENT, 'Adjustment'),
         (REASON_REFUND, 'Refund'),
         (REASON_PROMO, 'Promo Code'),
+        (REASON_SIGNUP_BONUS, 'Signup Bonus'),
     ]
 
     user = models.ForeignKey(
@@ -298,3 +300,47 @@ class PromoCodeRedemption(models.Model):
 
     def __str__(self):
         return f"{self.user_id} redeemed {self.promo_code.code}"
+
+
+class ScribConfig(models.Model):
+    """Singleton (pk=1) that controls the active marketing cohort.
+
+    Cohort A — 'preview':     Show the PreviewPromoModal (browse samples).
+    Cohort B — 'free_credit': Show the FreeCreditsModal (get 1 free credit).
+
+    When cohort == 'free_credit' AND give_free_credit_on_signup is True,
+    the OTP-verify signup flow actually grants 1 free credit to the new user.
+    """
+
+    COHORT_PREVIEW = 'preview'
+    COHORT_FREE_CREDIT = 'free_credit'
+
+    COHORT_CHOICES = [
+        (COHORT_PREVIEW, 'Preview Modal (Cohort A)'),
+        (COHORT_FREE_CREDIT, 'Free Credit Modal (Cohort B)'),
+    ]
+
+    cohort = models.CharField(
+        max_length=20,
+        choices=COHORT_CHOICES,
+        default=COHORT_PREVIEW,
+    )
+    give_free_credit_on_signup = models.BooleanField(
+        default=False,
+        help_text='When True and cohort is free_credit, grant 1 free credit on OTP signup verification.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Scrib Config'
+        verbose_name_plural = 'Scrib Config'
+
+    @classmethod
+    def get(cls):
+        """Return the singleton config, creating it with defaults if it doesn't exist yet."""
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        credit_label = ' (+ free credit)' if self.give_free_credit_on_signup else ''
+        return f'ScribConfig: {self.cohort}{credit_label}'
