@@ -127,6 +127,72 @@ const LeaderboardPanel = ({ title, icon: Icon, color, entries, valueKey, valueLa
   );
 };
 
+// ─── Note Generations Table ──────────────────────────────────────────────────
+
+const NoteGenerationsTable = ({ packs = [], emptyMessage, isDarkMode, handleViewPdf, pdfLoadingId, maxH = '' }) => {
+  const textMain = isDarkMode ? 'text-white' : 'text-gray-900';
+  const textSub = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+
+  return (
+    <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+      <div className={`overflow-x-auto ${maxH}`}>
+        <table className="min-w-full text-left text-sm whitespace-nowrap">
+          <thead className={`sticky top-0 z-10 ${isDarkMode ? 'bg-gray-700 border-b border-gray-600' : 'bg-gray-50 border-b border-gray-200'}`}>
+            <tr>
+              <th className={`px-4 py-3 font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Title</th>
+              <th className={`px-4 py-3 font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>User Email</th>
+              <th className={`px-4 py-3 font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Pages</th>
+              <th className={`px-4 py-3 font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Status</th>
+              <th className={`px-4 py-3 font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Created</th>
+              <th className={`px-4 py-3 font-semibold text-center ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>PDF</th>
+            </tr>
+          </thead>
+          <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-100'}`}>
+            {packs.map(pack => (
+              <tr key={pack.id} className={isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                <td className={`px-4 py-3 font-medium truncate max-w-[200px] ${textMain}`}>{pack.title}</td>
+                <td className={`px-4 py-3 ${textSub}`}>{pack.email}</td>
+                <td className={`px-4 py-3 ${textMain}`}>{pack.total_pages}</td>
+                <td className={`px-4 py-3`}>
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize
+                    ${pack.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
+                      pack.status === 'generating' ? 'bg-amber-100 text-amber-700' :
+                      pack.status === 'failed' ? 'bg-red-100 text-red-700' :
+                      'bg-gray-100 text-gray-700'}`}>
+                    {pack.status}
+                  </span>
+                </td>
+                <td className={`px-4 py-3 text-xs ${textSub}`}>
+                  {fmt.date(pack.created_at)} ({fmt.relDate(pack.created_at)})
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {(pack.status === 'completed' || pack.status === 'ready') ? (
+                    <button
+                      onClick={() => handleViewPdf(pack.id)}
+                      disabled={pdfLoadingId === pack.id}
+                      className={`text-lg transition-transform ${pdfLoadingId === pack.id ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'}`}
+                      title="View PDF"
+                    >
+                      {pdfLoadingId === pack.id ? <FaSpinner className="animate-spin h-4 w-4" /> : '📄'}
+                    </button>
+                  ) : (
+                    <span className={`text-xs ${textSub}`}>—</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {!packs.length && (
+              <tr>
+                <td colSpan="6" className={`px-4 py-8 text-center text-sm ${textSub}`}>{emptyMessage}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 // ─── PDF Drilldown Drawer ────────────────────────────────────────────────────
 
 const DrilldownDrawer = ({ user, onClose, isDarkMode }) => {
@@ -641,65 +707,36 @@ const ScribPaidAnalytics = ({ isDarkMode = false }) => {
         </div>
       </div>
 
+      {/* ── Today's Note Generations ── */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className={`text-sm font-semibold ${textMain}`}>📅 Today's Note Generations</h3>
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+            isDarkMode ? 'bg-indigo-900/50 text-indigo-300 border border-indigo-700/50' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+          }`}>
+            {data?.today_packs_count ?? data?.today_packs?.length ?? 0} generated today
+          </span>
+        </div>
+        <NoteGenerationsTable
+          packs={data?.today_packs ?? []}
+          emptyMessage="No note generations today yet."
+          isDarkMode={isDarkMode}
+          handleViewPdf={handleViewPdf}
+          pdfLoadingId={pdfLoadingId}
+          maxH="max-h-80 overflow-y-auto"
+        />
+      </div>
+
       {/* ── Recent Note Generations ── */}
       <div>
         <h3 className={`text-sm font-semibold mb-3 ${textMain}`}>⚡ Recent Note Generations</h3>
-        <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm whitespace-nowrap">
-              <thead className={isDarkMode ? 'bg-gray-700 border-b border-gray-600' : 'bg-gray-50 border-b border-gray-200'}>
-                <tr>
-                  <th className={`px-4 py-3 font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Title</th>
-                  <th className={`px-4 py-3 font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>User Email</th>
-                  <th className={`px-4 py-3 font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Pages</th>
-                  <th className={`px-4 py-3 font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Status</th>
-                  <th className={`px-4 py-3 font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Created</th>
-                  <th className={`px-4 py-3 font-semibold text-center ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>PDF</th>
-                </tr>
-              </thead>
-              <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-100'}`}>
-                {(data?.recent_packs ?? []).map(pack => (
-                  <tr key={pack.id} className={isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                    <td className={`px-4 py-3 font-medium truncate max-w-[200px] ${textMain}`}>{pack.title}</td>
-                    <td className={`px-4 py-3 ${textSub}`}>{pack.email}</td>
-                    <td className={`px-4 py-3 ${textMain}`}>{pack.total_pages}</td>
-                    <td className={`px-4 py-3`}>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize
-                        ${pack.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
-                          pack.status === 'generating' ? 'bg-amber-100 text-amber-700' :
-                          pack.status === 'failed' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-100 text-gray-700'}`}>
-                        {pack.status}
-                      </span>
-                    </td>
-                    <td className={`px-4 py-3 text-xs ${textSub}`}>
-                      {fmt.date(pack.created_at)} ({fmt.relDate(pack.created_at)})
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {(pack.status === 'completed' || pack.status === 'ready') ? (
-                        <button
-                          onClick={() => handleViewPdf(pack.id)}
-                          disabled={pdfLoadingId === pack.id}
-                          className={`text-lg transition-transform ${pdfLoadingId === pack.id ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'}`}
-                          title="View PDF"
-                        >
-                          {pdfLoadingId === pack.id ? <FaSpinner className="animate-spin h-4 w-4" /> : '📄'}
-                        </button>
-                      ) : (
-                        <span className={`text-xs ${textSub}`}>—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {!(data?.recent_packs?.length) && (
-                  <tr>
-                    <td colSpan="6" className={`px-4 py-8 text-center text-sm ${textSub}`}>No recent packs found.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <NoteGenerationsTable
+          packs={data?.recent_packs ?? []}
+          emptyMessage="No recent packs found."
+          isDarkMode={isDarkMode}
+          handleViewPdf={handleViewPdf}
+          pdfLoadingId={pdfLoadingId}
+        />
       </div>
 
       {/* ── Paid Users Table ── */}

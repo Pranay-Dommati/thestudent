@@ -2177,7 +2177,7 @@ class AdminPaidUsersAnalyticsView(APIView):
             for i, r in enumerate(sorted(rows, key=lambda x: x['credits_spent'], reverse=True)[:10])
         ]
 
-        recent_packs_qs = StudyPack.objects.select_related('user').order_by('-created_at')[:5]
+        recent_packs_qs = StudyPack.objects.select_related('user').order_by('-created_at')[:10]
         recent_packs = [
             {
                 'id': rp.id,
@@ -2190,6 +2190,24 @@ class AdminPaidUsersAnalyticsView(APIView):
             }
             for rp in recent_packs_qs
         ]
+
+        # Calculate start of today in IST (UTC+5:30)
+        ist_now = timezone.now() + datetime.timedelta(hours=5, minutes=30)
+        ist_today_start = (ist_now.replace(hour=0, minute=0, second=0, microsecond=0) - datetime.timedelta(hours=5, minutes=30))
+        today_packs_qs = StudyPack.objects.select_related('user').filter(created_at__gte=ist_today_start).order_by('-created_at')[:100]
+        today_packs = [
+            {
+                'id': rp.id,
+                'title': rp.title,
+                'email': rp.user.email,
+                'created_at': rp.created_at.isoformat() if rp.created_at else None,
+                'status': rp.status,
+                'total_pages': rp.total_pages,
+                'share_token': str(rp.share_token) if rp.share_token else None,
+            }
+            for rp in today_packs_qs
+        ]
+        today_packs_count = StudyPack.objects.filter(created_at__gte=ist_today_start).count()
 
         return Response({
             'summary': {
@@ -2211,6 +2229,8 @@ class AdminPaidUsersAnalyticsView(APIView):
                 'top_credits': top_credits,
             },
             'recent_packs': recent_packs,
+            'today_packs': today_packs,
+            'today_packs_count': today_packs_count,
         })
 
 
