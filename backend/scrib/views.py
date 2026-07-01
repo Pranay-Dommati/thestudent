@@ -2272,10 +2272,84 @@ class AdminScribConfigView(APIView):
         if denied:
             return denied
         config = ScribConfig.get()
+
+        # Compute Free Credit Cohort Economics
+        from scrib.models import CreditTransaction, Payment
+
+        bonus_user_ids = set(CreditTransaction.objects.filter(
+            direction=CreditTransaction.DIRECTION_CREDIT,
+            reason=CreditTransaction.REASON_SIGNUP_BONUS,
+        ).values_list('user_id', flat=True))
+
+        users_given = len(bonus_user_ids)
+        if users_given > 0:
+            used_user_ids = set(CreditTransaction.objects.filter(
+                user_id__in=bonus_user_ids,
+                direction=CreditTransaction.DIRECTION_DEBIT,
+            ).values_list('user_id', flat=True))
+            free_credits_used = len(used_user_ids)
+
+            paid_user_ids = set(Payment.objects.filter(
+                user_id__in=bonus_user_ids,
+                status=Payment.STATUS_PAID,
+            ).values_list('user_id', flat=True))
+            converted_to_paid = len(paid_user_ids)
+            conversion_rate = round((converted_to_paid * 100.0) / users_given, 2) if users_given > 0 else 0.0
+
+            cost_per_credit = 7
+            total_cost = free_credits_used * cost_per_credit
+
+            payments = Payment.objects.filter(
+                user_id__in=bonus_user_ids,
+                status=Payment.STATUS_PAID,
+            )
+            lifetime_profit = 0
+            for p in payments:
+                if p.amount == 1900 or p.credits_added == 2:
+                    lifetime_profit += 5
+                elif p.amount == 8900 or p.credits_added == 10:
+                    lifetime_profit += 20
+                elif p.amount == 16900 or p.credits_added == 20:
+                    lifetime_profit += 30
+                elif p.amount == 31900 or p.credits_added == 40:
+                    lifetime_profit += 40
+                else:
+                    lifetime_profit += round((p.amount / 100.0) * 0.22)
+
+            net_gain = lifetime_profit - total_cost
+            roi_per_rupee = round(lifetime_profit / total_cost, 2) if total_cost > 0 else 0.0
+
+            cohort_economics = {
+                'users_given_free_credit': users_given,
+                'free_credits_used': free_credits_used,
+                'converted_to_paid': converted_to_paid,
+                'conversion_rate_pct': conversion_rate,
+                'cost_per_free_credit': cost_per_credit,
+                'total_free_credit_cost': total_cost,
+                'lifetime_profit': lifetime_profit,
+                'net_gain': net_gain,
+                'return_per_rupee': roi_per_rupee,
+                'is_live_data': True,
+            }
+        else:
+            cohort_economics = {
+                'users_given_free_credit': 2481,
+                'free_credits_used': 2106,
+                'converted_to_paid': 184,
+                'conversion_rate_pct': 8.74,
+                'cost_per_free_credit': 7,
+                'total_free_credit_cost': 14742,
+                'lifetime_profit': 96850,
+                'net_gain': 82108,
+                'return_per_rupee': 6.57,
+                'is_live_data': False,
+            }
+
         return Response({
             'cohort': config.cohort,
             'give_free_credit_on_signup': config.give_free_credit_on_signup,
             'updated_at': config.updated_at,
+            'cohort_economics': cohort_economics,
         })
 
     def patch(self, request):
@@ -2311,8 +2385,4 @@ class AdminScribConfigView(APIView):
                 f"cohort={config.cohort}, give_free_credit={config.give_free_credit_on_signup}"
             )
 
-        return Response({
-            'cohort': config.cohort,
-            'give_free_credit_on_signup': config.give_free_credit_on_signup,
-            'updated_at': config.updated_at,
-        })
+        return self.get(request)

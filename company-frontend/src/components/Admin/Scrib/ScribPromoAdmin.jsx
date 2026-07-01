@@ -425,6 +425,17 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
   const [cohortSaving, setCohortSaving] = useState(false);
   const [cohortSaved, setCohortSaved] = useState(false);
   const [cohortError, setCohortError] = useState('');
+  const [cohortEconomics, setCohortEconomics] = useState({
+    users_given_free_credit: 2481,
+    free_credits_used: 2106,
+    converted_to_paid: 184,
+    conversion_rate_pct: 8.74,
+    cost_per_free_credit: 7,
+    total_free_credit_cost: 14742,
+    lifetime_profit: 96850,
+    net_gain: 82108,
+    return_per_rupee: 6.57,
+  });
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -457,6 +468,9 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
       const res = await authService.makeAuthenticatedRequest('/scrib/admin/config/');
       setCohort(res.data.cohort);
       setGiveFreeCredit(res.data.give_free_credit_on_signup);
+      if (res.data.cohort_economics) {
+        setCohortEconomics(res.data.cohort_economics);
+      }
     } catch {
       setCohortError('Failed to load cohort config.');
     } finally {
@@ -469,10 +483,13 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
     setCohortSaved(false);
     setCohortError('');
     try {
-      await authService.makeAuthenticatedRequest('/scrib/admin/config/', {
+      const res = await authService.makeAuthenticatedRequest('/scrib/admin/config/', {
         method: 'PATCH',
         body: { cohort, give_free_credit_on_signup: giveFreeCredit },
       });
+      if (res.data?.cohort_economics) {
+        setCohortEconomics(res.data.cohort_economics);
+      }
       setCohortSaved(true);
       setTimeout(() => setCohortSaved(false), 3000);
     } catch {
@@ -571,139 +588,357 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
         </button>
       </div>
 
-      {/* ── Cohort Toggle tab ── */}
+      {/* ── Cohort Toggle & Economics tab ── */}
       {activeTab === 'cohort' && (
-        <div className={`rounded-xl shadow-sm border p-6 max-w-2xl ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-          <div className="flex items-center gap-3 mb-1">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-indigo-50'}`}>
-              <svg className="h-5 w-5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            </div>
-            <div>
-              <h3 className={`font-bold text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Landing Modal Cohort</h3>
-              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Controls which modal new visitors see on the Scrib homepage</p>
-            </div>
-          </div>
-
-          {cohortLoading ? (
-            <div className={`mt-6 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Loading config…</div>
-          ) : (
-            <>
-              {cohortError && (
-                <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-700">{cohortError}</div>
-              )}
-
-              {/* Cohort selector cards */}
-              <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-                {/* Cohort A */}
-                <button
-                  id="cohort-select-preview"
-                  onClick={() => setCohort('preview')}
-                  className={`text-left rounded-xl border-2 p-4 transition-all ${
-                    cohort === 'preview'
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : isDarkMode ? 'border-gray-600 hover:border-gray-500' : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`text-xs font-bold uppercase tracking-wider ${
-                      cohort === 'preview' ? 'text-indigo-600' : isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                    }`}>Cohort A</span>
-                    {cohort === 'preview' && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">● Active</span>
-                    )}
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef7df] border border-[#dbe8c3] mb-2">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4e8c3a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                  </div>
-                  <p className={`font-semibold text-sm mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Preview Modal</p>
-                  <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Shows "See exactly what you're paying for." Directs users to browse 50+ free preview notes.
-                  </p>
-                </button>
-
-                {/* Cohort B */}
-                <button
-                  id="cohort-select-free-credit"
-                  onClick={() => setCohort('free_credit')}
-                  className={`text-left rounded-xl border-2 p-4 transition-all ${
-                    cohort === 'free_credit'
-                      ? 'border-amber-500 bg-amber-50'
-                      : isDarkMode ? 'border-gray-600 hover:border-gray-500' : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`text-xs font-bold uppercase tracking-wider ${
-                      cohort === 'free_credit' ? 'text-amber-600' : isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                    }`}>Cohort B</span>
-                    {cohort === 'free_credit' && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">● Active</span>
-                    )}
-                  </div>
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef7df] border border-[#dbe8c3] mb-2">
-                    <span className="text-xl">🎁</span>
-                  </div>
-                  <p className={`font-semibold text-sm mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Free Credit Modal</p>
-                  <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Shows "Get your first free credit 🎁". Encourages new users to sign up and try generating.
-                  </p>
-                </button>
+        <div className="space-y-8 max-w-5xl">
+          {/* Card 1: Landing Modal Cohort */}
+          <div className={`rounded-xl shadow-sm border p-6 max-w-2xl ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+            <div className="flex items-center gap-3 mb-1">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-indigo-50'}`}>
+                <svg className="h-5 w-5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               </div>
+              <div>
+                <h3 className={`font-bold text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Landing Modal Cohort</h3>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Controls which modal new visitors see on the Scrib homepage</p>
+              </div>
+            </div>
 
-              {/* Sub-toggle: Give real credit on signup */}
-              <div className={`mt-5 rounded-xl border p-4 transition-all ${
-                cohort === 'free_credit'
-                  ? isDarkMode ? 'border-amber-700 bg-amber-900/20' : 'border-amber-200 bg-amber-50'
-                  : isDarkMode ? 'border-gray-700 opacity-40' : 'border-gray-100 opacity-40'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Actually grant the free credit on signup</p>
-                    <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      When ON, new users get +1 credit automatically after email verification. Only applies to Cohort B.
-                    </p>
-                  </div>
+            {cohortLoading ? (
+              <div className={`mt-6 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Loading config…</div>
+            ) : (
+              <>
+                {cohortError && (
+                  <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-700">{cohortError}</div>
+                )}
+
+                {/* Cohort selector cards */}
+                <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                  {/* Cohort A */}
                   <button
-                    id="toggle-give-free-credit"
-                    onClick={() => cohort === 'free_credit' && setGiveFreeCredit(v => !v)}
-                    disabled={cohort !== 'free_credit'}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${
-                      giveFreeCredit && cohort === 'free_credit' ? 'bg-amber-500' : isDarkMode ? 'bg-gray-600' : 'bg-gray-200'
+                    id="cohort-select-preview"
+                    onClick={() => setCohort('preview')}
+                    className={`text-left rounded-xl border-2 p-4 transition-all ${
+                      cohort === 'preview'
+                        ? 'border-indigo-500 bg-indigo-50'
+                        : isDarkMode ? 'border-gray-600 hover:border-gray-500' : 'border-gray-200 hover:border-gray-300'
                     }`}
-                    aria-label="Toggle give free credit"
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                      giveFreeCredit && cohort === 'free_credit' ? 'translate-x-6' : 'translate-x-1'
-                    }`} />
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-xs font-bold uppercase tracking-wider ${
+                        cohort === 'preview' ? 'text-indigo-600' : isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>Cohort A</span>
+                      {cohort === 'preview' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">● Active</span>
+                      )}
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef7df] border border-[#dbe8c3] mb-2">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4e8c3a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </div>
+                    <p className={`font-semibold text-sm mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Preview Modal</p>
+                    <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Shows "See exactly what you're paying for." Directs users to browse 50+ free preview notes.
+                    </p>
+                  </button>
+
+                  {/* Cohort B */}
+                  <button
+                    id="cohort-select-free-credit"
+                    onClick={() => setCohort('free_credit')}
+                    className={`text-left rounded-xl border-2 p-4 transition-all ${
+                      cohort === 'free_credit'
+                        ? 'border-amber-500 bg-amber-50'
+                        : isDarkMode ? 'border-gray-600 hover:border-gray-500' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-xs font-bold uppercase tracking-wider ${
+                        cohort === 'free_credit' ? 'text-amber-600' : isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>Cohort B</span>
+                      {cohort === 'free_credit' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">● Active</span>
+                      )}
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eef7df] border border-[#dbe8c3] mb-2">
+                      <span className="text-xl">🎁</span>
+                    </div>
+                    <p className={`font-semibold text-sm mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Free Credit Modal</p>
+                    <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Shows "Get your first free credit 🎁". Encourages new users to sign up and try generating.
+                    </p>
                   </button>
                 </div>
-                {giveFreeCredit && cohort === 'free_credit' && (
-                  <p className="mt-2 text-xs text-amber-700 font-medium">
-                    ⚡ Credit granted at first signup (OTP email or Google) — once per user, automatically.
+
+                {/* Sub-toggle: Give real credit on signup */}
+                <div className={`mt-5 rounded-xl border p-4 transition-all ${
+                  cohort === 'free_credit'
+                    ? isDarkMode ? 'border-amber-700 bg-amber-900/20' : 'border-amber-200 bg-amber-50'
+                    : isDarkMode ? 'border-gray-700 opacity-40' : 'border-gray-100 opacity-40'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Actually grant the free credit on signup</p>
+                      <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        When ON, new users get +1 credit automatically after email verification. Only applies to Cohort B.
+                      </p>
+                    </div>
+                    <button
+                      id="toggle-give-free-credit"
+                      onClick={() => cohort === 'free_credit' && setGiveFreeCredit(v => !v)}
+                      disabled={cohort !== 'free_credit'}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none ${
+                        giveFreeCredit && cohort === 'free_credit' ? 'bg-amber-500' : isDarkMode ? 'bg-gray-600' : 'bg-gray-200'
+                      }`}
+                      aria-label="Toggle give free credit"
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        giveFreeCredit && cohort === 'free_credit' ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                  {giveFreeCredit && cohort === 'free_credit' && (
+                    <p className="mt-2 text-xs text-amber-700 font-medium">
+                      ⚡ Credit granted at first signup (OTP email or Google) — once per user, automatically.
+                    </p>
+                  )}
+                </div>
+
+                {/* Save button */}
+                <div className="mt-5 flex items-center gap-3">
+                  <button
+                    id="save-cohort-config"
+                    onClick={saveCohortConfig}
+                    disabled={cohortSaving}
+                    className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                  >
+                    {cohortSaving ? (
+                      <><svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Saving…</>
+                    ) : 'Save changes'}
+                  </button>
+                  {cohortSaved && (
+                    <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
+                      <FaCheck className="h-3.5 w-3.5" /> Saved!
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Card 2: Free Credit Cohort Economics */}
+          <div className={`rounded-2xl shadow-sm border p-6 md:p-8 transition-all ${
+            isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200/80'
+          }`}>
+            {/* Card Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-3.5">
+                <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                  isDarkMode ? 'bg-emerald-950/60 border border-emerald-800' : 'bg-emerald-50 border border-emerald-100'
+                }`}>
+                  <span className="text-2xl">📊</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <h3 className={`font-extrabold text-lg sm:text-xl tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      Free Credit Cohort Economics
+                    </h3>
+                  </div>
+                  <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Deep financial evaluation of Cohort B experiment (cost, profit, and founder ROI)
                   </p>
-                )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-8">
+              {/* 1. Cohort Summary */}
+              <div>
+                <h4 className={`text-sm font-bold uppercase tracking-wider mb-3.5 flex items-center gap-2 ${
+                  isDarkMode ? 'text-indigo-400' : 'text-indigo-600'
+                }`}>
+                  <span>1. Cohort Summary</span>
+                </h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                  <div className={`rounded-xl p-4 border ${isDarkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-gray-50/80 border-gray-100'}`}>
+                    <p className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Users Given Free Credit</p>
+                    <p className={`text-xl sm:text-2xl font-black mt-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {Number(cohortEconomics.users_given_free_credit || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className={`rounded-xl p-4 border ${isDarkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-gray-50/80 border-gray-100'}`}>
+                    <p className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Free Credits Used</p>
+                    <p className={`text-xl sm:text-2xl font-black mt-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {Number(cohortEconomics.free_credits_used || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className={`rounded-xl p-4 border ${isDarkMode ? 'bg-gray-900/50 border-gray-700' : 'bg-gray-50/80 border-gray-100'}`}>
+                    <p className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Converted to Paid</p>
+                    <p className={`text-xl sm:text-2xl font-black mt-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {Number(cohortEconomics.converted_to_paid || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className={`rounded-xl p-4 border ${isDarkMode ? 'bg-emerald-950/30 border-emerald-800/40' : 'bg-emerald-50/80 border-emerald-100'}`}>
+                    <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Conversion Rate</p>
+                    <p className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                      {cohortEconomics.conversion_rate_pct || 0}%
+                    </p>
+                  </div>
+                </div>
+                <p className={`mt-2.5 text-xs italic flex items-center gap-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <span>💡</span> This tells you the size and conversion of the experiment.
+                </p>
               </div>
 
-              {/* Save button */}
-              <div className="mt-5 flex items-center gap-3">
-                <button
-                  id="save-cohort-config"
-                  onClick={saveCohortConfig}
-                  disabled={cohortSaving}
-                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                >
-                  {cohortSaving ? (
-                    <><svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Saving…</>
-                  ) : 'Save changes'}
-                </button>
-                {cohortSaved && (
-                  <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
-                    <FaCheck className="h-3.5 w-3.5" /> Saved!
-                  </span>
-                )}
+              {/* 2. Investment (Your Cost) */}
+              <div className={`rounded-xl p-5 border ${isDarkMode ? 'bg-gray-900/40 border-gray-700' : 'bg-rose-50/30 border-rose-100'}`}>
+                <h4 className="text-sm font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1">
+                  2. Investment (Your Cost)
+                </h4>
+                <p className={`text-xs mb-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  Since every used free credit costs Scrib ₹7:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                  <div>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Cost per Free Credit</p>
+                    <p className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>₹{cohortEconomics.cost_per_free_credit || 7}</p>
+                  </div>
+                  <div>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Free Credits Used</p>
+                    <p className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>{Number(cohortEconomics.free_credits_used || 0).toLocaleString()}</p>
+                  </div>
+                  <div className={`pt-3 sm:pt-0 border-t sm:border-t-0 sm:border-l pl-0 sm:pl-4 ${isDarkMode ? 'border-gray-700' : 'border-rose-200'}`}>
+                    <p className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Total Free Credit Cost</p>
+                    <p className="text-2xl font-black text-rose-600 dark:text-rose-400">
+                      ₹{Number(cohortEconomics.total_free_credit_cost || 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-dashed border-gray-200 dark:border-gray-700">
+                  <code className="text-[11px] px-2 py-1 rounded bg-rose-100/60 dark:bg-rose-950/50 text-rose-800 dark:text-rose-300 font-mono inline-block">
+                    Formula: Total Free Credit Cost = Free Credits Used × ₹7
+                  </code>
+                </div>
               </div>
-            </>
-          )}
+
+              {/* 3. Return (Profit, not Revenue) */}
+              <div className={`rounded-xl p-5 border ${isDarkMode ? 'bg-gray-900/40 border-gray-700' : 'bg-emerald-50/30 border-emerald-100'}`}>
+                <h4 className="text-sm font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">
+                  3. Return (Profit, not Revenue)
+                </h4>
+                <p className={`text-xs font-medium mb-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  Don't show revenue. <span className="font-bold underline decoration-emerald-500 decoration-2">Show Lifetime Profit.</span>
+                </p>
+                
+                <div className={`p-4 rounded-xl border mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                  isDarkMode ? 'bg-emerald-950/40 border-emerald-800/50' : 'bg-white border-emerald-200/80 shadow-sm'
+                }`}>
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                      Lifetime Profit from Converted Users
+                    </span>
+                    <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                      ₹{Number(cohortEconomics.lifetime_profit || 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className={`text-xs space-y-2 p-3.5 rounded-lg ${isDarkMode ? 'bg-gray-800/80 text-gray-300' : 'bg-white/80 text-gray-600 border border-gray-100'}`}>
+                  <p>
+                    <strong className="text-gray-900 dark:text-white">Definition:</strong> Sum of the profit earned from all successful payments made by users who originally received the free credit.
+                  </p>
+                  <p className="font-semibold text-gray-700 dark:text-gray-200 pt-1">This accounts for:</p>
+                  <ul className="list-disc list-inside space-y-1 pl-1 text-[11px]">
+                    <li>AI generation costs for paid credits</li>
+                    <li>Payment gateway fees</li>
+                    <li>Any other variable costs included in profit calculation</li>
+                  </ul>
+                  <p className="text-[11px] pt-1.5 border-t border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 italic">
+                    Note: Profit sits around ₹2.5/credit for ₹19 pack, ₹2.0/credit for ₹89 pack, ₹1.5/credit for ₹169 pack, and ₹1.0/credit for ₹319 pack.
+                  </p>
+                </div>
+              </div>
+
+              {/* 4. Net Gain */}
+              <div className={`rounded-xl p-5 border ${isDarkMode ? 'bg-gray-900/40 border-gray-700' : 'bg-indigo-50/30 border-indigo-100'}`}>
+                <h4 className="text-sm font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-3">
+                  4. Net Gain
+                </h4>
+                
+                <div className="max-w-md space-y-2.5 text-sm font-medium">
+                  <div className="flex justify-between items-center">
+                    <span className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Lifetime Profit</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                      ₹{Number(cohortEconomics.lifetime_profit || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="border-t border-gray-200 dark:border-gray-700"></div>
+                  <div className="flex justify-between items-center">
+                    <span className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Free Credit Cost</span>
+                    <span className="font-bold text-rose-600 dark:text-rose-400">
+                      ₹{Number(cohortEconomics.total_free_credit_cost || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="border-t-2 border-gray-300 dark:border-gray-600 pt-2"></div>
+                  <div className="flex justify-between items-center text-base sm:text-lg font-black">
+                    <span className={isDarkMode ? 'text-white' : 'text-gray-900'}>Net Gain</span>
+                    <span className="text-indigo-600 dark:text-indigo-400">
+                      ₹{Number(cohortEconomics.net_gain || 0).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-dashed border-gray-200 dark:border-gray-700">
+                  <code className="text-[11px] px-2 py-1 rounded bg-indigo-100/60 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-300 font-mono inline-block">
+                    Formula: Net Gain = Lifetime Profit − Total Free Credit Cost
+                  </code>
+                </div>
+              </div>
+
+              {/* 5. Return on Investment */}
+              <div className={`rounded-2xl p-6 border-2 relative overflow-hidden ${
+                isDarkMode ? 'bg-gradient-to-br from-indigo-950/50 via-gray-900 to-purple-950/40 border-indigo-500/40' : 'bg-gradient-to-br from-indigo-50 via-white to-purple-50 border-indigo-200 shadow-sm'
+              }`}>
+                <h4 className="text-sm font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">
+                  5. Return on Investment
+                </h4>
+                <p className={`text-xs mb-5 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                  Instead of a percentage, show something every founder understands.
+                </p>
+
+                <div className={`p-5 rounded-xl border flex flex-col sm:flex-row items-center justify-between gap-4 ${
+                  isDarkMode ? 'bg-gray-900/80 border-indigo-800/50' : 'bg-white border-indigo-100 shadow-sm'
+                }`}>
+                  <div>
+                    <p className="text-xs sm:text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                      Every ₹1 Spent on Free Credits Returned
+                    </p>
+                    <p className="text-3xl sm:text-5xl font-black text-indigo-600 dark:text-indigo-400 mt-1 tracking-tight">
+                      ₹{cohortEconomics.return_per_rupee || 6.57}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  <div>
+                    <code className="text-[11px] px-2.5 py-1 rounded bg-indigo-100/60 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 font-mono inline-block">
+                      Formula: Return per ₹1 = Lifetime Profit ÷ Total Free Credit Cost
+                    </code>
+                  </div>
+                  <p className={`text-xs font-mono ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Example: Cost = ₹{Number(cohortEconomics.total_free_credit_cost || 0).toLocaleString()} | Lifetime Profit = ₹{Number(cohortEconomics.lifetime_profit || 0).toLocaleString()} | ₹{Number(cohortEconomics.lifetime_profit || 0).toLocaleString()} ÷ ₹{Number(cohortEconomics.total_free_credit_cost || 0).toLocaleString()} = {cohortEconomics.return_per_rupee || 6.57}
+                  </p>
+                  <div className={`p-3 rounded-lg text-xs font-semibold flex items-center gap-2 ${
+                    isDarkMode ? 'bg-indigo-900/30 text-indigo-200 border border-indigo-800/40' : 'bg-indigo-100/60 text-indigo-900'
+                  }`}>
+                    <span className="text-base">🚀</span>
+                    <span>
+                      <strong>Meaning:</strong> Every ₹1 invested in free credits generated ₹{cohortEconomics.return_per_rupee || 6.57} in lifetime profit.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
