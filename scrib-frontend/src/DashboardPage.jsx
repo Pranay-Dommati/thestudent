@@ -21,6 +21,7 @@ const DashboardPage = () => {
   const { user, logout, isLoggedIn, loading, refreshUser } = useAuth()
   const navigate = useNavigate()
   const [historyItems, setHistoryItems] = useState([])
+  const [loadingData, setLoadingData] = useState(false)
   const [statsData, setStatsData] = useState({ pdfs: 0, creditsUsed: 0 })
   const [shareModalData, setShareModalData] = useState(null)
   const [showBuyModal, setShowBuyModal] = useState(false)
@@ -55,8 +56,13 @@ const DashboardPage = () => {
   }
 
   useEffect(() => {
+    if (!loading && !isLoggedIn) {
+      navigate('/login?redirect=/dashboard', { replace: true })
+      return
+    }
     if (!isLoggedIn) return
     const loadData = async () => {
+      setLoadingData(true)
       try {
         const [notesRes, packsRes] = await Promise.all([
           axiosInstance.get('/scrib/my-notes/'),
@@ -84,10 +90,12 @@ const DashboardPage = () => {
         setStatsData({ pdfs: combined.length, creditsUsed: totalCreditsUsed })
       } catch (err) {
         console.error(err)
+      } finally {
+        setLoadingData(false)
       }
     }
     loadData()
-  }, [isLoggedIn])
+  }, [loading, isLoggedIn, navigate])
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -204,7 +212,22 @@ const DashboardPage = () => {
             <Link to="/generate" state={{ tab: 'history' }} className="text-xs font-semibold text-[#7b756d] hover:text-[#1f1f1f]">View all in History</Link>
           </div>
           <div className="divide-y divide-[#eee6dc]">
-            {historyItems.length === 0 ? (
+            {loading || loadingData ? (
+              <div className="space-y-3 p-4">
+                {[1, 2].map((n) => (
+                  <div key={n} className="animate-pulse flex items-center justify-between py-2">
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="h-9 w-9 rounded-lg bg-[#f0ebe1]" />
+                      <div className="space-y-1.5 flex-1 max-w-sm">
+                        <div className="h-4 w-2/3 rounded bg-[#f0ebe1]" />
+                        <div className="h-3 w-1/3 rounded bg-[#f0ebe1]" />
+                      </div>
+                    </div>
+                    <div className="h-7 w-16 rounded bg-[#f0ebe1]" />
+                  </div>
+                ))}
+              </div>
+            ) : historyItems.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-[#7b756d]">
                 No generations yet. Create your first study pack!
               </div>
@@ -291,6 +314,7 @@ const DashboardPage = () => {
                                   topics: item.topics_json || [item.name],
                                   totalPages: item.total_pages || 1,
                                   isPack,
+                                  returnUrl: '/dashboard'
                                 }
                               })
                             }}

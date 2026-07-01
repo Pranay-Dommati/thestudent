@@ -325,6 +325,7 @@ const App = () => {
                           topics: [note.title],
                           totalPages: 1,
                           isPack: true,
+                          returnUrl: '/'
                         }
                       })
                     }}

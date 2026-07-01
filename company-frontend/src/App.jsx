@@ -10,6 +10,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import NotFound from './components/NotFound/NotFound';
 import AdminForgotPassword from './components/Admin/AdminForgotPassword';
 import AdminResetPassword from './components/Admin/AdminResetPassword';
+import ResetPassword from './components/Auth/ResetPassword';
 import TermsAndConditions from './components/Legal/TermsAndConditions';
 import PrivacyPolicy from './components/Legal/PrivacyPolicy';
 import './utils/axios';
@@ -110,12 +111,15 @@ const App = () => {
                     {/* Auto-route to /offline when disconnected and back when restored */}
                     <OfflineRouterHandler />
 
-                    <Layout excludePaths={['/admin-p', '/offline', '/terms', '/privacy']}>
+                    <Layout excludePaths={['/admin-p', '/offline', '/terms', '/privacy', '/reset-password']}>
                         <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
                             <Routes>
                                 <Route path="/" element={<HomePage />} />
                                 {/* Offline fallback page */}
                                 <Route path="/offline" element={<OfflinePage />} />
+
+                                {/* User Auth Routes */}
+                                <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
 
                                 {/* Admin Routes */}
                                 <Route path="/admin-p/*" element={<AdminDashboard />} />

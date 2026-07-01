@@ -100,6 +100,7 @@ const PreviewsPage = () => {
             topics: [note.subject || note.title],
             totalPages: note.pageCount || 1,
             isPack: true,
+            returnUrl: '/previews'
           }
         })
       }}

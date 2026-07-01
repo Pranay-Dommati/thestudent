@@ -119,9 +119,22 @@ const GeneratePage = () => {
   
   const [historyItems, setHistoryItems] = useState([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [hasLoadedHistory, setHasLoadedHistory] = useState(false)
   const [openDropdownId, setOpenDropdownId] = useState(null)
   const [shareModalData, setShareModalData] = useState(null)
   const [hideBanner, setHideBanner] = useState(false)
+
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName)
+    const newParams = new URLSearchParams(location.search)
+    if (tabName === 'history') {
+      newParams.set('tab', 'history')
+    } else {
+      newParams.delete('tab')
+    }
+    const searchStr = newParams.toString()
+    navigate(`${location.pathname}${searchStr ? `?${searchStr}` : ''}`, { replace: true })
+  }
 
   // Sync active tab if URL changes
   useEffect(() => {
@@ -147,7 +160,10 @@ const GeneratePage = () => {
 
 
   const loadHistory = async () => {
-    if (!isLoggedIn) return
+    if (!isLoggedIn) {
+      setHasLoadedHistory(false)
+      return
+    }
     setIsLoadingHistory(true)
     try {
       const [notesRes, packsRes] = await Promise.all([
@@ -178,6 +194,7 @@ const GeneratePage = () => {
       customToast.error('Failed to load history')
     } finally {
       setIsLoadingHistory(false)
+      setHasLoadedHistory(true)
     }
   }
 
@@ -265,7 +282,11 @@ const GeneratePage = () => {
 
   useEffect(() => {
     if (activeTab === 'history' && !isGenerating) {
-      loadHistory()
+      if (isLoggedIn) {
+        loadHistory()
+      } else {
+        setHasLoadedHistory(false)
+      }
     }
   }, [activeTab, isLoggedIn])
 
@@ -490,7 +511,7 @@ const GeneratePage = () => {
       ? firstTopicName
       : `${firstTopicName} +${validPages.length - 1}`
 
-    setActiveTab('history')
+    handleTabChange('history')
     const tempId = `pending-${Date.now()}`
     setHistoryItems(prev => [{
       id: tempId, type: 'pack', name: packTitle,
@@ -528,7 +549,7 @@ const GeneratePage = () => {
       }, 800)
     } catch (error) {
       setHistoryItems(prev => prev.filter(item => item.id !== tempId))
-      setActiveTab('generate')
+      handleTabChange('generate')
       posthog?.capture('note_generation_failed', {
         page_count: validPages.length, error_status: error?.response?.status,
       })
@@ -599,7 +620,7 @@ const GeneratePage = () => {
       <main className="mx-auto max-w-5xl px-4 md:px-6 py-4 md:py-10">
         <div className="mb-4 md:mb-6 flex space-x-6 border-b border-[#e2dbd2]">
           <button
-            onClick={() => setActiveTab('generate')}
+            onClick={() => handleTabChange('generate')}
             className={`pb-2 text-sm font-semibold transition-colors ${
               activeTab === 'generate'
                 ? 'border-b-2 border-[#1f1f1f] text-[#1f1f1f]'
@@ -609,7 +630,7 @@ const GeneratePage = () => {
             Generate
           </button>
           <button
-            onClick={() => setActiveTab('history')}
+            onClick={() => handleTabChange('history')}
             className={`pb-2 text-sm font-semibold transition-colors ${
               activeTab === 'history'
                 ? 'border-b-2 border-[#1f1f1f] text-[#1f1f1f]'
@@ -991,8 +1012,51 @@ const GeneratePage = () => {
               </div>
             )}
             
-            {isLoadingHistory && historyItems.filter(i => i._isPending).length === 0 ? (
-              <p className="text-sm text-[#7b756d]">Loading history...</p>
+            {(loading || isLoadingHistory || (isLoggedIn && !hasLoadedHistory)) && historyItems.filter(i => i._isPending).length === 0 ? (
+              <div className="space-y-3 py-2">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="animate-pulse flex flex-col gap-3 rounded-xl border border-[#e2dbd2] bg-white p-4 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+                    <div className="flex items-center gap-3.5 flex-1">
+                      <div className="h-10 w-10 rounded-lg bg-[#f0ebe1]" />
+                      <div className="space-y-2 flex-1 max-w-md">
+                        <div className="h-4 w-3/4 rounded bg-[#f0ebe1]" />
+                        <div className="h-3 w-1/3 rounded bg-[#f0ebe1]" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-2 sm:pt-0">
+                      <div className="h-8 w-24 rounded-full bg-[#f0ebe1]" />
+                      <div className="h-8 w-8 rounded-full bg-[#f0ebe1]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : !isLoggedIn ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-[#e2dbd2] bg-white py-16 px-6 text-center shadow-sm my-4">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#f8f5f1] border border-[#e8e2d8]">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#557a3f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </div>
+                <h3 className="mb-2 text-lg font-bold text-[#1f1f1f]">Sign in to view your Scrib history</h3>
+                <p className="mb-6 max-w-md text-sm text-[#7b756d] leading-relaxed">
+                  Your generated study packs and handwritten notes are securely tied to your account. Sign in or create a free account to view and download them anytime.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-xs justify-center">
+                  <button
+                    onClick={() => setShowAuthModal(true)}
+                    className="w-full sm:w-auto rounded-full bg-[#1f1f1f] px-6 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm"
+                  >
+                    Log In to view notes →
+                  </button>
+                  <Link
+                    to="/signup"
+                    className="w-full sm:w-auto rounded-full border border-[#d9d1c7] bg-white px-6 py-2.5 text-sm font-bold text-[#1f1f1f] transition-colors hover:bg-[#f8f5f1]"
+                  >
+                    Sign up free
+                  </Link>
+                </div>
+              </div>
             ) : historyItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#e2dbd2] py-16 text-center">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#f8f5f1]">
@@ -1007,7 +1071,7 @@ const GeneratePage = () => {
                 <h3 className="mb-2 text-base font-bold text-[#1f1f1f]">No Scribs yet</h3>
                 <p className="mb-6 max-w-sm text-sm text-[#7b756d]">You haven't generated any handwritten notes yet. Create your first custom Scrib in seconds!</p>
                 <button
-                  onClick={() => setActiveTab('generate')}
+                  onClick={() => handleTabChange('generate')}
                   className="rounded-full bg-[#1f1f1f] px-6 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 shadow-sm"
                 >
                   Create your first Scrib →
@@ -1063,7 +1127,8 @@ const GeneratePage = () => {
                       totalPages: pages,
                       isPack: isPack,
                       packId: isPack ? item.id : null,
-                      shareToken: item.share_token || null
+                      shareToken: item.share_token || null,
+                      returnUrl: '/generate?tab=history'
                     }
                   })
                 }

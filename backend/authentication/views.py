@@ -1323,13 +1323,13 @@ class AccountActivationTokenGenerator(PasswordResetTokenGenerator):
 token_generator = AccountActivationTokenGenerator()
 
 
-def send_password_reset_email(user_email, uid, token, is_admin=False):
+def send_password_reset_email(user_email, uid, token, is_admin=False, origin=None):
     """Send password reset email — prefer AWS SES API with a friendly display name.
     Falls back to the legacy SMTP sender if SES is not available.
     """
     try:
         # Create reset URL - different for admin vs regular users
-        frontend_domain = getattr(settings, 'FRONTEND_DOMAIN', 'http://localhost:5173')
+        frontend_domain = origin if origin else getattr(settings, 'FRONTEND_DOMAIN', 'http://localhost:5173')
         if is_admin:
             reset_url = f"{frontend_domain}/admin-p/reset-password/{uid}/{token}"
             subject = "Admin Password Reset Request - EasyLearnova"
@@ -1444,12 +1444,29 @@ def forgot_password(request):
         try:
             user = User.objects.get(email=email)
             
+            # Determine valid frontend origin where request came from
+            origin = request.headers.get('Origin') or request.META.get('HTTP_ORIGIN') or request.data.get('origin') or request.data.get('domain')
+            if not origin:
+                referer = request.headers.get('Referer') or request.META.get('HTTP_REFERER')
+                if referer:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(referer)
+                    if parsed.scheme and parsed.netloc:
+                        origin = f"{parsed.scheme}://{parsed.netloc}"
+            
+            valid_origin = None
+            if origin:
+                clean_origin = str(origin).strip().rstrip('/')
+                allowed_cors = getattr(settings, 'CORS_ALLOWED_ORIGINS', [])
+                if clean_origin in allowed_cors or any(clean_origin.endswith(domain) for domain in ['.easylearnova.com', 'localhost:5173', 'localhost:5174', 'localhost:3000']) or clean_origin in ['https://easylearnova.com', 'https://www.easylearnova.com']:
+                    valid_origin = clean_origin
+            
             # Generate token and uid
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = token_generator.make_token(user)
             
-            # Send email
-            email_sent = send_password_reset_email(user.email, uid, token)
+            # Send email with dynamic origin
+            email_sent = send_password_reset_email(user.email, uid, token, origin=valid_origin)
             
             if email_sent:
                 logger.info(f"Password reset initiated for user: {email}")

@@ -175,7 +175,7 @@ const TopicPage = () => {
 
             <div className="mt-10 flex flex-col gap-4">
               <button 
-                onClick={() => navigate(`/view/${slug}`, { state: { pdfUrl: topic.pdf_url, title: topic.title, topics: [content?.category || topic.title], totalPages: topic.page_count, isPack: true } })}
+                onClick={() => navigate(`/view/${slug}`, { state: { pdfUrl: topic.pdf_url, title: topic.title, topics: [content?.category || topic.title], totalPages: topic.page_count, isPack: true, returnUrl: window.location.pathname } })}
                 className="w-full rounded-lg bg-[#c05c5c] px-6 py-3 text-center text-sm font-semibold text-white hover:bg-[#a84d4d] transition-colors shadow-sm"
               >
                 View Full PDF Notes
@@ -190,7 +190,7 @@ const TopicPage = () => {
             <div 
               ref={containerRef}
               className="aspect-[1/1.4] w-full rounded-xl overflow-hidden bg-[#f0eadd] relative group flex items-center justify-center cursor-pointer"
-              onClick={() => navigate(`/view/${slug}`, { state: { pdfUrl: topic.pdf_url, title: topic.title, topics: [content?.category || topic.title], totalPages: topic.page_count, isPack: true } })}
+              onClick={() => navigate(`/view/${slug}`, { state: { pdfUrl: topic.pdf_url, title: topic.title, topics: [content?.category || topic.title], totalPages: topic.page_count, isPack: true, returnUrl: window.location.pathname } })}
             >
               <Document
                 file={topic.pdf_url}
