@@ -65,9 +65,18 @@ class User(AbstractUser):
         default='main',
         help_text='Which product the user originally signed up from'
     )
-    
+
+    # Scrib cohort tracking — set at account activation (OTP or Google)
+    signup_cohort = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        help_text='Scrib marketing cohort active when this user first signed up (preview | free_credit | null if pre-dates cohort tracking)',
+    )
+
     date_joined = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
     
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['full_name']

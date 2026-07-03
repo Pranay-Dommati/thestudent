@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import uuid
@@ -5,7 +6,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import Case, F, IntegerField, Sum, When
+from django.db.models import Case, F, IntegerField, Q, Sum, When
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.views import APIView
@@ -14,7 +16,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # pyrefly: ignore [missing-import]
-from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction, PromoCode, PromoCodeRedemption, ScribConfig
+from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction, PromoCode, PromoCodeRedemption, ScribConfig, CohortPeriod
 # pyrefly: ignore [missing-import]
 from .serializers import (
     PreviewNoteSerializer,
@@ -2350,7 +2352,87 @@ class AdminScribConfigView(APIView):
             'give_free_credit_on_signup': config.give_free_credit_on_signup,
             'updated_at': config.updated_at,
             'cohort_economics': cohort_economics,
+            'cohort_comparison': self._compute_cohort_comparison(),
         })
+
+    def _compute_cohort_comparison(self):
+        """Aggregate lifetime signup and payment metrics grouped by User.signup_cohort.
+
+        Profit per pack per cohort uses the same per-pack formula as cohort_economics.
+        Returns a dict keyed by cohort name with summary stats + a periods timeline.
+        """
+        User = get_user_model()
+        now = timezone.now()
+        results = {}
+
+        for cohort_key in [CohortPeriod.COHORT_PREVIEW, CohortPeriod.COHORT_FREE_CREDIT]:
+            signups = User.objects.filter(signup_cohort=cohort_key).count()
+
+            paid_payments = Payment.objects.filter(
+                user__signup_cohort=cohort_key,
+                status=Payment.STATUS_PAID,
+            )
+            paid_user_ids = paid_payments.values_list('user_id', flat=True).distinct()
+            paid_users = paid_user_ids.count()
+            conversion_pct = round(paid_users * 100.0 / signups, 2) if signups else 0.0
+
+            lifetime_profit = 0
+            for p in paid_payments:
+                if p.amount == 1900 or p.credits_added == 2:
+                    lifetime_profit += 5
+                elif p.amount == 8900 or p.credits_added == 10:
+                    lifetime_profit += 20
+                elif p.amount == 16900 or p.credits_added == 20:
+                    lifetime_profit += 30
+                elif p.amount == 31900 or p.credits_added == 40:
+                    lifetime_profit += 40
+                else:
+                    lifetime_profit += round((p.amount / 100.0) * 0.22)
+
+            avg_profit = round(lifetime_profit / paid_users, 2) if paid_users else 0.0
+
+            credits_used = CreditTransaction.objects.filter(
+                user__signup_cohort=cohort_key,
+                direction=CreditTransaction.DIRECTION_DEBIT,
+            ).aggregate(total=Sum('credits'))['total'] or 0
+
+            # Days active = sum of all period durations for this cohort (in float days)
+            periods_qs = CohortPeriod.objects.filter(cohort=cohort_key)
+            total_sec = sum(
+                ((p.ended_at or now) - p.started_at).total_seconds()
+                for p in periods_qs
+            )
+            days_float = round(total_sec / 86400.0, 1) if total_sec > 0 else 0
+            days_active = int(days_float) if isinstance(days_float, float) and days_float.is_integer() else days_float
+
+            signups_per_day = round(signups / days_float, 1) if days_float > 0 else 0.0
+
+            results[cohort_key] = {
+                'signups': signups,
+                'signups_per_day': signups_per_day,
+                'paid_users': paid_users,
+                'conversion_pct': conversion_pct,
+                'lifetime_profit': lifetime_profit,
+                'avg_profit_per_paid_user': avg_profit,
+                'credits_used': credits_used,
+                'days_active': days_active,
+            }
+
+
+        # Build a period timeline for display
+        periods_timeline = [
+            {
+                'cohort': p.cohort,
+                'started_at': p.started_at.isoformat(),
+                'ended_at': p.ended_at.isoformat() if p.ended_at else None,
+            }
+            for p in CohortPeriod.objects.order_by('started_at')
+        ]
+
+        return {
+            'by_cohort': results,
+            'periods': periods_timeline,
+        }
 
     def patch(self, request):
         denied = self._check_superuser(request)
@@ -2367,6 +2449,19 @@ class AdminScribConfigView(APIView):
                 return Response(
                     {'error': f'Invalid cohort. Must be one of: {valid_cohorts}'},
                     status=400,
+                )
+            if cohort != config.cohort:
+                # Close the currently active period and open a new one
+                now = timezone.now()
+                CohortPeriod.objects.filter(ended_at__isnull=True).update(ended_at=now)
+                CohortPeriod.objects.create(
+                    cohort=cohort,
+                    started_at=now,
+                    switched_by=request.user,
+                )
+                logger.info(
+                    f"Admin {request.user.email} switched cohort: "
+                    f"{config.cohort} → {cohort}. New CohortPeriod created."
                 )
             config.cohort = cohort
             changed = True

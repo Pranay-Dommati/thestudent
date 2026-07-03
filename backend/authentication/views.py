@@ -78,6 +78,27 @@ def grant_signup_credits(user):
         logger.error(f"Failed to grant signup credits to {user.email}: {exc}")
 
 
+def tag_signup_cohort(user):
+    """Stamp the currently active CohortPeriod onto user.signup_cohort.
+
+    Called once at account activation (OTP verify or Google OAuth new-user path).
+    If signup_cohort is already set, or if no CohortPeriod exists yet, this is
+    a no-op — we never overwrite an existing cohort tag.
+    Non-fatal: any exception is logged and swallowed so it never blocks signup.
+    """
+    if user.signup_cohort:
+        return  # already tagged (e.g. retroactive backfill already ran)
+    try:
+        from scrib.models import CohortPeriod
+        period = CohortPeriod.current()
+        if period:
+            user.signup_cohort = period.cohort
+            user.save(update_fields=['signup_cohort'])
+            logger.info(f"Tagged signup_cohort='{period.cohort}' for new user {user.email}")
+    except Exception as exc:
+        logger.error(f"Failed to tag signup_cohort for {user.email}: {exc}")
+
+
 # Import database retry utilities for handling remote MySQL (Hostinger) connection issues
 from backend.db_utils import db_retry_on_connection_error
 
@@ -411,7 +432,9 @@ def otp_verify(request):
     if first_activation:
         user.is_active = True
         user.save(update_fields=['is_active'])
-        # Grant 1 free credit to new signups
+        # Tag which cohort was active when this user signed up
+        tag_signup_cohort(user)
+        # Grant 1 free credit to new signups (if Cohort B + toggle ON)
         grant_signup_credits(user)
 
     # Issue tokens
@@ -1113,6 +1136,7 @@ def google_auth_callback(request):
                 user.agreed_to_terms = True  # Google users implicitly agree
                 user.save(update_fields=['is_active', 'auth_method', 'full_name', 'agreed_to_terms'])
                 logger.info(f"Google auth: Activated previously inactive user - {email}")
+                tag_signup_cohort(user)
                 
         except User.DoesNotExist:
             # Create new user using your custom UserManager.create_user method
@@ -1126,6 +1150,7 @@ def google_auth_callback(request):
                 )
                 created = True
                 logger.info(f"Google Auth Token: New user created - {email}")
+                tag_signup_cohort(user)
                 grant_signup_credits(user)
             except Exception as e:
                 logger.error(f"Error creating user from token: {str(e)}")
@@ -1281,6 +1306,7 @@ def google_auth_token(request):
                 )
                 created = True
                 logger.info(f"Google token auth: New user created - {email}")
+                tag_signup_cohort(user)
                 grant_signup_credits(user)
             except Exception as e:
                 logger.error(f"Error creating user: {str(e)}")

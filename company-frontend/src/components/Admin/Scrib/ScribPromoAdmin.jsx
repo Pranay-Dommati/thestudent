@@ -436,6 +436,7 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
     net_gain: 82108,
     return_per_rupee: 6.57,
   });
+  const [cohortComparison, setCohortComparison] = useState(null);
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -470,6 +471,9 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
       setGiveFreeCredit(res.data.give_free_credit_on_signup);
       if (res.data.cohort_economics) {
         setCohortEconomics(res.data.cohort_economics);
+      }
+      if (res.data.cohort_comparison) {
+        setCohortComparison(res.data.cohort_comparison);
       }
     } catch {
       setCohortError('Failed to load cohort config.');
@@ -938,6 +942,153 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
                 </div>
               </div>
             </div>
+
+            {/* Card 3: Lifetime Cohort Comparison */}
+            {cohortComparison && (() => {
+              const B = cohortComparison.by_cohort?.free_credit || {};
+              const A = cohortComparison.by_cohort?.preview || {};
+              const periods = cohortComparison.periods || [];
+
+              const delta = (aVal, bVal, higherIsBetter = true) => {
+                if (!bVal) return null;
+                const pct = Math.round(((aVal - bVal) / bVal) * 100);
+                const improved = higherIsBetter ? pct > 0 : pct < 0;
+                return { pct, improved };
+              };
+
+              const DeltaBadge = ({ d }) => {
+                if (!d) return null;
+                return (
+                  <span className={`ml-1.5 inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    d.improved ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                  }`}>
+                    {d.pct > 0 ? '↑' : '↓'} {Math.abs(d.pct)}%
+                  </span>
+                );
+              };
+
+              const rows = [
+                { label: 'Days Active',              bVal: B.days_active,              aVal: A.days_active,              fmt: v => v ?? '—',        higher: false },
+                { label: 'Total Signups',             bVal: B.signups,                  aVal: A.signups,                  fmt: v => v?.toLocaleString() ?? '—', higher: false },
+                { label: 'Signups / Day',             bVal: B.signups_per_day,          aVal: A.signups_per_day,          fmt: v => v != null ? `${v}` : '—',   higher: true  },
+                { label: 'Paid Users',                bVal: B.paid_users,               aVal: A.paid_users,               fmt: v => v?.toLocaleString() ?? '—', higher: true  },
+                { label: 'Paid Conversion Rate',      bVal: B.conversion_pct,           aVal: A.conversion_pct,           fmt: v => v != null ? `${v}%` : '—',  higher: true, emphasis: true },
+                { label: 'Lifetime Profit',           bVal: B.lifetime_profit,          aVal: A.lifetime_profit,          fmt: v => v != null ? `₹${Number(v).toLocaleString()}` : '—', higher: true },
+
+                { label: 'Avg Profit / Paid User',    bVal: B.avg_profit_per_paid_user, aVal: A.avg_profit_per_paid_user, fmt: v => v != null ? `₹${v}` : '—',  higher: true },
+                { label: 'Credits Used',              bVal: B.credits_used,             aVal: A.credits_used,             fmt: v => v?.toLocaleString() ?? '—', higher: false },
+              ];
+
+              const textMain = isDarkMode ? 'text-white' : 'text-gray-900';
+              const textSub  = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+              const cardBg   = isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200/80';
+
+              return (
+                <div className={`mt-8 rounded-2xl shadow-sm border p-6 md:p-8 ${cardBg}`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center gap-3.5">
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                        isDarkMode ? 'bg-indigo-950/60 border border-indigo-800' : 'bg-indigo-50 border border-indigo-100'
+                      }`}>
+                        <span className="text-2xl">⚖️</span>
+                      </div>
+                      <div>
+                        <h3 className={`font-extrabold text-lg sm:text-xl tracking-tight ${textMain}`}>
+                          Lifetime Cohort Comparison
+                        </h3>
+                        <p className={`text-xs mt-0.5 ${textSub}`}>
+                          All-time metrics aggregated by the cohort users signed up under
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-xs px-3 py-1.5 rounded-full font-semibold ${
+                      isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {periods.length} period{periods.length !== 1 ? 's' : ''} tracked
+                    </span>
+                  </div>
+
+                  <div className="mt-6 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr>
+                          <th className={`text-left py-3 pr-4 font-semibold text-xs uppercase tracking-wider ${textSub}`}>Metric</th>
+                          <th className={`text-center py-3 px-4 font-extrabold text-sm ${
+                            isDarkMode ? 'text-amber-300' : 'text-amber-600'
+                          }`}>
+                            Cohort B
+                            <span className={`block text-[10px] font-normal ${textSub}`}>Free Credit</span>
+                          </th>
+                          <th className={`text-center py-3 pl-4 font-extrabold text-sm ${
+                            isDarkMode ? 'text-indigo-300' : 'text-indigo-600'
+                          }`}>
+                            Cohort A
+                            <span className={`block text-[10px] font-normal ${textSub}`}>Preview Modal</span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-100'}`}>
+                        {rows.map(({ label, bVal, aVal, fmt, higher, emphasis }) => {
+                          const d = delta(aVal, bVal, higher);
+                          return (
+                            <tr key={label} className={emphasis ? (isDarkMode ? 'bg-indigo-950/20' : 'bg-indigo-50/40') : ''}>
+                              <td className={`py-3 pr-4 font-medium ${emphasis ? (isDarkMode ? 'text-indigo-200' : 'text-indigo-800') : textMain}`}>
+                                {label}
+                                {emphasis && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-500">★ KEY</span>}
+                              </td>
+                              <td className={`py-3 px-4 text-center font-semibold ${
+                                isDarkMode ? 'text-amber-200' : 'text-amber-700'
+                              }`}>
+                                {fmt(bVal)}
+                              </td>
+                              <td className={`py-3 pl-4 text-center font-semibold flex items-center justify-center gap-0 ${
+                                isDarkMode ? 'text-indigo-200' : 'text-indigo-700'
+                              }`}>
+                                {fmt(aVal)}
+                                <DeltaBadge d={d} />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className={`mt-5 pt-4 border-t text-xs flex items-center gap-4 flex-wrap ${
+                    isDarkMode ? 'border-gray-700 text-gray-400' : 'border-gray-100 text-gray-500'
+                  }`}>
+                    <span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold text-[10px] mr-1">↑ x%</span>
+                      Cohort A is better than Cohort B by x%
+                    </span>
+                    <span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-[10px] mr-1">↓ x%</span>
+                      Cohort A is worse than Cohort B by x%
+                    </span>
+                  </div>
+
+                  {periods.length > 0 && (
+                    <div className="mt-5 pt-4 border-t border-gray-100 dark:border-gray-700">
+                      <p className={`text-xs font-semibold mb-2 uppercase tracking-wider ${textSub}`}>Period Timeline</p>
+                      <div className="flex flex-wrap gap-2">
+                        {periods.map((p, i) => (
+                          <div key={i} className={`text-xs px-2.5 py-1.5 rounded-lg border font-medium ${
+                            p.cohort === 'free_credit'
+                              ? (isDarkMode ? 'bg-amber-900/30 border-amber-700/50 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-800')
+                              : (isDarkMode ? 'bg-indigo-900/30 border-indigo-700/50 text-indigo-200' : 'bg-indigo-50 border-indigo-200 text-indigo-800')
+                          }`}>
+                            <span className="font-bold">{p.cohort === 'free_credit' ? 'B' : 'A'}</span>
+                            {' '}{new Date(p.started_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                            {' → '}
+                            {p.ended_at ? new Date(p.ended_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'now'}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

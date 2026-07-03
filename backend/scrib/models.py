@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 from django.utils.text import slugify
 
 
@@ -344,3 +345,64 @@ class ScribConfig(models.Model):
     def __str__(self):
         credit_label = ' (+ free credit)' if self.give_free_credit_on_signup else ''
         return f'ScribConfig: {self.cohort}{credit_label}'
+
+
+class CohortPeriod(models.Model):
+    """Immutable log of every cohort Scrib has run.
+
+    When the admin switches cohorts:
+      1. The current active period gets ended_at = now.
+      2. A new period is created with started_at = now, ended_at = NULL.
+
+    Once a period is closed (ended_at is set) it is NEVER modified.
+    Analytics are derived from User.signup_cohort, not from these timestamps —
+    CohortPeriod is used only to (a) determine the active cohort at signup time,
+    and (b) display a historical timeline in the admin.
+    """
+
+    COHORT_PREVIEW     = 'preview'
+    COHORT_FREE_CREDIT = 'free_credit'
+
+    COHORT_CHOICES = [
+        (COHORT_PREVIEW,     'Cohort A — Preview Modal'),
+        (COHORT_FREE_CREDIT, 'Cohort B — Free Credit'),
+    ]
+
+    cohort      = models.CharField(max_length=20, choices=COHORT_CHOICES)
+    started_at  = models.DateTimeField()
+    ended_at    = models.DateTimeField(null=True, blank=True)
+    switched_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='cohort_switches',
+    )
+
+    class Meta:
+        ordering = ['started_at']
+        verbose_name = 'Cohort Period'
+        verbose_name_plural = 'Cohort Periods'
+        indexes = [
+            models.Index(fields=['cohort'], name='scrib_cohort_period_cohort_idx'),
+            models.Index(fields=['ended_at'], name='scrib_cohort_period_ended_idx'),
+        ]
+
+    @classmethod
+    def current(cls):
+        """Return the currently active period (ended_at IS NULL), or None."""
+        return cls.objects.filter(ended_at__isnull=True).order_by('-started_at').first()
+
+    @classmethod
+    def cohort_at(cls, dt):
+        """Return the cohort name active at a given datetime, or None."""
+        period = cls.objects.filter(
+            started_at__lte=dt
+        ).filter(
+            models.Q(ended_at__isnull=True) | models.Q(ended_at__gt=dt)
+        ).order_by('-started_at').first()
+        return period.cohort if period else None
+
+    def __str__(self):
+        end = self.ended_at.strftime('%Y-%m-%d') if self.ended_at else 'now'
+        return f'{self.cohort}: {self.started_at.strftime("%Y-%m-%d")} → {end}'
