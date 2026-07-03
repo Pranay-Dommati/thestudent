@@ -485,9 +485,11 @@ const GeneratePage = () => {
     try {
       const response = await axiosInstance.post('/scrib/moderate-topics/', { topics: allTopicNames })
       const moderationFlags = response.data.moderation || []
-      const isValid = moderationFlags.every((flag) => flag === true)
+      const isValid = Array.isArray(moderationFlags)
+        ? moderationFlags.every((flag) => Boolean(flag) && flag !== 'false' && flag !== 0)
+        : true
       if (!isValid) {
-        const badTopics = allTopicNames.filter((_, idx) => moderationFlags[idx] === false)
+        const badTopics = allTopicNames.filter((_, idx) => !moderationFlags[idx] || moderationFlags[idx] === 'false' || moderationFlags[idx] === 0)
         setInvalidTopics(badTopics.length > 0 ? badTopics : allTopicNames)
         customToast.error('One or more topics violate our content policy. Please revise.', { id: 'gen-error', duration: 5000 })
         setIsGenerating(false)
@@ -496,6 +498,7 @@ const GeneratePage = () => {
     } catch (err) {
       console.error('Moderation check failed', err)
     }
+
 
 
     const creditsNeeded = validPages.length

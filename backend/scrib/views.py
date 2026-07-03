@@ -513,22 +513,52 @@ class ModerateTopicsView(APIView):
             return error_response('List of topics is required', status_code=400)
             
         prompt = (
-            f"You are a strict content moderator for an educational app. Evaluate the following list of study topics. "
-            f"Return a JSON array of booleans corresponding to each topic. True means it is a valid, acceptable educational or general topic. "
-            f"False means it is highly inappropriate, sexually explicit, pornographic, or hate speech. Return ONLY the JSON array.\n\n"
+            f"You are a helpful content safety classifier for an educational study platform. "
+            f"Evaluate the following list of study topics.\n"
+            f"You MUST be permissive and allow all academic, scientific, medical, historical, technical, professional, and general knowledge topics "
+            f"(including Chemistry, Biology, Anatomy, Pharmacology, Warfare History, Cybersecurity, Law, etc.).\n"
+            f"Only return false if a topic is egregiously sexually explicit pornography or severe hate speech.\n"
+            f"Return ONLY a JSON array of booleans (true or false) with exactly {len(topics)} elements corresponding to each topic.\n\n"
             f"Topics:\n{json.dumps(topics)}"
         )
         
         try:
             response_text = call_scrib_vertex_ai(prompt, response_mime_type='application/json')
             
-            # Clean up the markdown if present
+            # Clean up markdown if present
             if response_text.startswith('```json'):
                 response_text = response_text[7:-3].strip()
             elif response_text.startswith('```'):
                 response_text = response_text[3:-3].strip()
                 
-            return Response({'moderation': json.loads(response_text)})
+            parsed = json.loads(response_text)
+            
+            # Extract list if LLM wrapped it in a dict
+            if isinstance(parsed, dict):
+                for k, v in parsed.items():
+                    if isinstance(v, list):
+                        parsed = v
+                        break
+                        
+            if not isinstance(parsed, list) or len(parsed) != len(topics):
+                logger.warning(f"ModerateTopicsView: AI returned unexpected format {parsed}, defaulting to allow.")
+                return Response({'moderation': [True] * len(topics)})
+                
+            clean_flags = []
+            for item in parsed:
+                if isinstance(item, bool):
+                    clean_flags.append(item)
+                elif isinstance(item, str):
+                    clean_flags.append(item.lower() not in ('false', '0', 'no', 'f'))
+                elif isinstance(item, (int, float)):
+                    clean_flags.append(bool(item))
+                elif isinstance(item, dict):
+                    val = item.get('valid', item.get('allowed', item.get('is_valid', True)))
+                    clean_flags.append(bool(val))
+                else:
+                    clean_flags.append(True)
+                    
+            return Response({'moderation': clean_flags})
         except Exception as e:
             # Fallback: assume valid if AI fails, but log it
             logger.error(f"Moderation failed: {e}")
