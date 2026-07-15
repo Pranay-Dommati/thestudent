@@ -29,6 +29,115 @@ const fmt = {
   },
 };
 
+const parseTopicsList = (topicsJson) => {
+  if (!topicsJson) return [];
+  let parsed = topicsJson;
+  if (typeof parsed === 'string') {
+    try { parsed = JSON.parse(parsed); } catch { return []; }
+  }
+  if (!Array.isArray(parsed) || !parsed.length) return [];
+  const list = [];
+  parsed.forEach((page, pageIdx) => {
+    if (page && typeof page === 'object' && Array.isArray(page.topics)) {
+      page.topics.forEach((t) => {
+        if (t && typeof t === 'object') {
+          if (t.name || t.instruction) {
+            list.push({
+              pageNumber: pageIdx + 1,
+              name: t.name || '—',
+              instruction: t.instruction || '',
+            });
+          }
+        } else if (t) {
+          list.push({ pageNumber: pageIdx + 1, name: String(t), instruction: '' });
+        }
+      });
+    } else if (Array.isArray(page)) {
+      page.forEach((t) => {
+        if (t && typeof t === 'object') {
+          list.push({ pageNumber: pageIdx + 1, name: t.name || '—', instruction: t.instruction || '' });
+        } else if (t) {
+          list.push({ pageNumber: pageIdx + 1, name: String(t), instruction: '' });
+        }
+      });
+    } else if (page && typeof page === 'object' && (page.name || page.topic)) {
+      list.push({ pageNumber: pageIdx + 1, name: page.name || page.topic, instruction: page.instruction || '' });
+    } else if (page) {
+      list.push({ pageNumber: pageIdx + 1, name: String(page), instruction: '' });
+    }
+  });
+  return list;
+};
+
+const TopicsBreakdownBox = ({ topicsList, title, email, isDarkMode }) => {
+  if (!topicsList || !topicsList.length) return null;
+  const pages = Array.from(new Set(topicsList.map(t => t.pageNumber)));
+  return (
+    <div className={`p-4 rounded-xl border shadow-inner text-left space-y-3 ${
+      isDarkMode ? 'bg-gray-800/90 border-gray-700' : 'bg-white border-indigo-100'
+    }`}>
+      <div className="flex items-center justify-between border-b pb-2.5 border-inherit">
+        <div>
+          <span className="text-xs font-bold tracking-wide uppercase text-indigo-600 dark:text-indigo-400">
+            📋 User Entered Topics & Optional Instructions
+          </span>
+          {title && (
+            <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              Study Note: <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{title}</span> {email ? `(${email})` : ''}
+            </p>
+          )}
+        </div>
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-indigo-300">
+          {topicsList.length} topic{topicsList.length !== 1 ? 's' : ''} • {pages.length} page{pages.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1">
+        {pages.map(pageNum => {
+          const pageTopics = topicsList.filter(t => t.pageNumber === pageNum);
+          return (
+            <div key={pageNum} className={`p-3 rounded-lg border flex flex-col justify-between ${
+              isDarkMode ? 'bg-gray-900/70 border-gray-700' : 'bg-gray-50/80 border-gray-200 shadow-sm'
+            }`}>
+              <div>
+                <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-inherit">
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                    isDarkMode ? 'bg-indigo-900/80 text-indigo-300' : 'bg-indigo-100 text-indigo-800'
+                  }`}>
+                    Page {pageNum}
+                  </span>
+                  <span className="text-[11px] text-gray-400 font-medium">
+                    {pageTopics.length} topic{pageTopics.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <ul className="space-y-2">
+                  {pageTopics.map((t, idx) => (
+                    <li key={idx} className="text-xs">
+                      <div className="font-semibold flex items-start gap-1.5">
+                        <span className="text-indigo-500 mt-0.5 shrink-0">•</span>
+                        <span className={`break-words ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>{t.name}</span>
+                      </div>
+                      {t.instruction ? (
+                        <div className={`mt-1.5 ml-3 p-2 rounded text-[11px] border-l-2 border-amber-500 ${
+                          isDarkMode ? 'bg-gray-800/90 text-amber-300' : 'bg-amber-50 text-amber-900'
+                        }`}>
+                          <span className="font-semibold text-gray-400 text-[10px] uppercase tracking-wider block mb-0.5">Optional Instruction:</span>
+                          <span className="italic">"{t.instruction}"</span>
+                        </div>
+                      ) : (
+                        <span className="ml-3 text-[10px] text-gray-400 italic block mt-0.5">No optional instruction provided</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // ─── Summary Card ────────────────────────────────────────────────────────────
 
 const KpiCard = ({ label, value, icon: Icon, color, sub, isDarkMode }) => (
@@ -130,6 +239,7 @@ const LeaderboardPanel = ({ title, icon: Icon, color, entries, valueKey, valueLa
 // ─── Note Generations Table ──────────────────────────────────────────────────
 
 const NoteGenerationsTable = ({ packs = [], emptyMessage, isDarkMode, handleViewPdf, pdfLoadingId, maxH = '' }) => {
+  const [expandedPackId, setExpandedPackId] = useState(null);
   const textMain = isDarkMode ? 'text-white' : 'text-gray-900';
   const textSub = isDarkMode ? 'text-gray-400' : 'text-gray-500';
 
@@ -148,39 +258,75 @@ const NoteGenerationsTable = ({ packs = [], emptyMessage, isDarkMode, handleView
             </tr>
           </thead>
           <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-100'}`}>
-            {packs.map(pack => (
-              <tr key={pack.id} className={isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                <td className={`px-4 py-3 font-medium truncate max-w-[200px] ${textMain}`}>{pack.title}</td>
-                <td className={`px-4 py-3 ${textSub}`}>{pack.email}</td>
-                <td className={`px-4 py-3 ${textMain}`}>{pack.total_pages}</td>
-                <td className={`px-4 py-3`}>
-                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize
-                    ${pack.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
-                      pack.status === 'generating' ? 'bg-amber-100 text-amber-700' :
-                      pack.status === 'failed' ? 'bg-red-100 text-red-700' :
-                      'bg-gray-100 text-gray-700'}`}>
-                    {pack.status}
-                  </span>
-                </td>
-                <td className={`px-4 py-3 text-xs ${textSub}`}>
-                  {fmt.date(pack.created_at)} ({fmt.relDate(pack.created_at)})
-                </td>
-                <td className="px-4 py-3 text-center">
-                  {(pack.status === 'completed' || pack.status === 'ready') ? (
-                    <button
-                      onClick={() => handleViewPdf(pack.id)}
-                      disabled={pdfLoadingId === pack.id}
-                      className={`text-lg transition-transform ${pdfLoadingId === pack.id ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'}`}
-                      title="View PDF"
-                    >
-                      {pdfLoadingId === pack.id ? <FaSpinner className="animate-spin h-4 w-4" /> : '📄'}
-                    </button>
-                  ) : (
-                    <span className={`text-xs ${textSub}`}>—</span>
+            {packs.map(pack => {
+              const topicsList = parseTopicsList(pack.topics_json);
+              const isExpanded = expandedPackId === pack.id;
+              return (
+                <React.Fragment key={pack.id}>
+                  <tr className={isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                    <td className={`px-4 py-3 font-medium max-w-[260px] ${textMain}`}>
+                      <div className="truncate" title={pack.title}>{pack.title}</div>
+                      {topicsList.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedPackId(isExpanded ? null : pack.id)}
+                          className={`mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md border transition-colors ${
+                            isExpanded
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : isDarkMode
+                                ? 'bg-gray-700/80 text-indigo-300 border-gray-600 hover:bg-gray-700'
+                                : 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100'
+                          }`}
+                        >
+                          <span>📋 {topicsList.length} topic{topicsList.length !== 1 ? 's' : ''} & optional instructions</span>
+                          {isExpanded ? <FaChevronUp className="text-[10px]" /> : <FaChevronDown className="text-[10px]" />}
+                        </button>
+                      )}
+                    </td>
+                    <td className={`px-4 py-3 ${textSub}`}>{pack.email}</td>
+                    <td className={`px-4 py-3 ${textMain}`}>{pack.total_pages}</td>
+                    <td className={`px-4 py-3`}>
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize
+                        ${pack.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
+                          pack.status === 'generating' ? 'bg-amber-100 text-amber-700' :
+                          pack.status === 'failed' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'}`}>
+                        {pack.status}
+                      </span>
+                    </td>
+                    <td className={`px-4 py-3 text-xs ${textSub}`}>
+                      {fmt.date(pack.created_at)} ({fmt.relDate(pack.created_at)})
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {(pack.status === 'completed' || pack.status === 'ready') ? (
+                        <button
+                          onClick={() => handleViewPdf(pack.id)}
+                          disabled={pdfLoadingId === pack.id}
+                          className={`text-lg transition-transform ${pdfLoadingId === pack.id ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'}`}
+                          title="View PDF"
+                        >
+                          {pdfLoadingId === pack.id ? <FaSpinner className="animate-spin h-4 w-4" /> : '📄'}
+                        </button>
+                      ) : (
+                        <span className={`text-xs ${textSub}`}>—</span>
+                      )}
+                    </td>
+                  </tr>
+                  {isExpanded && topicsList.length > 0 && (
+                    <tr className={isDarkMode ? 'bg-gray-900/60' : 'bg-indigo-50/30'}>
+                      <td colSpan="6" className="px-4 py-4 whitespace-normal">
+                        <TopicsBreakdownBox
+                          topicsList={topicsList}
+                          title={pack.title}
+                          email={pack.email}
+                          isDarkMode={isDarkMode}
+                        />
+                      </td>
+                    </tr>
                   )}
-                </td>
-              </tr>
-            ))}
+                </React.Fragment>
+              );
+            })}
             {!packs.length && (
               <tr>
                 <td colSpan="6" className={`px-4 py-8 text-center text-sm ${textSub}`}>{emptyMessage}</td>
@@ -196,8 +342,8 @@ const NoteGenerationsTable = ({ packs = [], emptyMessage, isDarkMode, handleView
 // ─── PDF Drilldown Drawer ────────────────────────────────────────────────────
 
 const DrilldownDrawer = ({ user, onClose, isDarkMode }) => {
-  // pdfState: null | { loading: true, packId } | { url: string, title: string } | { error: string }
   const [pdfState, setPdfState] = useState(null);
+  const [expandedPackId, setExpandedPackId] = useState(null);
 
   const bg = isDarkMode ? 'bg-gray-900' : 'bg-white';
   const border = isDarkMode ? 'border-gray-700' : 'border-gray-200';
@@ -209,14 +355,15 @@ const DrilldownDrawer = ({ user, onClose, isDarkMode }) => {
 
   const handleViewPdf = async (pack) => {
     // If pack has s3_key (or even pdf_url stored) — fetch a fresh URL from the admin endpoint
-    setPdfState({ loading: true, packId: pack.id, title: pack.title });
+    setPdfState({ loading: true, packId: pack.id, title: pack.title, topicsJson: pack.topics_json });
     try {
       const res = await authService.makeAuthenticatedRequest(`/scrib/admin/packs/${pack.id}/pdf/`);
       const freshUrl = res.data?.pdf_url;
+      const topicsJson = res.data?.topics_json || pack.topics_json;
       if (!freshUrl) throw new Error('No URL returned');
-      setPdfState({ url: freshUrl, title: pack.title });
+      setPdfState({ url: freshUrl, title: res.data?.title || pack.title, topicsJson });
     } catch (err) {
-      setPdfState({ error: err?.response?.data?.message || 'Could not load PDF. Try opening it directly.', packId: pack.id, title: pack.title });
+      setPdfState({ error: err?.response?.data?.message || 'Could not load PDF. Try opening it directly.', packId: pack.id, title: pack.title, topicsJson: pack.topics_json });
     }
   };
 
@@ -299,6 +446,16 @@ const DrilldownDrawer = ({ user, onClose, isDarkMode }) => {
                 </button>
                 <span className={`ml-2 text-xs truncate max-w-[200px] ${textSub}`}>{pdfState.title}</span>
               </div>
+              {pdfState?.topicsJson && parseTopicsList(pdfState.topicsJson).length > 0 && (
+                <div className="p-4 border-b border-inherit">
+                  <TopicsBreakdownBox
+                    topicsList={parseTopicsList(pdfState.topicsJson)}
+                    title={pdfState.title}
+                    email={user.email}
+                    isDarkMode={isDarkMode}
+                  />
+                </div>
+              )}
               <iframe src={pdfState.url} className="flex-1 w-full border-0" title="PDF Preview" style={{ minHeight: '500px' }} />
               <div className={`p-3 border-t ${border} flex gap-2`}>
                 <a
@@ -331,26 +488,62 @@ const DrilldownDrawer = ({ user, onClose, isDarkMode }) => {
                     </tr>
                   </thead>
                   <tbody className={`divide-y ${divider}`}>
-                    {user.packs.map((pack) => (
-                      <tr key={pack.id} className={row}>
-                        <td className={`px-4 py-3 text-sm font-medium ${textMain} max-w-[160px] truncate`}>{pack.title || '—'}</td>
-                        <td className={`px-4 py-3 text-xs ${textSub} whitespace-nowrap`}>{fmt.date(pack.created_at)}</td>
-                        <td className={`px-4 py-3 text-xs ${textSub}`}>{pack.credits_used ?? '—'}</td>
-                        <td className={`px-4 py-3 text-xs ${textSub}`}>{pack.total_pages ?? '—'}</td>
-                        <td className="px-4 py-3 text-right">
-                          {(pack.pdf_url || pack.share_token) ? (
-                            <button
-                              onClick={() => handleViewPdf(pack)}
-                              className="text-blue-600 hover:text-blue-700 text-xs font-semibold"
-                            >
-                              View PDF
-                            </button>
-                          ) : (
-                            <span className={`text-xs ${textSub}`}>—</span>
+                    {user.packs.map((pack) => {
+                      const topicsList = parseTopicsList(pack.topics_json);
+                      const isExpanded = expandedPackId === pack.id;
+                      return (
+                        <React.Fragment key={pack.id}>
+                          <tr className={row}>
+                            <td className={`px-4 py-3 text-sm font-medium ${textMain} max-w-[180px]`}>
+                              <div className="truncate" title={pack.title}>{pack.title || '—'}</div>
+                              {topicsList.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedPackId(isExpanded ? null : pack.id)}
+                                  className={`mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md border transition-colors ${
+                                    isExpanded
+                                      ? 'bg-indigo-600 text-white border-indigo-600'
+                                      : isDarkMode
+                                        ? 'bg-gray-700/80 text-indigo-300 border-gray-600 hover:bg-gray-700'
+                                        : 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100'
+                                  }`}
+                                >
+                                  <span>📋 {topicsList.length} topic{topicsList.length !== 1 ? 's' : ''}</span>
+                                  {isExpanded ? <FaChevronUp className="text-[10px]" /> : <FaChevronDown className="text-[10px]" />}
+                                </button>
+                              )}
+                            </td>
+                            <td className={`px-4 py-3 text-xs ${textSub} whitespace-nowrap`}>{fmt.date(pack.created_at)}</td>
+                            <td className={`px-4 py-3 text-xs ${textSub}`}>{pack.credits_used ?? '—'}</td>
+                            <td className={`px-4 py-3 text-xs ${textSub}`}>{pack.total_pages ?? '—'}</td>
+                            <td className="px-4 py-3 text-right">
+                              {(pack.pdf_url || pack.share_token) ? (
+                                <button
+                                  onClick={() => handleViewPdf(pack)}
+                                  className="text-blue-600 hover:text-blue-700 text-xs font-semibold"
+                                >
+                                  View PDF
+                                </button>
+                              ) : (
+                                <span className={`text-xs ${textSub}`}>—</span>
+                              )}
+                            </td>
+                          </tr>
+                          {isExpanded && topicsList.length > 0 && (
+                            <tr className={isDarkMode ? 'bg-gray-900/60' : 'bg-indigo-50/30'}>
+                              <td colSpan="5" className="px-4 py-4 whitespace-normal">
+                                <TopicsBreakdownBox
+                                  topicsList={topicsList}
+                                  title={pack.title}
+                                  email={user.email}
+                                  isDarkMode={isDarkMode}
+                                />
+                              </td>
+                            </tr>
                           )}
-                        </td>
-                      </tr>
-                    ))}
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}

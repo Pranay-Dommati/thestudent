@@ -311,7 +311,18 @@ const DashboardPage = () => {
                                   pdfUrl: isPack ? viewUrl : null,
                                   imageUrl: isPack ? null : viewUrl,
                                   title: item.name,
-                                  topics: item.topics_json || [item.name],
+                                  topics: Array.isArray(item.topics_json)
+                                    ? item.topics_json.map(t => {
+                                        if (Array.isArray(t)) return t.join(', ');
+                                        if (t && typeof t === 'object' && Array.isArray(t.topics)) {
+                                          return t.topics.map(sub => typeof sub === 'object' ? `${sub.name}${sub.instruction ? ` (${sub.instruction})` : ''}` : String(sub)).join(', ');
+                                        }
+                                        if (t && typeof t === 'object' && (t.name || t.topic)) {
+                                          return `${t.name || t.topic}${t.instruction ? ` (${t.instruction})` : ''}`;
+                                        }
+                                        return String(t);
+                                      })
+                                    : [item.name],
                                   totalPages: item.total_pages || 1,
                                   isPack,
                                   returnUrl: '/dashboard'

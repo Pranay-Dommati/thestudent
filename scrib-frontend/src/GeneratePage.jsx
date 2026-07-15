@@ -1119,7 +1119,16 @@ const GeneratePage = () => {
                   setLoadingItemId(null)
                   if (!resolvedUrl) return
                   const topicsArr = Array.isArray(item.topics_json)
-                    ? item.topics_json.map(t => Array.isArray(t) ? t.join(', ') : t)
+                    ? item.topics_json.map(t => {
+                        if (Array.isArray(t)) return t.join(', ');
+                        if (t && typeof t === 'object' && Array.isArray(t.topics)) {
+                          return t.topics.map(sub => typeof sub === 'object' ? `${sub.name}${sub.instruction ? ` (${sub.instruction})` : ''}` : String(sub)).join(', ');
+                        }
+                        if (t && typeof t === 'object' && (t.name || t.topic)) {
+                          return `${t.name || t.topic}${t.instruction ? ` (${t.instruction})` : ''}`;
+                        }
+                        return String(t);
+                      })
                     : Array.from({ length: pages }, (_, i) => `Page ${i + 1}`)
                   const noteSlug = (item.name || 'study-pack').toLowerCase().replace(/[^a-z0-9]+/g, '-')
                   navigate(`/view/${noteSlug}`, {

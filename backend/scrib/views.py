@@ -1368,7 +1368,12 @@ class AdminStudyPackPdfView(APIView):
             # Older packs stored a full URL — return it directly.
             if pack.pdf_url:
                 logger.info('[admin-pdf] No s3_key, falling back to stored pdf_url for pack %s', pack_id)
-                return Response({'pdf_url': pack.pdf_url})
+                return Response({
+                    'pdf_url': pack.pdf_url,
+                    'topics_json': pack.topics_json or [],
+                    'title': pack.title,
+                    'total_pages': pack.total_pages,
+                })
             logger.warning('[admin-pdf] Pack %s has no s3_key and no pdf_url', pack_id)
             return error_response('PDF not available for this pack', status_code=404, code='not_found')
 
@@ -1402,7 +1407,12 @@ class AdminStudyPackPdfView(APIView):
             logger.error('[admin-pdf] presign failed for pack %s: %s', pack_id, exc)
             return error_response('Could not generate PDF link', status_code=503, code='storage_unavailable')
 
-        return Response({'pdf_url': fresh_url})
+        return Response({
+            'pdf_url': fresh_url,
+            'topics_json': pack.topics_json or [],
+            'title': pack.title,
+            'total_pages': pack.total_pages,
+        })
 
 
 class StudyPackShareView(APIView):
@@ -2044,7 +2054,7 @@ class AdminPaidUsersAnalyticsView(APIView):
             .exclude(status=StudyPack.STATUS_FAILED)
             .order_by('-created_at')
             .values('id', 'user_id', 'title', 'created_at', 'credits_used',
-                    'status', 'pdf_url', 's3_key', 'share_token', 'total_pages')
+                    'status', 'pdf_url', 's3_key', 'share_token', 'total_pages', 'topics_json')
         ):
             packs_per_user.setdefault(pack['user_id'], []).append(pack)
 
@@ -2113,6 +2123,7 @@ class AdminPaidUsersAnalyticsView(APIView):
                     'created_at': pk['created_at'].isoformat() if pk['created_at'] else None,
                     'pdf_url': pk['pdf_url'] or None,
                     'share_token': str(pk['share_token']) if pk['share_token'] else None,
+                    'topics_json': pk.get('topics_json') or [],
                 })
 
             rows.append({
@@ -2219,6 +2230,7 @@ class AdminPaidUsersAnalyticsView(APIView):
                 'status': rp.status,
                 'total_pages': rp.total_pages,
                 'share_token': str(rp.share_token) if rp.share_token else None,
+                'topics_json': rp.topics_json or [],
             }
             for rp in recent_packs_qs
         ]
@@ -2236,6 +2248,7 @@ class AdminPaidUsersAnalyticsView(APIView):
                 'status': rp.status,
                 'total_pages': rp.total_pages,
                 'share_token': str(rp.share_token) if rp.share_token else None,
+                'topics_json': rp.topics_json or [],
             }
             for rp in today_packs_qs
         ]
