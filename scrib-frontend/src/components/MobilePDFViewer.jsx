@@ -6,7 +6,7 @@ import 'react-pdf/dist/Page/TextLayer.css'
 // Use CDN for worker to prevent module resolution errors on older mobile browsers
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
-const MobilePDFViewer = ({ url }) => {
+const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages }) => {
   const [numPages, setNumPages] = useState(null)
   const [pageWidth, setPageWidth] = useState(null)
   const containerRef = useRef(null)
@@ -15,7 +15,7 @@ const MobilePDFViewer = ({ url }) => {
   // NOT on pinch-zoom — which changes visualViewport but not layout width).
   const measureWidth = useCallback(() => {
     if (containerRef.current) {
-      setPageWidth(containerRef.current.offsetWidth)
+      setPageWidth(Math.min(containerRef.current.offsetWidth, 800))
     }
   }, [])
 
@@ -57,7 +57,7 @@ const MobilePDFViewer = ({ url }) => {
         error={<div className="py-20 text-sm text-red-500">Failed to load PDF.</div>}
       >
         {pageWidth && Array.from(new Array(numPages || 0), (el, index) => (
-          <div key={`page_${index + 1}`} className="w-full mb-4">
+          <div key={`page_${index + 1}`} className="w-full mb-4 flex justify-center">
             <Page
               pageNumber={index + 1}
               width={pageWidth}
@@ -66,6 +66,35 @@ const MobilePDFViewer = ({ url }) => {
             />
           </div>
         ))}
+        {isPreviewMode && totalOriginalPages > (numPages || 1) && (
+          Array.from(new Array(totalOriginalPages - (numPages || 1)), (_, index) => (
+            <div key={`locked_${index}`} className="w-full mb-4 flex justify-center px-4 md:px-0">
+              <div 
+                style={{ width: pageWidth, height: pageWidth }} 
+                className="relative bg-white flex flex-col items-center justify-center border border-[#e2dbd2] rounded-md overflow-hidden select-none"
+              >
+                {/* Simulated handwritten lines */}
+                <div className="absolute inset-0 p-8 space-y-4 opacity-40">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-3 rounded-full bg-[#d6cfc4]"
+                      style={{ width: `${60 + Math.sin(i * 1.3) * 30}%` }}
+                    />
+                  ))}
+                </div>
+                {/* Lock icon overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/50 backdrop-blur-[4px]">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9a9289" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <span className="text-sm text-[#9a9289] font-semibold tracking-wide uppercase">Locked Page</span>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </Document>
     </div>
   )

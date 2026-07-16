@@ -6,6 +6,7 @@ import customToast from './utils/customToast'
 import Breadcrumb from './components/Breadcrumb'
 import MobilePDFViewer from './components/MobilePDFViewer'
 import axiosInstance from './utils/axios'
+import { getSharePdf } from './services/shareService'
 
 // In development the backend returns absolute URLs like http://127.0.0.1:8000/media/...
 // We strip the host so the Vite proxy (localhost:5173/media → 127.0.0.1:8000/media) handles it.
@@ -51,17 +52,41 @@ const PDFViewerPage = () => {
   useEffect(() => {
     if (shareToken) {
       setDataLoading(true)
-      fetch(`${API_BASE}/scrib/packs/share/${shareToken}/`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.pdf_url) {
-            setFetchedData(data)
-          } else {
-            setDataError('This share link is invalid or the PDF is not ready yet.')
-          }
-        })
-        .catch(() => setDataError('Failed to load the shared PDF.'))
-        .finally(() => setDataLoading(false))
+      // Detect Base36 share codes (exactly 8 alphanumeric chars) vs legacy UUIDs
+      const isShareCode = /^[A-Z0-9]{8}$/i.test(shareToken) && shareToken.length === 8
+      if (isShareCode) {
+        // New Earn While Learning share code — requires auth, returns presigned URL
+        getSharePdf(shareToken)
+          .then((data) => {
+            if (data.pdf_url) {
+              setFetchedData(data)
+            } else {
+              setDataError('Could not load the PDF. Please try again.')
+            }
+          })
+          .catch((err) => {
+            const code = err?.response?.data?.code
+            if (code === 'purchase_required') {
+              setDataError('You need to purchase these notes to view them.')
+            } else {
+              setDataError('Failed to load the PDF.')
+            }
+          })
+          .finally(() => setDataLoading(false))
+      } else {
+        // Legacy UUID share token — public endpoint, no auth needed
+        fetch(`${API_BASE}/scrib/packs/share/${shareToken}/`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.pdf_url) {
+              setFetchedData(data)
+            } else {
+              setDataError('This share link is invalid or the PDF is not ready yet.')
+            }
+          })
+          .catch(() => setDataError('Failed to load the shared PDF.'))
+          .finally(() => setDataLoading(false))
+      }
     } else if (slug && !location.state?.pdfUrl) {
       setDataLoading(true)
       fetch(`${API_BASE}/scrib/previews/${slug}/`)
@@ -93,6 +118,7 @@ const PDFViewerPage = () => {
   const topics = fetchedData ? (fetchedData.topics_json || []) : (routeState.topics || [])
   const totalPages = fetchedData ? (fetchedData.total_pages || 1) : (routeState.totalPages || 1)
   const forceImage = fetchedData ? (fetchedData.isImage || false) : (routeState.isImage || false)
+  const isPreviewMode = routeState.isPreviewMode || false
 
   // Rewrite backend absolute URL → relative path so Vite proxy handles it
   const pdfUrl = normalizeUrl(rawPdfUrl)
@@ -335,9 +361,9 @@ const PDFViewerPage = () => {
                   className="max-h-full max-w-full rounded-sm object-contain shadow-xl"
                 />
               </div>
-            ) : isMobile ? (
+            ) : isMobile || isPreviewMode ? (
               <div className="w-full h-full">
-                <MobilePDFViewer url={pdfUrl} />
+                <MobilePDFViewer url={pdfUrl} isPreviewMode={isPreviewMode} totalOriginalPages={totalPages} />
               </div>
             ) : (
               <div className="h-full w-full overflow-hidden">

@@ -1,5 +1,9 @@
 from django.contrib import admin
-from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction, PromoCode, PromoCodeRedemption
+# pyrefly: ignore [missing-import]
+from .models import (
+    PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction,
+    PromoCode, PromoCodeRedemption, NoteShareLink, SharedPackPurchase,
+)
 
 
 @admin.register(PreviewNote)
@@ -61,3 +65,86 @@ class PromoCodeRedemptionAdmin(admin.ModelAdmin):
     list_filter = ('promo_code__campaign_name',)
     search_fields = ('promo_code__code', 'user__email')
     readonly_fields = ('redeemed_at',)
+
+
+# ─── Earn While Learning ─────────────────────────────────────────────────────
+
+@admin.register(NoteShareLink)
+class NoteShareLinkAdmin(admin.ModelAdmin):
+    list_display = (
+        'share_code', 'owner_email', 'pack_title', 'purchase_count',
+        'reward_amount', 'reward_type', 'is_active', 'created_at',
+    )
+    list_filter = ('is_active', 'reward_type', 'created_at')
+    search_fields = ('share_code', 'owner__email', 'study_pack__title')
+    readonly_fields = ('share_code', 'created_at', 'purchase_count', 'reward_amount')
+    ordering = ('-created_at',)
+
+    @admin.display(description='Owner')
+    def owner_email(self, obj):
+        return obj.owner.email
+
+    @admin.display(description='Pack Title')
+    def pack_title(self, obj):
+        return obj.study_pack.title
+
+    actions = ['deactivate_links']
+
+    @admin.action(description='Deactivate selected share links')
+    def deactivate_links(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f'{updated} share link(s) deactivated.')
+
+
+@admin.register(SharedPackPurchase)
+class SharedPackPurchaseAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'buyer_email', 'sharer_email', 'pack_title',
+        'amount_inr', 'reward_amount', 'reward_type',
+        'purchased_at', 'conversion_time_display',
+        'device', 'browser', 'country', 'referrer_short',
+    )
+    list_filter = ('reward_type', 'device', 'country', 'purchased_at')
+    search_fields = (
+        'buyer__email',
+        'share_link__owner__email',
+        'share_link__study_pack__title',
+        'share_link__share_code',
+    )
+    readonly_fields = (
+        'purchased_at', 'clicked_at', 'conversion_time',
+        'device', 'browser', 'country', 'referrer',
+        'reward_amount', 'reward_type', 'amount_paise',
+    )
+    ordering = ('-purchased_at',)
+
+    @admin.display(description='Buyer')
+    def buyer_email(self, obj):
+        return obj.buyer.email
+
+    @admin.display(description='Sharer')
+    def sharer_email(self, obj):
+        return obj.share_link.owner.email
+
+    @admin.display(description='Pack')
+    def pack_title(self, obj):
+        return obj.share_link.study_pack.title
+
+    @admin.display(description='Amount (₹)')
+    def amount_inr(self, obj):
+        return f'₹{obj.amount_paise / 100:.0f}'
+
+    @admin.display(description='Conv. Time')
+    def conversion_time_display(self, obj):
+        if obj.conversion_time is None:
+            return '—'
+        total_seconds = int(obj.conversion_time.total_seconds())
+        if total_seconds < 60:
+            return f'{total_seconds}s'
+        minutes = total_seconds // 60
+        return f'{minutes}m {total_seconds % 60}s'
+
+    @admin.display(description='Referrer')
+    def referrer_short(self, obj):
+        return (obj.referrer or '')[:60] + ('…' if len(obj.referrer or '') > 60 else '')
+

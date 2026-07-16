@@ -10,6 +10,8 @@ import BuyCreditsModal from './components/BuyCreditsModal'
 import MobileMenu from './components/MobileMenu'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 import RedeemCouponCard from './components/RedeemCouponCard'
+import ShareAndEarnModal from './components/ShareAndEarnModal'
+import { getShareStats } from './services/shareService'
 
 const toneColors = {
   blue: 'bg-[#7ba7ff]',
@@ -23,36 +25,13 @@ const DashboardPage = () => {
   const [historyItems, setHistoryItems] = useState([])
   const [loadingData, setLoadingData] = useState(false)
   const [statsData, setStatsData] = useState({ pdfs: 0, creditsUsed: 0 })
-  const [shareModalData, setShareModalData] = useState(null)
+  const [shareModalPackId, setShareModalPackId] = useState(null)
   const [showBuyModal, setShowBuyModal] = useState(false)
+  const [sharingStats, setSharingStats] = useState(null)
+  const [loadingSharingStats, setLoadingSharingStats] = useState(false)
 
-  const handleShareOption = async (option, item, isPack, fileUrl, titleStr) => {
-    // Use custom share modal immediately
-    setShareModalData({ title: titleStr, url: 'Fetching secure link...', isLoading: true })
-    let freshUrl = fileUrl
-    if (isPack && item.id) {
-      try {
-        const res = await axiosInstance.get(`/scrib/packs/${item.id}/pdf/`, {
-          maxRedirects: 0,
-          validateStatus: (s) => s < 400,
-        })
-        freshUrl = res.request?.responseURL || fileUrl
-      } catch (err) {
-        console.error('Failed to get fresh PDF URL for share', err)
-      }
-    }
-    setShareModalData({ title: titleStr, url: freshUrl, isLoading: false })
-  }
-
-  const copyShareLink = async () => {
-    if (!shareModalData || shareModalData.isLoading) return
-    try {
-      await navigator.clipboard.writeText(shareModalData.url)
-      customToast.success('Link copied to clipboard!')
-      setShareModalData(null)
-    } catch (err) {
-      console.error('Failed to copy', err)
-    }
+  const handleShareEarn = (packId) => {
+    setShareModalPackId(packId)
   }
 
   useEffect(() => {
@@ -95,6 +74,20 @@ const DashboardPage = () => {
       }
     }
     loadData()
+
+    // Fetch Earn While Learning stats separately so it doesn't block the main load
+    const loadSharingStats = async () => {
+      setLoadingSharingStats(true)
+      try {
+        const data = await getShareStats()
+        setSharingStats(data)
+      } catch {
+        // Non-critical — silently ignore
+      } finally {
+        setLoadingSharingStats(false)
+      }
+    }
+    loadSharingStats()
   }, [loading, isLoggedIn, navigate])
 
   const formatDate = (dateString) => {
@@ -197,6 +190,48 @@ const DashboardPage = () => {
           </button>
         </div>
 
+        {/* Earn While Learning stats */}
+        {isLoggedIn && (
+          <div className="mt-6 rounded-xl border border-[#e8eefb] bg-[#f0f5fd] overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#d8e6f8]">
+              <p className="text-sm font-bold text-[#4a6aa6]">Share & Earn Credits ✨</p>
+              <Link to="/generate?tab=history" className="text-xs font-semibold text-[#4a6aa6] hover:text-[#1f3a5f]">
+                Share notes →
+              </Link>
+            </div>
+            {loadingSharingStats ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#4a6aa6] border-t-transparent" />
+              </div>
+            ) : sharingStats && sharingStats.notes_shared > 0 ? (
+              <div className="grid grid-cols-3 divide-x divide-[#d8e6f8]">
+                {[
+                  { label: 'Notes Shared', value: sharingStats.notes_shared },
+                  { label: 'Successful Purchases', value: sharingStats.successful_purchases },
+                  { label: 'Rewards Earned', value: `${parseFloat(sharingStats.rewards_earned || 0).toFixed(1)} ${sharingStats.reward_type}` },
+                ].map(({ label, value }) => (
+                  <div key={label} className="px-4 py-4 text-center">
+                    <p className="text-xl font-bold text-[#1f3a5f]">{value}</p>
+                    <p className="mt-0.5 text-[10px] text-[#5a7aae] uppercase tracking-wide">{label}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 py-5 text-center">
+                <p className="text-xs text-[#5a7aae]">
+                  Share your notes and earn credits when friends purchase through your link.
+                </p>
+                <Link
+                  to="/generate?tab=history"
+                  className="mt-3 inline-block rounded-full border border-[#c4d9f5] bg-white px-4 py-1.5 text-xs font-semibold text-[#4a6aa6] hover:bg-[#e8f0fb] transition-colors"
+                >
+                  Start sharing →
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Redeem Coupon */}
         {isLoggedIn && (
           <RedeemCouponCard
@@ -264,20 +299,15 @@ const DashboardPage = () => {
                         </span>
                       ) : (
                         fileUrl && (
-                          <button
-                            onClick={() => handleShareOption('share', item, isPack, fileUrl, item.name)}
-                            className="flex items-center gap-1 rounded-lg border border-[#e2dbd2] bg-white px-2 py-1 text-xs hover:bg-[#faf8f3] text-[#4b4742]"
-                            title="Share"
-                          >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="18" cy="5" r="3" />
-                              <circle cx="6" cy="12" r="3" />
-                              <circle cx="18" cy="19" r="3" />
-                              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                            </svg>
-                            Share
-                          </button>
+                          item.type === 'pack' && item.status === 'ready' ? (
+                            <button
+                              onClick={() => handleShareEarn(item.id)}
+                              className="flex items-center gap-1 rounded-lg border border-[#e2dbd2] bg-white px-2 py-1 text-xs hover:bg-[#faf8f3] text-[#4b4742]"
+                              title="Share & Earn"
+                            >
+                              ✨ Share &amp; Earn
+                            </button>
+                          ) : null
                         )
                       )}
                       {fileUrl && (
@@ -353,36 +383,13 @@ const DashboardPage = () => {
           }}
         />
       )}
-      {/* Share Modal */}
-      {shareModalData && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl relative">
-            <button
-              onClick={() => setShareModalData(null)}
-              className="absolute right-4 top-4 text-[#9a9289] hover:text-[#1f1f1f] transition-colors"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-            <h2 className="mb-1 text-lg font-bold text-[#1f1f1f]">Share link</h2>
-            <p className="mb-5 text-sm text-[#7b756d]">Anyone with this link can view and download.</p>
-            
-            <div className="flex items-center gap-2 rounded-xl border border-[#e2dbd2] bg-[#faf8f3] p-1.5">
-              <input 
-                type="text" 
-                readOnly 
-                value={shareModalData.url} 
-                className="w-full bg-transparent px-3 py-2 text-sm text-[#5a554f] outline-none"
-              />
-              <button
-                onClick={copyShareLink}
-                disabled={shareModalData.isLoading}
-                className="flex-shrink-0 rounded-lg bg-[#1f1f1f] px-5 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
-                Copy
-              </button>
-            </div>
-          </div>
-        </div>
+
+      {/* Share & Earn Modal */}
+      {shareModalPackId && (
+        <ShareAndEarnModal
+          packId={shareModalPackId}
+          onClose={() => setShareModalPackId(null)}
+        />
       )}
 
     </div>

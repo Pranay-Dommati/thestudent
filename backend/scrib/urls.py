@@ -1,6 +1,12 @@
 from django.urls import path
 # pyrefly: ignore [missing-import]
 from . import views
+# pyrefly: ignore [missing-import]
+from .views import (
+    ShareCreateView, ShareMetaView, SharePreviewView,
+    SharePurchaseOrderView, SharePaymentVerifyView, SharingStatsView,
+    SharePackPdfView,
+)
 
 app_name = 'scrib'
 
@@ -40,4 +46,15 @@ urlpatterns = [
     # Cohort config
     path('config/', views.ScribConfigPublicView.as_view(), name='scrib-config-public'),
     path('admin/config/', views.AdminScribConfigView.as_view(), name='admin-scrib-config'),
+
+    # ── Earn While Learning ───────────────────────────────────────────────────────────────
+    # Order matters: specific paths (create, stats, payment-verify, preview) must
+    # come BEFORE the wildcard <str:share_code> pattern.
+    path('share/create/',                         ShareCreateView.as_view(),         name='share-create'),
+    path('share/stats/',                          SharingStatsView.as_view(),        name='share-stats'),
+    path('share/payment-verify/',                 SharePaymentVerifyView.as_view(),  name='share-payment-verify'),
+    path('share/preview/<str:preview_token>/',    SharePreviewView.as_view(),        name='share-preview'),
+    path('share/<str:share_code>/pdf/',           SharePackPdfView.as_view(),        name='share-pack-pdf'),
+    path('share/<str:share_code>/purchase/',      SharePurchaseOrderView.as_view(),  name='share-purchase'),
+    path('share/<str:share_code>/',               ShareMetaView.as_view(),           name='share-meta'),
 ]
