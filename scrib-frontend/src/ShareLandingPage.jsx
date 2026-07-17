@@ -6,83 +6,9 @@ import { getShareMeta, startSharePurchaseFlow, createShareLink } from './service
 import ShareAndEarnModal from './components/ShareAndEarnModal'
 import customToast from './utils/customToast'
 
-// ─── Payment Success Transition ───────────────────────────────────────────────
-
-function PaymentSuccessScreen({ result, onOpenNotes, onShareEarn }) {
-  const [step, setStep] = useState(1) // 1 = "Payment Successful", 2 = "Unlocking", 3 = "Done"
-
-  useEffect(() => {
-    const t1 = setTimeout(() => setStep(2), 900)
-    const t2 = setTimeout(() => setStep(3), 2400)
-    return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [])
-
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#fcf9f4] px-6 text-center">
-      {step === 1 && (
-        <div className="animate-fade-in space-y-3">
-          <div className="text-5xl">✅</div>
-          <h2 className="text-2xl font-bold text-[#1f1f1f]">Payment Successful!</h2>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="animate-fade-in space-y-4">
-          <div className="h-10 w-10 mx-auto animate-spin rounded-full border-4 border-[#1f3a5f] border-t-transparent" />
-          <h2 className="text-xl font-semibold text-[#1f1f1f]">Unlocking your notes…</h2>
-          <p className="text-sm text-[#7b756d]">{result.title}</p>
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="animate-fade-in w-full max-w-sm space-y-5">
-          <div className="text-4xl">🎉</div>
-          <div>
-            <h2 className="text-2xl font-bold text-[#1f1f1f]">You now own these notes.</h2>
-            <p className="mt-1 text-sm text-[#7b756d]">{result.title} · {result.total_pages} page{result.total_pages !== 1 ? 's' : ''}</p>
-          </div>
-
-          {/* Primary CTA */}
-          <button
-            onClick={onOpenNotes}
-            className="w-full rounded-xl bg-[#1f3a5f] py-3 text-sm font-bold text-white hover:bg-[#2d5fa6] transition-colors"
-          >
-            Open Notes
-          </button>
-
-          {/* Divider */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#e2dbd2]" />
-            </div>
-          </div>
-
-          {/* Secondary CTA — Share & Earn */}
-          <div className="rounded-2xl border border-[#dbe8c3] bg-[#f2f9e8] px-5 py-4 text-left space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">💰</span>
-              <p className="text-sm font-bold text-[#3a5c20]">Want to earn credits?</p>
-            </div>
-            <p className="text-xs text-[#5a7a38] leading-relaxed">
-              Share these notes with classmates. When someone buys through your link,
-              you earn <strong>0.5 credits per page</strong>.
-            </p>
-            <button
-              onClick={onShareEarn}
-              className="w-full rounded-xl border border-[#c4dea0] bg-white py-2.5 text-sm font-semibold text-[#3a5c20] hover:bg-[#eaf5d6] transition-colors"
-            >
-              Share & Earn ✨
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── Blurred Page Preview ─────────────────────────────────────────────────────
 
-function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken, totalOriginalPages }) {
+function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken, totalOriginalPages, isUnlocked, pdfUrl }) {
   const [iframeLoaded, setIframeLoaded] = useState(false)
   return (
     <div className={`rounded-xl border border-[#e2dbd2] overflow-hidden bg-white ${isFirst ? '' : 'relative'}`}>
@@ -100,7 +26,7 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
       </div>
 
       {/* Note paper illustration */}
-      {isFirst && previewToken ? (
+      {(isFirst && previewToken) || (isUnlocked && pdfUrl) ? (
         <div className="relative w-full aspect-square overflow-hidden bg-white">
           {/* Loading Skeleton */}
           {!iframeLoaded && (
@@ -116,37 +42,33 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
             </div>
           )}
           <iframe 
-            src={`/api/scrib/share/preview/${previewToken}/#toolbar=0&navpanes=0&scrollbar=0`}
+            src={isUnlocked && pdfUrl ? `${pdfUrl}#page=${pageNumber}&toolbar=0&navpanes=0&scrollbar=0&view=Fit` : `/api/scrib/share/preview/${previewToken}/#toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
             className={`absolute inset-0 w-full h-full border-0 pointer-events-none transition-opacity duration-300 ${iframeLoaded ? 'opacity-100' : 'opacity-0'}`}
             title="Page 1 Preview"
-            style={{ width: '100%', height: '100%' }}
+            style={{ width: '100%', height: '100%', overflow: 'hidden' }}
             onLoad={() => setIframeLoaded(true)}
           />
           {/* Prevent interacting with the iframe to hide standard viewer UI on hover */}
           <div className="absolute inset-0 z-10" />
 
-          {/* Full-screen viewer button */}
-          <Link
-            to="/view"
-            state={{ 
-              pdfUrl: `/api/scrib/share/preview/${previewToken}/`, 
-              title: `Preview: ${topics[0] || 'Notes'}`,
-              totalPages: totalOriginalPages || 1,
-              isPreviewMode: true
-            }}
-            className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 rounded-full bg-[#1f1f1f]/80 px-3 py-1.5 text-[11px] font-semibold text-white backdrop-blur-md hover:bg-[#1f1f1f] transition-all hover:scale-105 shadow-sm"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-            </svg>
-            Open Viewer
-          </Link>
+          {/* For single-page notes, blur the bottom half to encourage unlocking */}
+          {singlePage && !isUnlocked && (
+            <div className="absolute inset-x-0 bottom-0 top-1/2 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-md border-t border-white/40 shadow-[0_-10px_20px_rgba(255,255,255,0.8)]">
+              <div className="flex flex-col items-center p-4 bg-white/80 rounded-2xl shadow-sm border border-white/50 backdrop-blur-xl">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1f3a5f" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="mb-1.5 opacity-90">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <span className="text-[10px] font-bold text-[#1f3a5f] uppercase tracking-widest opacity-90">Locked</span>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="relative w-full aspect-square p-4 select-none">
           {/* Simulated handwritten lines */}
-          <div className="space-y-2 opacity-60">
-            {Array.from({ length: 8 }).map((_, i) => (
+          <div className="absolute inset-0 p-6 space-y-4 opacity-60 overflow-hidden">
+            {Array.from({ length: 24 }).map((_, i) => (
               <div
                 key={i}
                 className="h-2.5 rounded-full bg-[#e8e2d9]"
@@ -180,31 +102,64 @@ export default function ShareLandingPage() {
   const [loadingMeta, setLoadingMeta] = useState(true)
   const [metaError, setMetaError] = useState(null)
 
-  const [paymentState, setPaymentState] = useState('idle') // idle | processing | success | error
-  const [paymentResult, setPaymentResult] = useState(null)
-  const [purchasedPackId, setPurchasedPackId] = useState(null) // set from verify response
-
+  const [paymentState, setPaymentState] = useState('idle') // idle | processing
   const [showShareModal, setShowShareModal] = useState(false)
+  const [purchasedPackId, setPurchasedPackId] = useState(null)
 
   const purchaseCardRef = useRef(null)
 
-  // Fetch share metadata
+  // Fetch share metadata.
+  // We wait for authLoading to finish so we know if the user is logged in.
+  // This ensures already_purchased / is_own_link fields are correct.
   useEffect(() => {
     if (!shareCode) return
-    const load = async () => {
+    if (authLoading) return  // wait until we know the auth state
+
+    let isMounted = true
+
+    const load = async (isRetry = false) => {
+      if (!isMounted) return
       try {
         const data = await getShareMeta(shareCode)
-        setMeta(data)
+        if (isMounted) {
+          setMeta(data)
+          setLoadingMeta(false)
+        }
       } catch (err) {
+        if (!isMounted) return
+
+        // If we had an expired/invalid token, the Axios interceptor clears it and rejects.
+        // Retry once — this time the request runs anonymously and will succeed.
+        if (!isRetry && err?.response?.status === 401) {
+          load(true)
+          return
+        }
+
         const code = err?.response?.data?.code
         if (code === 'not_found') setMetaError('not_found')
         else setMetaError('error')
-      } finally {
+
         setLoadingMeta(false)
       }
     }
     load()
-  }, [shareCode])
+
+    return () => { isMounted = false }
+  }, [shareCode, authLoading, isLoggedIn])
+
+  const navigateWithPdfUrl = (pdfUrl, title, totalPages, packId) => {
+    const slug = encodeURIComponent((title || 'notes').toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+    navigate(`/view/${slug}`, {
+      state: {
+        pdfUrl,
+        title,
+        totalPages,
+        isPack: true,
+        packId: packId || meta?.pack_id,
+        returnUrl: `/share/${shareCode}`,
+      }
+    })
+  }
 
   const handleUnlock = () => {
     if (!isLoggedIn) {
@@ -218,9 +173,28 @@ export default function ShareLandingPage() {
       meta,
       user,
       onSuccess: (result) => {
-        setPaymentResult(result)
         if (result.pack_id) setPurchasedPackId(result.pack_id)
-        setPaymentState('success')
+        customToast.success('Notes unlocked! Share with classmates to earn credits.', { duration: 5000 })
+        // pdf_url comes directly from the verify response — no second API call needed
+        if (result.pdf_url) {
+          navigateWithPdfUrl(result.pdf_url, result.title || meta?.title, result.total_pages || meta?.total_pages, result.pack_id)
+        } else {
+          // Fallback if pdf_url was not returned (e.g. storage misconfigured)
+          navigate(`/view/share/${shareCode}`, {
+            state: { title: result.title || meta?.title, totalPages: result.total_pages || meta?.total_pages, isPack: true, returnUrl: `/share/${shareCode}` }
+          })
+        }
+      },
+      onAlreadyPurchased: (data) => {
+        setPaymentState('idle')
+        customToast.success('You already own these notes! Opening now...')
+        if (data?.pdf_url) {
+          navigateWithPdfUrl(data.pdf_url, data.title || meta?.title, data.total_pages || meta?.total_pages, data.pack_id)
+        } else {
+          navigate(`/view/share/${shareCode}`, {
+            state: { title: meta?.title, totalPages: meta?.total_pages, isPack: true, returnUrl: `/share/${shareCode}` }
+          })
+        }
       },
       onFailure: (msg) => {
         setPaymentState('idle')
@@ -229,19 +203,6 @@ export default function ShareLandingPage() {
       onDismiss: () => {
         setPaymentState('idle')
       },
-    })
-  }
-
-  const handleOpenNotes = () => {
-    // Navigate to PDF viewer via share code — the backend resolves access
-    // for the buyer via SharedPackPurchase check.
-    navigate(`/view/share/${shareCode}`, {
-      state: {
-        title: meta?.title || paymentResult?.title,
-        totalPages: meta?.total_pages || paymentResult?.total_pages,
-        isPack: true,
-        returnUrl: `/share/${shareCode}`,
-      }
     })
   }
 
@@ -278,25 +239,6 @@ export default function ShareLandingPage() {
         <p className="text-sm text-[#7b756d]">Something went wrong. Please try again.</p>
         <Link to="/" className="text-sm text-[#1f3a5f] font-semibold hover:underline">Go to Scrib</Link>
       </div>
-    )
-  }
-
-  // ── Payment success screen ────────────────────────────────────────────────────
-  if (paymentState === 'success' && paymentResult) {
-    return (
-      <>
-        <PaymentSuccessScreen
-          result={paymentResult}
-          onOpenNotes={handleOpenNotes}
-          onShareEarn={handleShareEarnPostPurchase}
-        />
-        {showShareModal && purchasedPackId && (
-          <ShareAndEarnModal
-            packId={purchasedPackId}
-            onClose={() => setShowShareModal(false)}
-          />
-        )}
-      </>
     )
   }
 
@@ -381,7 +323,26 @@ export default function ShareLandingPage() {
 
             {/* Preview section */}
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-[#9a9289] mb-3">Preview</p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#9a9289]">Preview</p>
+                {meta?.preview_token && (
+                  <Link
+                    to="/view"
+                    state={{ 
+                      pdfUrl: `/api/scrib/share/preview/${meta.preview_token}/`, 
+                      title: `Preview: ${meta?.title || 'Notes'}`,
+                      totalPages: totalPages,
+                      isPreviewMode: true
+                    }}
+                    className="flex items-center gap-1.5 rounded-full border border-[#e2dbd2] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1f1f1f] hover:bg-[#faf8f3] transition-colors shadow-sm"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                    </svg>
+                    Open Viewer
+                  </Link>
+                )}
+              </div>
               <div className="space-y-3">
                 {topicsPerPage.map((page, idx) => (
                   <PagePreviewCard
@@ -393,6 +354,8 @@ export default function ShareLandingPage() {
                     previewToken={meta?.preview_token}
                     totalOriginalPages={totalPages}
                     isPreviewMode={true}
+                    isUnlocked={!!meta?.pdf_url}
+                    pdfUrl={meta?.pdf_url}
                   />
                 ))}
               </div>
@@ -440,7 +403,7 @@ export default function ShareLandingPage() {
                       ✓ Already Purchased
                     </div>
                     <button
-                      onClick={handleOpenNotes}
+                      onClick={handleUnlock}
                       className="w-full rounded-xl bg-[#1f3a5f] py-2.5 text-sm font-semibold text-white hover:bg-[#2d5fa6] transition-colors"
                     >
                       Open Notes

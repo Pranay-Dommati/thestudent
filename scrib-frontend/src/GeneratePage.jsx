@@ -8,6 +8,7 @@ import customToast from './utils/customToast'
 import { forceDownload } from './utils/download'
 import Breadcrumb from './components/Breadcrumb'
 import MobileMenu from './components/MobileMenu'
+import ShareAndEarnModal from './components/ShareAndEarnModal'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 import { usePostHog } from '@posthog/react'
 import { useGoogleAuth } from './hooks/useGoogleAuth'
@@ -106,6 +107,7 @@ const GeneratePage = () => {
   const [isOrganizing, setIsOrganizing] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [latestCreditBalance, setLatestCreditBalance] = useState(null)
+  const [shareModalPackId, setShareModalPackId] = useState(null)
   const [processingPack, setProcessingPack] = useState(null)
   const [loadingItemId, setLoadingItemId] = useState(null)
   const [downloadingItemId, setDownloadingItemId] = useState(null)
@@ -183,7 +185,7 @@ const GeneratePage = () => {
       }))
       
       const combined = [...notes, ...packs].sort(
-        (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        (a, b) => new Date(b.purchased_at || b.created_at) - new Date(a.purchased_at || a.created_at)
       )
 
       // The API now returns the real pack (with generating/pending status),
@@ -1088,7 +1090,7 @@ const GeneratePage = () => {
                 const pages = item.total_pages || item.page_count || (isPack ? 3 : 1)
                 const credits = item.credits_used || pages
                 const titleStr = isPack ? `${item.name} — ${pages} pages` : item.name
-                const dateStr = item._displayDate || new Date(item.created_at).toLocaleDateString()
+                const dateStr = item._displayDate || new Date(item.purchased_at || item.created_at).toLocaleDateString()
 
                 const isGenerating = item.status === 'generating' || item.status === 'pending'
                 const isFailed = item.status === 'failed'
@@ -1182,8 +1184,22 @@ const GeneratePage = () => {
                             {isPack ? 'PDF' : 'Image'}
                           </span>
                         </div>
-                        <p className="mt-1 text-xs text-[#7b756d]">
-                          {dateStr} • {credits} credit{credits > 1 ? 's' : ''}
+                        <p className="mt-1 flex items-center gap-1.5 text-xs text-[#7b756d]">
+                          {dateStr}
+                          {item.is_purchased ? (
+                            <>
+                              <span>•</span>
+                              <span className="inline-flex items-center gap-1 text-[#4a6aa6] font-medium">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                                Purchased
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span>•</span>
+                              <span>{credits} credit{credits > 1 ? 's' : ''}</span>
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -1259,14 +1275,27 @@ const GeneratePage = () => {
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                             )}
                           </button>
-                          <button
-                            onClick={() => handleShareClick(item, isPack, url, titleStr)}
-                            disabled={!url}
-                            title="Share"
-                            className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50`}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-                          </button>
+                          {isPack && item.status === 'ready' ? (
+                            <button
+                              onClick={() => setShareModalPackId(item.id)}
+                              className="flex items-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-2.5 h-8 text-xs hover:bg-[#faf8f3] text-[#4b4742] shadow-sm transition-colors"
+                              title="Share & Earn"
+                            >
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#f59e0b]">
+                                <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                              </svg>
+                              <span className="hidden sm:inline">Share &amp; Earn</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleShareClick(item, isPack, url, titleStr)}
+                              disabled={!url}
+                              title="Share"
+                              className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50`}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -1340,6 +1369,14 @@ const GeneratePage = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Share & Earn Modal */}
+      {shareModalPackId && (
+        <ShareAndEarnModal
+          packId={shareModalPackId}
+          onClose={() => setShareModalPackId(null)}
+        />
       )}
     </div>
   )

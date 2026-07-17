@@ -18,6 +18,7 @@ export const AuthProvider = ({ children }) => {
   const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   const isValidatingRef = useRef(false)
+  const validationPromiseRef = useRef(null)
   const lastValidationTimeRef = useRef(0)
 
   const handleAuthFailure = () => {
@@ -61,72 +62,85 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  const validateAuth = useCallback(async () => {
+  const validateAuth = useCallback(() => {
     const now = Date.now()
-    if (isValidatingRef.current || (now - lastValidationTimeRef.current < 2000)) {
-      return isLoggedIn
+    
+    // If we're already validating, return the existing promise to prevent race conditions
+    // where a second call returns immediately and triggers setLoading(false) prematurely.
+    if (validationPromiseRef.current) {
+      return validationPromiseRef.current
+    }
+    
+    if (now - lastValidationTimeRef.current < 2000) {
+      return Promise.resolve(isLoggedIn)
     }
 
     const token = storage.getItem('accessToken')
     const refreshToken = storage.getItem('refreshToken')
 
     if (now - lastChecked < 60000 && isLoggedIn) {
-      return true
+      return Promise.resolve(true)
     }
 
     if (!token || !refreshToken) {
       handleAuthFailure()
-      return false
+      return Promise.resolve(false)
     }
 
     isValidatingRef.current = true
     lastValidationTimeRef.current = now
 
-    try {
+    const doValidation = async () => {
       try {
-        const profileUrl = `${axiosInstance.defaults.baseURL}/auth/profile/`
-        const response = await axios.get(profileUrl, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        })
-        setUser(response.data)
-        setIsLoggedIn(true)
-        setLastChecked(now)
-        return true
-      } catch (error) {
-        if (error.response?.status === 401) {
-          await refreshAccessToken()
-          const newToken = storage.getItem('accessToken')
+        try {
           const profileUrl = `${axiosInstance.defaults.baseURL}/auth/profile/`
-          const retryResponse = await axios.get(profileUrl, {
-            headers: { 'Authorization': `Bearer ${newToken}` },
+          const response = await axios.get(profileUrl, {
+            headers: { 'Authorization': `Bearer ${token}` },
           })
-          setUser(retryResponse.data)
+          setUser(response.data)
           setIsLoggedIn(true)
           setLastChecked(now)
           return true
+        } catch (error) {
+          if (error.response?.status === 401) {
+            await refreshAccessToken()
+            const newToken = storage.getItem('accessToken')
+            const profileUrl = `${axiosInstance.defaults.baseURL}/auth/profile/`
+            const retryResponse = await axios.get(profileUrl, {
+              headers: { 'Authorization': `Bearer ${newToken}` },
+            })
+            setUser(retryResponse.data)
+            setIsLoggedIn(true)
+            setLastChecked(now)
+            return true
+          }
+          throw error
         }
-        throw error
-      }
-    } catch (error) {
-      if (IS_DEV) console.error('Auth validation failed:', error)
-      
-      // Prevent hydration mismatch: If react-snap blocks the API, we are definitely not logged in on the server.
-      if (error.message === 'API calls disabled during prerendering') {
-        handleAuthFailure()
-        return false
-      }
+      } catch (error) {
+        if (IS_DEV) console.error('Auth validation failed:', error)
+        
+        // Prevent hydration mismatch: If react-snap blocks the API, we are definitely not logged in on the server.
+        if (error.message === 'API calls disabled during prerendering') {
+          handleAuthFailure()
+          return false
+        }
 
-      const status = error.response?.status
-      if (status === 401) {
-        handleAuthFailure()
-        return false
+        const status = error.response?.status
+        if (status === 401) {
+          handleAuthFailure()
+          return false
+        }
+        setIsLoggedIn(true)
+        setLastChecked(now)
+        return true
+      } finally {
+        isValidatingRef.current = false
+        validationPromiseRef.current = null
       }
-      setIsLoggedIn(true)
-      setLastChecked(now)
-      return true
-    } finally {
-      isValidatingRef.current = false
     }
+
+    validationPromiseRef.current = doValidation()
+    return validationPromiseRef.current
   }, [isLoggedIn, lastChecked])
 
   useEffect(() => {

@@ -113,7 +113,7 @@ export async function getShareStats() {
  * @param {function} options.onFailure   - called with error message string
  * @param {function} options.onDismiss   - called when user closes the modal
  */
-export async function startSharePurchaseFlow({ shareCode, meta, user, onSuccess, onFailure, onDismiss }) {
+export async function startSharePurchaseFlow({ shareCode, meta, user, onSuccess, onFailure, onDismiss, onAlreadyPurchased }) {
   // 1. Load Razorpay script
   try {
     await loadRazorpayScript()
@@ -127,6 +127,12 @@ export async function startSharePurchaseFlow({ shareCode, meta, user, onSuccess,
   try {
     orderData = await createSharePurchaseOrder(shareCode)
   } catch (err) {
+    const code = err?.response?.data?.code
+    // If already purchased, skip Razorpay and open the notes directly
+    if (code === 'already_purchased') {
+      onAlreadyPurchased?.(err?.response?.data)
+      return
+    }
     const msg = err?.response?.data?.message || 'Failed to initiate payment. Please try again.'
     onFailure?.(msg)
     return

@@ -29,6 +29,7 @@ const DashboardPage = () => {
   const [showBuyModal, setShowBuyModal] = useState(false)
   const [sharingStats, setSharingStats] = useState(null)
   const [loadingSharingStats, setLoadingSharingStats] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(5)
 
   const handleShareEarn = (packId) => {
     setShareModalPackId(packId)
@@ -36,7 +37,7 @@ const DashboardPage = () => {
 
   useEffect(() => {
     if (!loading && !isLoggedIn) {
-      navigate('/login?redirect=/dashboard', { replace: true })
+      navigate('/login?next=/dashboard', { replace: true })
       return
     }
     if (!isLoggedIn) return
@@ -60,7 +61,7 @@ const DashboardPage = () => {
         }))
         
         const combined = [...notes, ...packs].sort(
-          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+          (a, b) => new Date(b.purchased_at || b.created_at) - new Date(a.purchased_at || a.created_at)
         )
         
         setHistoryItems(combined)
@@ -267,7 +268,7 @@ const DashboardPage = () => {
                 No generations yet. Create your first study pack!
               </div>
             ) : (
-              historyItems.slice(0, 5).map((item, index) => {
+              historyItems.slice(0, visibleCount).map((item, index) => {
                 const isPack = item.type === 'pack'
                 const fileUrl = isPack ? item.pdf_url : item.image_url
                 const toneKeys = Object.keys(toneColors)
@@ -283,12 +284,26 @@ const DashboardPage = () => {
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold leading-tight">{item.name}</p>
-                        <p className="text-xs text-[#7b756d]">
-                          {formatDate(item.created_at)} · {item.credits_used} credit{item.credits_used !== 1 ? 's' : ''}
+                        <p className="text-xs text-[#7b756d] flex items-center gap-1.5">
+                          {formatDate(item.purchased_at || item.created_at)}
+                          {item.is_purchased ? (
+                            <>
+                              <span>·</span>
+                              <span className="inline-flex items-center gap-1 text-[#4a6aa6] font-medium">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                                Purchased
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span>·</span>
+                              <span>{item.credits_used} credit{item.credits_used !== 1 ? 's' : ''}</span>
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0">
+                    <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0 flex-shrink-0">
                       {item.status === 'failed' ? (
                         <span className="text-[11px] font-medium text-red-500">
                           Failed
@@ -299,13 +314,16 @@ const DashboardPage = () => {
                         </span>
                       ) : (
                         fileUrl && (
-                          item.type === 'pack' && item.status === 'ready' ? (
+                          item.type === 'pack' && item.status === 'ready' && !item.is_purchased ? (
                             <button
                               onClick={() => handleShareEarn(item.id)}
-                              className="flex items-center gap-1 rounded-lg border border-[#e2dbd2] bg-white px-2 py-1 text-xs hover:bg-[#faf8f3] text-[#4b4742]"
+                              className="flex items-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-2.5 py-1 text-xs hover:bg-[#faf8f3] text-[#4b4742] shadow-sm transition-colors"
                               title="Share & Earn"
                             >
-                              ✨ Share &amp; Earn
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#f59e0b]">
+                                <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                              </svg>
+                              Share &amp; Earn
                             </button>
                           ) : null
                         )
@@ -314,7 +332,7 @@ const DashboardPage = () => {
                         <>
                           <button
                             onClick={() => forceDownload(fileUrl, `${item.name}.pdf`)}
-                            className="rounded-lg border border-[#e2dbd2] bg-white px-2 py-1 text-xs hover:bg-[#faf8f3]"
+                            className="rounded-lg border border-[#e2dbd2] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] shadow-sm transition-colors"
                           >
                             Download
                           </button>
@@ -355,6 +373,7 @@ const DashboardPage = () => {
                                     : [item.name],
                                   totalPages: item.total_pages || 1,
                                   isPack,
+                                  packId: isPack ? item.id : null,
                                   returnUrl: '/dashboard'
                                 }
                               })
@@ -369,6 +388,17 @@ const DashboardPage = () => {
                   </div>
                 )
               })
+            )}
+            
+            {!loading && !loadingData && historyItems.length > visibleCount && (
+              <div className="border-t border-[#eee6dc] p-4 text-center">
+                <button
+                  onClick={() => setVisibleCount(v => v + 5)}
+                  className="rounded-lg border border-[#e2dbd2] bg-[#faf8f3] px-4 py-2 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f0ebe1]"
+                >
+                  Load more
+                </button>
+              </div>
             )}
           </div>
         </div>

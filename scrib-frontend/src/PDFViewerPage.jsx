@@ -5,6 +5,7 @@ import { forceDownload } from './utils/download'
 import customToast from './utils/customToast'
 import Breadcrumb from './components/Breadcrumb'
 import MobilePDFViewer from './components/MobilePDFViewer'
+import ShareAndEarnModal from './components/ShareAndEarnModal'
 import axiosInstance from './utils/axios'
 import { getSharePdf } from './services/shareService'
 
@@ -48,6 +49,7 @@ const PDFViewerPage = () => {
   const [dataError, setDataError] = useState(null)
   
   const [shareModalData, setShareModalData] = useState(null)
+  const [shareModalPackId, setShareModalPackId] = useState(null)
 
   useEffect(() => {
     if (shareToken) {
@@ -56,23 +58,45 @@ const PDFViewerPage = () => {
       const isShareCode = /^[A-Z0-9]{8}$/i.test(shareToken) && shareToken.length === 8
       if (isShareCode) {
         // New Earn While Learning share code — requires auth, returns presigned URL
-        getSharePdf(shareToken)
-          .then((data) => {
-            if (data.pdf_url) {
-              setFetchedData(data)
-            } else {
-              setDataError('Could not load the PDF. Please try again.')
-            }
-          })
-          .catch((err) => {
-            const code = err?.response?.data?.code
-            if (code === 'purchase_required') {
-              setDataError('You need to purchase these notes to view them.')
-            } else {
-              setDataError('Failed to load the PDF.')
-            }
-          })
-          .finally(() => setDataLoading(false))
+        const tryLoadPdf = (retryCount = 0) => {
+          getSharePdf(shareToken)
+            .then((data) => {
+              if (data.pdf_url) {
+                setFetchedData(data)
+              } else {
+                setDataError('Could not load the PDF. Please try again.')
+              }
+              setDataLoading(false)
+            })
+            .catch((err) => {
+              const status = err?.response?.status
+              const code = err?.response?.data?.code
+
+              // If 401 and we haven't retried yet — token may have just been refreshed
+              // by the interceptor; wait briefly and retry once
+              if (status === 401 && retryCount === 0) {
+                setTimeout(() => tryLoadPdf(1), 500)
+                return
+              }
+
+              setDataLoading(false)
+
+              if (status === 401 || status === 403 && code !== 'purchase_required') {
+                // Not authenticated — send to login and come back after
+                navigate(`/login?next=/view/share/${shareToken}`)
+                return
+              }
+
+              if (code === 'purchase_required') {
+                // Not purchased — send back to share landing page to pay
+                navigate(`/share/${shareToken}`, { replace: true })
+                return
+              }
+
+              setDataError('Failed to load the PDF. Please try again.')
+            })
+        }
+        tryLoadPdf()
       } else {
         // Legacy UUID share token — public endpoint, no auth needed
         fetch(`${API_BASE}/scrib/packs/share/${shareToken}/`)
@@ -118,7 +142,7 @@ const PDFViewerPage = () => {
   const topics = fetchedData ? (fetchedData.topics_json || []) : (routeState.topics || [])
   const totalPages = fetchedData ? (fetchedData.total_pages || 1) : (routeState.totalPages || 1)
   const forceImage = fetchedData ? (fetchedData.isImage || false) : (routeState.isImage || false)
-  const isPreviewMode = routeState.isPreviewMode || false
+  const isPreviewMode = routeState.isPreviewMode || (rawPdfUrl && rawPdfUrl.includes('/preview/')) || false
 
   // Rewrite backend absolute URL → relative path so Vite proxy handles it
   const pdfUrl = normalizeUrl(rawPdfUrl)
@@ -167,21 +191,8 @@ const PDFViewerPage = () => {
     const { isPack, packId, shareToken: stateShareToken } = routeState
 
     if (isPack && packId) {
-      setShareModalData({ title, url: 'Generating share link...', isLoading: true })
-      try {
-        let token = stateShareToken
-        if (!token) {
-          const res = await axiosInstance.post(`/scrib/packs/${packId}/pdf/`)
-          token = res.data?.share_token
-        }
-        if (token) {
-          const shareUrl = `${window.location.origin}/view/share/${token}`
-          setShareModalData({ title, url: shareUrl, isLoading: false })
-          return
-        }
-      } catch (err) {
-        console.error('Failed to generate share token', err)
-      }
+      setShareModalPackId(packId)
+      return
     }
     
     // Fallback: copy current url
@@ -315,27 +326,45 @@ const PDFViewerPage = () => {
 
         {/* Right section: Mobile Actions & Desktop Credits */}
         <div className="flex flex-shrink-0 items-center gap-2">
-          {/* Actions */}
-          <button
-            onClick={handleShare}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1c1c1e] text-white hover:bg-[#2c2c2e] transition-colors md:border md:border-[#e0d9ce] md:bg-[#f7f4ee] md:text-[#5a554f] md:hover:bg-[#ede9e1]"
-            aria-label="Share"
-            title="Copy Link"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" />
-            </svg>
-          </button>
-          <button
-            onClick={handleDownload}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1c1c1e] text-white hover:bg-[#2c2c2e] transition-colors md:border md:border-[#e0d9ce] md:bg-[#f7f4ee] md:text-[#5a554f] md:hover:bg-[#ede9e1]"
-            aria-label="Download"
-            title="Download PDF"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-          </button>
+          {/* Actions (hidden in preview mode since they must purchase first) */}
+          {!isPreviewMode && (
+            <>
+              {routeState.isPack && routeState.packId ? (
+                <button
+                  onClick={handleShare}
+                  className="flex h-8 items-center justify-center gap-1.5 rounded-full border border-[#f59e0b] bg-[#fef3c7] px-3 text-[#b45309] hover:bg-[#fde68a] transition-colors"
+                  aria-label="Share and Earn"
+                  title="Share and Earn Credits"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                  </svg>
+                  <span className="hidden text-xs font-bold md:inline">Share &amp; Earn</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleShare}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1c1c1e] text-white hover:bg-[#2c2c2e] transition-colors md:border md:border-[#e0d9ce] md:bg-[#f7f4ee] md:text-[#5a554f] md:hover:bg-[#ede9e1]"
+                  aria-label="Share"
+                  title="Copy Link"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" />
+                  </svg>
+                </button>
+              )}
+              <button
+                onClick={handleDownload}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1c1c1e] text-white hover:bg-[#2c2c2e] transition-colors md:border md:border-[#e0d9ce] md:bg-[#f7f4ee] md:text-[#5a554f] md:hover:bg-[#ede9e1]"
+                aria-label="Download"
+                title="Download PDF"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
+            </>
+          )}
 
           {/* Desktop-only credits */}
           {user && (
@@ -363,7 +392,12 @@ const PDFViewerPage = () => {
               </div>
             ) : isMobile || isPreviewMode ? (
               <div className="w-full h-full">
-                <MobilePDFViewer url={pdfUrl} isPreviewMode={isPreviewMode} totalOriginalPages={totalPages} />
+                <MobilePDFViewer 
+                  url={pdfUrl} 
+                  isPreviewMode={isPreviewMode} 
+                  totalOriginalPages={totalPages} 
+                  onUnlock={() => handleBack()}
+                />
               </div>
             ) : (
               <div className="h-full w-full overflow-hidden">
@@ -425,6 +459,14 @@ const PDFViewerPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Share & Earn Modal */}
+      {shareModalPackId && (
+        <ShareAndEarnModal
+          packId={shareModalPackId}
+          onClose={() => setShareModalPackId(null)}
+        />
       )}
     </div>
   )

@@ -1,3 +1,4 @@
+from django.db import models
 import datetime
 import json
 import logging
@@ -5,7 +6,7 @@ import uuid
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db.models import Case, F, IntegerField, Q, Sum, When
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -1282,6 +1283,7 @@ class StudyPackPdfView(APIView):
         pack = StudyPack.objects.filter(pk=pack_id, user=request.user).first()
         if not pack:
             # Also allow buyers who purchased via a share link to access this pack
+            # pyrefly: ignore [missing-import]
             from .models import SharedPackPurchase
             has_purchase = SharedPackPurchase.objects.filter(
                 buyer=request.user,
@@ -1542,12 +1544,28 @@ class MyStudyPacksView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        # pyrefly: ignore [missing-import]
         from .models import NoteShareLink, SharedPackPurchase
         # Clean up any zombie packs before returning history
         cleanup_stuck_packs(request.user)
 
-        packs = StudyPack.objects.filter(user=request.user)
-        serializer = StudyPackSerializer(packs, many=True)
+        created_packs = StudyPack.objects.filter(user=request.user)
+
+        # Also include packs the user purchased via a share link.
+        purchases = SharedPackPurchase.objects.filter(
+            buyer=request.user, amount_paise__gt=0
+        ).values('share_link__study_pack_id', 'purchased_at')
+        
+        purchased_pack_info = {
+            p['share_link__study_pack_id']: p['purchased_at']
+            for p in purchases
+        }
+        purchased_pack_ids = set(purchased_pack_info.keys())
+        purchased_packs = StudyPack.objects.filter(id__in=purchased_pack_ids)
+        
+        all_packs = (created_packs | purchased_packs).distinct()
+        
+        serializer = StudyPackSerializer(all_packs, many=True)
         data = serializer.data
 
         # Attach share link info so the frontend can show "✓ Sharing" badges without
@@ -1558,15 +1576,13 @@ class MyStudyPacksView(APIView):
                 owner=request.user, is_active=True
             )
         }
-        # Also include packs the user purchased via a share link.
-        purchased_pack_ids = set(
-            SharedPackPurchase.objects.filter(buyer=request.user)
-            .values_list('share_link__study_pack_id', flat=True)
-        )
+
         for item in data:
             item['has_share_link'] = item['id'] in share_links
             item['share_code'] = share_links.get(item['id'])
             item['is_purchased'] = item['id'] in purchased_pack_ids
+            if item['is_purchased']:
+                item['purchased_at'] = purchased_pack_info[item['id']].isoformat() if purchased_pack_info[item['id']] else None
 
         return Response(data)
 
@@ -2558,7 +2574,9 @@ class AdminScribConfigView(APIView):
 # ─── Earn While Learning Views ───────────────────────────────────────────────────
 # All constants imported from share_constants.py — no hardcoded numbers here.
 
+# pyrefly: ignore [missing-import]
 from .models import NoteShareLink, SharedPackPurchase
+# pyrefly: ignore [missing-import]
 from .share_constants import (
     SHARE_PRICE_PER_PAGE, SHARE_REWARD_PER_PAGE, SHARE_REWARD_TYPE,
     generate_share_code, SHARE_CODE_MAX_RETRIES, PREVIEW_TOKEN_TTL_SECONDS,
@@ -2609,6 +2627,7 @@ def _parse_device_info(request):
     device = ''
     browser = ''
     try:
+        # pyrefly: ignore [missing-import]
         import user_agents
         ua = user_agents.parse(ua_string)
         if ua.is_mobile:
@@ -2627,14 +2646,40 @@ def _parse_device_info(request):
 def _generate_share_message(pack, is_creator, share_url):
     """Build the share message text, dynamically worded for creator vs. buyer."""
     total_price = int(pack.total_pages * SHARE_PRICE_PER_PAGE)
-    if is_creator:
-        intro = '📚 I created these AI handwritten notes on Scrib.'
+    
+    intro = 'Check out my AI handwritten notes on Scrib!' if is_creator else 'Check out these AI handwritten notes on Scrib!'
+    
+    raw_topics = getattr(pack, 'topics_json', None)
+    topics = []
+    
+    if isinstance(raw_topics, dict):
+        topics_data = raw_topics.get('topics', [])
+    elif isinstance(raw_topics, list):
+        topics_data = raw_topics
     else:
-        intro = '📚 Check out these AI handwritten notes on Scrib.'
+        topics_data = []
+
+    for t in topics_data:
+        if isinstance(t, dict) and 'name' in t:
+            topics.append(t['name'])
+        elif isinstance(t, str):
+            topics.append(t)
+
+    if not topics:
+        topics = [pack.title]
+        
+    if len(topics) > 4:
+        topics = topics[:4]
+        
+    topics_list = '\n'.join([f"- {t}" for t in topics])
+
     return (
         f"{intro}\n\n"
-        f"Topic: {pack.title} · {pack.total_pages} Page{'s' if pack.total_pages != 1 else ''}\n"
-        f"Unlock instantly for just \u20b9{total_price}.\n\n"
+        f"Why generate your own notes when you can unlock these ready-made notes for almost 50% less?\n\n"
+        f"Topics:\n"
+        f"{topics_list}\n\n"
+        f"{pack.total_pages} Page{'s' if pack.total_pages != 1 else ''}\n"
+        f"Only \u20b9{total_price}\n\n"
         f"{share_url}"
     )
 
@@ -2721,13 +2766,19 @@ class ShareCreateView(APIView):
                 logger.error('[share] Failed to generate unique share code after %d retries', SHARE_CODE_MAX_RETRIES)
                 return error_response('Could not create share link. Please try again.', status_code=500)
 
-            share_link = NoteShareLink.objects.create(
-                study_pack=pack,
-                owner=request.user,
-                share_code=code,
-                reward_type=SHARE_REWARD_TYPE,
-            )
-            is_new = True
+            try:
+                share_link = NoteShareLink.objects.create(
+                    study_pack=pack,
+                    owner=request.user,
+                    share_code=code,
+                    reward_type=SHARE_REWARD_TYPE,
+                )
+                is_new = True
+            except IntegrityError:
+                share_link = NoteShareLink.objects.get(
+                    study_pack=pack, owner=request.user
+                )
+                is_new = False
 
         share_url = _build_share_url(share_link.share_code, request)
         share_message = _generate_share_message(pack, is_creator, share_url)
@@ -2813,6 +2864,7 @@ class ShareMetaView(APIView):
         # ── User-specific flags ──────────────────────────────────────────────────
         already_purchased = False
         is_own_link = False
+        pdf_url = None
         if request.user and request.user.is_authenticated:
             is_own_link = (share_link.owner_id == request.user.id)
             already_purchased = (
@@ -2821,9 +2873,12 @@ class ShareMetaView(APIView):
                     share_link__study_pack=pack, buyer=request.user, amount_paise__gt=0
                 ).exists()
             )
+            if already_purchased or is_own_link:
+                pdf_url = _get_pack_presigned_url(pack)
 
         return Response({
             'title': pack.title,
+            'pack_id': pack.id,
             'total_pages': total_pages,
             'price_per_page': price_per_page,
             'total_price': total_price,
@@ -2833,6 +2888,7 @@ class ShareMetaView(APIView):
             'preview_token': preview_token,
             'already_purchased': already_purchased,
             'is_own_link': is_own_link,
+            'pdf_url': pdf_url,
         })
 
 
@@ -2935,6 +2991,35 @@ class SharePreviewView(APIView):
         return HttpResponseRedirect(fresh_url)
 
 
+def _get_pack_presigned_url(pack):
+    """Generate a presigned S3 URL for the given pack's PDF.
+    Returns the URL string or None if unavailable."""
+    if not pack.s3_key:
+        return pack.pdf_url or None
+    import boto3
+    from botocore.exceptions import BotoCoreError, ClientError
+    bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
+    region = getattr(settings, 'AWS_S3_REGION_NAME', 'ap-south-1')
+    access_key = getattr(settings, 'SCRIB_S3_ACCESS_KEY_ID', '')
+    secret_key = getattr(settings, 'SCRIB_S3_SECRET_ACCESS_KEY', '')
+    if not bucket or not access_key or not secret_key:
+        return None
+    try:
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name=region,
+        )
+        return s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket, 'Key': pack.s3_key},
+            ExpiresIn=3600,
+        )
+    except (BotoCoreError, ClientError):
+        return None
+
+
 class SharePurchaseOrderView(APIView):
     """POST /api/scrib/share/<share_code>/purchase/
 
@@ -2971,10 +3056,16 @@ class SharePurchaseOrderView(APIView):
             ).exists()
         )
         if already_owns:
-            return error_response(
-                'You have already purchased these notes',
-                status_code=400, code='already_purchased',
-            )
+            # Return the PDF URL so the frontend can open the notes directly
+            pdf_url = _get_pack_presigned_url(pack)
+            return Response({
+                'code': 'already_purchased',
+                'message': 'You have already purchased these notes',
+                'pdf_url': pdf_url,
+                'title': pack.title,
+                'total_pages': pack.total_pages or 1,
+                'pack_id': pack.id,
+            }, status=400)
 
         total_pages = pack.total_pages or 1
         amount_paise = int(SHARE_PRICE_PER_PAGE * total_pages * 100)
@@ -3041,20 +3132,6 @@ class SharePaymentVerifyView(APIView):
         if not payment:
             return error_response('Order not found', status_code=404, code='not_found')
 
-        # Idempotent — already verified
-        if payment.status == Payment.STATUS_PAID:
-            purchase = SharedPackPurchase.objects.filter(
-                share_link=share_link, buyer=request.user
-            ).first()
-            return Response({
-                'success': True,
-                'message': 'Payment already verified',
-                'share_code': share_code,
-                'title': share_link.study_pack.title,
-                'total_pages': share_link.study_pack.total_pages,
-                'reward_granted': str(purchase.reward_amount) if purchase else '0',
-                'reward_type': SHARE_REWARD_TYPE,
-            })
 
         # Verify HMAC signature
         try:
@@ -3081,54 +3158,60 @@ class SharePaymentVerifyView(APIView):
         with transaction.atomic():
             # Re-fetch with row lock
             payment = Payment.objects.select_for_update().get(pk=payment.pk)
-            if payment.status == Payment.STATUS_PAID:
-                # Lost the race — another request already verified
-                logger.info('[share-verify] Race duplicate order_id=%s', order_id)
-            else:
+            
+            if payment.status != Payment.STATUS_PAID:
                 payment.status = Payment.STATUS_PAID
                 payment.razorpay_payment_id = payment_id
                 payment.razorpay_signature = signature
                 payment.save(update_fields=['status', 'razorpay_payment_id', 'razorpay_signature', 'updated_at'])
+            else:
+                logger.info('[share-verify] Payment already PAID order_id=%s (likely webhook)', order_id)
 
-                # Create purchase record (grants buyer PDF access)
-                existing_click = SharedPackPurchase.objects.filter(
-                    share_link=share_link, buyer=request.user
-                ).first()
-                clicked_at = existing_click.clicked_at if existing_click else None
-                conversion_time = (now - clicked_at) if clicked_at else None
+            # ALWAYS create/update purchase record (grants buyer PDF access)
+            existing_click = SharedPackPurchase.objects.filter(
+                share_link=share_link, buyer=request.user
+            ).first()
+            clicked_at = existing_click.clicked_at if existing_click else None
+            conversion_time = (now - clicked_at) if clicked_at else None
 
-                purchase, created = SharedPackPurchase.objects.get_or_create(
-                    share_link=share_link,
-                    buyer=request.user,
-                    defaults=dict(
-                        payment=payment,
-                        amount_paise=amount_paise,
-                        reward_amount=reward_amount,
-                        reward_type=SHARE_REWARD_TYPE,
-                        clicked_at=clicked_at,
-                        purchased_at=now,
-                        conversion_time=conversion_time,
-                        referrer=referrer,
-                        **device_info,
-                    )
+            # We need to ensure we don't grant reward twice for the same purchase
+            is_already_granted = existing_click and getattr(existing_click, 'amount_paise', 0) > 0
+            
+            purchase, created = SharedPackPurchase.objects.get_or_create(
+                share_link=share_link,
+                buyer=request.user,
+                defaults=dict(
+                    payment=payment,
+                    amount_paise=amount_paise,
+                    reward_amount=reward_amount,
+                    reward_type=SHARE_REWARD_TYPE,
+                    clicked_at=clicked_at,
+                    purchased_at=now,
+                    conversion_time=conversion_time,
+                    referrer=referrer,
+                    **device_info,
                 )
-                if not created:
-                    # Update analytics on existing stub
-                    purchase.payment = payment
-                    purchase.amount_paise = amount_paise
-                    purchase.reward_amount = reward_amount
-                    purchase.purchased_at = now
-                    purchase.conversion_time = conversion_time
-                    purchase.referrer = referrer
-                    for k, v in device_info.items():
-                        setattr(purchase, k, v)
-                    purchase.save()
+            )
+            
+            if not created and not is_already_granted:
+                # Update analytics on existing stub
+                purchase.payment = payment
+                purchase.amount_paise = amount_paise
+                purchase.reward_amount = reward_amount
+                purchase.purchased_at = now
+                purchase.conversion_time = conversion_time
+                purchase.referrer = referrer
+                for k, v in device_info.items():
+                    setattr(purchase, k, v)
+                purchase.save()
 
+            if created or not is_already_granted:
                 # Reward the sharer with credits
                 CreditTransaction.objects.create(
                     user=share_link.owner,
                     direction=CreditTransaction.DIRECTION_CREDIT,
                     credits=int(reward_amount),  # stored as integer credits
+                    payment=payment,
                     reason=CreditTransaction.REASON_REFERRAL,
                 )
 
@@ -3143,12 +3226,17 @@ class SharePaymentVerifyView(APIView):
                     share_code, request.user.id, share_link.owner_id, reward_amount,
                 )
 
+        # Generate presigned URL so frontend can navigate directly to viewer
+        # without a second API call (the token may expire during payment flow).
+        pdf_url = _get_pack_presigned_url(pack)
+
         return Response({
             'success': True,
             'share_code': share_code,
             'pack_id': pack.id,       # returned so buyer can create their own share link
             'title': pack.title,
             'total_pages': total_pages,
+            'pdf_url': pdf_url,
             'reward_granted': str(reward_amount),
             'reward_type': SHARE_REWARD_TYPE,
         })
