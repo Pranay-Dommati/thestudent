@@ -42,7 +42,7 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
             </div>
           )}
           <iframe 
-            src={isUnlocked && pdfUrl ? `${pdfUrl}#page=${pageNumber}&toolbar=0&navpanes=0&scrollbar=0&view=Fit` : `/api/scrib/share/preview/${previewToken}/#toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
+            src={isUnlocked && pdfUrl ? `${pdfUrl}#page=${pageNumber}&toolbar=0&navpanes=0&scrollbar=0&view=FitH` : `/api/scrib/share/preview/${previewToken}/#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
             className={`absolute inset-0 w-full h-full border-0 pointer-events-none transition-opacity duration-300 ${iframeLoaded ? 'opacity-100' : 'opacity-0'}`}
             title="Page 1 Preview"
             style={{ width: '100%', height: '100%', overflow: 'hidden' }}
@@ -248,6 +248,103 @@ export default function ShareLandingPage() {
   const isSinglePage = totalPages === 1
   const topicsPerPage = meta?.topics_per_page || []
 
+  // ── Render Purchase Card ──────────────────────────────────────────────────────
+  const renderPurchaseCard = () => (
+    <>
+      <div
+        ref={purchaseCardRef}
+        className="sticky top-20 rounded-2xl border border-[#e2dbd2] bg-white shadow-sm overflow-hidden"
+      >
+        <div className="p-5 border-b border-[#e2dbd2] bg-[#faf8f3]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-2xl font-bold text-[#1f1f1f]">₹{meta?.total_price}</p>
+              <p className="text-xs text-[#7b756d]">{totalPages} page{totalPages !== 1 ? 's' : ''} · ₹{meta?.price_per_page}/page</p>
+            </div>
+            <div className="rounded-xl bg-[#1f3a5f] px-3 py-1.5">
+              <p className="text-xs font-bold text-white">{totalPages}p</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Benefits */}
+          <ul className="space-y-2">
+            {[
+              '✓ Instant Access',
+              '✓ High-Quality PDF',
+              '✓ Download Anytime',
+              '✓ Share & Earn Credits',
+            ].map((item) => (
+              <li key={item} className="text-xs text-[#5a554f] flex items-center gap-2">
+                <span className="text-[#4caf50] font-bold">{item.slice(0, 1)}</span>
+                <span>{item.slice(2)}</span>
+              </li>
+            ))}
+          </ul>
+
+          {/* CTA */}
+          {isAlreadyPurchased ? (
+            <div className="space-y-2">
+              <div className="w-full rounded-xl bg-[#eef7df] py-2.5 text-center text-sm font-semibold text-[#557a3f]">
+                ✓ Already Purchased
+              </div>
+              <button
+                onClick={handleUnlock}
+                className="w-full rounded-xl bg-[#1f3a5f] py-2.5 text-sm font-semibold text-white hover:bg-[#2d5fa6] transition-colors"
+              >
+                Open Notes
+              </button>
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="w-full rounded-xl border border-[#dbe8c3] bg-[#f2f9e8] py-2.5 text-sm font-semibold text-[#3a5c20] hover:bg-[#eaf5d6] transition-colors"
+              >
+                Share & Earn ✨
+              </button>
+            </div>
+          ) : isOwnLink ? (
+            <div className="w-full rounded-xl border border-[#e2dbd2] bg-[#faf8f3] py-2.5 text-center text-xs font-medium text-[#9a9289]">
+              This is your own share link
+            </div>
+          ) : (
+            <button
+              onClick={handleUnlock}
+              disabled={paymentState === 'processing'}
+              className="w-full rounded-xl bg-[#1f3a5f] py-3 text-sm font-bold text-white hover:bg-[#2d5fa6] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {paymentState === 'processing' ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Processing…
+                </span>
+              ) : !isLoggedIn ? (
+                'Sign in to Unlock'
+              ) : (
+                'Unlock Complete Notes'
+              )}
+            </button>
+          )}
+
+          {/* Security badge */}
+          <div className="flex items-center justify-center gap-1.5 text-[10px] text-[#9a9289]">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            Secured by Razorpay · UPI, cards accepted
+          </div>
+        </div>
+      </div>
+
+      {/* Share & Earn Credits info card */}
+      <div className="mt-4 rounded-2xl border border-[#e8eefb] bg-[#f0f5fd] p-4">
+        <p className="text-xs font-bold text-[#4a6aa6]">💡 Share & Earn Credits</p>
+        <p className="mt-1 text-[11px] text-[#5a7aae] leading-relaxed">
+          After purchasing, share with your classmates and earn <strong>0.5 credits per page</strong> every time someone buys through your link.
+        </p>
+      </div>
+    </>
+  )
+
   // ── Main landing page ─────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#fcf9f4]">
@@ -300,6 +397,11 @@ export default function ShareLandingPage() {
                   ✓ Instant access after payment
                 </span>
               </div>
+            </div>
+
+            {/* ── MOBILE ONLY: Purchase card rendered before preview ── */}
+            <div className="block lg:hidden mt-6">
+              {renderPurchaseCard()}
             </div>
 
             {/* Topics Included */}
@@ -366,99 +468,9 @@ export default function ShareLandingPage() {
             </div>
           </div>
 
-          {/* ── RIGHT: Sticky purchase card ── */}
-          <div className="lg:w-80 lg:flex-shrink-0">
-            <div
-              ref={purchaseCardRef}
-              className="sticky top-20 rounded-2xl border border-[#e2dbd2] bg-white shadow-sm overflow-hidden"
-            >
-              <div className="p-5 border-b border-[#e2dbd2] bg-[#faf8f3]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-2xl font-bold text-[#1f1f1f]">₹{meta?.total_price}</p>
-                    <p className="text-xs text-[#7b756d]">{totalPages} page{totalPages !== 1 ? 's' : ''} · ₹{meta?.price_per_page}/page</p>
-                  </div>
-                  <div className="rounded-xl bg-[#1f3a5f] px-3 py-1.5">
-                    <p className="text-xs font-bold text-white">{totalPages}p</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5 space-y-4">
-                {/* Benefits */}
-                <ul className="space-y-2">
-                  {[
-                    '✓ Instant Access',
-                    '✓ High-Quality PDF',
-                    '✓ Download Anytime',
-                    '✓ Share & Earn Credits',
-                  ].map((item) => (
-                    <li key={item} className="text-xs text-[#5a554f] flex items-center gap-2">
-                      <span className="text-[#4caf50] font-bold">{item.slice(0, 1)}</span>
-                      <span>{item.slice(2)}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                {/* CTA */}
-                {isAlreadyPurchased ? (
-                  <div className="space-y-2">
-                    <div className="w-full rounded-xl bg-[#eef7df] py-2.5 text-center text-sm font-semibold text-[#557a3f]">
-                      ✓ Already Purchased
-                    </div>
-                    <button
-                      onClick={handleUnlock}
-                      className="w-full rounded-xl bg-[#1f3a5f] py-2.5 text-sm font-semibold text-white hover:bg-[#2d5fa6] transition-colors"
-                    >
-                      Open Notes
-                    </button>
-                    <button
-                      onClick={() => setShowShareModal(true)}
-                      className="w-full rounded-xl border border-[#dbe8c3] bg-[#f2f9e8] py-2.5 text-sm font-semibold text-[#3a5c20] hover:bg-[#eaf5d6] transition-colors"
-                    >
-                      Share & Earn ✨
-                    </button>
-                  </div>
-                ) : isOwnLink ? (
-                  <div className="w-full rounded-xl border border-[#e2dbd2] bg-[#faf8f3] py-2.5 text-center text-xs font-medium text-[#9a9289]">
-                    This is your own share link
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleUnlock}
-                    disabled={paymentState === 'processing'}
-                    className="w-full rounded-xl bg-[#1f3a5f] py-3 text-sm font-bold text-white hover:bg-[#2d5fa6] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {paymentState === 'processing' ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        Processing…
-                      </span>
-                    ) : !isLoggedIn ? (
-                      'Sign in to Unlock'
-                    ) : (
-                      'Unlock Complete Notes'
-                    )}
-                  </button>
-                )}
-
-                {/* Security badge */}
-                <div className="flex items-center justify-center gap-1.5 text-[10px] text-[#9a9289]">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                  Secured by Razorpay · UPI, cards accepted
-                </div>
-              </div>
-            </div>
-
-            {/* Share & Earn Credits info card */}
-            <div className="mt-4 rounded-2xl border border-[#e8eefb] bg-[#f0f5fd] p-4">
-              <p className="text-xs font-bold text-[#4a6aa6]">💡 Share & Earn Credits</p>
-              <p className="mt-1 text-[11px] text-[#5a7aae] leading-relaxed">
-                After purchasing, share with your classmates and earn <strong>0.5 credits per page</strong> every time someone buys through your link.
-              </p>
-            </div>
+          {/* ── RIGHT: Sticky purchase card (Desktop) ── */}
+          <div className="hidden lg:block lg:w-80 lg:flex-shrink-0">
+            {renderPurchaseCard()}
           </div>
         </div>
       </main>

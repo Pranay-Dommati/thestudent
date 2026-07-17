@@ -314,7 +314,7 @@ const DashboardPage = () => {
                         </span>
                       ) : (
                         fileUrl && (
-                          item.type === 'pack' && item.status === 'ready' && !item.is_purchased ? (
+                          item.type === 'pack' && item.status === 'ready' ? (
                             <button
                               onClick={() => handleShareEarn(item.id)}
                               className="flex items-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-2.5 py-1 text-xs hover:bg-[#faf8f3] text-[#4b4742] shadow-sm transition-colors"

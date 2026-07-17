@@ -2987,6 +2987,10 @@ class SharePreviewView(APIView):
             logger.error('[share-preview] presign failed pack=%s: %s', pack_id, exc)
             return error_response('Could not fetch preview', status_code=503, code='storage_unavailable')
 
+        if request.GET.get('json') == 'true' or 'application/json' in request.META.get('HTTP_ACCEPT', ''):
+            from rest_framework.response import Response
+            return Response({'pdf_url': fresh_url})
+
         from django.http import HttpResponseRedirect
         return HttpResponseRedirect(fresh_url)
 

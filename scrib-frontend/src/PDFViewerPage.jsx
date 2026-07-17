@@ -147,6 +147,31 @@ const PDFViewerPage = () => {
   // Rewrite backend absolute URL → relative path so Vite proxy handles it
   const pdfUrl = normalizeUrl(rawPdfUrl)
 
+  const [resolvedPreviewUrl, setResolvedPreviewUrl] = useState(null)
+
+  useEffect(() => {
+    // If the PDF URL is a backend preview endpoint, resolve it to the direct S3 URL first
+    // to prevent react-pdf from bouncing through 302 redirects for every chunk request.
+    if (pdfUrl && pdfUrl.includes('/api/scrib/share/preview/') && !resolvedPreviewUrl) {
+      setDataLoading(true)
+      fetch(pdfUrl + (pdfUrl.includes('?') ? '&' : '?') + 'json=true', {
+        headers: { 'Accept': 'application/json' }
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.pdf_url) {
+          setResolvedPreviewUrl(data.pdf_url)
+        } else {
+          setDataError('Failed to resolve secure preview URL.')
+        }
+      })
+      .catch(() => setDataError('Failed to load preview.'))
+      .finally(() => setDataLoading(false))
+    }
+  }, [pdfUrl, resolvedPreviewUrl])
+
+  const finalPdfUrl = resolvedPreviewUrl || pdfUrl
+
   // True if we should render as an image (preview notes) rather than PDF iframe
   const renderAsImage = forceImage || isImageUrl(rawPdfUrl)
 
@@ -215,7 +240,7 @@ const PDFViewerPage = () => {
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
     try {
-      await forceDownload(rawPdfUrl || pdfUrl, title || 'Scrib_Notes', !renderAsImage)
+      await forceDownload(finalPdfUrl, title || 'Scrib_Notes', !renderAsImage)
       if (isIOS) {
         customToast.success('Opening PDF — tap the Share icon to save to Files', { duration: 4000 })
       } else {
@@ -393,7 +418,7 @@ const PDFViewerPage = () => {
             ) : isMobile || isPreviewMode ? (
               <div className="w-full h-full">
                 <MobilePDFViewer 
-                  url={pdfUrl} 
+                  url={resolvedPreviewUrl || pdfUrl} 
                   isPreviewMode={isPreviewMode} 
                   totalOriginalPages={totalPages} 
                   onUnlock={() => handleBack()}
