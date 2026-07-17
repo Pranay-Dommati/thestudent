@@ -327,12 +327,16 @@ export default function ShareLandingPage() {
                 <p className="text-xs font-bold uppercase tracking-wider text-[#9a9289]">Preview</p>
                 {meta?.preview_token && (
                   <Link
-                    to="/view"
+                    to={meta?.pdf_url ? `/view/${(meta?.title || 'study-pack').toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : "/view"}
                     state={{ 
-                      pdfUrl: `/api/scrib/share/preview/${meta.preview_token}/`, 
-                      title: `Preview: ${meta?.title || 'Notes'}`,
+                      pdfUrl: meta?.pdf_url || `/api/scrib/share/preview/${meta.preview_token}/`, 
+                      title: meta?.pdf_url ? (meta?.title || 'Notes') : `Preview: ${meta?.title || 'Notes'}`,
                       totalPages: totalPages,
-                      isPreviewMode: true
+                      isPreviewMode: !meta?.pdf_url,
+                      isPack: true,
+                      packId: meta?.pack_id,
+                      shareToken: shareCode,
+                      returnUrl: `/share/${shareCode}`
                     }}
                     className="flex items-center gap-1.5 rounded-full border border-[#e2dbd2] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1f1f1f] hover:bg-[#faf8f3] transition-colors shadow-sm"
                   >
