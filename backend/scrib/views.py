@@ -2697,17 +2697,24 @@ def _generate_share_message(pack, is_creator, share_url):
 
 def _build_share_url(share_code, request):
     """Return the canonical share URL for Scrib note share links."""
+    # If the incoming request is from a local development frontend (localhost or 127.0.0.1 on any port),
+    # construct the share URL using that exact local origin so local dev links point to localhost.
+    origin = request.headers.get('Origin', '') or ''
+    referer = request.headers.get('Referer', '') or ''
+    
+    from urllib.parse import urlparse
+    for header_val in [origin, referer]:
+        if header_val and ('localhost' in header_val or '127.0.0.1' in header_val):
+            parsed = urlparse(header_val)
+            if parsed.scheme and parsed.netloc:
+                local_domain = f"{parsed.scheme}://{parsed.netloc}"
+                return f"{local_domain.rstrip('/')}/share/{share_code}"
+
     # First check for explicit SCRIB_FRONTEND_DOMAIN setting in settings
     scrib_domain = getattr(settings, 'SCRIB_FRONTEND_DOMAIN', None)
     
     if not scrib_domain or ('easylearnova.com' in scrib_domain and 'scrib' not in scrib_domain) or 'www.scrib' in scrib_domain:
-        # Check if incoming request Origin / Referer points to local dev
-        origin = request.headers.get('Origin', '') or ''
-        referer = request.headers.get('Referer', '') or ''
-        if 'localhost:5174' in origin or 'localhost:5174' in referer:
-            scrib_domain = 'http://localhost:5174'
-        else:
-            scrib_domain = 'https://scrib.easylearnova.com'
+        scrib_domain = 'https://scrib.easylearnova.com'
             
     return f"{scrib_domain.rstrip('/')}/share/{share_code}"
 

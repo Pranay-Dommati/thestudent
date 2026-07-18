@@ -246,7 +246,7 @@ const GeneratePage = () => {
           token = res.data?.share_token
         }
         if (token) {
-          const shareUrl = `${window.location.origin}/view/share/${token}`
+          const shareUrl = `${window.location.origin}/share/${token}`
           setShareModalData({ title: titleStr, url: shareUrl, isLoading: false })
           return
         }
@@ -1164,12 +1164,11 @@ const GeneratePage = () => {
                   if (isPack && item.id && !String(item.id).startsWith('pending-')) {
                     try {
                       const res = await axiosInstance.get(`/scrib/packs/${item.id}/pdf/`, {
-                        maxRedirects: 0,
-                        validateStatus: (s) => s < 400,
+                        params: { json: 'true' },
+                        validateStatus: (s) => s >= 200 && s < 400,
                       })
-                      // The view returns a 302 redirect; axios follows it by default and
-                      // ends up at the presigned URL. We use the final URL via res.request.
-                      resolvedUrl = res.request?.responseURL || url
+                      // json param makes the backend return { pdf_url: '...' } instead of a 302 redirect
+                      resolvedUrl = res.data?.pdf_url || res.headers?.location || res.request?.responseURL || url
                     } catch (err) {
                       console.error('Failed to get fresh PDF URL', err)
                       // fall back to stored url

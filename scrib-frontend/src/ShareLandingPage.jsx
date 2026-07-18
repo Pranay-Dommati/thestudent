@@ -17,13 +17,26 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
   const cardRef = useRef(null)
 
   useEffect(() => {
+    let currentW = null
     const updateWidth = () => {
       if (cardRef.current) {
-        setContainerWidth(cardRef.current.offsetWidth)
+        const w = Math.floor(cardRef.current.clientWidth)
+        if (w > 0 && (!currentW || Math.abs(w - currentW) > 4)) {
+          currentW = w
+          setContainerWidth(w)
+        }
       }
     }
     updateWidth()
-    const ro = new ResizeObserver(updateWidth)
+    const ro = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const w = Math.floor(entry.contentRect ? entry.contentRect.width : (cardRef.current ? cardRef.current.clientWidth : 0))
+        if (w > 0 && (!currentW || Math.abs(w - currentW) > 4)) {
+          currentW = w
+          setContainerWidth(w)
+        }
+      }
+    })
     if (cardRef.current) ro.observe(cardRef.current)
     return () => ro.disconnect()
   }, [])
@@ -67,6 +80,7 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
               <Page
                 pageNumber={isUnlocked ? pageNumber : 1}
                 width={containerWidth}
+                devicePixelRatio={Math.max(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 3)}
                 renderAnnotationLayer={false}
                 renderTextLayer={false}
               />
@@ -435,10 +449,10 @@ export default function ShareLandingPage() {
       </header>
 
       <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-8 md:px-6 md:py-10">
-        <div className="flex flex-col gap-6 lg:flex-row lg:gap-8 lg:items-start">
+        <div className="flex flex-col gap-6 lg:flex-row lg:gap-8 lg:items-start w-full min-w-0">
 
           {/* ── LEFT: Note info + Topics + Preview ── */}
-          <div className="flex-1 space-y-6">
+          <div className="flex-1 min-w-0 w-full space-y-6">
 
             {/* Note title & meta */}
             <div>

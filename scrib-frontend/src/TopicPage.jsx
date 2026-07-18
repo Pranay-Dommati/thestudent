@@ -21,18 +21,30 @@ const TopicPage = () => {
   const containerRef = useRef(null)
   const [pdfWidth, setPdfWidth] = useState(null)
 
-  const measureWidth = useCallback(() => {
-    if (containerRef.current) {
-      setPdfWidth(containerRef.current.offsetWidth)
-    }
-  }, [])
-
   useEffect(() => {
-    measureWidth()
-    const ro = new ResizeObserver(measureWidth)
+    let currentW = null
+    const measure = () => {
+      if (containerRef.current) {
+        const w = Math.floor(containerRef.current.clientWidth)
+        if (w > 0 && (!currentW || Math.abs(w - currentW) > 4)) {
+          currentW = w
+          setPdfWidth(w)
+        }
+      }
+    }
+    measure()
+    const ro = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const w = Math.floor(entry.contentRect ? entry.contentRect.width : (containerRef.current ? containerRef.current.clientWidth : 0))
+        if (w > 0 && (!currentW || Math.abs(w - currentW) > 4)) {
+          currentW = w
+          setPdfWidth(w)
+        }
+      }
+    })
     if (containerRef.current) ro.observe(containerRef.current)
     return () => ro.disconnect()
-  }, [measureWidth, topic])
+  }, [topic])
 
 
   useEffect(() => {
@@ -186,6 +198,7 @@ const TopicPage = () => {
                   <Page
                     pageNumber={1}
                     width={pdfWidth}
+                    devicePixelRatio={Math.max(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 3)}
                     renderAnnotationLayer={false}
                     renderTextLayer={false}
                     className="shadow-md"
