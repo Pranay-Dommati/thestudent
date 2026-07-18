@@ -185,23 +185,21 @@ export default function ShareLandingPage() {
     })
   }
 
-  const handleViewInDashboard = () => {
-    navigate('/dashboard', {
-      state: {
-        highlightPackId: purchasedPackId || meta?.pack_id
-      }
-    })
-  }
-
   const handleUnlock = () => {
     if (!isLoggedIn) {
       navigate(`/login?next=/share/${shareCode}`)
       return
     }
-    if (isAlreadyPurchased || meta?.is_own_link) {
-      handleViewInDashboard()
+    if (meta?.already_purchased || purchasedPackId) {
+      setPaymentState('processing')
+      navigate('/dashboard', {
+        state: {
+          highlightPackId: purchasedPackId || meta?.pack_id
+        }
+      })
       return
     }
+    if (meta?.is_own_link) return
     setPaymentState('processing')
     startSharePurchaseFlow({
       shareCode,
@@ -270,7 +268,7 @@ export default function ShareLandingPage() {
     )
   }
 
-  const isAlreadyPurchased = meta?.already_purchased
+  const isAlreadyPurchased = meta?.already_purchased || !!purchasedPackId
   const isOwnLink = meta?.is_own_link
   const totalPages = meta?.total_pages || 1
   const isSinglePage = totalPages === 1
@@ -318,10 +316,18 @@ export default function ShareLandingPage() {
                 ✓ Already Purchased
               </div>
               <button
-                onClick={handleViewInDashboard}
-                className="w-full rounded-xl bg-[#1f3a5f] py-2.5 text-sm font-semibold text-white hover:bg-[#2d5fa6] transition-colors"
+                onClick={handleUnlock}
+                disabled={paymentState === 'processing'}
+                className="w-full rounded-xl bg-[#1f3a5f] py-2.5 text-sm font-semibold text-white hover:bg-[#2d5fa6] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                View in Dashboard
+                {paymentState === 'processing' ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    Opening Dashboard…
+                  </span>
+                ) : (
+                  'View in Dashboard'
+                )}
               </button>
               <button
                 onClick={() => setShowShareModal(true)}

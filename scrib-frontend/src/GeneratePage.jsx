@@ -1262,9 +1262,9 @@ const GeneratePage = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 w-full pt-1 sm:flex sm:w-auto sm:pt-0 sm:items-center sm:justify-end">
+                    <div className="flex w-full flex-shrink-0 items-center justify-end gap-2 sm:w-auto">
                       {item._isPending || isGenerating ? (
-                        <div className="flex flex-col items-end gap-1.5 px-2 min-w-[120px] col-span-3 sm:col-span-1">
+                        <div className="flex flex-col items-end gap-1.5 px-2 min-w-[120px]">
                           <span className="flex items-center gap-1.5 text-xs font-semibold text-[#7b756d]">
                             {item.status === 'pending' ? (
                               <>
@@ -1315,55 +1315,43 @@ const GeneratePage = () => {
                           ) : null}
                         </div>
                       ) : isFailed ? (
-                        <div className="text-xs font-medium text-[#ef4444] italic px-2 col-span-3 sm:col-span-1">Failed</div>
+                        <div className="text-xs font-medium text-[#ef4444] italic px-2">Failed</div>
                       ) : (
                         <>
-                          <button
-                            onClick={openViewer}
-                            disabled={loadingItemId === id}
-                            title="Open Viewer"
-                            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#e2dbd2] bg-white px-3 h-9 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#faf8f3] disabled:opacity-50"
-                          >
+                          <button onClick={openViewer} disabled={loadingItemId === id} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] sm:flex-none disabled:opacity-50">
                             {loadingItemId === id ? (
                               <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
                             ) : (
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                             )}
-                            <span>Open</span>
+                            Open
                           </button>
-                          <button
-                            onClick={(e) => handleDownloadClick(item, isPack, url, titleStr)}
-                            disabled={downloadingItemId === item.id || !url}
-                            title="Download PDF"
-                            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#e2dbd2] bg-white px-3 h-9 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#faf8f3] disabled:opacity-50"
-                          >
+                          <button onClick={(e) => handleDownloadClick(item, isPack, url, titleStr)} disabled={downloadingItemId === item.id || !url} className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50`}>
                             {downloadingItemId === item.id ? (
                               <svg className="animate-spin text-[#1f1f1f]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
                             ) : (
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                             )}
-                            <span>Download</span>
                           </button>
                           {isPack && item.status === 'ready' ? (
                             <button
                               onClick={() => setShareModalPackId(item.id)}
-                              className="flex items-center justify-center gap-1.5 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-3 h-9 text-xs font-semibold hover:bg-[#fef3c7] text-[#b45309] shadow-sm transition-colors"
-                              title="Share & Earn Credits"
+                              className="flex items-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-2.5 h-8 text-xs hover:bg-[#faf8f3] text-[#4b4742] shadow-sm transition-colors"
+                              title="Share & Earn"
                             >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#f59e0b] flex-shrink-0">
-                                <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L12 3Z"/>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#f59e0b]">
+                                <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
                               </svg>
-                              <span className="truncate">Share &amp; Earn</span>
+                              <span className="hidden sm:inline">Share &amp; Earn</span>
                             </button>
                           ) : (
                             <button
                               onClick={() => handleShareClick(item, isPack, url, titleStr)}
                               disabled={!url}
                               title="Share"
-                              className="flex items-center justify-center gap-1.5 rounded-xl border border-[#e2dbd2] bg-white px-3 h-9 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#faf8f3] disabled:opacity-50"
+                              className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50`}
                             >
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-                              <span>Share</span>
                             </button>
                           )}
                         </>
