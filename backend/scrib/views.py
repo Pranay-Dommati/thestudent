@@ -2696,18 +2696,14 @@ def _build_share_url(share_code, request):
     # First check for explicit SCRIB_FRONTEND_DOMAIN setting in settings
     scrib_domain = getattr(settings, 'SCRIB_FRONTEND_DOMAIN', None)
     
-    if not scrib_domain or 'www.easylearnova.com' in scrib_domain and 'scrib' not in scrib_domain:
-        # Check if incoming request Origin / Referer points to scrib or local dev
+    if not scrib_domain or ('easylearnova.com' in scrib_domain and 'scrib' not in scrib_domain) or 'www.scrib' in scrib_domain:
+        # Check if incoming request Origin / Referer points to local dev
         origin = request.headers.get('Origin', '') or ''
         referer = request.headers.get('Referer', '') or ''
         if 'localhost:5174' in origin or 'localhost:5174' in referer:
             scrib_domain = 'http://localhost:5174'
-        elif 'www.scrib.easylearnova.com' in origin or 'www.scrib.easylearnova.com' in referer:
-            scrib_domain = 'https://www.scrib.easylearnova.com'
-        elif 'scrib.easylearnova.com' in origin or 'scrib.easylearnova.com' in referer:
-            scrib_domain = 'https://scrib.easylearnova.com'
         else:
-            scrib_domain = 'https://www.scrib.easylearnova.com'
+            scrib_domain = 'https://scrib.easylearnova.com'
             
     return f"{scrib_domain.rstrip('/')}/share/{share_code}"
 

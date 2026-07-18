@@ -817,7 +817,7 @@ SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'true').lower() in ('1', 'true', '
 
 # Optional: Frontend domain for building links in emails
 FRONTEND_DOMAIN = os.environ.get('FRONTEND_DOMAIN', 'http://localhost:5173')
-SCRIB_FRONTEND_DOMAIN = os.environ.get('SCRIB_FRONTEND_DOMAIN', 'https://www.scrib.easylearnova.com')
+SCRIB_FRONTEND_DOMAIN = os.environ.get('SCRIB_FRONTEND_DOMAIN', 'https://scrib.easylearnova.com')
 
 # -----------------------------------------------------------------------------
 # MONKEY PATCH: Automatic Retries for Flaky Remote MySQL Connections
