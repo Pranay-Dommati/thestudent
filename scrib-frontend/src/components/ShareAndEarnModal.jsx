@@ -100,13 +100,6 @@ export default function ShareAndEarnModal({ packId, shareToken, onClose }) {
         </button>
 
         <div>
-          {/* Top Icon */}
-          <div className="mx-auto flex h-13 w-13 items-center justify-center rounded-2xl bg-[#eef7df] text-[#557a3f] mb-3.5 shadow-sm border border-[#d6edb9]">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-            </svg>
-          </div>
-
           {/* Header Text */}
           <h2 className="text-xl font-bold text-[#1f1f1f] mb-1.5">Share & Earn Credits ✨</h2>
           <p className="text-xs text-[#7b756d] mb-3.5 max-w-[280px] mx-auto leading-relaxed">

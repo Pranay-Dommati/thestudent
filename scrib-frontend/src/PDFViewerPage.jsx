@@ -282,8 +282,11 @@ const PDFViewerPage = () => {
   }
 
   const handleBack = () => {
-    if (shareToken) {
-      navigate('/')
+    const returnUrl = routeState.returnUrl
+    if (returnUrl) {
+      navigate(returnUrl)
+    } else if (activeShareToken) {
+      navigate(`/share/${activeShareToken}`)
     } else {
       navigate(-1)
     }

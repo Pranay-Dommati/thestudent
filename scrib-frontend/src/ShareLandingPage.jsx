@@ -14,6 +14,7 @@ import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 
 function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken, totalOriginalPages, isUnlocked, pdfUrl }) {
   const [containerWidth, setContainerWidth] = useState(null)
+  const [pdfLoaded, setPdfLoaded] = useState(false)
   const cardRef = useRef(null)
 
   useEffect(() => {
@@ -60,15 +61,26 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
 
       {/* Note paper illustration */}
       {((isFirst && previewToken) || (isUnlocked && pdfUrl)) && docUrl ? (
-        <div className="relative w-full overflow-hidden bg-white min-h-[300px] flex justify-center">
+        <div className="relative w-full overflow-hidden bg-white">
+          {/* Skeleton overlay — shown until PDF page renders */}
+          {!pdfLoaded && (
+            <div className="absolute inset-0 z-10 bg-[#faf8f3] animate-pulse flex flex-col p-6 gap-3">
+              {/* Title skeleton */}
+              <div className="h-5 rounded-full bg-[#e4ddd4] w-1/3 mx-auto mb-4" />
+              {/* Body lines */}
+              {Array.from({ length: 22 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-2.5 rounded-full bg-[#e4ddd4] shrink-0"
+                  style={{ width: `${58 + Math.sin(i * 1.9) * 28}%` }}
+                />
+              ))}
+            </div>
+          )}
+
           <Document
             file={docUrl}
-            loading={
-              <div className="flex flex-col items-center justify-center py-20 bg-[#faf8f3] w-full">
-                <div className="h-7 w-7 animate-spin rounded-full border-3 border-[#1f3a5f] border-t-transparent mb-2" />
-                <span className="text-xs text-[#7b756d]">Loading preview...</span>
-              </div>
-            }
+            loading={null}
             error={
               <div className="flex items-center justify-center py-20 text-xs text-red-500 w-full">
                 Could not load preview image.
@@ -83,6 +95,7 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
                 devicePixelRatio={Math.max(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 3)}
                 renderAnnotationLayer={false}
                 renderTextLayer={false}
+                onRenderSuccess={() => setPdfLoaded(true)}
               />
             )}
           </Document>
@@ -325,24 +338,32 @@ export default function ShareLandingPage() {
 
           {/* CTA */}
           {isAlreadyPurchased ? (
-            <div className="space-y-2">
-              <div className="w-full rounded-xl bg-[#eef7df] py-2.5 text-center text-sm font-semibold text-[#557a3f]">
-                ✓ Already Purchased
+            <div className="space-y-3">
+              {/* Compact purchased indicator */}
+              <div className="flex items-center justify-center gap-1.5 py-1.5">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#557a3f] text-white">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <span className="text-sm font-semibold text-[#3a5c20]">Already Purchased · Full Access</span>
               </div>
+
+              {/* Primary CTA */}
               <button
                 onClick={handleUnlock}
                 disabled={paymentState === 'processing'}
-                className="w-full rounded-xl bg-[#1f3a5f] py-2.5 text-sm font-semibold text-white hover:bg-[#2d5fa6] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full rounded-xl bg-[#1f3a5f] py-2.5 text-sm font-bold text-white hover:bg-[#2d5fa6] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {paymentState === 'processing' ? (
                   <span className="flex items-center justify-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    Opening Dashboard…
+                    Opening…
                   </span>
-                ) : (
-                  'View in Dashboard'
-                )}
+                ) : 'View in Dashboard'}
               </button>
+
+              {/* Share & Earn */}
               <button
                 onClick={() => setShowShareModal(true)}
                 className="w-full rounded-xl border border-[#dbe8c3] bg-[#f2f9e8] py-2.5 text-sm font-semibold text-[#3a5c20] hover:bg-[#eaf5d6] transition-colors"
