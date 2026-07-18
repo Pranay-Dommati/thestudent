@@ -6,6 +6,7 @@ import customToast from './utils/customToast'
 import Breadcrumb from './components/Breadcrumb'
 import MobilePDFViewer from './components/MobilePDFViewer'
 import ShareAndEarnModal from './components/ShareAndEarnModal'
+import DownloadReminderModal from './components/DownloadReminderModal'
 import axiosInstance from './utils/axios'
 import { getSharePdf } from './services/shareService'
 
@@ -50,6 +51,7 @@ const PDFViewerPage = () => {
   
   const [shareModalData, setShareModalData] = useState(null)
   const [shareModalPackId, setShareModalPackId] = useState(null)
+  const [showDownloadReminder, setShowDownloadReminder] = useState(false)
 
   useEffect(() => {
     if (shareToken) {
@@ -235,7 +237,7 @@ const PDFViewerPage = () => {
     }
   }
 
-  const handleDownload = async () => {
+  const executeDownload = async () => {
     const isIOS =
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
@@ -248,6 +250,15 @@ const PDFViewerPage = () => {
       }
     } catch (err) {
       customToast.error('Download failed. Try again.')
+    }
+  }
+
+  const handleDownloadClick = () => {
+    const { isPack, packId } = routeState
+    if (isPack && packId && user) {
+      setShowDownloadReminder(true)
+    } else {
+      executeDownload()
     }
   }
 
@@ -379,7 +390,7 @@ const PDFViewerPage = () => {
                 </button>
               )}
               <button
-                onClick={handleDownload}
+                onClick={handleDownloadClick}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1c1c1e] text-white hover:bg-[#2c2c2e] transition-colors md:border md:border-[#e0d9ce] md:bg-[#f7f4ee] md:text-[#5a554f] md:hover:bg-[#ede9e1]"
                 aria-label="Download"
                 title="Download PDF"
@@ -491,6 +502,21 @@ const PDFViewerPage = () => {
         <ShareAndEarnModal
           packId={shareModalPackId}
           onClose={() => setShareModalPackId(null)}
+        />
+      )}
+
+      {/* Download Reminder Modal */}
+      {showDownloadReminder && (
+        <DownloadReminderModal
+          onShare={() => {
+            setShowDownloadReminder(false)
+            handleShare()
+          }}
+          onDownload={() => {
+            setShowDownloadReminder(false)
+            executeDownload()
+          }}
+          onClose={() => setShowDownloadReminder(false)}
         />
       )}
     </div>

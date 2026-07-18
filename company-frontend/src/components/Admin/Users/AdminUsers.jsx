@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaSearch, FaFilter, FaEllipsisV, FaUserGraduate } from 'react-icons/fa';
+import { FaSearch, FaFilter, FaEllipsisV, FaUserGraduate, FaEnvelope } from 'react-icons/fa';
 import authService from '../../../services/authService';
 
 const AdminUsers = () => {
@@ -13,9 +13,16 @@ const AdminUsers = () => {
   const [enrollmentFilter, setEnrollmentFilter] = useState('all'); // all|none|1plus|5plus
   const [currentPage, setCurrentPage] = useState(1);
   const [users, setUsers] = useState([]);
-  const [stats, setStats] = useState({ total_users: 0, active_users: 0, new_this_month: 0, inactive_users: 0 });
+  const [stats, setStats] = useState({ total_users: 0, active_users: 0, active_last_7_days: 0, active_last_30_days: 0, new_this_month: 0, inactive_users: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastTarget, setBroadcastTarget] = useState('paid_users');
+  const [broadcastSubject, setBroadcastSubject] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState(null);
 
   const fetchUsers = async () => {
     try {
@@ -36,7 +43,7 @@ const AdminUsers = () => {
       const results = Array.isArray(data.results) ? data.results : [];
       // Keep the order returned by backend; do not re-sort here
       setUsers(results);
-      setStats(data.stats || { total_users: 0, active_users: 0, new_this_month: 0, inactive_users: 0 });
+      setStats(data.stats || { total_users: 0, active_users: 0, active_last_7_days: 0, active_last_30_days: 0, new_this_month: 0, inactive_users: 0 });
     } catch (e) {
       console.error('Fetch users error:', e);
       const serverMsg = e?.response?.data?.error;
@@ -62,6 +69,45 @@ const AdminUsers = () => {
       return true;
     });
   }, [users, enrollmentFilter]);
+
+  const handleSendBroadcast = async (e) => {
+    e.preventDefault();
+    if (!broadcastSubject.trim() || !broadcastMessage.trim()) {
+      alert('Please enter both subject and message.');
+      return;
+    }
+    const confirmed = window.confirm(`Are you sure you want to broadcast this email to all ${broadcastTarget === 'paid_users' ? 'paid' : 'registered'} users using AWS SES?`);
+    if (!confirmed) return;
+
+    try {
+      setBroadcastSending(true);
+      setBroadcastResult(null);
+      const resp = await authService.makeAuthenticatedRequest('/auth/users/broadcast/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_group: broadcastTarget,
+          subject: broadcastSubject,
+          message: broadcastMessage
+        })
+      });
+      const data = resp.data || {};
+      setBroadcastResult({
+        success: true,
+        status: data.status || 'Broadcast campaign started in background via Celery worker.',
+        task_id: data.task_id,
+        total: data.total_recipients || 0
+      });
+      setBroadcastSubject('');
+      setBroadcastMessage('');
+    } catch (err) {
+      console.error('Broadcast email error:', err);
+      const serverMsg = err?.response?.data?.error || err.message || 'Failed to send broadcast email';
+      setBroadcastResult({ success: false, error: serverMsg });
+    } finally {
+      setBroadcastSending(false);
+    }
+  };
 
   const handleUserAction = async (userId, action) => {
     try {
@@ -101,28 +147,50 @@ const AdminUsers = () => {
           <h1 className="text-2xl font-bold mb-2">User Management</h1>
           <p className="text-sm text-gray-500">View and manage user accounts</p>
         </div>
-        <button className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-          Add New User
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <button
+            onClick={() => { setShowBroadcastModal(true); setBroadcastResult(null); }}
+            className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 font-medium transition-all shadow-sm flex items-center justify-center gap-2"
+          >
+            <FaEnvelope className="text-sm" /> Send Broadcast Email
+          </button>
+          <button className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+            Add New User
+          </button>
+        </div>
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
           <div className="text-2xl font-bold text-blue-600">{stats.total_users || 0}</div>
-          <div className="text-sm text-gray-500">Total Users</div>
+          <div className="text-sm text-gray-500 font-medium">Total Users</div>
+          <div className="text-xs text-gray-400 mt-0.5">Registered accounts</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+          <div className="text-2xl font-bold text-emerald-600">{stats.active_last_7_days || 0}</div>
+          <div className="text-sm text-gray-500 font-medium">Active (7 Days)</div>
+          <div className="text-xs text-gray-400 mt-0.5">Opened in last 7 days</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+          <div className="text-2xl font-bold text-purple-600">{stats.active_last_30_days || 0}</div>
+          <div className="text-sm text-gray-500 font-medium">Active (30 Days)</div>
+          <div className="text-xs text-gray-400 mt-0.5">Opened in last 30 days</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
           <div className="text-2xl font-bold text-green-600">{stats.active_users || 0}</div>
-          <div className="text-sm text-gray-500">Active Users</div>
+          <div className="text-sm text-gray-500 font-medium">Enabled Accounts</div>
+          <div className="text-xs text-gray-400 mt-0.5">Not disabled</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
           <div className="text-2xl font-bold text-yellow-600">{stats.new_this_month || 0}</div>
-          <div className="text-sm text-gray-500">New This Month</div>
+          <div className="text-sm text-gray-500 font-medium">New This Month</div>
+          <div className="text-xs text-gray-400 mt-0.5">Joined this calendar month</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
           <div className="text-2xl font-bold text-red-600">{stats.inactive_users || 0}</div>
-          <div className="text-sm text-gray-500">Inactive Users</div>
+          <div className="text-sm text-gray-500 font-medium">Disabled Accounts</div>
+          <div className="text-xs text-gray-400 mt-0.5">Banned / deactivated</div>
         </div>
       </div>
       
@@ -345,6 +413,148 @@ const AdminUsers = () => {
           </button>
         </div>
       </div>
+
+      {/* Broadcast Email Modal */}
+      {showBroadcastModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden border border-gray-100 animate-fadeIn">
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <FaEnvelope className="text-xl" />
+                <div>
+                  <h3 className="text-lg font-bold">Send Broadcast Email</h3>
+                  <p className="text-xs text-purple-100">Delivered via official AWS SES (info@easylearnova.com)</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBroadcastModal(false)}
+                className="text-white hover:text-gray-200 text-2xl leading-none font-bold"
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleSendBroadcast} className="p-6 space-y-5">
+              {broadcastResult && (
+                <div className={`p-4 rounded-xl text-sm ${broadcastResult.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+                  {broadcastResult.success ? (
+                    <div>
+                      <p className="font-bold text-base flex items-center gap-1.5">
+                        ✅ Background Campaign Started!
+                      </p>
+                      <p className="mt-1">
+                        Queued <strong>{broadcastResult.total}</strong> target recipients for delivery via your background Celery worker at ~12 emails/sec (AWS SES quota safe).
+                      </p>
+                      {broadcastResult.task_id && (
+                        <p className="mt-1 text-xs text-green-700 bg-green-100 px-2 py-1 rounded inline-block font-mono">
+                          Task ID: {broadcastResult.task_id}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="font-semibold">❌ Error: {broadcastResult.error}</p>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Target Audience
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className={`cursor-pointer border rounded-xl p-3 flex items-start gap-3 transition-all ${broadcastTarget === 'paid_users' ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500/20' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <input
+                      type="radio"
+                      name="target_group"
+                      value="paid_users"
+                      checked={broadcastTarget === 'paid_users'}
+                      onChange={() => setBroadcastTarget('paid_users')}
+                      className="mt-1 text-purple-600 focus:ring-purple-500"
+                    />
+                    <div>
+                      <span className="font-bold text-gray-900 block text-sm">All Paid Users ⭐</span>
+                      <span className="text-xs text-gray-500">Users who have completed at least 1 paid purchase</span>
+                    </div>
+                  </label>
+
+                  <label className={`cursor-pointer border rounded-xl p-3 flex items-start gap-3 transition-all ${broadcastTarget === 'all_users' ? 'border-purple-600 bg-purple-50 ring-2 ring-purple-500/20' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <input
+                      type="radio"
+                      name="target_group"
+                      value="all_users"
+                      checked={broadcastTarget === 'all_users'}
+                      onChange={() => setBroadcastTarget('all_users')}
+                      className="mt-1 text-purple-600 focus:ring-purple-500"
+                    />
+                    <div>
+                      <span className="font-bold text-gray-900 block text-sm">All Registered Users</span>
+                      <span className="text-xs text-gray-500">Every active account in the ecosystem ({stats.total_users || 'All'})</span>
+                    </div>
+                  </label>
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5 italic">Note: Additional segmentation options will be added in future updates.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Subject Line
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., Exciting New Features Available on EasyLearnova!"
+                  value={broadcastSubject}
+                  onChange={(e) => setBroadcastSubject(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Message Body
+                </label>
+                <textarea
+                  rows="6"
+                  placeholder="Write your email announcement here. Paragraphs and line breaks will be automatically formatted inside our official branded HTML template..."
+                  value={broadcastMessage}
+                  onChange={(e) => setBroadcastMessage(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 font-sans"
+                  required
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Your message will be automatically wrapped in our responsive EasyLearnova header and footer with unsubscribe & support links.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowBroadcastModal(false)}
+                  className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  disabled={broadcastSending}
+                  className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 font-semibold transition-all shadow-md disabled:opacity-60 flex items-center gap-2"
+                >
+                  {broadcastSending ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Sending via SES...
+                    </>
+                  ) : (
+                    <>
+                      <FaEnvelope /> Send Broadcast Now
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

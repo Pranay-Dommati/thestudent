@@ -114,7 +114,7 @@ class ScribMeSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     email = serializers.EmailField()
     full_name = serializers.CharField()
-    credit_balance = serializers.IntegerField()
+    credit_balance = serializers.FloatField()
 
 
 class RedeemCouponSerializer(serializers.Serializer):

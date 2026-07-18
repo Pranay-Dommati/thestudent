@@ -138,3 +138,56 @@ def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
             
         # Optionally retry
         # raise self.retry(exc=exc, countdown=60)
+
+@shared_task(bind=True)
+def send_broadcast_chunk_task(self, chunk_emails, subject, html_content, chunk_index, total_chunks):
+    """
+    Worker task that sends a mini-chunk of up to 50 emails (~4 seconds duration).
+    Because each task takes only ~4 seconds, the worker thread yields back to the Redis queue
+    frequently, allowing user note generation (`generate_study_pack_task`) to be processed immediately without waiting!
+    """
+    import time
+    from django.db import close_old_connections
+    close_old_connections()
+    
+    sent_count = 0
+    failed_count = 0
+    
+    for i, email in enumerate(chunk_emails):
+        if email and '@' in email:
+            try:
+                success = send_email_via_ses(email, subject, html_content)
+                if success:
+                    sent_count += 1
+                else:
+                    failed_count += 1
+            except Exception as ex:
+                logger.error(f"Failed sending broadcast email to {email}: {ex}")
+                failed_count += 1
+                
+        # Rate limiting: pause 0.08s after each email (~12 emails/sec max)
+        time.sleep(0.08)
+        if (i + 1) % 14 == 0:
+            time.sleep(0.2)
+            
+    logger.info(f"Broadcast chunk {chunk_index}/{total_chunks} completed for '{subject}': {sent_count} sent, {failed_count} failed.")
+    return {"chunk_index": chunk_index, "sent": sent_count, "failed": failed_count}
+
+@shared_task(bind=True)
+def send_broadcast_email_task(self, recipient_emails, subject, html_content, target_group):
+    """
+    Master dispatcher task: Splits `recipient_emails` into mini-chunks of 50 emails
+    and queues `send_broadcast_chunk_task` for each chunk.
+    This ensures long campaigns never hold a Celery worker thread for more than 4 seconds at a time!
+    """
+    logger.info(f"Starting Celery master broadcast task '{subject}' to {len(recipient_emails)} users [{target_group}]")
+    
+    chunk_size = 50
+    chunks = [recipient_emails[i:i + chunk_size] for i in range(0, len(recipient_emails), chunk_size)]
+    total_chunks = len(chunks)
+    
+    for idx, chunk in enumerate(chunks, 1):
+        send_broadcast_chunk_task.delay(chunk, subject, html_content, idx, total_chunks)
+        
+    logger.info(f"Dispatched {total_chunks} chunk tasks (50 emails each) for '{subject}' [{target_group}]")
+    return {"status": "dispatched", "total_recipients": len(recipient_emails), "total_chunks": total_chunks}

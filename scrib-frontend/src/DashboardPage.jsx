@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState, useRef } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { Helmet } from 'react-helmet-async'
 import { getInitials } from './utils/user'
@@ -11,7 +11,8 @@ import MobileMenu from './components/MobileMenu'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 import RedeemCouponCard from './components/RedeemCouponCard'
 import ShareAndEarnModal from './components/ShareAndEarnModal'
-import { getShareStats } from './services/shareService'
+import DownloadReminderModal from './components/DownloadReminderModal'
+import ShareStatsBanner from './components/ShareStatsBanner'
 
 const toneColors = {
   blue: 'bg-[#7ba7ff]',
@@ -22,18 +23,53 @@ const toneColors = {
 const DashboardPage = () => {
   const { user, logout, isLoggedIn, loading, refreshUser } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [historyItems, setHistoryItems] = useState([])
   const [loadingData, setLoadingData] = useState(false)
   const [statsData, setStatsData] = useState({ pdfs: 0, creditsUsed: 0 })
   const [shareModalPackId, setShareModalPackId] = useState(null)
   const [showBuyModal, setShowBuyModal] = useState(false)
-  const [sharingStats, setSharingStats] = useState(null)
-  const [loadingSharingStats, setLoadingSharingStats] = useState(false)
   const [visibleCount, setVisibleCount] = useState(5)
+  const [downloadReminderData, setDownloadReminderData] = useState(null)
+  const [highlightedItem, setHighlightedItem] = useState(null)
 
   const handleShareEarn = (packId) => {
     setShareModalPackId(packId)
   }
+
+  const handleDownloadClick = (item, fileUrl) => {
+    const isPack = item.type === 'pack'
+    if (isPack && item.id && user) {
+      setDownloadReminderData({ item, fileUrl })
+    } else {
+      forceDownload(fileUrl, `${item.name}.pdf`)
+    }
+  }
+
+  useEffect(() => {
+    if (location.state?.purchaseSuccess) {
+      customToast.success('✅ Purchase successful! Your notes are now available below.', { duration: 5000 })
+    }
+    if (location.state?.highlightPackId) {
+      setHighlightedItem(location.state.highlightPackId)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location, navigate])
+
+  useEffect(() => {
+    if (highlightedItem && !loadingData && historyItems.length > 0) {
+      setTimeout(() => {
+        const el = document.getElementById(`history-item-${highlightedItem}`)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          const timer = setTimeout(() => {
+            setHighlightedItem(null)
+          }, 4000)
+          return () => clearTimeout(timer)
+        }
+      }, 100)
+    }
+  }, [highlightedItem, loadingData, historyItems])
 
   useEffect(() => {
     if (!loading && !isLoggedIn) {
@@ -75,20 +111,6 @@ const DashboardPage = () => {
       }
     }
     loadData()
-
-    // Fetch Earn While Learning stats separately so it doesn't block the main load
-    const loadSharingStats = async () => {
-      setLoadingSharingStats(true)
-      try {
-        const data = await getShareStats()
-        setSharingStats(data)
-      } catch {
-        // Non-critical — silently ignore
-      } finally {
-        setLoadingSharingStats(false)
-      }
-    }
-    loadSharingStats()
   }, [loading, isLoggedIn, navigate])
 
   const formatDate = (dateString) => {
@@ -192,46 +214,7 @@ const DashboardPage = () => {
         </div>
 
         {/* Earn While Learning stats */}
-        {isLoggedIn && (
-          <div className="mt-6 rounded-xl border border-[#e8eefb] bg-[#f0f5fd] overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[#d8e6f8]">
-              <p className="text-sm font-bold text-[#4a6aa6]">Share & Earn Credits ✨</p>
-              <Link to="/generate?tab=history" className="text-xs font-semibold text-[#4a6aa6] hover:text-[#1f3a5f]">
-                Share notes →
-              </Link>
-            </div>
-            {loadingSharingStats ? (
-              <div className="flex items-center justify-center py-6">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#4a6aa6] border-t-transparent" />
-              </div>
-            ) : sharingStats && sharingStats.notes_shared > 0 ? (
-              <div className="grid grid-cols-3 divide-x divide-[#d8e6f8]">
-                {[
-                  { label: 'Notes Shared', value: sharingStats.notes_shared },
-                  { label: 'Successful Purchases', value: sharingStats.successful_purchases },
-                  { label: 'Rewards Earned', value: `${parseFloat(sharingStats.rewards_earned || 0).toFixed(1)} ${sharingStats.reward_type}` },
-                ].map(({ label, value }) => (
-                  <div key={label} className="px-4 py-4 text-center">
-                    <p className="text-xl font-bold text-[#1f3a5f]">{value}</p>
-                    <p className="mt-0.5 text-[10px] text-[#5a7aae] uppercase tracking-wide">{label}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="px-4 py-5 text-center">
-                <p className="text-xs text-[#5a7aae]">
-                  Share your notes and earn credits when friends purchase through your link.
-                </p>
-                <Link
-                  to="/generate?tab=history"
-                  className="mt-3 inline-block rounded-full border border-[#c4d9f5] bg-white px-4 py-1.5 text-xs font-semibold text-[#4a6aa6] hover:bg-[#e8f0fb] transition-colors"
-                >
-                  Start sharing →
-                </Link>
-              </div>
-            )}
-          </div>
-        )}
+        <ShareStatsBanner isLoggedIn={isLoggedIn} className="mt-6" />
 
         {/* Redeem Coupon */}
         {isLoggedIn && (
@@ -273,10 +256,24 @@ const DashboardPage = () => {
                 const fileUrl = isPack ? item.pdf_url : item.image_url
                 const toneKeys = Object.keys(toneColors)
                 const tone = toneKeys[index % toneKeys.length]
+                const isHighlighted = highlightedItem === item.id
                 
                 return (
-                  <div key={item.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-3">
+                  <div key={item.id} id={`history-item-${item.id}`} className="relative">
+                    {isHighlighted && (
+                      <div className="absolute inset-0 z-0 animate-pulse rounded-xl bg-gradient-to-r from-[#4ade80] via-[#34d399] to-[#4ade80] blur-md opacity-60" />
+                    )}
+                    <div 
+                      className={`relative flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between transition-all duration-700 ${isHighlighted ? 'bg-white z-10 rounded-xl scale-[1.02] shadow-[0_0_15px_rgba(52,211,153,0.3)] ring-2 ring-emerald-400 my-2 mx-1' : ''}`}
+                    >
+                      {isHighlighted && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-500 to-green-500 text-white text-[11px] font-bold px-4 py-1 rounded-full shadow-lg animate-bounce flex items-center gap-1 z-20 whitespace-nowrap">
+                          <span>✨</span>
+                          YOUR NEW NOTES
+                          <span>✨</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-3 relative z-10">
                       <div className="flex-shrink-0 rounded-lg border border-[#e2dbd2] bg-[#faf8f3] p-2">
                         <div className={`h-1.5 w-10 rounded-full ${toneColors[tone]}`} />
                         <div className={`mt-2 h-1.5 w-8 rounded-full ${toneColors[tone]}`} />
@@ -386,6 +383,7 @@ const DashboardPage = () => {
                       )}
                     </div>
                   </div>
+                  </div>
                 )
               })
             )}
@@ -419,6 +417,23 @@ const DashboardPage = () => {
         <ShareAndEarnModal
           packId={shareModalPackId}
           onClose={() => setShareModalPackId(null)}
+        />
+      )}
+
+      {/* Download Reminder Modal */}
+      {downloadReminderData && (
+        <DownloadReminderModal
+          onShare={() => {
+            const { item } = downloadReminderData
+            setDownloadReminderData(null)
+            setShareModalPackId(item.id)
+          }}
+          onDownload={() => {
+            const { item, fileUrl } = downloadReminderData
+            setDownloadReminderData(null)
+            forceDownload(fileUrl, `${item.name}.pdf`)
+          }}
+          onClose={() => setDownloadReminderData(null)}
         />
       )}
 

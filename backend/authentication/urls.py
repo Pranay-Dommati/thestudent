@@ -22,6 +22,7 @@ from .views import (
     reset_password,
     validate_reset_token,
     admin_set_user_password,
+    admin_broadcast_email,
     TokenRefreshViewWithRetry,  # Custom token refresh with retry logic
     record_product_usage,
 )
@@ -34,6 +35,7 @@ urlpatterns = [
     path('users/', admin_list_users, name='admin_list_users'),
     path('users/<int:user_id>/', admin_user_detail, name='admin_user_detail'),
     path('users/<int:user_id>/set-password/', admin_set_user_password, name='admin_set_user_password'),
+    path('users/broadcast/', admin_broadcast_email, name='admin_broadcast_email'),
     path('token/refresh/', TokenRefreshViewWithRetry.as_view(), name='token_refresh'),  # Use retry-enabled view
     path('profile/', user_profile, name='user_profile'),
     path('onboarding/mark-seen/', mark_onboarding_seen, name='mark_onboarding_seen'),

@@ -85,7 +85,7 @@ def get_credit_balance(user):
         user=user, direction=CreditTransaction.DIRECTION_DEBIT
     ).aggregate(total=Sum('credits'))['total'] or 0
     
-    return int(credits_in - credits_out)
+    return float(credits_in - credits_out)
 
 
 def ensure_absolute_url(request, url):
@@ -596,12 +596,14 @@ def parse_topics_from_request(data):
                     if name:
                         page_topics.append({'name': name, 'instruction': instruction})
                 if page_topics:
-                    parsed_pages.append({'topics': page_topics})
+                    for i in range(0, len(page_topics), 2):
+                        parsed_pages.append({'topics': page_topics[i:i + 2]})
             elif isinstance(entry, (list, tuple)):
                 # v1 list of strings
                 page_topics = [{'name': str(t).strip(), 'instruction': ''} for t in entry if str(t).strip()]
                 if page_topics:
-                    parsed_pages.append({'topics': page_topics})
+                    for i in range(0, len(page_topics), 2):
+                        parsed_pages.append({'topics': page_topics[i:i + 2]})
             else:
                 # v1 bare string
                 name = str(entry).strip()
@@ -1248,6 +1250,11 @@ class MeView(APIView):
 
     def get(self, request):
         user = request.user
+        from django.utils import timezone
+        if not user.last_login or (timezone.now() - user.last_login).total_seconds() > 3600:
+            user.last_login = timezone.now()
+            user.save(update_fields=['last_login', 'updated_at'])
+
         payload = {
             'id': user.id,
             'email': user.email,
@@ -3214,7 +3221,7 @@ class SharePaymentVerifyView(APIView):
                 CreditTransaction.objects.create(
                     user=share_link.owner,
                     direction=CreditTransaction.DIRECTION_CREDIT,
-                    credits=int(reward_amount),  # stored as integer credits
+                    credits=reward_amount,  # stored as decimal credits
                     payment=payment,
                     reason=CreditTransaction.REASON_REFERRAL,
                 )
@@ -3229,6 +3236,53 @@ class SharePaymentVerifyView(APIView):
                     '[share-verify] Purchase complete share=%s buyer=%s sharer=%s reward=%s',
                     share_code, request.user.id, share_link.owner_id, reward_amount,
                 )
+                should_send_reward_email = True
+            else:
+                should_send_reward_email = False
+
+        if should_send_reward_email:
+            try:
+                from authentication.views import send_email_via_ses
+                import threading
+                frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+                
+                credits_str = str(reward_amount).rstrip('0').rstrip('.') if '.' in str(reward_amount) else str(reward_amount)
+                
+                html_content = f"""
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                  <h2>🎉 You earned {credits_str} credits from your shared notes!</h2>
+                  <p>Hi {share_link.owner.full_name or 'there'},</p>
+                  <p>Great news! 🎉</p>
+                  <p>Someone just purchased your shared notes:</p>
+                  <p style="font-size: 18px; font-weight: bold; color: #1f3a5f; margin: 15px 0;">
+                    "{pack.title}"
+                  </p>
+                  <p>🪙 You've earned <strong>{credits_str} credits</strong>!</p>
+                  <p>Every successful purchase through your share link earns you more credits, which you can use to generate even more AI handwritten notes.</p>
+                  <p>Keep sharing your notes with friends and continue earning credits with every successful purchase.</p>
+                  <br>
+                  <a href="{frontend_url}/dashboard" style="display: inline-block; padding: 12px 24px; background-color: #1f3a5f; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600;">
+                    👉 Share More Notes
+                  </a>
+                  <br><br>
+                  <p>Thank you for helping fellow students learn smarter.</p>
+                  <p>— Team Scrib</p>
+                </div>
+                """
+                
+                def _send():
+                    try:
+                        send_email_via_ses(
+                            to_email=share_link.owner.email,
+                            subject=f"🎉 You earned {credits_str} credits from your shared notes!",
+                            html_content=html_content
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send reward email to {share_link.owner.email}: {e}")
+                        
+                threading.Thread(target=_send, daemon=True).start()
+            except Exception as e:
+                logger.error(f"Error setting up reward email thread: {e}")
 
         # Generate presigned URL so frontend can navigate directly to viewer
         # without a second API call (the token may expire during payment flow).

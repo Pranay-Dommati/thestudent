@@ -605,7 +605,13 @@ def user_profile(request):
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    serializer = UserSerializer(request.user)
+    user = request.user
+    from django.utils import timezone
+    if not user.last_login or (timezone.now() - user.last_login).total_seconds() > 3600:
+        user.last_login = timezone.now()
+        user.save(update_fields=['last_login', 'updated_at'])
+
+    serializer = UserSerializer(user)
     return Response(serializer.data)
 
 @api_view(['POST'])
@@ -840,9 +846,20 @@ def admin_list_users(request):
         total_users = User.objects.count()
         active_users = User.objects.filter(is_active=True).count()
         from django.utils import timezone
+        from datetime import timedelta
+        from django.db.models import Q
         now = timezone.now()
         new_this_month = User.objects.filter(date_joined__year=now.year, date_joined__month=now.month).count()
         inactive_users = total_users - active_users
+
+        cutoff_7d = now - timedelta(days=7)
+        cutoff_30d = now - timedelta(days=30)
+        active_last_7_days = User.objects.filter(
+            Q(last_login__gte=cutoff_7d) | Q(updated_at__gte=cutoff_7d) | Q(date_joined__gte=cutoff_7d)
+        ).distinct().count()
+        active_last_30_days = User.objects.filter(
+            Q(last_login__gte=cutoff_30d) | Q(updated_at__gte=cutoff_30d) | Q(date_joined__gte=cutoff_30d)
+        ).distinct().count()
         
         # Product stats
         product_stats = dict(UserProduct.objects.values('product').annotate(count=Count('user', distinct=True)).values_list('product', 'count'))
@@ -891,6 +908,8 @@ def admin_list_users(request):
             'stats': {
                 'total_users': total_users,
                 'active_users': active_users,
+                'active_last_7_days': active_last_7_days,
+                'active_last_30_days': active_last_30_days,
                 'new_this_month': new_this_month,
                 'inactive_users': inactive_users,
                 'scrib_users': product_stats.get('scrib', 0),
@@ -1016,6 +1035,86 @@ def admin_set_user_password(request, user_id: int):
         if getattr(settings, 'DEBUG', False):
             logger.exception(f"Admin set password error: {str(e)}")
         return Response({"error": "Failed to update password"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_broadcast_email(request):
+    """
+    Admin-only: Send a broadcast email using AWS SES (info@easylearnova.com).
+    Target groups: 'paid_users' (all users with at least 1 paid order) or 'all_users' (all active registered accounts).
+    Payload: { target_group: 'paid_users'|'all_users', subject: str, message: str }
+    """
+    try:
+        if not request.user.is_superuser:
+            return Response({"error": "Access denied. Superuser privileges required."}, status=status.HTTP_403_FORBIDDEN)
+
+        payload = request.data or {}
+        target_group = (payload.get('target_group') or 'paid_users').strip().lower()
+        subject = (payload.get('subject') or '').strip()
+        message_body = (payload.get('message') or '').strip()
+
+        if not subject or not message_body:
+            return Response({"error": "Subject and message are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Determine target recipients
+        if target_group == 'paid_users':
+            try:
+                from scrib.models import Payment
+                paid_user_ids = Payment.objects.filter(status=Payment.STATUS_PAID).values_list('user_id', flat=True).distinct()
+                recipient_emails = list(User.objects.filter(id__in=paid_user_ids, is_active=True).values_list('email', flat=True).distinct())
+            except Exception as e:
+                logger.error(f"Error querying paid users: {e}")
+                recipient_emails = []
+        elif target_group == 'all_users':
+            recipient_emails = list(User.objects.filter(is_active=True).values_list('email', flat=True).distinct())
+        else:
+            return Response({"error": f"Invalid target group: {target_group}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not recipient_emails:
+            return Response({"error": "No recipient users found for this target group."}, status=status.HTTP_404_NOT_FOUND)
+
+        formatted_content = message_body.replace('\r\n', '\n').replace('\n', '<br/>')
+        
+        from django.utils import timezone
+        year = timezone.now().year
+        
+        html_content = f"""
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+            <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); padding: 32px; text-align: center;">
+                <h1 style="color: #ffffff; font-size: 26px; font-weight: 800; margin: 0; letter-spacing: -0.5px;">EasyLearnova</h1>
+                <p style="color: #e2e8f0; font-size: 14px; margin: 6px 0 0 0; font-weight: 500;">Official Announcement</p>
+            </div>
+            <div style="padding: 36px 32px; color: #1f2937; font-size: 16px; line-height: 1.7;">
+                {formatted_content}
+            </div>
+            <div style="background-color: #f8fafc; padding: 24px 32px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 13px; color: #64748b;">
+                <p style="margin: 0 0 8px 0;">You are receiving this communication because you have an active account on EasyLearnova.</p>
+                <p style="margin: 0;">&copy; {year} EasyLearnova. All rights reserved. &bull; <a href="https://easylearnova.com" style="color: #2563eb; text-decoration: none; font-weight: 600;">Visit Dashboard</a></p>
+            </div>
+        </div>
+        """
+
+        # Dispatch to Celery background task with rate limiting (<= 12 emails/sec to respect AWS SES 14/sec quota)
+        try:
+            from scrib.tasks import send_broadcast_email_task
+            task = send_broadcast_email_task.delay(recipient_emails, subject, html_content, target_group)
+            task_id = str(task.id) if task else 'sync'
+        except Exception as task_err:
+            logger.error(f"Failed to queue Celery broadcast task, falling back: {task_err}")
+            task_id = 'error'
+
+        logger.info(f"Queued Celery broadcast task {task_id} for '{subject}' to {len(recipient_emails)} recipients [{target_group}]")
+        return Response({
+            "success": True,
+            "status": "Background broadcast campaign started successfully",
+            "task_id": task_id,
+            "total_recipients": len(recipient_emails),
+            "target_group": target_group
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.exception(f"Admin broadcast email error: {str(e)}")
+        return Response({"error": "An error occurred while sending the broadcast email."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

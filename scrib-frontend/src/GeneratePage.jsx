@@ -9,7 +9,9 @@ import { forceDownload } from './utils/download'
 import Breadcrumb from './components/Breadcrumb'
 import MobileMenu from './components/MobileMenu'
 import ShareAndEarnModal from './components/ShareAndEarnModal'
+import DownloadReminderModal from './components/DownloadReminderModal'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
+import ShareStatsBanner from './components/ShareStatsBanner'
 import { usePostHog } from '@posthog/react'
 import { useGoogleAuth } from './hooks/useGoogleAuth'
 import { startPaymentFlow } from './services/paymentService'
@@ -77,6 +79,14 @@ const GeneratePage = () => {
       },
     })
   }
+
+  const handleDownloadClick = (item, isPack, storedUrl, titleStr) => {
+    if (isPack && item.id && !String(item.id).startsWith('pending-') && user) {
+      setDownloadReminderData({ item, isPack, storedUrl, titleStr })
+    } else {
+      executeDownloadClick(item, isPack, storedUrl, titleStr)
+    }
+  }
   const MAX_PAGES = 8
   const MAX_TOPICS_PER_PAGE = 2
 
@@ -86,7 +96,24 @@ const GeneratePage = () => {
   const [pages, setPages] = useState(() => {
     try {
       const saved = sessionStorage.getItem('scrib_draft_pages_v2')
-      return saved ? JSON.parse(saved) : [{ topics: [{ name: '', instruction: '' }] }]
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const normalized = []
+          for (const page of parsed) {
+            const pageTopics = Array.isArray(page?.topics) ? page.topics : []
+            if (pageTopics.length <= MAX_TOPICS_PER_PAGE) {
+              if (normalized.length < MAX_PAGES) normalized.push({ topics: pageTopics.length ? pageTopics : [{ name: '', instruction: '' }] })
+            } else {
+              for (let i = 0; i < pageTopics.length && normalized.length < MAX_PAGES; i += MAX_TOPICS_PER_PAGE) {
+                normalized.push({ topics: pageTopics.slice(i, i + MAX_TOPICS_PER_PAGE) })
+              }
+            }
+          }
+          return normalized.length > 0 ? normalized : [{ topics: [{ name: '', instruction: '' }] }]
+        }
+      }
+      return [{ topics: [{ name: '', instruction: '' }] }]
     } catch { return [{ topics: [{ name: '', instruction: '' }] }] }
   })
   const [pasteText, setPasteText] = useState(() => sessionStorage.getItem('scrib_draft_paste') || '')
@@ -111,6 +138,7 @@ const GeneratePage = () => {
   const [processingPack, setProcessingPack] = useState(null)
   const [loadingItemId, setLoadingItemId] = useState(null)
   const [downloadingItemId, setDownloadingItemId] = useState(null)
+  const [downloadReminderData, setDownloadReminderData] = useState(null)
   const [invalidTopics, setInvalidTopics] = useState([])
   const [aiGeneratedWarning, setAiGeneratedWarning] = useState(false)
   const location = useLocation()
@@ -122,6 +150,7 @@ const GeneratePage = () => {
   const [historyItems, setHistoryItems] = useState([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [hasLoadedHistory, setHasLoadedHistory] = useState(false)
+  const [historyLoadError, setHistoryLoadError] = useState(false)
   const [openDropdownId, setOpenDropdownId] = useState(null)
   const [shareModalData, setShareModalData] = useState(null)
   const [hideBanner, setHideBanner] = useState(false)
@@ -167,6 +196,7 @@ const GeneratePage = () => {
       return
     }
     setIsLoadingHistory(true)
+    setHistoryLoadError(false)
     try {
       const [notesRes, packsRes] = await Promise.all([
         axiosInstance.get('/scrib/my-notes/'),
@@ -193,6 +223,7 @@ const GeneratePage = () => {
       setHistoryItems(combined)
     } catch (err) {
       console.error(err)
+      setHistoryLoadError(true)
       customToast.error('Failed to load history')
     } finally {
       setIsLoadingHistory(false)
@@ -228,7 +259,7 @@ const GeneratePage = () => {
     setShareModalData({ title: titleStr, url: url || window.location.href, isLoading: false })
   }
 
-  const handleDownloadClick = async (item, isPack, storedUrl, titleStr) => {
+  const executeDownloadClick = async (item, isPack, storedUrl, titleStr) => {
     if (downloadingItemId === item.id) return
     setDownloadingItemId(item.id)
 
@@ -381,8 +412,8 @@ const GeneratePage = () => {
 
 
 
-  const handleOrganizeTopics = async () => {
-    const trimmed = pasteText.trim()
+  const handleOrganizeTopics = async (customText = null) => {
+    const trimmed = (typeof customText === 'string' ? customText : pasteText).trim()
     if (!trimmed) {
       customToast.error('Please paste some syllabus text first.')
       return
@@ -400,8 +431,12 @@ const GeneratePage = () => {
       if (!Array.isArray(groups) || !groups.length) throw new Error('Empty groups')
 
       // groups is already v2 format: [{topics: [{name, instruction}]}, ...]
-      // Cap at MAX_PAGES
-      const organized = groups.slice(0, MAX_PAGES)
+      // Cap at MAX_TOPICS_PER_PAGE and MAX_PAGES
+      const cappedGroups = groups.map(g => ({
+        ...g,
+        topics: (g.topics || []).slice(0, MAX_TOPICS_PER_PAGE)
+      }))
+      const organized = cappedGroups.slice(0, MAX_PAGES)
       setPages(organized)
       
       const extraGroups = groups.slice(MAX_PAGES)
@@ -423,17 +458,24 @@ const GeneratePage = () => {
     const params = new URLSearchParams(location.search)
     const incoming = params.get('topic')
     if (!incoming) return
-    const names = incoming.split(/\n|,/).map(s => s.trim()).filter(Boolean)
-    if (names.length) {
-      setMode('manual')
-      setPages([{ topics: names.map(n => ({ name: n, instruction: '' })) }])
-    }
-  }, [location.search])
+
+    // Clear URL parameter right away so re-render/refresh doesn't re-trigger
+    const newParams = new URLSearchParams(location.search)
+    newParams.delete('topic')
+    const searchString = newParams.toString()
+    navigate(`${location.pathname}${searchString ? `?${searchString}` : ''}`, { replace: true, state: location.state })
+
+    // Route homepage input directly into AI organization just like 'Paste syllabus'
+    setMode('paste')
+    setPasteText(incoming)
+    handleOrganizeTopics(incoming)
+  }, [location.search, navigate])
 
   // ── Page builder helpers ────────────────────────────────────────────────
   const validPages = pages
-    .map(p => ({ ...p, topics: (p.topics || []).filter(t => t.name.trim()) }))
+    .map(p => ({ ...p, topics: (p.topics || []).filter(t => t.name.trim()).slice(0, MAX_TOPICS_PER_PAGE) }))
     .filter(p => p.topics.length > 0)
+    .slice(0, MAX_PAGES)
 
   const addPage = () => {
     if (pages.length >= MAX_PAGES) return
@@ -998,6 +1040,7 @@ const GeneratePage = () => {
 
         {activeTab === 'history' && (
           <div className="space-y-4">
+            <ShareStatsBanner isLoggedIn={isLoggedIn} className="mb-4 mt-2" />
             {!hideBanner && historyItems.some(i => i._isPending || i.status === 'generating' || i.status === 'pending') && (
               <div className="mb-6 rounded-xl border border-[#dbe8c3] bg-[#eef7df] p-4 text-[#557a3f] shadow-sm relative">
                 <button onClick={() => setHideBanner(true)} className="absolute right-3 top-3 text-[#557a3f] hover:text-[#3f5c2d] transition-colors">
@@ -1061,6 +1104,21 @@ const GeneratePage = () => {
                     Sign up free
                   </Link>
                 </div>
+              </div>
+            ) : historyLoadError ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-[#f5c6cb] bg-[#f8d7da] py-16 px-4 shadow-sm text-center">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#721c24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-4 opacity-80">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <h3 className="mb-2 text-xl font-bold text-[#721c24]">Oops! Something went wrong</h3>
+                <p className="max-w-md text-sm text-[#721c24]/90">
+                  We're having trouble reaching the server right now. Please reload the page or try again in a few minutes.
+                </p>
+                <button onClick={loadHistory} className="mt-6 rounded-full bg-[#721c24] px-6 py-2 text-sm font-semibold text-white hover:bg-[#5c161d] transition-colors">
+                  Try Again
+                </button>
               </div>
             ) : historyItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#e2dbd2] py-16 text-center">
@@ -1376,6 +1434,27 @@ const GeneratePage = () => {
         <ShareAndEarnModal
           packId={shareModalPackId}
           onClose={() => setShareModalPackId(null)}
+        />
+      )}
+
+      {/* Download Reminder Modal */}
+      {downloadReminderData && (
+        <DownloadReminderModal
+          onShare={() => {
+            const { item, isPack, storedUrl, titleStr } = downloadReminderData
+            setDownloadReminderData(null)
+            if (isPack) {
+              setShareModalPackId(item.id)
+            } else {
+              handleShareClick(item, isPack, storedUrl, titleStr)
+            }
+          }}
+          onDownload={() => {
+            const { item, isPack, storedUrl, titleStr } = downloadReminderData
+            setDownloadReminderData(null)
+            executeDownloadClick(item, isPack, storedUrl, titleStr)
+          }}
+          onClose={() => setDownloadReminderData(null)}
         />
       )}
     </div>

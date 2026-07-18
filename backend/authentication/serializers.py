@@ -27,7 +27,7 @@ class UserSerializer(serializers.ModelSerializer):
                 user=obj, direction=CreditTransaction.DIRECTION_DEBIT
             ).aggregate(total=Sum('credits'))['total'] or 0
             
-            return int(credits_in - credits_out)
+            return float(credits_in - credits_out)
         except Exception:
             return 0
 

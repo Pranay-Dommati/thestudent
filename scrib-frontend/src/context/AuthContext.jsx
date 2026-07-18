@@ -126,13 +126,19 @@ export const AuthProvider = ({ children }) => {
         }
 
         const status = error.response?.status
-        if (status === 401) {
+        if (status === 401 || status === 404 || status === 403 || status === 400) {
           handleAuthFailure()
           return false
         }
-        setIsLoggedIn(true)
-        setLastChecked(now)
-        return true
+        
+        // If we are already logged in (user object in memory), stay logged in during transient errors
+        if (isLoggedIn) {
+          setLastChecked(now)
+          return true
+        }
+        
+        // If this is first load and validation failed due to network error, remain logged out
+        return false
       } finally {
         isValidatingRef.current = false
         validationPromiseRef.current = null

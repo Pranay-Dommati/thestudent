@@ -5,6 +5,9 @@ import { useAuth } from './context/AuthContext'
 import { getShareMeta, startSharePurchaseFlow, createShareLink } from './services/shareService'
 import ShareAndEarnModal from './components/ShareAndEarnModal'
 import customToast from './utils/customToast'
+import { getInitials } from './utils/user'
+import MobileMenu from './components/MobileMenu'
+import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 
 // ─── Blurred Page Preview ─────────────────────────────────────────────────────
 
@@ -96,7 +99,7 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
 export default function ShareLandingPage() {
   const { shareCode } = useParams()
   const navigate = useNavigate()
-  const { user, isLoggedIn, loading: authLoading } = useAuth()
+  const { user, isLoggedIn, loading: authLoading, logout } = useAuth()
 
   const [meta, setMeta] = useState(null)
   const [loadingMeta, setLoadingMeta] = useState(true)
@@ -174,27 +177,20 @@ export default function ShareLandingPage() {
       user,
       onSuccess: (result) => {
         if (result.pack_id) setPurchasedPackId(result.pack_id)
-        customToast.success('Notes unlocked! Share with classmates to earn credits.', { duration: 5000 })
-        // pdf_url comes directly from the verify response — no second API call needed
-        if (result.pdf_url) {
-          navigateWithPdfUrl(result.pdf_url, result.title || meta?.title, result.total_pages || meta?.total_pages, result.pack_id)
-        } else {
-          // Fallback if pdf_url was not returned (e.g. storage misconfigured)
-          navigate(`/view/share/${shareCode}`, {
-            state: { title: result.title || meta?.title, totalPages: result.total_pages || meta?.total_pages, isPack: true, returnUrl: `/share/${shareCode}` }
-          })
-        }
+        navigate('/dashboard', {
+          state: {
+            highlightPackId: result.pack_id,
+            purchaseSuccess: true
+          }
+        })
       },
       onAlreadyPurchased: (data) => {
         setPaymentState('idle')
-        customToast.success('You already own these notes! Opening now...')
-        if (data?.pdf_url) {
-          navigateWithPdfUrl(data.pdf_url, data.title || meta?.title, data.total_pages || meta?.total_pages, data.pack_id)
-        } else {
-          navigate(`/view/share/${shareCode}`, {
-            state: { title: meta?.title, totalPages: meta?.total_pages, isPack: true, returnUrl: `/share/${shareCode}` }
-          })
-        }
+        navigate('/dashboard', {
+          state: {
+            highlightPackId: data?.pack_id || meta?.pack_id
+          }
+        })
       },
       onFailure: (msg) => {
         setPaymentState('idle')
@@ -293,7 +289,7 @@ export default function ShareLandingPage() {
                 onClick={handleUnlock}
                 className="w-full rounded-xl bg-[#1f3a5f] py-2.5 text-sm font-semibold text-white hover:bg-[#2d5fa6] transition-colors"
               >
-                Open Notes
+                View in Dashboard
               </button>
               <button
                 onClick={() => setShowShareModal(true)}
@@ -353,24 +349,54 @@ export default function ShareLandingPage() {
         <meta name="description" content={`Unlock ${meta?.total_pages}-page AI handwritten notes for just ₹${meta?.total_price} on Scrib.`} />
       </Helmet>
 
-      {/* Minimal header */}
+      {/* Standard full header */}
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 md:px-6">
-          <Link to="/" className="flex items-center gap-2.5">
-            <img src="/scrib_favicon.svg" alt="Scrib" className="h-8 w-8 rounded-lg border border-[#e2dbd2] shadow-sm" />
-            <div>
-              <p className="text-sm font-semibold leading-none">Scrib</p>
-              <p className="text-[10px] text-[#7b756d]">by EasyLearnova</p>
-            </div>
-          </Link>
-          {!isLoggedIn && (
+          <div className="flex items-center gap-6">
+            <Link to="/" className="flex items-center gap-2.5">
+              <img src="/scrib_favicon.svg" alt="Scrib" className="h-8 w-8 rounded-lg border border-[#e2dbd2] shadow-sm" />
+              <div>
+                <p className="text-sm font-semibold leading-none">Scrib</p>
+                <p className="text-[10px] text-[#7b756d]">by EasyLearnova</p>
+              </div>
+            </Link>
+          </div>
+          <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
+            <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
+            <Link to="/generate" className="hover:text-[#1f1f1f]">Generate</Link>
+            <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
+            {isLoggedIn && (
+              <Link to="/generate?tab=history" className="hover:text-[#1f1f1f]">My Scribs</Link>
+            )}
+          </nav>
+          {authLoading ? (
+            <HeaderAuthSkeleton />
+          ) : isLoggedIn ? (
             <div className="flex items-center gap-2">
-              <Link to={`/login?next=/share/${shareCode}`} className="rounded-full border border-[#d9d1c7] bg-white px-4 py-1.5 text-xs font-semibold hover:bg-[#faf8f3]">
+              <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold sm:inline-flex">
+                Dashboard
+              </Link>
+              <span className="rounded-full border border-[#dbe8c3] bg-[#eef7df] px-3 py-1 text-xs font-semibold text-[#557a3f]">
+                {user?.credit_balance ?? 0} credits
+              </span>
+              <Link
+                to="/profile"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e2dbd2] bg-white text-xs font-semibold transition-colors hover:bg-[#f5f2ec]"
+                title="Profile"
+              >
+                {getInitials(user?.full_name)}
+              </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link to={`/login?next=/share/${shareCode}`} className="hidden sm:inline-flex rounded-full border border-[#d9d1c7] bg-white px-3 py-1.5 text-xs font-semibold md:px-4 md:py-2">
                 Log in
               </Link>
-              <Link to={`/signup?next=/share/${shareCode}`} className="rounded-full bg-[#1f3a5f] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2d5fa6]">
-                Sign up
+              <Link to={`/signup?next=/share/${shareCode}`} className="rounded-full bg-[#1f3a5f] px-3 py-1.5 text-xs font-semibold text-white md:px-4 md:py-2">
+                Get started
               </Link>
+              <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
           )}
         </div>

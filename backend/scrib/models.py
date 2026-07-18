@@ -188,7 +188,7 @@ class CreditTransaction(models.Model):
         related_name='scrib_credit_transactions',
     )
     direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES)
-    credits = models.PositiveIntegerField()
+    credits = models.FloatField()
     reason = models.CharField(max_length=20, choices=REASON_CHOICES)
     payment = models.ForeignKey(
         Payment,
@@ -231,7 +231,7 @@ class PromoCode(models.Model):
     """
 
     code = models.CharField(max_length=32, unique=True, db_index=True)
-    credits_to_add = models.PositiveIntegerField(default=5)
+    credits_to_add = models.FloatField(default=5.0)
     campaign_name = models.CharField(max_length=100)
     max_redemptions = models.PositiveIntegerField(default=1)
     times_redeemed = models.PositiveIntegerField(default=0)
@@ -290,7 +290,7 @@ class PromoCodeRedemption(models.Model):
         on_delete=models.CASCADE,
         related_name='promo_redemptions',
     )
-    credits_added = models.PositiveIntegerField()
+    credits_added = models.FloatField()
     redeemed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
