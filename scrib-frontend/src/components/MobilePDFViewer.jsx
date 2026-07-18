@@ -15,7 +15,7 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
   // NOT on pinch-zoom — which changes visualViewport but not layout width).
   const measureWidth = useCallback(() => {
     if (containerRef.current) {
-      setPageWidth(Math.min(containerRef.current.offsetWidth, 800))
+      setPageWidth(Math.min(containerRef.current.offsetWidth, 900))
     }
   }, [])
 
@@ -40,7 +40,7 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
   return (
     <div
       ref={containerRef}
-      className="relative flex flex-col items-center w-full min-h-screen bg-black pt-4 pb-16"
+      className={`relative flex flex-col items-center w-full min-h-full ${isPreviewMode ? 'bg-transparent' : 'bg-black'} pt-4 pb-16`}
     >
       {/* Floating page indicator */}
       {numPages && (
@@ -65,6 +65,7 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
             <Page
               pageNumber={index + 1}
               width={pageWidth}
+              devicePixelRatio={Math.max(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 3)}
               renderAnnotationLayer={false}
               renderTextLayer={false}
             />

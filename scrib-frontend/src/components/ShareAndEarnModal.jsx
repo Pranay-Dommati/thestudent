@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react'
-import { createShareLink } from '../services/shareService'
+import { createShareLink, getShareMeta } from '../services/shareService'
 import customToast from '../utils/customToast'
 
 /**
  * ShareAndEarnModal
  *
- * Opens when the user clicks "Share & Earn" on any ready StudyPack in History
- * or Dashboard. Fetches (or creates) the user's unique share link, then presents
+ * Opens when the user clicks "Share & Earn" on any ready StudyPack in History,
+ * Dashboard, or inside the PDF Viewer (whether opened directly or via share link).
+ * Fetches (or creates) the user's unique share link, then presents
  * Copy Link, WhatsApp, and a toggleable Preview Message view for pristine UI/UX.
  *
  * Props:
- *   packId        {number}   - StudyPack id
+ *   packId        {number}   - StudyPack id (optional if shareToken provided)
+ *   shareToken    {string}   - Share link code/token (optional if packId provided)
  *   onClose       {function} - called when modal is dismissed
  */
-export default function ShareAndEarnModal({ packId, onClose }) {
+export default function ShareAndEarnModal({ packId, shareToken, onClose }) {
   const [shareData, setShareData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [copiedMsg, setCopiedMsg] = useState(false)
@@ -24,8 +26,31 @@ export default function ShareAndEarnModal({ packId, onClose }) {
     let cancelled = false
     const fetchLink = async () => {
       try {
-        const data = await createShareLink({ packId })
-        if (!cancelled) setShareData(data)
+        let targetPackId = packId
+        if (!targetPackId && shareToken) {
+          try {
+            const meta = await getShareMeta(shareToken)
+            targetPackId = meta?.pack_id
+          } catch {
+            // Ignore meta error, will fallback below
+          }
+        }
+
+        if (targetPackId) {
+          const data = await createShareLink({ packId: targetPackId })
+          if (!cancelled) setShareData(data)
+        } else if (shareToken) {
+          // Fallback if targetPackId not found but we have shareToken
+          const origin = window.location.origin
+          const url = `${origin}/share/${shareToken}`
+          if (!cancelled) {
+            setShareData({
+              share_code: shareToken,
+              share_url: url,
+              share_message: `Check out these study notes on Scrib: ${url}`
+            })
+          }
+        }
       } catch (err) {
         if (!cancelled) customToast.error('Could not create share link. Please try again.')
       } finally {
@@ -34,7 +59,7 @@ export default function ShareAndEarnModal({ packId, onClose }) {
     }
     fetchLink()
     return () => { cancelled = true }
-  }, [packId])
+  }, [packId, shareToken])
 
   const handleCopyMessage = async () => {
     if (!shareData?.share_message) return
