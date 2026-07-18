@@ -32,17 +32,44 @@ const DashboardPage = () => {
   const [visibleCount, setVisibleCount] = useState(5)
   const [downloadReminderData, setDownloadReminderData] = useState(null)
   const [highlightedItem, setHighlightedItem] = useState(null)
+  const [resolvingId, setResolvingId] = useState(null)
+  const [resolvingAction, setResolvingAction] = useState(null)
 
   const handleShareEarn = (packId) => {
     setShareModalPackId(packId)
   }
 
-  const handleDownloadClick = (item, fileUrl) => {
+  const resolveFreshUrl = async (item, fallbackUrl) => {
+    const isPack = item.type === 'pack'
+    let resolvedUrl = fallbackUrl || (isPack ? item.pdf_url : item.image_url)
+    if (isPack && item.id && !String(item.id).startsWith('pending-')) {
+      try {
+        const res = await axiosInstance.get(`/scrib/packs/${item.id}/pdf/`, {
+          params: { json: 'true' },
+          validateStatus: (status) => status >= 200 && status < 400
+        })
+        resolvedUrl = res.data?.pdf_url || res.headers?.location || res.request?.responseURL || resolvedUrl
+      } catch (err) {
+        console.error('Failed to resolve fresh PDF download URL:', err)
+      }
+    }
+    return resolvedUrl
+  }
+
+  const handleDownloadClick = async (item, fileUrl) => {
     const isPack = item.type === 'pack'
     if (isPack && item.id && user) {
       setDownloadReminderData({ item, fileUrl })
     } else {
-      forceDownload(fileUrl, `${item.name}.pdf`)
+      setResolvingId(item.id)
+      setResolvingAction('download')
+      try {
+        const freshUrl = await resolveFreshUrl(item, fileUrl)
+        forceDownload(freshUrl, `${item.name}.pdf`, isPack)
+      } finally {
+        setResolvingId(null)
+        setResolvingAction(null)
+      }
     }
   }
 
@@ -300,85 +327,89 @@ const DashboardPage = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0 flex-shrink-0">
+                    <div className="grid grid-cols-3 gap-2 w-full pt-1 sm:flex sm:w-auto sm:pt-0 sm:items-center sm:justify-end">
                       {item.status === 'failed' ? (
-                        <span className="text-[11px] font-medium text-red-500">
+                        <span className="text-[11px] font-medium text-red-500 col-span-3 sm:col-span-1">
                           Failed
                         </span>
                       ) : item.status === 'pending' || item.status === 'generating' ? (
-                        <span className="rounded-full border border-[#e2dbd2] bg-[#f5f2ec] px-3 py-1 text-[10px] font-semibold text-[#6b655d] uppercase tracking-wider">
+                        <span className="rounded-full border border-[#e2dbd2] bg-[#f5f2ec] px-3 py-1 text-[10px] font-semibold text-[#6b655d] uppercase tracking-wider col-span-3 sm:col-span-1">
                           Generating...
                         </span>
-                      ) : (
-                        fileUrl && (
-                          item.type === 'pack' && item.status === 'ready' ? (
-                            <button
-                              onClick={() => handleShareEarn(item.id)}
-                              className="flex items-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-2.5 py-1 text-xs hover:bg-[#faf8f3] text-[#4b4742] shadow-sm transition-colors"
-                              title="Share & Earn"
-                            >
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#f59e0b]">
-                                <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-                              </svg>
-                              Share &amp; Earn
-                            </button>
-                          ) : null
-                        )
-                      )}
-                      {fileUrl && (
+                      ) : fileUrl && (
                         <>
                           <button
-                            onClick={() => forceDownload(fileUrl, `${item.name}.pdf`)}
-                            className="rounded-lg border border-[#e2dbd2] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] shadow-sm transition-colors"
+                            onClick={async () => {
+                              setResolvingId(item.id)
+                              setResolvingAction('view')
+                              try {
+                                const viewUrl = await resolveFreshUrl(item, isPack ? item.pdf_url : item.image_url)
+
+                                const slug = (item.name || 'document').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                                navigate(`/view/${slug}`, {
+                                  state: {
+                                    pdfUrl: isPack ? viewUrl : null,
+                                    imageUrl: isPack ? null : viewUrl,
+                                    title: item.name,
+                                    topics: Array.isArray(item.topics_json)
+                                      ? item.topics_json.map(t => {
+                                          if (Array.isArray(t)) return t.join(', ');
+                                          if (t && typeof t === 'object' && Array.isArray(t.topics)) {
+                                            return t.topics.map(sub => typeof sub === 'object' ? `${sub.name}${sub.instruction ? ` (${sub.instruction})` : ''}` : String(sub)).join(', ');
+                                          }
+                                          if (t && typeof t === 'object' && (t.name || t.topic)) {
+                                            return `${t.name || t.topic}${t.instruction ? ` (${t.instruction})` : ''}`;
+                                          }
+                                          return String(t);
+                                        })
+                                      : [item.name],
+                                    totalPages: item.total_pages || 1,
+                                    isPack,
+                                    packId: isPack ? item.id : null,
+                                    returnUrl: '/dashboard'
+                                  }
+                                })
+                              } finally {
+                                setResolvingId(null)
+                                setResolvingAction(null)
+                              }
+                            }}
+                            disabled={resolvingId === item.id}
+                            title="Open Viewer"
+                            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#e2dbd2] bg-white px-3 h-9 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#faf8f3] disabled:opacity-60 disabled:cursor-not-allowed"
                           >
-                            Download
+                            {resolvingId === item.id && resolvingAction === 'view' ? (
+                              <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            )}
+                            <span>Open</span>
                           </button>
                           <button
-                            onClick={async () => {
-                              let viewUrl = isPack ? item.pdf_url : item.image_url
-
-                              // For packs: get a fresh presigned URL so it never expires
-                              if (isPack && item.id) {
-                                try {
-                                  const res = await axiosInstance.get(`/scrib/packs/${item.id}/pdf/`, {
-                                    maxRedirects: 0,
-                                    validateStatus: (s) => s < 400,
-                                  })
-                                  viewUrl = res.request?.responseURL || viewUrl
-                                } catch (err) {
-                                  console.error('Failed to get fresh PDF URL', err)
-                                }
-                              }
-
-                              const slug = (item.name || 'document').toLowerCase().replace(/[^a-z0-9]+/g, '-')
-                              navigate(`/view/${slug}`, {
-                                state: {
-                                  pdfUrl: isPack ? viewUrl : null,
-                                  imageUrl: isPack ? null : viewUrl,
-                                  title: item.name,
-                                  topics: Array.isArray(item.topics_json)
-                                    ? item.topics_json.map(t => {
-                                        if (Array.isArray(t)) return t.join(', ');
-                                        if (t && typeof t === 'object' && Array.isArray(t.topics)) {
-                                          return t.topics.map(sub => typeof sub === 'object' ? `${sub.name}${sub.instruction ? ` (${sub.instruction})` : ''}` : String(sub)).join(', ');
-                                        }
-                                        if (t && typeof t === 'object' && (t.name || t.topic)) {
-                                          return `${t.name || t.topic}${t.instruction ? ` (${t.instruction})` : ''}`;
-                                        }
-                                        return String(t);
-                                      })
-                                    : [item.name],
-                                  totalPages: item.total_pages || 1,
-                                  isPack,
-                                  packId: isPack ? item.id : null,
-                                  returnUrl: '/dashboard'
-                                }
-                              })
-                            }}
-                            className="rounded-lg border border-[#e2dbd2] bg-white px-2 py-1 text-xs hover:bg-[#faf8f3]"
+                            onClick={() => handleDownloadClick(item, fileUrl)}
+                            disabled={resolvingId === item.id}
+                            title="Download PDF"
+                            className="flex items-center justify-center gap-1.5 rounded-xl border border-[#e2dbd2] bg-white px-3 h-9 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#faf8f3] disabled:opacity-60 disabled:cursor-not-allowed"
                           >
-                            View
+                            {resolvingId === item.id && resolvingAction === 'download' ? (
+                              <svg className="animate-spin text-[#1f1f1f]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            )}
+                            <span>Download</span>
                           </button>
+                          {item.type === 'pack' && item.status === 'ready' && (
+                            <button
+                              onClick={() => handleShareEarn(item.id)}
+                              className="flex items-center justify-center gap-1.5 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-3 h-9 text-xs font-semibold hover:bg-[#fef3c7] text-[#b45309] shadow-sm transition-colors"
+                              title="Share & Earn Credits"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#f59e0b] flex-shrink-0">
+                                <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L12 3Z"/>
+                              </svg>
+                              <span className="truncate">Share &amp; Earn</span>
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -428,10 +459,11 @@ const DashboardPage = () => {
             setDownloadReminderData(null)
             setShareModalPackId(item.id)
           }}
-          onDownload={() => {
+          onDownload={async () => {
             const { item, fileUrl } = downloadReminderData
             setDownloadReminderData(null)
-            forceDownload(fileUrl, `${item.name}.pdf`)
+            const freshUrl = await resolveFreshUrl(item, fileUrl)
+            forceDownload(freshUrl, `${item.name}.pdf`, item.type === 'pack')
           }}
           onClose={() => setDownloadReminderData(null)}
         />

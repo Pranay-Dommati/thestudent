@@ -41,8 +41,9 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api
 const PDFViewerPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { shareToken, slug } = useParams()
+  const { shareToken: paramShareToken, slug } = useParams()
   const { user } = useAuth()
+  const activeShareToken = paramShareToken || location.state?.shareToken
 
   // State for fetched mode (data fetched from the public API)
   const [fetchedData, setFetchedData] = useState(null)
@@ -54,14 +55,14 @@ const PDFViewerPage = () => {
   const [showDownloadReminder, setShowDownloadReminder] = useState(false)
 
   useEffect(() => {
-    if (shareToken) {
+    if (activeShareToken && !fetchedData) {
       setDataLoading(true)
       // Detect Base36 share codes (exactly 8 alphanumeric chars) vs legacy UUIDs
-      const isShareCode = /^[A-Z0-9]{8}$/i.test(shareToken) && shareToken.length === 8
+      const isShareCode = /^[A-Z0-9]{8}$/i.test(activeShareToken) && activeShareToken.length === 8
       if (isShareCode) {
         // New Earn While Learning share code — requires auth, returns presigned URL
         const tryLoadPdf = (retryCount = 0) => {
-          getSharePdf(shareToken)
+          getSharePdf(activeShareToken)
             .then((data) => {
               if (data.pdf_url) {
                 setFetchedData(data)
@@ -85,13 +86,13 @@ const PDFViewerPage = () => {
 
               if (status === 401 || status === 403 && code !== 'purchase_required') {
                 // Not authenticated — send to login and come back after
-                navigate(`/login?next=/view/share/${shareToken}`)
+                navigate(`/login?next=/view/share/${activeShareToken}`)
                 return
               }
 
               if (code === 'purchase_required') {
                 // Not purchased — send back to share landing page to pay
-                navigate(`/share/${shareToken}`, { replace: true })
+                navigate(`/share/${activeShareToken}`, { replace: true })
                 return
               }
 
@@ -101,7 +102,7 @@ const PDFViewerPage = () => {
         tryLoadPdf()
       } else {
         // Legacy UUID share token — public endpoint, no auth needed
-        fetch(`${API_BASE}/scrib/packs/share/${shareToken}/`)
+        fetch(`${API_BASE}/scrib/packs/share/${activeShareToken}/`)
           .then((r) => r.json())
           .then((data) => {
             if (data.pdf_url) {
@@ -113,7 +114,7 @@ const PDFViewerPage = () => {
           .catch(() => setDataError('Failed to load the shared PDF.'))
           .finally(() => setDataLoading(false))
       }
-    } else if (slug && !location.state?.pdfUrl) {
+    } else if (slug && !location.state?.pdfUrl && !activeShareToken) {
       setDataLoading(true)
       fetch(`${API_BASE}/scrib/previews/${slug}/`)
         .then((r) => {
@@ -136,7 +137,7 @@ const PDFViewerPage = () => {
         .catch(() => setDataError('Failed to load the preview note.'))
         .finally(() => setDataLoading(false))
     }
-  }, [shareToken, slug, location.state])
+  }, [activeShareToken, slug, location.state, fetchedData])
 
   const routeState = location.state || {}
   const rawPdfUrl = fetchedData ? fetchedData.pdf_url : routeState.pdfUrl
@@ -152,23 +153,40 @@ const PDFViewerPage = () => {
   const [resolvedPreviewUrl, setResolvedPreviewUrl] = useState(null)
 
   useEffect(() => {
-    // If the PDF URL is a backend preview endpoint, resolve it to the direct S3 URL first
+    // If the PDF URL is a backend preview or API endpoint, resolve it to the direct S3 URL first
     // to prevent react-pdf from bouncing through 302 redirects for every chunk request.
-    if (pdfUrl && pdfUrl.includes('/api/scrib/share/preview/') && !resolvedPreviewUrl) {
+    if (pdfUrl && (pdfUrl.includes('/scrib/share/preview/') || pdfUrl.includes('/scrib/packs/') || (pdfUrl.includes('/scrib/share/') && pdfUrl.includes('/pdf/'))) && !resolvedPreviewUrl) {
       setDataLoading(true)
-      fetch(pdfUrl + (pdfUrl.includes('?') ? '&' : '?') + 'json=true', {
-        headers: { 'Accept': 'application/json' }
-      })
-      .then(r => r.json())
-      .then(data => {
-        if (data.pdf_url) {
-          setResolvedPreviewUrl(data.pdf_url)
-        } else {
-          setDataError('Failed to resolve secure preview URL.')
-        }
-      })
-      .catch(() => setDataError('Failed to load preview.'))
-      .finally(() => setDataLoading(false))
+      const isAuthEndpoint = pdfUrl.includes('/scrib/packs/') || (pdfUrl.includes('/scrib/share/') && pdfUrl.includes('/pdf/'))
+      if (isAuthEndpoint) {
+        axiosInstance.get(pdfUrl, { params: { json: 'true' } })
+          .then(res => {
+            if (res.data?.pdf_url) {
+              setResolvedPreviewUrl(res.data.pdf_url)
+            } else {
+              setDataError('Failed to resolve secure note URL.')
+            }
+          })
+          .catch(() => setDataError('Failed to load note PDF.'))
+          .finally(() => setDataLoading(false))
+      } else {
+        const targetUrl = pdfUrl.startsWith('http') 
+          ? pdfUrl 
+          : (import.meta.env.VITE_API_BASE_URL ? `${import.meta.env.VITE_API_BASE_URL.replace(/\/api\/?$/, '')}${pdfUrl}` : pdfUrl)
+        fetch(targetUrl + (targetUrl.includes('?') ? '&' : '?') + 'json=true', {
+          headers: { 'Accept': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.pdf_url) {
+            setResolvedPreviewUrl(data.pdf_url)
+          } else {
+            setDataError('Failed to resolve secure preview URL.')
+          }
+        })
+        .catch(() => setDataError('Failed to load preview.'))
+        .finally(() => setDataLoading(false))
+      }
     }
   }, [pdfUrl, resolvedPreviewUrl])
 
@@ -204,6 +222,10 @@ const PDFViewerPage = () => {
       window.removeEventListener('pageshow', handlePageShow)
     }
   }, [])
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pdfUrl, resolvedPreviewUrl])
 
   const creditBalance = user?.credit_balance ?? 0
   const pageCount = totalPages
@@ -312,9 +334,9 @@ const PDFViewerPage = () => {
   }
 
   return (
-    <div className={`flex h-[100dvh] flex-col overflow-hidden ${isMobile ? 'bg-black' : 'bg-[#f0ede7]'}`}>
+    <div className={`flex flex-col ${isMobile || isPreviewMode ? 'min-h-screen bg-black text-white' : 'h-[100dvh] overflow-hidden bg-[#f0ede7]'}`}>
       {/* ── Top bar ── */}
-      <header className={`flex flex-shrink-0 items-center justify-between px-3 py-2.5 md:px-5 md:py-3 ${isMobile ? 'bg-black text-white' : 'border-b border-[#e0d9ce] bg-white'}`}>
+      <header className={`flex flex-shrink-0 items-center justify-between px-3 py-2.5 md:px-5 md:py-3 ${isMobile || isPreviewMode ? 'sticky top-0 inset-x-0 z-50 bg-[#1c1c1e] text-white shadow-md' : 'border-b border-[#e0d9ce] bg-white'}`}>
         {/* Left section: Back button, Logo, Breadcrumb */}
         <div className="flex items-center gap-2 md:gap-3">
           {/* Mobile Back Button (icon only) */}
@@ -353,7 +375,7 @@ const PDFViewerPage = () => {
 
         {/* Center section: Document Title */}
         <div className="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden px-3">
-          <p className={`max-w-[160px] truncate text-xs font-semibold sm:max-w-[300px] sm:text-sm ${isMobile ? 'text-white' : 'text-[#1f1f1f]'}`}>{title || 'Study Notes'}</p>
+          <p className={`max-w-[160px] truncate text-xs font-semibold sm:max-w-[300px] sm:text-sm ${isMobile || isPreviewMode ? 'text-white' : 'text-[#1f1f1f]'}`}>{title || 'Study Notes'}</p>
           <span className={`hidden rounded-full px-2 py-0.5 text-[10px] font-semibold sm:inline ${renderAsImage ? 'bg-[#fef3c7] text-[#d97706]' : 'bg-[#f0f0ff] text-[#6366f1]'}`}>
             {renderAsImage ? 'Image' : 'PDF'}
           </span>
@@ -413,11 +435,11 @@ const PDFViewerPage = () => {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className={`flex flex-1 ${isMobile || isPreviewMode ? 'bg-black' : 'overflow-hidden'}`}>
         {/* ── Main PDF viewer ── */}
-        <main className="flex flex-1 flex-col overflow-hidden">
+        <main className={`flex flex-1 flex-col ${isMobile || isPreviewMode ? 'bg-black min-h-screen' : 'overflow-hidden'}`}>
           {/* Content area: image, MobilePDFViewer, or native iframe */}
-          <div className={`flex flex-1 items-start justify-center overflow-auto ${isMobile ? 'bg-black' : 'bg-[#e8e4dc]'}`}>
+          <div className={`flex flex-1 items-start justify-center ${isMobile || isPreviewMode ? 'bg-black min-h-screen w-full py-4' : 'overflow-auto bg-[#e8e4dc]'}`}>
             {renderAsImage ? (
               <div className="py-4 md:py-6 flex justify-center items-center h-full w-full bg-[#f0f0f0]">
                 <img
@@ -427,7 +449,7 @@ const PDFViewerPage = () => {
                 />
               </div>
             ) : isMobile || isPreviewMode ? (
-              <div className="w-full h-full">
+              <div className="w-full min-h-screen bg-black">
                 <MobilePDFViewer 
                   url={resolvedPreviewUrl || pdfUrl} 
                   isPreviewMode={isPreviewMode} 

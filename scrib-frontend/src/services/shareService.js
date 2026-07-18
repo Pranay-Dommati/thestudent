@@ -48,7 +48,7 @@ export async function getShareMeta(shareCode) {
  * @returns {string} - The URL to use as the PDF source
  */
 export function getPreviewUrl(previewToken) {
-  const base = axiosInstance.defaults.baseURL || ''
+  const base = (axiosInstance.defaults.baseURL || '').replace(/\/+$/, '')
   return `${base}/scrib/share/preview/${previewToken}/`
 }
 

@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
+import { Document, Page } from 'react-pdf'
 import { useAuth } from './context/AuthContext'
-import { getShareMeta, startSharePurchaseFlow, createShareLink } from './services/shareService'
+import { getShareMeta, startSharePurchaseFlow, createShareLink, getPreviewUrl } from './services/shareService'
 import ShareAndEarnModal from './components/ShareAndEarnModal'
 import customToast from './utils/customToast'
 import { getInitials } from './utils/user'
@@ -12,9 +13,25 @@ import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 // ─── Blurred Page Preview ─────────────────────────────────────────────────────
 
 function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken, totalOriginalPages, isUnlocked, pdfUrl }) {
-  const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [containerWidth, setContainerWidth] = useState(null)
+  const cardRef = useRef(null)
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (cardRef.current) {
+        setContainerWidth(cardRef.current.offsetWidth)
+      }
+    }
+    updateWidth()
+    const ro = new ResizeObserver(updateWidth)
+    if (cardRef.current) ro.observe(cardRef.current)
+    return () => ro.disconnect()
+  }, [])
+
+  const docUrl = isUnlocked && pdfUrl ? pdfUrl : (previewToken ? getPreviewUrl(previewToken) : null)
+
   return (
-    <div className={`rounded-xl border border-[#e2dbd2] overflow-hidden bg-white ${isFirst ? '' : 'relative'}`}>
+    <div ref={cardRef} className={`rounded-xl border border-[#e2dbd2] overflow-hidden bg-white ${isFirst ? '' : 'relative'}`}>
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#e2dbd2] bg-[#faf8f3]">
         <span className="text-xs font-semibold text-[#5a554f]">Page {pageNumber}</span>
         {topics.length > 0 && (
@@ -29,30 +46,32 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
       </div>
 
       {/* Note paper illustration */}
-      {(isFirst && previewToken) || (isUnlocked && pdfUrl) ? (
-        <div className="relative w-full aspect-square overflow-hidden bg-white">
-          {/* Loading Skeleton */}
-          {!iframeLoaded && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#faf8f3]">
-              <div className="space-y-3 w-3/4 opacity-40">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-3 rounded-full bg-[#d6cfc4]" style={{ width: `${70 + Math.sin(i) * 20}%` }} />
-                ))}
+      {((isFirst && previewToken) || (isUnlocked && pdfUrl)) && docUrl ? (
+        <div className="relative w-full overflow-hidden bg-white min-h-[300px] flex justify-center">
+          <Document
+            file={docUrl}
+            loading={
+              <div className="flex flex-col items-center justify-center py-20 bg-[#faf8f3] w-full">
+                <div className="h-7 w-7 animate-spin rounded-full border-3 border-[#1f3a5f] border-t-transparent mb-2" />
+                <span className="text-xs text-[#7b756d]">Loading preview...</span>
               </div>
-              <div className="absolute inset-0 flex items-center justify-center bg-white/30 backdrop-blur-sm">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#1f3a5f] border-t-transparent" />
+            }
+            error={
+              <div className="flex items-center justify-center py-20 text-xs text-red-500 w-full">
+                Could not load preview image.
               </div>
-            </div>
-          )}
-          <iframe 
-            src={isUnlocked && pdfUrl ? `${pdfUrl}#page=${pageNumber}&toolbar=0&navpanes=0&scrollbar=0&view=FitH` : `/api/scrib/share/preview/${previewToken}/#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-            className={`absolute inset-0 w-full h-full border-0 pointer-events-none transition-opacity duration-300 ${iframeLoaded ? 'opacity-100' : 'opacity-0'}`}
-            title="Page 1 Preview"
-            style={{ width: '100%', height: '100%', overflow: 'hidden' }}
-            onLoad={() => setIframeLoaded(true)}
-          />
-          {/* Prevent interacting with the iframe to hide standard viewer UI on hover */}
-          <div className="absolute inset-0 z-10" />
+            }
+            className="flex justify-center w-full"
+          >
+            {containerWidth && (
+              <Page
+                pageNumber={isUnlocked ? pageNumber : 1}
+                width={containerWidth}
+                renderAnnotationLayer={false}
+                renderTextLayer={false}
+              />
+            )}
+          </Document>
 
           {/* For single-page notes, blur the bottom half to encourage unlocking */}
           {singlePage && !isUnlocked && (
@@ -152,14 +171,24 @@ export default function ShareLandingPage() {
 
   const navigateWithPdfUrl = (pdfUrl, title, totalPages, packId) => {
     const slug = encodeURIComponent((title || 'notes').toLowerCase().replace(/[^a-z0-9]+/g, '-'))
-    navigate(`/view/${slug}`, {
+    const targetUrl = shareCode && meta?.pdf_url ? `/view/share/${shareCode}` : `/view/${slug}`
+    navigate(targetUrl, {
       state: {
         pdfUrl,
         title,
         totalPages,
         isPack: true,
         packId: packId || meta?.pack_id,
+        shareToken: shareCode,
         returnUrl: `/share/${shareCode}`,
+      }
+    })
+  }
+
+  const handleViewInDashboard = () => {
+    navigate('/dashboard', {
+      state: {
+        highlightPackId: purchasedPackId || meta?.pack_id
       }
     })
   }
@@ -169,7 +198,10 @@ export default function ShareLandingPage() {
       navigate(`/login?next=/share/${shareCode}`)
       return
     }
-    if (meta?.is_own_link) return
+    if (isAlreadyPurchased || meta?.is_own_link) {
+      handleViewInDashboard()
+      return
+    }
     setPaymentState('processing')
     startSharePurchaseFlow({
       shareCode,
@@ -286,7 +318,7 @@ export default function ShareLandingPage() {
                 ✓ Already Purchased
               </div>
               <button
-                onClick={handleUnlock}
+                onClick={handleViewInDashboard}
                 className="w-full rounded-xl bg-[#1f3a5f] py-2.5 text-sm font-semibold text-white hover:bg-[#2d5fa6] transition-colors"
               >
                 View in Dashboard
@@ -343,7 +375,7 @@ export default function ShareLandingPage() {
 
   // ── Main landing page ─────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#fcf9f4]">
+    <div className="flex flex-col min-h-screen bg-[#fcf9f4] text-[#1f1f1f]">
       <Helmet>
         <title>{meta?.title ? `${meta.title} — Scrib Notes` : 'Scrib Notes'}</title>
         <meta name="description" content={`Unlock ${meta?.total_pages}-page AI handwritten notes for just ₹${meta?.total_price} on Scrib.`} />
@@ -402,7 +434,7 @@ export default function ShareLandingPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-8 md:px-6 md:py-10">
+      <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-8 md:px-6 md:py-10">
         <div className="flex flex-col gap-6 lg:flex-row lg:gap-8 lg:items-start">
 
           {/* ── LEFT: Note info + Topics + Preview ── */}
@@ -455,9 +487,9 @@ export default function ShareLandingPage() {
                 <p className="text-xs font-bold uppercase tracking-wider text-[#9a9289]">Preview</p>
                 {meta?.preview_token && (
                   <Link
-                    to={meta?.pdf_url ? `/view/${(meta?.title || 'study-pack').toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : "/view"}
+                    to={meta?.pdf_url ? `/view/share/${shareCode}` : "/view"}
                     state={{ 
-                      pdfUrl: meta?.pdf_url || `/api/scrib/share/preview/${meta.preview_token}/`, 
+                      pdfUrl: meta?.pdf_url || getPreviewUrl(meta.preview_token), 
                       title: meta?.pdf_url ? (meta?.title || 'Notes') : `Preview: ${meta?.title || 'Notes'}`,
                       totalPages: totalPages,
                       isPreviewMode: !meta?.pdf_url,
@@ -500,6 +532,17 @@ export default function ShareLandingPage() {
           </div>
         </div>
       </main>
+
+      <footer className="mt-auto border-t border-[#e2dbd2] py-8 text-center text-sm text-[#7b756d] bg-[#fcf9f4]">
+        <div className="mx-auto max-w-5xl px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p>&copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.</p>
+          <div className="flex justify-center gap-4">
+            <Link to="/support" className="hover:text-[#1f1f1f] transition-colors">Support</Link>
+            <Link to="/terms" className="hover:text-[#1f1f1f] transition-colors">Terms</Link>
+            <Link to="/privacy" className="hover:text-[#1f1f1f] transition-colors">Privacy</Link>
+          </div>
+        </div>
+      </footer>
 
       {/* Share & Earn Modal */}
       {showShareModal && meta && (

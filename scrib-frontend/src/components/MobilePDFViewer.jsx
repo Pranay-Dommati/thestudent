@@ -29,6 +29,10 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
     return () => ro.disconnect()
   }, [measureWidth])
 
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [url])
+
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages)
   }
@@ -36,7 +40,7 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
   return (
     <div
       ref={containerRef}
-      className="relative flex flex-col items-center w-full h-full overflow-y-auto bg-black pt-16 pb-32 pb-[env(safe-area-inset-bottom)]"
+      className="relative flex flex-col items-center w-full min-h-screen bg-black pt-4 pb-16"
     >
       {/* Floating page indicator */}
       {numPages && (

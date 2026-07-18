@@ -101,7 +101,7 @@ const TopicPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#fcf9f4] text-[#1f1f1f]">
+    <div className="flex flex-col min-h-screen bg-[#fcf9f4] text-[#1f1f1f]">
       <Helmet>
         <title>{topic.title} Handwritten Notes - Scrib</title>
         <meta name="description" content={content?.overview} />
@@ -139,39 +139,24 @@ const TopicPage = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 py-12 md:py-20">
+      <main className="flex-1 mx-auto w-full max-w-4xl px-6 py-12 md:py-20">
         <div className="flex items-center gap-2 text-sm text-[#7b756d] mb-6">
           <Link to="/" className="hover:text-[#1f1f1f]">Home</Link>
           <span>/</span>
           <Link to="/previews" className="hover:text-[#1f1f1f]">Topics</Link>
           <span>/</span>
-          <span className="text-[#1f1f1f] font-medium">{topic.title}</span>
+          <span className="text-[#1f1f1f] truncate">{topic.title}</span>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-12 items-start">
-          <div>
-            <span className="inline-block px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-[#1a1a1a] bg-[#efe7dd] rounded mb-4">
-              {content?.category}
+        {/* Note paper illustration */}
+        <div className="bg-white rounded-2xl border border-[#e2dbd2] shadow-sm overflow-hidden mb-12">
+          <div className="p-8 md:p-12 border-b border-[#e2dbd2] bg-[#faf8f3]">
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-[#eef7df] text-[#557a3f] border border-[#dbe8c3] mb-4">
+              AI Handwritten Study Notes
             </span>
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-[#1f1f1f] leading-tight">
-              {topic.title} Handwritten Notes
+            <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-[#1f1f1f] mb-4">
+              {topic.title}
             </h1>
-            
-            <p className="mt-6 text-[15px] leading-relaxed text-[#5f5a54]">
-              {content?.overview}
-            </p>
-
-            <div className="mt-8 border-t border-[#e2dbd2] pt-8">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-[#9a9289] mb-4">Key Concepts</h3>
-              <ul className="space-y-2">
-                {content?.concepts.map((concept, i) => (
-                  <li key={i} className="flex items-center gap-2 text-[15px] text-[#1f1f1f]">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#c05c5c]"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                    {concept}
-                  </li>
-                ))}
-              </ul>
-            </div>
 
             <div className="mt-10 flex flex-col gap-4">
               <button 
