@@ -574,6 +574,10 @@ else:
             CORS_ALLOWED_ORIGINS.append("https://www.easylearnova.com")
         if "https://easylearnova.com" not in CORS_ALLOWED_ORIGINS:
             CORS_ALLOWED_ORIGINS.append("https://easylearnova.com")
+        if "https://www.scrib.easylearnova.com" not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append("https://www.scrib.easylearnova.com")
+        if "https://scrib.easylearnova.com" not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append("https://scrib.easylearnova.com")
                 
     # Add regex whitelist as a backup for subdomains or slight variations
     CORS_ORIGIN_REGEX_WHITELIST = [
@@ -813,6 +817,7 @@ SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'true').lower() in ('1', 'true', '
 
 # Optional: Frontend domain for building links in emails
 FRONTEND_DOMAIN = os.environ.get('FRONTEND_DOMAIN', 'http://localhost:5173')
+SCRIB_FRONTEND_DOMAIN = os.environ.get('SCRIB_FRONTEND_DOMAIN', 'https://www.scrib.easylearnova.com')
 
 # -----------------------------------------------------------------------------
 # MONKEY PATCH: Automatic Retries for Flaky Remote MySQL Connections

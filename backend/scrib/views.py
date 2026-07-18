@@ -2692,9 +2692,24 @@ def _generate_share_message(pack, is_creator, share_url):
 
 
 def _build_share_url(share_code, request):
-    """Return the canonical share URL. Uses FRONTEND_DOMAIN from settings."""
-    frontend = getattr(settings, 'FRONTEND_DOMAIN', 'https://scrib.easylearnova.com').rstrip('/')
-    return f'{frontend}/share/{share_code}'
+    """Return the canonical share URL for Scrib note share links."""
+    # First check for explicit SCRIB_FRONTEND_DOMAIN setting in settings
+    scrib_domain = getattr(settings, 'SCRIB_FRONTEND_DOMAIN', None)
+    
+    if not scrib_domain or 'www.easylearnova.com' in scrib_domain and 'scrib' not in scrib_domain:
+        # Check if incoming request Origin / Referer points to scrib or local dev
+        origin = request.headers.get('Origin', '') or ''
+        referer = request.headers.get('Referer', '') or ''
+        if 'localhost:5174' in origin or 'localhost:5174' in referer:
+            scrib_domain = 'http://localhost:5174'
+        elif 'www.scrib.easylearnova.com' in origin or 'www.scrib.easylearnova.com' in referer:
+            scrib_domain = 'https://www.scrib.easylearnova.com'
+        elif 'scrib.easylearnova.com' in origin or 'scrib.easylearnova.com' in referer:
+            scrib_domain = 'https://scrib.easylearnova.com'
+        else:
+            scrib_domain = 'https://www.scrib.easylearnova.com'
+            
+    return f"{scrib_domain.rstrip('/')}/share/{share_code}"
 
 
 class ShareCreateView(APIView):
