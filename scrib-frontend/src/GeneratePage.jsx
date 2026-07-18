@@ -148,6 +148,7 @@ const GeneratePage = () => {
   const [activeTab, setActiveTab] = useState(initialTab)
   
   const [historyItems, setHistoryItems] = useState([])
+  const [visibleCount, setVisibleCount] = useState(10)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [hasLoadedHistory, setHasLoadedHistory] = useState(false)
   const [historyLoadError, setHistoryLoadError] = useState(false)
@@ -157,6 +158,9 @@ const GeneratePage = () => {
 
   const handleTabChange = (tabName) => {
     setActiveTab(tabName)
+    if (tabName === 'history') {
+      setVisibleCount(10)
+    }
     const newParams = new URLSearchParams(location.search)
     if (tabName === 'history') {
       newParams.set('tab', 'history')
@@ -164,15 +168,22 @@ const GeneratePage = () => {
       newParams.delete('tab')
     }
     const searchStr = newParams.toString()
-    navigate(`${location.pathname}${searchStr ? `?${searchStr}` : ''}`, { replace: true })
+    navigate(`${location.pathname}${searchStr ? `?${searchStr}` : ''}`)
   }
 
   // Sync active tab if URL changes
   useEffect(() => {
-    const tab = new URLSearchParams(location.search).get('tab')
-    if (tab === 'history') setActiveTab('history')
-    else if (tab === 'generate') setActiveTab('generate')
-  }, [location.search])
+    const tabFromUrl = new URLSearchParams(location.search).get('tab')
+    if (tabFromUrl === 'history') {
+      setActiveTab('history')
+    } else if (tabFromUrl === 'generate') {
+      setActiveTab('generate')
+    } else if (location.state?.tab) {
+      setActiveTab(location.state.tab)
+    } else {
+      setActiveTab('generate')
+    }
+  }, [location])
 
   // --- Browser Notifications Setup ---
   const requestNotificationPermission = async () => {
@@ -404,11 +415,7 @@ const GeneratePage = () => {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [])
 
-  useEffect(() => {
-    if (location.state?.tab) {
-      setActiveTab(location.state.tab)
-    }
-  }, [location.state])
+
 
 
 
@@ -1141,8 +1148,9 @@ const GeneratePage = () => {
                 </button>
               </div>
             ) : (
-              historyItems.map((item) => {
-                const isPack = item.type === 'pack'
+              <>
+                {historyItems.slice(0, visibleCount).map((item) => {
+                  const isPack = item.type === 'pack'
                 const url = isPack ? item.pdfUrl || item.pdf_url : item.imageUrl || item.image_url
                 const id = `${item.type}-${item.id}`
                 const pages = item.total_pages || item.page_count || (isPack ? 3 : 1)
@@ -1317,40 +1325,42 @@ const GeneratePage = () => {
                         <div className="text-xs font-medium text-[#ef4444] italic px-2">Failed</div>
                       ) : (
                         <>
-                          <button onClick={openViewer} disabled={loadingItemId === id} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] sm:flex-none disabled:opacity-50">
+                          <button onClick={openViewer} disabled={loadingItemId === id} title="Open" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50">
                             {loadingItemId === id ? (
                               <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
                             ) : (
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                             )}
-                            Open
                           </button>
-                          <button onClick={(e) => handleDownloadClick(item, isPack, url, titleStr)} disabled={downloadingItemId === item.id || !url} className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50`}>
+                          
+                          <button onClick={(e) => handleDownloadClick(item, isPack, url, titleStr)} disabled={downloadingItemId === item.id || !url} title="Download" className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50">
                             {downloadingItemId === item.id ? (
                               <svg className="animate-spin text-[#1f1f1f]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>
                             ) : (
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                             )}
                           </button>
+
                           {isPack && item.status === 'ready' ? (
                             <button
                               onClick={() => setShareModalPackId(item.id)}
-                              className="flex items-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-2.5 h-8 text-xs hover:bg-[#faf8f3] text-[#4b4742] shadow-sm transition-colors"
+                              className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 h-8 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee]"
                               title="Share & Earn"
                             >
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#f59e0b]">
                                 <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
                               </svg>
-                              <span className="hidden sm:inline">Share &amp; Earn</span>
+                              Share &amp; Earn
                             </button>
                           ) : (
                             <button
                               onClick={() => handleShareClick(item, isPack, url, titleStr)}
                               disabled={!url}
                               title="Share"
-                              className={`flex h-8 w-8 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50`}
+                              className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 h-8 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f7f4ee] disabled:opacity-50"
                             >
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                              Share
                             </button>
                           )}
                         </>
@@ -1358,7 +1368,18 @@ const GeneratePage = () => {
                     </div>
                   </div>
                 )
-              })
+              })}
+              {visibleCount < historyItems.length && (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    onClick={() => setVisibleCount((prev) => prev + 10)}
+                    className="rounded-full border border-[#d9d1c7] bg-white px-6 py-2.5 text-sm font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f5f2ec]"
+                  >
+                    Load more
+                  </button>
+                </div>
+              )}
+              </>
             )}
           </div>
         )}

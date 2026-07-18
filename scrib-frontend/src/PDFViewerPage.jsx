@@ -110,7 +110,7 @@ const PDFViewerPage = () => {
           .catch(() => setDataError('Failed to load the shared PDF.'))
           .finally(() => setDataLoading(false))
       }
-    } else if (slug && !location.state?.pdfUrl && !activeShareToken) {
+    } else if (slug && !location.state?.pdfUrl && !activeShareToken && !fetchedData) {
       setDataLoading(true)
       fetch(`${API_BASE}/scrib/previews/${slug}/`)
         .then((r) => {
@@ -133,13 +133,14 @@ const PDFViewerPage = () => {
         .catch(() => setDataError('Failed to load the preview note.'))
         .finally(() => setDataLoading(false))
     }
-  }, [activeShareToken, slug, location.state, fetchedData])
+  }, [activeShareToken, slug, location.state])
 
   const routeState = location.state || {}
   const rawPdfUrl = fetchedData ? fetchedData.pdf_url : routeState.pdfUrl
   const title = fetchedData ? fetchedData.title : routeState.title
   const topics = fetchedData ? (fetchedData.topics_json || []) : (routeState.topics || [])
   const totalPages = fetchedData ? (fetchedData.total_pages || 1) : (routeState.totalPages || 1)
+  const totalPrice = fetchedData ? fetchedData.total_price : routeState.totalPrice
   const forceImage = fetchedData ? (fetchedData.isImage || false) : (routeState.isImage || false)
   const isPreviewMode = routeState.isPreviewMode || (rawPdfUrl && rawPdfUrl.includes('/preview/')) || false
 
@@ -228,10 +229,6 @@ const PDFViewerPage = () => {
     }
   }, [])
 
-  useEffect(() => {
-    window.scrollTo(0, 0)
-  }, [pdfUrl, resolvedPreviewUrl])
-
   const creditBalance = user?.credit_balance ?? 0
   const pageCount = totalPages
 
@@ -253,7 +250,13 @@ const PDFViewerPage = () => {
       return
     }
 
-    setShareModalPackId(routeState?.packId || null)
+    // For public preview URLs (no packId/shareToken), just copy the current URL
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      customToast.success('Link copied to clipboard!')
+    } catch (err) {
+      customToast.error('Failed to copy link')
+    }
   }
 
   const executeDownload = async () => {
@@ -347,15 +350,15 @@ const PDFViewerPage = () => {
   }
 
   return (
-    <div className={`flex flex-col ${isMobile ? 'min-h-screen bg-black text-white' : 'h-[100dvh] overflow-hidden bg-[#f0ede7]'}`}>
+    <div className="flex flex-col bg-[#f0ede7]" style={{ minHeight: '100dvh' }}>
       {/* ── Top bar ── */}
-      <header className={`flex flex-shrink-0 items-center justify-between px-3 py-2.5 md:px-5 md:py-3 ${isMobile ? 'sticky top-0 inset-x-0 z-50 bg-[#1c1c1e] text-white shadow-md' : 'border-b border-[#e0d9ce] bg-white'}`}>
+      <header className="flex flex-shrink-0 items-center justify-between px-3 py-2.5 md:px-5 md:py-3 sticky top-0 inset-x-0 z-50 border-b border-[#e0d9ce] bg-white shadow-sm">
         {/* Left section: Back button, Logo, Breadcrumb */}
         <div className="flex items-center gap-2 md:gap-3">
           {/* Mobile Back Button (icon only) */}
           <button
             onClick={handleBack}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1c1c1e] text-white hover:bg-[#2c2c2e] transition-colors md:hidden"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e0d9ce] bg-[#f7f4ee] text-[#557a3f] hover:bg-[#ede9e1] transition-colors md:hidden"
             aria-label="Go back"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -388,7 +391,7 @@ const PDFViewerPage = () => {
 
         {/* Center section: Document Title */}
         <div className="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden px-3">
-          <p className={`max-w-[160px] truncate text-xs font-semibold sm:max-w-[300px] sm:text-sm ${isMobile ? 'text-white' : 'text-[#1f1f1f]'}`}>{title || 'Study Notes'}</p>
+          <p className="max-w-[160px] truncate text-xs font-semibold sm:max-w-[300px] sm:text-sm text-[#1f1f1f]">{title || 'Study Notes'}</p>
           <span className={`hidden rounded-full px-2 py-0.5 text-[10px] font-semibold sm:inline ${renderAsImage ? 'bg-[#fef3c7] text-[#d97706]' : 'bg-[#f0f0ff] text-[#6366f1]'}`}>
             {renderAsImage ? 'Image' : 'PDF'}
           </span>
@@ -414,7 +417,7 @@ const PDFViewerPage = () => {
               ) : (
                 <button
                   onClick={handleShare}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1c1c1e] text-white hover:bg-[#2c2c2e] transition-colors md:border md:border-[#e0d9ce] md:bg-[#f7f4ee] md:text-[#5a554f] md:hover:bg-[#ede9e1]"
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e0d9ce] bg-[#f7f4ee] text-[#5a554f] hover:bg-[#ede9e1] transition-colors"
                   aria-label="Share"
                   title="Copy Link"
                 >
@@ -425,7 +428,7 @@ const PDFViewerPage = () => {
               )}
               <button
                 onClick={handleDownloadClick}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1c1c1e] text-white hover:bg-[#2c2c2e] transition-colors md:border md:border-[#e0d9ce] md:bg-[#f7f4ee] md:text-[#5a554f] md:hover:bg-[#ede9e1]"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#e0d9ce] bg-[#f7f4ee] text-[#5a554f] hover:bg-[#ede9e1] transition-colors"
                 aria-label="Download"
                 title="Download PDF"
               >
@@ -458,11 +461,11 @@ const PDFViewerPage = () => {
         </div>
       </header>
 
-      <div className={`flex flex-1 ${isMobile ? 'bg-black' : 'overflow-hidden'}`}>
+      <div className={`flex flex-1 ${isMobile ? '' : 'overflow-hidden'}`}>
         {/* ── Main PDF viewer ── */}
-        <main className={`flex flex-1 flex-col ${isMobile ? 'bg-black min-h-screen' : 'overflow-hidden'}`}>
-          {/* Content area: image, MobilePDFViewer, or native iframe */}
-          <div className={`flex flex-1 items-start justify-center ${isMobile ? 'bg-black min-h-screen w-full py-4' : 'overflow-auto bg-[#e8e4dc]'}`}>
+        <main className={`flex flex-1 flex-col ${isMobile ? '' : 'overflow-hidden'}`}>
+          {/* Content area */}
+          <div className={`flex flex-1 items-start justify-center ${isMobile ? 'bg-[#f0ede7] w-full py-4' : 'overflow-auto bg-[#e8e4dc]'}`}>
             {renderAsImage ? (
               <div className="py-4 md:py-6 flex justify-center items-center h-full w-full bg-[#f0f0f0]">
                 <img
@@ -472,9 +475,9 @@ const PDFViewerPage = () => {
                 />
               </div>
             ) : isMobile || isPreviewMode ? (
-              <div className={`w-full flex flex-col items-center ${isMobile ? 'min-h-screen bg-black' : 'min-h-full py-2'}`}>
-                {/* On desktop preview mode, show the informative sample banner at the top of the canvas area */}
-                {!isMobile && isPreviewMode && (
+              <div className={`w-full flex flex-col items-center ${isMobile ? 'bg-[#f0ede7]' : 'min-h-full py-2'}`}>
+                {/* Show preview banner on both mobile and desktop */}
+                {isPreviewMode && (
                   <div className="w-full max-w-4xl mb-4 rounded-xl bg-[#fef3c7] border border-[#f59e0b] px-4 py-3 flex items-center justify-between shadow-sm">
                     <p className="text-xs font-semibold text-[#b45309]">
                       💡 You are viewing the free sample preview. {totalPages === 1 ? 'Bottom half is locked.' : `Unlock the full ${totalPages}-page study pack!`}
@@ -483,7 +486,7 @@ const PDFViewerPage = () => {
                       onClick={() => handleBack()}
                       className="rounded-full bg-[#b45309] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#92400e] transition-colors shadow-sm"
                     >
-                      Unlock Now (₹5)
+                      Unlock Now (₹{totalPrice || totalPages * 5})
                     </button>
                   </div>
                 )}

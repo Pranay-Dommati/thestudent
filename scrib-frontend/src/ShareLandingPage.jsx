@@ -207,6 +207,7 @@ export default function ShareLandingPage() {
         isPack: true,
         packId: packId || meta?.pack_id,
         shareToken: shareCode,
+        totalPrice: meta?.total_price,
         returnUrl: `/share/${shareCode}`,
       }
     })

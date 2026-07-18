@@ -220,29 +220,29 @@ const DashboardPage = () => {
           </p>
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-xl border border-[#e2dbd2] bg-white px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#9a9289]">Credits left</p>
-            <p className="mt-3 text-2xl font-semibold">{user?.credit_balance ?? 0}</p>
+        <div className="mt-6 grid grid-cols-3 gap-3 md:gap-4">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-[#e2dbd2] bg-white p-3 text-center md:items-start md:px-4 md:py-3 md:text-left">
+            <p className="text-[10px] uppercase tracking-wider text-[#9a9289] md:text-xs md:tracking-[0.2em]">Credits left</p>
+            <p className="mt-1 text-xl font-semibold md:mt-3 md:text-2xl">{user?.credit_balance ?? 0}</p>
           </div>
-          <div className="rounded-xl border border-[#e2dbd2] bg-white px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#9a9289]">PDFs Generated</p>
-            <p className="mt-3 text-2xl font-semibold">{statsData.pdfs}</p>
+          <div className="flex flex-col items-center justify-center rounded-xl border border-[#e2dbd2] bg-white p-3 text-center md:items-start md:px-4 md:py-3 md:text-left">
+            <p className="text-[10px] uppercase tracking-wider text-[#9a9289] md:text-xs md:tracking-[0.2em]">PDFs Gen.</p>
+            <p className="mt-1 text-xl font-semibold md:mt-3 md:text-2xl">{statsData.pdfs}</p>
           </div>
-          <div className="rounded-xl border border-[#e2dbd2] bg-white px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#9a9289]">Credits Used</p>
-            <p className="mt-3 text-2xl font-semibold">{statsData.creditsUsed}</p>
+          <div className="flex flex-col items-center justify-center rounded-xl border border-[#e2dbd2] bg-white p-3 text-center md:items-start md:px-4 md:py-3 md:text-left">
+            <p className="text-[10px] uppercase tracking-wider text-[#9a9289] md:text-xs md:tracking-[0.2em]">Credits used</p>
+            <p className="mt-1 text-xl font-semibold md:mt-3 md:text-2xl">{statsData.creditsUsed}</p>
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#e2dbd2] bg-white px-4 py-3">
+        <div className="mt-6 flex flex-col items-start gap-3 rounded-xl border border-[#e2dbd2] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-4">
           <p className="text-sm text-[#6f6a63]">
             Running low? <span className="font-semibold text-[#1f1f1f]">Top up credits</span> - starts at ₹19 for 2.
           </p>
           <button
             id="dashboard-buy-credits-btn"
             onClick={() => setShowBuyModal(true)}
-            className="rounded-lg border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold hover:bg-[#faf8f3] transition-colors"
+            className="w-full whitespace-nowrap rounded-lg border border-[#d9d1c7] bg-white px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-[#faf8f3] sm:w-auto sm:text-xs"
           >
             + Buy credits
           </button>
@@ -299,7 +299,7 @@ const DashboardPage = () => {
                       <div className="absolute inset-0 z-0 animate-pulse rounded-xl bg-gradient-to-r from-[#4ade80] via-[#34d399] to-[#4ade80] blur-md opacity-60" />
                     )}
                     <div 
-                      className={`relative flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between transition-all duration-700 ${isHighlighted ? 'bg-white z-10 rounded-xl scale-[1.02] shadow-[0_0_15px_rgba(52,211,153,0.3)] ring-2 ring-emerald-400 my-2 mx-1' : ''}`}
+                      className={`relative flex flex-col px-4 py-3 sm:flex-row sm:items-center sm:justify-between transition-all duration-700 ${isHighlighted ? 'bg-white z-10 rounded-xl scale-[1.02] shadow-[0_0_15px_rgba(52,211,153,0.3)] ring-2 ring-emerald-400 my-2 mx-1' : ''}`}
                     >
                       {isHighlighted && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-500 to-green-500 text-white text-[11px] font-bold px-4 py-1 rounded-full shadow-lg animate-bounce flex items-center gap-1 z-20 whitespace-nowrap">
@@ -308,15 +308,15 @@ const DashboardPage = () => {
                           <span>✨</span>
                         </div>
                       )}
-                      <div className="flex items-center gap-3 relative z-10">
-                      <div className="flex-shrink-0 rounded-lg border border-[#e2dbd2] bg-[#faf8f3] p-2">
+                      <div className="flex items-start sm:items-center gap-3 relative z-10 flex-1 min-w-0">
+                      <div className="flex-shrink-0 rounded-lg border border-[#e2dbd2] bg-[#faf8f3] p-2 mt-0.5 sm:mt-0">
                         <div className={`h-1.5 w-10 rounded-full ${toneColors[tone]}`} />
                         <div className={`mt-2 h-1.5 w-8 rounded-full ${toneColors[tone]}`} />
                         <div className={`mt-2 h-1.5 w-6 rounded-full ${toneColors[tone]}`} />
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold leading-tight">{item.name}</p>
-                        <p className="text-xs text-[#7b756d] flex items-center gap-1.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold leading-snug line-clamp-2 sm:line-clamp-none">{item.name}</p>
+                        <p className="mt-1 text-[11px] sm:text-xs text-[#7b756d] flex items-center gap-1.5 flex-wrap">
                           {formatDate(item.purchased_at || item.created_at)}
                           {item.is_purchased ? (
                             <>
@@ -335,7 +335,7 @@ const DashboardPage = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 pl-11 sm:pl-0 flex-shrink-0">
+                    <div className="mt-3 flex w-full flex-wrap items-center gap-2 border-t border-[#f0ebe1] pt-3 sm:mt-0 sm:w-auto sm:border-0 sm:pt-0 sm:justify-end flex-shrink-0">
                       {item.status === 'failed' ? (
                         <span className="text-[11px] font-medium text-red-500">
                           Failed
