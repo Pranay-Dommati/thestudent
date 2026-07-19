@@ -474,12 +474,12 @@ class SharedPackPurchase(models.Model):
 
     share_link = models.ForeignKey(
         NoteShareLink,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name='purchases',
     )
     buyer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
         related_name='shared_pack_purchases',
     )
     payment = models.ForeignKey(

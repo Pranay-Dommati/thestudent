@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { useGoogleAuth } from './hooks/useGoogleAuth'
 import universalToast from './utils/universalToast'
+import GoogleButtonSkeleton from './components/GoogleButtonSkeleton'
 
 const LoginPage = () => {
   const navigate = useNavigate()
@@ -86,7 +87,8 @@ const LoginPage = () => {
           <p className="mt-1 text-sm text-[#7b756d]">Log in to access your notes and credits.</p>
 
           <div className="mt-6 flex w-full justify-center">
-            <div id="google-login-btn" className="w-full max-w-[400px] flex justify-center"></div>
+            <div id="google-login-btn" className={`w-full max-w-[400px] flex justify-center ${!isReady ? 'hidden' : ''}`}></div>
+            {!isReady && <GoogleButtonSkeleton />}
           </div>
 
           <div className="my-5 flex items-center gap-3 text-xs text-[#9a9289]">

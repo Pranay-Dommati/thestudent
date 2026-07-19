@@ -5,6 +5,7 @@ import { useGoogleAuth } from './hooks/useGoogleAuth'
 import OtpModal from './components/Auth/OtpModal'
 import { otpSignup } from './services/otpAuth'
 import universalToast from './utils/universalToast'
+import GoogleButtonSkeleton from './components/GoogleButtonSkeleton'
 
 const SignupPage = () => {
   const navigate = useNavigate()
@@ -134,7 +135,8 @@ const SignupPage = () => {
 
 
           <div className="mt-6 flex w-full flex-col items-center">
-            <div id="google-signup-btn" className="w-full max-w-[400px] flex justify-center"></div>
+            <div id="google-signup-btn" className={`w-full max-w-[400px] flex justify-center ${!isReady ? 'hidden' : ''}`}></div>
+            {!isReady && <GoogleButtonSkeleton />}
             <p className="mt-3 text-[11px] text-[#9a9289]">
               By signing up, you agree to our <Link to="/terms" className="underline hover:text-[#1f1f1f]">Terms</Link> and <Link to="/privacy" className="underline hover:text-[#1f1f1f]">Privacy Policy</Link>.
             </p>

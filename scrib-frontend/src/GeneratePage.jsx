@@ -14,6 +14,7 @@ import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 import ShareStatsBanner from './components/ShareStatsBanner'
 import { usePostHog } from '@posthog/react'
 import { useGoogleAuth } from './hooks/useGoogleAuth'
+import GoogleButtonSkeleton from './components/GoogleButtonSkeleton'
 import { startPaymentFlow } from './services/paymentService'
 
 
@@ -1432,7 +1433,8 @@ const GeneratePage = () => {
             <p className="mt-1 text-sm text-[#7b756d]">Create an account to save your generated notes and get free credits.</p>
             
             <div className="mt-6 w-full flex justify-center">
-              <div id="google-login-modal-btn"></div>
+              <div id="google-login-modal-btn" className={!googleReady ? 'hidden' : ''}></div>
+              {!googleReady && <GoogleButtonSkeleton />}
             </div>
 
             <div className="my-5 flex items-center gap-3 text-xs text-[#9a9289]">

@@ -11,7 +11,7 @@ from urllib.parse import urlencode
 import logging
 import requests
 from django.core.mail import send_mail
-from django.db.models import Q, Count
+from django.db.models import Q, Count, ProtectedError
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -997,7 +997,11 @@ def admin_user_detail(request, user_id: int):
             if target.is_superuser and User.objects.filter(is_superuser=True).count() <= 1:
                 return Response({"error": "Cannot delete the last remaining admin."}, status=status.HTTP_400_BAD_REQUEST)
 
-            target.delete()
+            try:
+                target.delete()
+            except ProtectedError as e:
+                return Response({"error": f"Cannot delete this user because they have protected associated records: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
             from django.core.cache import cache
             cache.delete('admin_users_dashboard_stats')
             return Response({"success": True}, status=status.HTTP_200_OK)

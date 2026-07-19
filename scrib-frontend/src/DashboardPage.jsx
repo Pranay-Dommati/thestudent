@@ -32,6 +32,8 @@ const DashboardPage = () => {
   const [visibleCount, setVisibleCount] = useState(5)
   const [downloadReminderData, setDownloadReminderData] = useState(null)
   const [highlightedItem, setHighlightedItem] = useState(null)
+  const [viewingItemId, setViewingItemId] = useState(null)
+  const [downloadingItemId, setDownloadingItemId] = useState(null)
 
   const handleShareEarn = (packId) => {
     setShareModalPackId(packId)
@@ -43,10 +45,11 @@ const DashboardPage = () => {
     if (isPack && item.id && !String(item.id).startsWith('pending-')) {
       try {
         const res = await axiosInstance.get(`/scrib/packs/${item.id}/pdf/`, {
+          params: { json: 'true' },
           maxRedirects: 0,
           validateStatus: (status) => status >= 200 && status < 400
         })
-        resolvedUrl = res.headers?.location || res.data?.pdf_url || res.request?.responseURL || resolvedUrl
+        resolvedUrl = res.data?.pdf_url || res.headers?.location || res.request?.responseURL || resolvedUrl
       } catch (err) {
         console.error('Failed to resolve fresh PDF download URL:', err)
       }
@@ -59,8 +62,13 @@ const DashboardPage = () => {
     if (isPack && item.id && user) {
       setDownloadReminderData({ item, fileUrl })
     } else {
-      const freshUrl = await resolveFreshUrl(item, fileUrl)
-      forceDownload(freshUrl, `${item.name}.pdf`, isPack)
+      setDownloadingItemId(item.id)
+      try {
+        const freshUrl = await resolveFreshUrl(item, fileUrl)
+        forceDownload(freshUrl, `${item.name}.pdf`, isPack)
+      } finally {
+        setDownloadingItemId(null)
+      }
     }
   }
 
@@ -364,45 +372,72 @@ const DashboardPage = () => {
                         <>
                           <button
                             onClick={() => handleDownloadClick(item, fileUrl)}
-                            className="rounded-lg border border-[#e2dbd2] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] shadow-sm transition-colors"
+                            disabled={downloadingItemId === item.id || viewingItemId === item.id}
+                            className="flex items-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] shadow-sm transition-colors disabled:opacity-60 disabled:cursor-wait"
                           >
-                            Download
+                            {downloadingItemId === item.id ? (
+                              <>
+                                <svg className="animate-spin text-[#1f1f1f]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                                </svg>
+                                Downloading...
+                              </>
+                            ) : (
+                              'Download'
+                            )}
                           </button>
                           <button
+                            disabled={viewingItemId === item.id || downloadingItemId === item.id}
                             onClick={async () => {
-                              const viewUrl = await resolveFreshUrl(item, isPack ? item.pdf_url : item.image_url)
+                              if (viewingItemId === item.id || downloadingItemId === item.id) return
+                              setViewingItemId(item.id)
+                              try {
+                                const viewUrl = await resolveFreshUrl(item, isPack ? item.pdf_url : item.image_url)
 
-                              const slug = (item.name || 'document').toLowerCase().replace(/[^a-z0-9]+/g, '-')
-                              navigate(`/view/${slug}`, {
-                                state: {
-                                  pdfUrl: isPack ? viewUrl : null,
-                                  imageUrl: isPack ? null : viewUrl,
-                                  title: item.name,
-                                  topics: Array.isArray(item.topics_json)
-                                    ? item.topics_json.map(t => {
-                                        if (Array.isArray(t)) return t.join(', ');
-                                        if (t && typeof t === 'object' && Array.isArray(t.topics)) {
-                                          return t.topics.map(sub => typeof sub === 'object' ? `${sub.name}${sub.instruction ? ` (${sub.instruction})` : ''}` : String(sub)).join(', ');
-                                        }
-                                        if (t && typeof t === 'object' && (t.name || t.topic)) {
-                                          return `${t.name || t.topic}${t.instruction ? ` (${t.instruction})` : ''}`;
-                                        }
-                                        return String(t);
-                                      })
-                                    : [item.name],
-                                  totalPages: item.total_pages || 1,
-                                  isPack,
-                                  packId: isPack ? item.id : null,
-                                  returnUrl: '/dashboard'
-                                }
-                              })
+                                const slug = (item.name || 'document').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+                                navigate(`/view/${slug}`, {
+                                  state: {
+                                    pdfUrl: isPack ? viewUrl : null,
+                                    imageUrl: isPack ? null : viewUrl,
+                                    title: item.name,
+                                    topics: Array.isArray(item.topics_json)
+                                      ? item.topics_json.map(t => {
+                                          if (Array.isArray(t)) return t.join(', ');
+                                          if (t && typeof t === 'object' && Array.isArray(t.topics)) {
+                                            return t.topics.map(sub => typeof sub === 'object' ? `${sub.name}${sub.instruction ? ` (${sub.instruction})` : ''}` : String(sub)).join(', ');
+                                          }
+                                          if (t && typeof t === 'object' && (t.name || t.topic)) {
+                                            return `${t.name || t.topic}${t.instruction ? ` (${t.instruction})` : ''}`;
+                                          }
+                                          return String(t);
+                                        })
+                                      : [item.name],
+                                    totalPages: item.total_pages || 1,
+                                    isPack,
+                                    packId: isPack ? item.id : null,
+                                    returnUrl: '/dashboard'
+                                  }
+                                })
+                              } finally {
+                                setViewingItemId(null)
+                              }
                             }}
-                            className="rounded-lg border border-[#e2dbd2] bg-white px-2 py-1 text-xs hover:bg-[#faf8f3]"
+                            className="flex items-center gap-1.5 rounded-lg border border-[#e2dbd2] bg-white px-2.5 py-1 text-xs font-semibold hover:bg-[#faf8f3] shadow-sm transition-colors disabled:opacity-60 disabled:cursor-wait"
                           >
-                            View
+                            {viewingItemId === item.id ? (
+                              <>
+                                <svg className="animate-spin text-[#1f1f1f]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                                </svg>
+                                Opening...
+                              </>
+                            ) : (
+                              'View'
+                            )}
                           </button>
                         </>
                       )}
+
                     </div>
                   </div>
                   </div>
@@ -453,8 +488,13 @@ const DashboardPage = () => {
           onDownload={async () => {
             const { item, fileUrl } = downloadReminderData
             setDownloadReminderData(null)
-            const freshUrl = await resolveFreshUrl(item, fileUrl)
-            forceDownload(freshUrl, `${item.name}.pdf`, item.type === 'pack')
+            setDownloadingItemId(item.id)
+            try {
+              const freshUrl = await resolveFreshUrl(item, fileUrl)
+              forceDownload(freshUrl, `${item.name}.pdf`, item.type === 'pack')
+            } finally {
+              setDownloadingItemId(null)
+            }
           }}
           onClose={() => setDownloadReminderData(null)}
         />
