@@ -11,6 +11,8 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
   const [pageWidth, setPageWidth] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [showIndicator, setShowIndicator] = useState(true)
+  const [renderedPages, setRenderedPages] = useState({})
+  const [isSlowConnection, setIsSlowConnection] = useState(false)
   const containerRef = useRef(null)
   const debounceRef = useRef(null)
   const indicatorTimeoutRef = useRef(null)
@@ -95,7 +97,23 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
 
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages)
+    setIsSlowConnection(false)
   }
+
+  // Detect slow PDF download
+  useEffect(() => {
+    if (numPages) {
+      setIsSlowConnection(false)
+      return
+    }
+    
+    setIsSlowConnection(false)
+    const timer = setTimeout(() => {
+      setIsSlowConnection(true)
+    }, 6000)
+
+    return () => clearTimeout(timer)
+  }, [numPages, url])
 
   return (
     <div
@@ -120,16 +138,46 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
         onLoadSuccess={onDocumentLoadSuccess}
         className="flex flex-col items-center w-full"
         loading={
-          <div className="w-full bg-white p-6 space-y-3 animate-pulse" style={{ minHeight: 320 }}>
-            <div className="h-5 rounded-full bg-[#e4ddd4] w-1/3 mx-auto mb-4" />
-            {Array.from({ length: 18 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-2.5 rounded-full bg-[#e4ddd4]"
-                style={{ width: `${58 + Math.sin(i * 1.9) * 28}%` }}
-              />
-            ))}
-          </div>
+          (() => {
+            const w = pageWidth || (typeof window !== 'undefined' ? Math.min(window.innerWidth, 900) : 400);
+            const h = w * 1.414; // Standard A4 ratio
+            
+            // If in preview mode, we only expect 1 real page (the rest are mocked locked pages)
+            // Otherwise, render as many skeletons as the document has pages (default 1)
+            const skeletonCount = isPreviewMode ? 1 : Math.max(1, totalOriginalPages || 1);
+            
+            return (
+              <div className="w-full flex flex-col items-center">
+                {isSlowConnection && (
+                  <div className="w-full max-w-md mb-4 flex items-center justify-center gap-2 rounded-xl bg-[#fef3c7] border border-[#f59e0b] px-4 py-3 text-xs font-semibold text-[#b45309] shadow-sm animate-fadeIn">
+                    <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                    Your connection seems slow. Still downloading document...
+                  </div>
+                )}
+                {Array.from({ length: skeletonCount }).map((_, pageIndex) => (
+                  <div 
+                    key={`doc_loading_${pageIndex}`}
+                    className={`bg-white p-8 space-y-5 animate-pulse mx-auto shadow-sm border border-[#e2dbd2] overflow-hidden ${pageIndex > 0 ? 'mt-3' : ''}`} 
+                    style={{ 
+                      width: w, 
+                      height: h 
+                    }}
+                  >
+                    <div className="h-6 rounded-full bg-[#e4ddd4] w-2/5 mx-auto mb-8" />
+                    {Array.from({ length: 24 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-3 rounded-full bg-[#e4ddd4]"
+                        style={{ width: `${60 + Math.sin(i * 1.5) * 30}%`, marginLeft: i % 2 === 0 ? '0' : '5%' }}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            );
+          })()
         }
         error={<div className="py-20 text-sm text-red-500 text-center">Failed to load PDF.</div>}
       >
@@ -140,6 +188,28 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
             data-page-number={index + 1}
             style={{ contain: 'layout' }}
           >
+            {/* Persistent Skeleton Overlay to prevent blank canvas flash */}
+            {!renderedPages[index + 1] && (
+              <div 
+                className="absolute z-10 bg-white p-8 space-y-5 animate-pulse shadow-sm border border-[#e2dbd2] overflow-hidden" 
+                style={{ 
+                  width: pageWidth, 
+                  height: pageWidth * 1.414,
+                  left: '50%',
+                  transform: 'translateX(-50%)'
+                }}
+              >
+                <div className="h-6 rounded-full bg-[#e4ddd4] w-2/5 mx-auto mb-8" />
+                {Array.from({ length: 24 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-3 rounded-full bg-[#e4ddd4]"
+                    style={{ width: `${60 + Math.sin(i * 1.5) * 30}%`, marginLeft: i % 2 === 0 ? '0' : '5%' }}
+                  />
+                ))}
+              </div>
+            )}
+            
             <Page
               pageNumber={index + 1}
               width={pageWidth}
@@ -147,6 +217,13 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
               devicePixelRatio={typeof window !== 'undefined' ? Math.max(window.devicePixelRatio || 1, 3) : 3}
               renderAnnotationLayer={false}
               renderTextLayer={false}
+              onRenderSuccess={() => setRenderedPages(prev => ({ ...prev, [index + 1]: true }))}
+              loading={
+                <div 
+                  className="bg-transparent" 
+                  style={{ width: pageWidth, height: pageWidth * 1.414 }} 
+                />
+              }
             />
             {/* Blur bottom half of first page for single-page preview */}
             {isPreviewMode && totalOriginalPages === 1 && index === 0 && (

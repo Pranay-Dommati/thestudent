@@ -31,8 +31,11 @@ export default function ShareAndEarnModal({ packId, shareToken, onClose }) {
           try {
             const meta = await getShareMeta(shareToken)
             targetPackId = meta?.pack_id
-          } catch {
-            // Ignore meta error, will fallback below
+          } catch (metaErr) {
+            // If it's a network error, re-throw so the outer handler shows the right message.
+            // Otherwise silently ignore meta errors and fall through to shareToken fallback.
+            const isMetaNetworkError = !metaErr?.response || metaErr?.code === 'ECONNABORTED' || metaErr?.message === 'Network Error'
+            if (isMetaNetworkError) throw metaErr
           }
         }
 
@@ -52,7 +55,16 @@ export default function ShareAndEarnModal({ packId, shareToken, onClose }) {
           }
         }
       } catch (err) {
-        if (!cancelled) customToast.error('Could not create share link. Please try again.')
+        if (!cancelled) {
+          // Check directly — do not rely on the non-enumerable isNetworkError property
+          // which may not survive all promise rejection paths.
+          const isNetworkErr = err?.isNetworkError === true || !err?.response || err?.code === 'ECONNABORTED' || err?.message === 'Network Error'
+          if (isNetworkErr) {
+            customToast.error('Connection is slow or unavailable. Couldn\'t create your share link. Please try again.')
+          } else {
+            customToast.error('Could not create share link. Please try again.')
+          }
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }

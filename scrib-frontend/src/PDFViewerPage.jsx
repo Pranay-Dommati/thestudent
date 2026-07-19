@@ -148,7 +148,19 @@ const PDFViewerPage = () => {
   const pdfUrl = normalizeUrl(rawPdfUrl)
 
   // Detect if this URL is an API endpoint that needs to be resolved to an actual S3 PDF URL
-  const needsResolution = pdfUrl && (pdfUrl.includes('/scrib/share/preview/') || pdfUrl.includes('/scrib/packs/') || (pdfUrl.includes('/scrib/share/') && pdfUrl.includes('/pdf/')))
+  // Exclude direct S3/CloudFront URLs to prevent downloading the entire PDF via Axios!
+  const isDirectFile = pdfUrl && (
+    pdfUrl.includes('.pdf?') || 
+    pdfUrl.endsWith('.pdf') || 
+    pdfUrl.includes('X-Amz-') || 
+    pdfUrl.includes('s3.')
+  )
+  const isApiRoute = pdfUrl && (
+    pdfUrl.includes('/scrib/share/preview/') || 
+    pdfUrl.includes('/scrib/packs/') || 
+    (pdfUrl.includes('/scrib/share/') && pdfUrl.includes('/pdf/'))
+  )
+  const needsResolution = isApiRoute && !isDirectFile
 
   const [resolvedPreviewUrl, setResolvedPreviewUrl] = useState(null)
   const [resolving, setResolving] = useState(false)
@@ -405,12 +417,12 @@ const PDFViewerPage = () => {
               {(routeState.isPack && routeState.packId) || shareToken || fetchedData?.pack_id ? (
                 <button
                   onClick={handleShare}
-                  className="flex h-8 items-center justify-center gap-1.5 rounded-full border border-[#f59e0b] bg-[#fef3c7] px-3 text-[#b45309] hover:bg-[#fde68a] transition-colors"
+                  className="flex flex-shrink-0 whitespace-nowrap h-8 w-8 md:w-auto items-center justify-center gap-1.5 rounded-full border border-[#f59e0b] bg-[#fef3c7] md:px-3 text-[#b45309] hover:bg-[#fde68a] transition-colors"
                   aria-label="Share and Earn"
                   title="Share and Earn Credits"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1-1.275-1.275L12 3Z"/>
+                  <svg className="flex-shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
                   </svg>
                   <span className="hidden text-xs font-bold md:inline">Share &amp; Earn</span>
                 </button>

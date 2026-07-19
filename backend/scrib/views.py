@@ -718,6 +718,30 @@ class PreviewDetailView(APIView):
         previews = get_dynamic_s3_previews()
         for p in previews:
             if p['slug'] == slug:
+                # Generate a presigned URL forcing inline display to handle badly-uploaded preview PDFs
+                import boto3
+                from django.conf import settings
+                bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
+                region = getattr(settings, 'AWS_S3_REGION_NAME', 'ap-south-1')
+                access_key = getattr(settings, 'SCRIB_S3_ACCESS_KEY_ID', '')
+                secret_key = getattr(settings, 'SCRIB_S3_SECRET_ACCESS_KEY', '')
+                if bucket and access_key and secret_key:
+                    s3 = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret_key, region_name=region)
+                    try:
+                        presigned_url = s3.generate_presigned_url(
+                            'get_object',
+                            Params={
+                                'Bucket': bucket,
+                                'Key': p['id'],
+                                'ResponseContentDisposition': 'inline',
+                                'ResponseContentType': 'application/pdf',
+                            },
+                            ExpiresIn=3600,
+                        )
+                        p['pdf_url'] = presigned_url
+                    except Exception as e:
+                        pass # Fallback to original public URL if signing fails
+
                 # Cache the result for 5 minutes
                 cache.set(cache_key, p, timeout=300)
                 return Response(p)

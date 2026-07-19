@@ -12,6 +12,7 @@ import PreviewCard from './components/PreviewCard'
 import { startPaymentFlow } from './services/paymentService'
 import customToast from './utils/customToast'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
+import NetworkIndicator from './components/NetworkIndicator'
 
 const fallbackPreviewStrip = [
   { id: 'osi-model', title: 'OSI Model', pdfUrl: null },
@@ -193,6 +194,7 @@ const App = () => {
           `}
         </script>
       </Helmet>
+      <NetworkIndicator />
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center gap-3">

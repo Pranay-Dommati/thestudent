@@ -43,6 +43,9 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
   }, [])
 
   const docUrl = isUnlocked && pdfUrl ? pdfUrl : (previewToken ? getPreviewUrl(previewToken) : null)
+  
+  const w = containerWidth || (typeof window !== 'undefined' ? Math.min(window.innerWidth - 48, 800) : 400);
+  const h = w * 1.414; // Standard A4 ratio
 
   return (
     <div ref={cardRef} className={`rounded-xl border border-[#e2dbd2] overflow-hidden bg-white ${isFirst ? '' : 'relative'}`}>
@@ -61,18 +64,16 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
 
       {/* Note paper illustration */}
       {((isFirst && previewToken) || (isUnlocked && pdfUrl)) && docUrl ? (
-        <div className="relative w-full overflow-hidden bg-white">
+        <div className="relative w-full overflow-hidden bg-white" style={{ minHeight: pdfLoaded ? 'auto' : h }}>
           {/* Skeleton overlay — shown until PDF page renders */}
           {!pdfLoaded && (
-            <div className="absolute inset-0 z-10 bg-[#faf8f3] animate-pulse flex flex-col p-6 gap-3">
-              {/* Title skeleton */}
-              <div className="h-5 rounded-full bg-[#e4ddd4] w-1/3 mx-auto mb-4" />
-              {/* Body lines */}
-              {Array.from({ length: 22 }).map((_, i) => (
+            <div className="absolute inset-0 z-10 bg-white p-8 space-y-5 animate-pulse mx-auto overflow-hidden flex flex-col">
+              <div className="h-6 rounded-full bg-[#e4ddd4] w-2/5 mx-auto mb-8 shrink-0" />
+              {Array.from({ length: 24 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-2.5 rounded-full bg-[#e4ddd4] shrink-0"
-                  style={{ width: `${58 + Math.sin(i * 1.9) * 28}%` }}
+                  className="h-3 rounded-full bg-[#e4ddd4] shrink-0"
+                  style={{ width: `${60 + Math.sin(i * 1.5) * 30}%`, marginLeft: i % 2 === 0 ? '0' : '5%' }}
                 />
               ))}
             </div>
@@ -82,7 +83,7 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
             file={docUrl}
             loading={null}
             error={
-              <div className="flex items-center justify-center py-20 text-xs text-red-500 w-full">
+              <div className="flex items-center justify-center py-20 text-xs text-red-500 w-full absolute inset-0 z-20 bg-white">
                 Could not load preview image.
               </div>
             }
@@ -103,7 +104,7 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
           {/* For single-page notes, blur the bottom half to encourage unlocking */}
           {singlePage && !isUnlocked && (
             <div className="absolute inset-x-0 bottom-0 top-1/2 z-20 flex flex-col items-center justify-center bg-white/40 backdrop-blur-md border-t border-white/40 shadow-[0_-10px_20px_rgba(255,255,255,0.8)]">
-              <div className="flex flex-col items-center p-4 bg-white/80 rounded-2xl shadow-sm border border-white/50 backdrop-blur-xl">
+              <div className="flex flex-col items-center p-4 bg-white/90 rounded-2xl shadow-sm border border-white/50 backdrop-blur-xl">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1f3a5f" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="mb-1.5 opacity-90">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
@@ -114,25 +115,26 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
           )}
         </div>
       ) : (
-        <div className="relative w-full aspect-square p-4 select-none">
-          {/* Simulated handwritten lines */}
-          <div className="absolute inset-0 p-6 space-y-4 opacity-60 overflow-hidden">
+        <div className="relative w-full bg-white select-none" style={{ height: h }}>
+          {/* Simulated handwritten lines matching the skeleton */}
+          <div className="absolute inset-0 p-8 space-y-5 opacity-40 overflow-hidden flex flex-col">
+            <div className="h-6 rounded-full bg-[#d6cfc4] w-2/5 mx-auto mb-8 shrink-0" />
             {Array.from({ length: 24 }).map((_, i) => (
               <div
                 key={i}
-                className="h-2.5 rounded-full bg-[#e8e2d9]"
-                style={{ width: `${70 + Math.sin(i * 1.3) * 20}%` }}
+                className="h-3 rounded-full bg-[#d6cfc4] shrink-0"
+                style={{ width: `${60 + Math.sin(i * 1.5) * 30}%`, marginLeft: i % 2 === 0 ? '0' : '5%' }}
               />
             ))}
           </div>
 
           {/* Protection Watermark overlay */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[5px]">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9a9289" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-1">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[4px]">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9a9289" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-2">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
-            <span className="text-[10px] text-[#9a9289] font-medium tracking-wide uppercase">Locked Page</span>
+            <span className="text-sm text-[#9a9289] font-bold tracking-wide uppercase mb-4">Locked Page</span>
           </div>
         </div>
       )}

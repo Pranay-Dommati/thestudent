@@ -1,5 +1,6 @@
 import axios from 'axios'
 import storage from './storage'
+import customToast from './customToast'
 
 const instance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
@@ -24,6 +25,14 @@ instance.interceptors.request.use(
         config.headers['Authorization'] = `Bearer ${token}`
       }
     }
+    
+    // Start slow network timer — all requests share one global toast to prevent duplicates
+    config.metadata = config.metadata || {}
+    config.metadata.slowWarningTimeout = setTimeout(() => {
+      showSlowToast()
+      config.metadata.slowShown = true
+    }, 7000)
+
     return config
   },
   (error) => Promise.reject(error),
@@ -31,6 +40,25 @@ instance.interceptors.request.use(
 
 let isRefreshing = false
 const subscribers = []
+
+// Single shared slow-network toast — avoids duplicate toasts when multiple
+// concurrent requests are all slow at the same time.
+const SLOW_TOAST_ID = 'global-slow-connection'
+let slowRequestCount = 0
+
+function showSlowToast() {
+  slowRequestCount++
+  if (slowRequestCount === 1) {
+    customToast.info('Still working... Your connection seems slow.', { id: SLOW_TOAST_ID, duration: Infinity })
+  }
+}
+
+function clearSlowToast() {
+  if (slowRequestCount > 0) slowRequestCount--
+  if (slowRequestCount === 0) {
+    customToast.dismiss(SLOW_TOAST_ID)
+  }
+}
 
 function onRefreshed(newToken) {
   subscribers.forEach((cb) => cb(newToken))
@@ -42,9 +70,34 @@ function addSubscriber(callback) {
 }
 
 instance.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const config = response.config || {}
+    if (config.metadata?.slowWarningTimeout) {
+      clearTimeout(config.metadata.slowWarningTimeout)
+    }
+    if (config.metadata?.slowShown) {
+      clearSlowToast()
+    }
+    return response
+  },
   async (error) => {
     const originalRequest = error.config || {}
+    
+    if (originalRequest.metadata?.slowWarningTimeout) {
+      clearTimeout(originalRequest.metadata.slowWarningTimeout)
+    }
+    if (originalRequest.metadata?.slowShown) {
+      clearSlowToast()
+    }
+
+    const isNetworkError = error.code === 'ECONNABORTED' || !error.response || error.message === 'Network Error'
+    if (isNetworkError) {
+      Object.defineProperty(error, "isNetworkError", {
+        value: true,
+        enumerable: false,
+      })
+    }
+
     const status = error.response?.status
 
     if (status === 401 && !originalRequest._retry) {
