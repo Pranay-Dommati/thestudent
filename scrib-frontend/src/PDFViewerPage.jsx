@@ -474,7 +474,7 @@ const PDFViewerPage = () => {
                   className="max-h-full max-w-full rounded-sm object-contain shadow-xl"
                 />
               </div>
-            ) : isMobile || isPreviewMode ? (
+            ) : isPreviewMode ? (
               <div className={`w-full flex flex-col items-center ${isMobile ? 'bg-[#f0ede7]' : 'min-h-full py-2'}`}>
                 {/* Show preview banner on both mobile and desktop */}
                 {isPreviewMode && (

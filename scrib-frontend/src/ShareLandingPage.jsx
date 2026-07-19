@@ -61,17 +61,20 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
 
       {/* Note paper illustration */}
       {((isFirst && previewToken) || (isUnlocked && pdfUrl)) && docUrl ? (
-        <div className="relative w-full overflow-hidden bg-white">
+        <div 
+          className="relative w-full overflow-hidden bg-white"
+          style={!pdfLoaded ? { minHeight: containerWidth ? `${containerWidth * 1.414}px` : '400px' } : {}}
+        >
           {/* Skeleton overlay — shown until PDF page renders */}
           {!pdfLoaded && (
-            <div className="absolute inset-0 z-10 bg-[#faf8f3] animate-pulse flex flex-col p-6 gap-3">
+            <div className="absolute inset-0 z-10 bg-[#faf8f3] animate-pulse flex flex-col p-8 gap-5 w-full h-full">
               {/* Title skeleton */}
-              <div className="h-5 rounded-full bg-[#e4ddd4] w-1/3 mx-auto mb-4" />
+              <div className="h-6 rounded-full bg-[#e4ddd4] w-2/5 mx-auto mb-6" />
               {/* Body lines */}
-              {Array.from({ length: 22 }).map((_, i) => (
+              {Array.from({ length: 18 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-2.5 rounded-full bg-[#e4ddd4] shrink-0"
+                  className="h-3.5 rounded-full bg-[#e4ddd4] shrink-0"
                   style={{ width: `${58 + Math.sin(i * 1.9) * 28}%` }}
                 />
               ))}
@@ -114,13 +117,16 @@ function PagePreviewCard({ pageNumber, topics, isFirst, singlePage, previewToken
           )}
         </div>
       ) : (
-        <div className="relative w-full aspect-square p-4 select-none">
+        <div 
+          className="relative w-full p-4 select-none bg-[#faf8f3]"
+          style={{ minHeight: containerWidth ? `${containerWidth * 1.414}px` : '400px' }}
+        >
           {/* Simulated handwritten lines */}
-          <div className="absolute inset-0 p-6 space-y-4 opacity-60 overflow-hidden">
+          <div className="absolute inset-0 p-8 space-y-5 opacity-60 overflow-hidden">
             {Array.from({ length: 24 }).map((_, i) => (
               <div
                 key={i}
-                className="h-2.5 rounded-full bg-[#e8e2d9]"
+                className="h-3.5 rounded-full bg-[#e8e2d9]"
                 style={{ width: `${70 + Math.sin(i * 1.3) * 20}%` }}
               />
             ))}

@@ -8,7 +8,12 @@ pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.vers
 
 const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) => {
   const [numPages, setNumPages] = useState(null)
-  const [pageWidth, setPageWidth] = useState(null)
+  const [pageWidth, setPageWidth] = useState(() => {
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      return Math.min(document.documentElement.clientWidth || window.innerWidth, 900)
+    }
+    return null
+  })
   const [currentPage, setCurrentPage] = useState(1)
   const [showIndicator, setShowIndicator] = useState(true)
   const containerRef = useRef(null)
@@ -120,15 +125,33 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
         onLoadSuccess={onDocumentLoadSuccess}
         className="flex flex-col items-center w-full"
         loading={
-          <div className="w-full bg-white p-6 space-y-3 animate-pulse" style={{ minHeight: 320 }}>
-            <div className="h-5 rounded-full bg-[#e4ddd4] w-1/3 mx-auto mb-4" />
-            {Array.from({ length: 18 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-2.5 rounded-full bg-[#e4ddd4]"
-                style={{ width: `${58 + Math.sin(i * 1.9) * 28}%` }}
-              />
-            ))}
+          <div 
+            className="bg-white p-8 animate-pulse border border-[#e2dbd2] shadow-sm flex flex-col mt-2" 
+            style={{ 
+              width: pageWidth ? `${pageWidth}px` : '100%', 
+              minHeight: pageWidth ? `${pageWidth * 1.414}px` : '600px', // standard A4 aspect ratio
+              maxWidth: '900px'
+            }}
+          >
+            <div className="h-6 rounded-full bg-[#e4ddd4] w-2/5 mx-auto mb-10" />
+            <div className="space-y-5">
+              {Array.from({ length: 15 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-3.5 rounded-full bg-[#f0ede7]"
+                  style={{ width: `${60 + Math.sin(i * 1.5) * 35}%` }}
+                />
+              ))}
+            </div>
+            <div className="mt-12 space-y-5">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div
+                  key={`b_${i}`}
+                  className="h-3.5 rounded-full bg-[#f0ede7]"
+                  style={{ width: `${50 + Math.cos(i * 1.2) * 45}%` }}
+                />
+              ))}
+            </div>
           </div>
         }
         error={<div className="py-20 text-sm text-red-500 text-center">Failed to load PDF.</div>}
