@@ -102,6 +102,7 @@ class AuthService {
       const data = options.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : undefined;
       const headers = options.headers || {};
       const config = { url, method, headers };
+      if (options.signal) config.signal = options.signal;
       if (data !== undefined) config.data = data;
       const response = await apiAxios.request(config);
       return response;

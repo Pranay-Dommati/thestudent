@@ -4,6 +4,7 @@ import authService from '../../../services/authService';
 
 const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all|active|inactive
   const [roleFilter, setRoleFilter] = useState('all'); // all|admin|user
   const [joinedFilter, setJoinedFilter] = useState('all'); // all|last7|last30|thismonth
@@ -15,6 +16,7 @@ const AdminUsers = () => {
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState({ total_users: 0, active_users: 0, active_last_7_days: 0, active_last_30_days: 0, new_this_month: 0, inactive_users: 0 });
   const [loading, setLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState('');
 
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
@@ -24,12 +26,34 @@ const AdminUsers = () => {
   const [broadcastSending, setBroadcastSending] = useState(false);
   const [broadcastResult, setBroadcastResult] = useState(null);
 
+  const abortControllerRef = React.useRef(null);
+  const requestSeqRef = React.useRef(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const fetchUsers = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const currentSeq = ++requestSeqRef.current;
+
     try {
-      setLoading(true);
+      if (users.length === 0) {
+        setLoading(true);
+      } else {
+        setIsFetching(true);
+      }
       setError('');
       const params = new URLSearchParams({
-        q: searchQuery,
+        q: debouncedSearchQuery,
         status: statusFilter,
         role: roleFilter,
         joined: joinedFilter,
@@ -38,25 +62,33 @@ const AdminUsers = () => {
         page: String(currentPage),
         page_size: '10',
       });
-      const resp = await authService.makeAuthenticatedRequest(`/auth/users/?${params.toString()}`);
+      const resp = await authService.makeAuthenticatedRequest(`/auth/users/?${params.toString()}`, {
+        signal: controller.signal
+      });
+      if (currentSeq !== requestSeqRef.current) return;
       const data = resp.data || {};
       const results = Array.isArray(data.results) ? data.results : [];
-      // Keep the order returned by backend; do not re-sort here
       setUsers(results);
       setStats(data.stats || { total_users: 0, active_users: 0, active_last_7_days: 0, active_last_30_days: 0, new_this_month: 0, inactive_users: 0 });
     } catch (e) {
+      if (e.name === 'CanceledError' || e.message === 'canceled' || currentSeq !== requestSeqRef.current) {
+        return;
+      }
       console.error('Fetch users error:', e);
       const serverMsg = e?.response?.data?.error;
       setError(serverMsg || e.message || 'Failed to fetch users');
     } finally {
-      setLoading(false);
+      if (currentSeq === requestSeqRef.current) {
+        setLoading(false);
+        setIsFetching(false);
+      }
     }
   };
 
   useEffect(() => {
     fetchUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, statusFilter, roleFilter, joinedFilter, productFilter, sortBy, currentPage]);
+  }, [debouncedSearchQuery, statusFilter, roleFilter, joinedFilter, productFilter, sortBy, currentPage]);
 
   // Derive client-side filter for enrollment counts (backend may ignore this param)
   const usersToRender = React.useMemo(() => {
@@ -217,10 +249,15 @@ const AdminUsers = () => {
           <input
             type="text"
             placeholder="Search users..."
-            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+          {isFetching && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2" title="Searching...">
+              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
         </div>
         {/* Status filter */}
         <select

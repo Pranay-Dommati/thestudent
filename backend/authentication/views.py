@@ -841,28 +841,42 @@ def admin_list_users(request):
         end = start + page_size
         items = list(queryset[start:end])
 
-        # Stats
-        # Compute enrolled courses count per listed user in one query
-        total_users = User.objects.count()
-        active_users = User.objects.filter(is_active=True).count()
-        from django.utils import timezone
-        from datetime import timedelta
-        from django.db.models import Q
-        now = timezone.now()
-        new_this_month = User.objects.filter(date_joined__year=now.year, date_joined__month=now.month).count()
-        inactive_users = total_users - active_users
+        # Stats (cached for 60 seconds to prevent heavy database queries during search/pagination across thousands of users)
+        from django.core.cache import cache
+        stats_cache_key = 'admin_users_dashboard_stats'
+        stats_data = cache.get(stats_cache_key)
+        if not stats_data:
+            total_users = User.objects.count()
+            active_users = User.objects.filter(is_active=True).count()
+            from django.utils import timezone
+            from datetime import timedelta
+            now = timezone.now()
+            new_this_month = User.objects.filter(date_joined__year=now.year, date_joined__month=now.month).count()
+            inactive_users = total_users - active_users
 
-        cutoff_7d = now - timedelta(days=7)
-        cutoff_30d = now - timedelta(days=30)
-        active_last_7_days = User.objects.filter(
-            Q(last_login__gte=cutoff_7d) | Q(updated_at__gte=cutoff_7d) | Q(date_joined__gte=cutoff_7d)
-        ).distinct().count()
-        active_last_30_days = User.objects.filter(
-            Q(last_login__gte=cutoff_30d) | Q(updated_at__gte=cutoff_30d) | Q(date_joined__gte=cutoff_30d)
-        ).distinct().count()
-        
-        # Product stats
-        product_stats = dict(UserProduct.objects.values('product').annotate(count=Count('user', distinct=True)).values_list('product', 'count'))
+            cutoff_7d = now - timedelta(days=7)
+            cutoff_30d = now - timedelta(days=30)
+            active_last_7_days = User.objects.filter(
+                Q(last_login__gte=cutoff_7d) | Q(updated_at__gte=cutoff_7d) | Q(date_joined__gte=cutoff_7d)
+            ).distinct().count()
+            active_last_30_days = User.objects.filter(
+                Q(last_login__gte=cutoff_30d) | Q(updated_at__gte=cutoff_30d) | Q(date_joined__gte=cutoff_30d)
+            ).distinct().count()
+            
+            # Product stats
+            product_stats = dict(UserProduct.objects.values('product').annotate(count=Count('user', distinct=True)).values_list('product', 'count'))
+            stats_data = {
+                'total_users': total_users,
+                'active_users': active_users,
+                'active_last_7_days': active_last_7_days,
+                'active_last_30_days': active_last_30_days,
+                'new_this_month': new_this_month,
+                'inactive_users': inactive_users,
+                'scrib_users': product_stats.get('scrib', 0),
+                'courses_users': product_stats.get('courses', 0),
+                'codevisualizer_users': product_stats.get('codevisualizer', 0),
+            }
+            cache.set(stats_cache_key, stats_data, 60)
 
         # Compute enrolled courses count per listed user in one query
         try:
@@ -905,17 +919,7 @@ def admin_list_users(request):
                 'has_next': end < total,
                 'has_prev': start > 0,
             },
-            'stats': {
-                'total_users': total_users,
-                'active_users': active_users,
-                'active_last_7_days': active_last_7_days,
-                'active_last_30_days': active_last_30_days,
-                'new_this_month': new_this_month,
-                'inactive_users': inactive_users,
-                'scrib_users': product_stats.get('scrib', 0),
-                'courses_users': product_stats.get('courses', 0),
-                'codevisualizer_users': product_stats.get('codevisualizer', 0),
-            },
+            'stats': stats_data,
         }
 
         return Response(payload, status=status.HTTP_200_OK)
@@ -980,6 +984,8 @@ def admin_user_detail(request, user_id: int):
 
             if updated:
                 target.save()
+                from django.core.cache import cache
+                cache.delete('admin_users_dashboard_stats')
 
             return Response({"success": True}, status=status.HTTP_200_OK)
 
@@ -992,6 +998,8 @@ def admin_user_detail(request, user_id: int):
                 return Response({"error": "Cannot delete the last remaining admin."}, status=status.HTTP_400_BAD_REQUEST)
 
             target.delete()
+            from django.core.cache import cache
+            cache.delete('admin_users_dashboard_stats')
             return Response({"success": True}, status=status.HTTP_200_OK)
 
         return Response({"error": "Method not allowed"}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
