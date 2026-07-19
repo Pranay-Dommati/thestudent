@@ -9,8 +9,11 @@ pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.vers
 const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) => {
   const [numPages, setNumPages] = useState(null)
   const [pageWidth, setPageWidth] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [showIndicator, setShowIndicator] = useState(true)
   const containerRef = useRef(null)
   const debounceRef = useRef(null)
+  const indicatorTimeoutRef = useRef(null)
 
   // Use window.innerWidth to determine width. It is completely immune to flexbox layout 
   // quirks that happen when the iOS Safari address bar expands/collapses.
@@ -42,6 +45,54 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
     }
   }, [measureWidth])
 
+  // Track scrolling and interaction to show/hide indicator
+  useEffect(() => {
+    const show = () => {
+      setShowIndicator(true)
+      if (indicatorTimeoutRef.current) clearTimeout(indicatorTimeoutRef.current)
+      indicatorTimeoutRef.current = setTimeout(() => {
+        setShowIndicator(false)
+      }, 2500)
+    }
+
+    show() // Initial show
+
+    window.addEventListener('scroll', show, { passive: true })
+    window.addEventListener('touchstart', show, { passive: true })
+    window.addEventListener('touchmove', show, { passive: true })
+    
+    return () => {
+      window.removeEventListener('scroll', show)
+      window.removeEventListener('touchstart', show)
+      window.removeEventListener('touchmove', show)
+      if (indicatorTimeoutRef.current) clearTimeout(indicatorTimeoutRef.current)
+    }
+  }, [])
+
+  // Intersection Observer to track current page
+  useEffect(() => {
+    if (!numPages) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const pageNum = parseInt(entry.target.getAttribute('data-page-number'), 10)
+            if (!isNaN(pageNum)) {
+              setCurrentPage(pageNum)
+            }
+          }
+        })
+      },
+      { rootMargin: '-40% 0px -40% 0px' }
+    )
+
+    const pageContainers = document.querySelectorAll('.pdf-page-container')
+    pageContainers.forEach(el => observer.observe(el))
+
+    return () => observer.disconnect()
+  }, [numPages, pageWidth])
+
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages)
   }
@@ -53,12 +104,14 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
     >
       {/* Floating page indicator */}
       {numPages && (
-        <div className="absolute top-4 left-4 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md shadow-sm pointer-events-none">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <line x1="9" y1="3" x2="9" y2="21" />
-          </svg>
-          1 of {(isPreviewMode && totalOriginalPages) ? Math.max(totalOriginalPages, numPages) : numPages}
+        <div className="sticky top-20 z-50 self-start ml-4" style={{ marginBottom: '-32px' }}>
+          <div className={`flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md shadow-sm pointer-events-none transition-opacity duration-500 ${showIndicator ? 'opacity-100' : 'opacity-0'}`}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="9" y1="3" x2="9" y2="21" />
+            </svg>
+            {currentPage} of {(isPreviewMode && totalOriginalPages) ? Math.max(totalOriginalPages, numPages) : numPages}
+          </div>
         </div>
       )}
 
@@ -83,13 +136,15 @@ const MobilePDFViewer = ({ url, isPreviewMode, totalOriginalPages, onUnlock }) =
         {pageWidth && Array.from(new Array(numPages || 0), (el, index) => (
           <div
             key={`page_${index + 1}`}
-            className="w-full mb-3 flex justify-center relative"
+            className="w-full mb-3 flex justify-center relative pdf-page-container"
+            data-page-number={index + 1}
             style={{ contain: 'layout' }}
           >
             <Page
               pageNumber={index + 1}
               width={pageWidth}
-              devicePixelRatio={Math.max(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2)}
+              // Increased devicePixelRatio multiplier for sharper text, especially when users pinch-zoom
+              devicePixelRatio={typeof window !== 'undefined' ? Math.max(window.devicePixelRatio || 1, 3) : 3}
               renderAnnotationLayer={false}
               renderTextLayer={false}
             />
