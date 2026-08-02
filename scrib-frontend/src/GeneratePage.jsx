@@ -157,6 +157,10 @@ const GeneratePage = () => {
   const [openDropdownId, setOpenDropdownId] = useState(null)
   const [shareModalData, setShareModalData] = useState(null)
   const [hideBanner, setHideBanner] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedPackIds, setSelectedPackIds] = useState([])
+  const [isBulkDownloading, setIsBulkDownloading] = useState(false)
+  const [isMerging, setIsMerging] = useState(false)
 
   const handleTabChange = (tabName) => {
     setActiveTab(tabName)
@@ -312,6 +316,89 @@ const GeneratePage = () => {
     })
 
     setDownloadingItemId(null)
+  }
+
+  // ── Multi-select: bulk download / merge ────────────────────────────────
+  const togglePackSelection = (packId) => {
+    setSelectedPackIds(prev =>
+      prev.includes(packId) ? prev.filter(id => id !== packId) : [...prev, packId]
+    )
+  }
+
+  const exitSelectMode = () => {
+    setSelectMode(false)
+    setSelectedPackIds([])
+  }
+
+  // Esc clears the selection and exits select mode, same as clicking Cancel.
+  useEffect(() => {
+    if (!selectMode) return
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') exitSelectMode()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectMode])
+
+  const handleDownloadAllSelected = async () => {
+    if (isBulkDownloading || selectedPackIds.length === 0) return
+    setIsBulkDownloading(true)
+    try {
+      for (const packId of selectedPackIds) {
+        const item = historyItems.find(i => i.type === 'pack' && i.id === packId)
+        if (!item) continue
+        const pages = item.total_pages || item.page_count || 1
+        const titleStr = `${item.name || 'Study Pack'} — ${pages} pages`
+        try {
+          const res = await axiosInstance.get(`/scrib/packs/${packId}/pdf/`, {
+            maxRedirects: 0,
+            validateStatus: (s) => s >= 200 && s < 400,
+          })
+          const resolvedUrl = res.headers.location || res.data?.pdf_url || res.request?.responseURL
+          if (resolvedUrl) await forceDownload(resolvedUrl, titleStr, true)
+        } catch (err) {
+          console.error(`Failed to download pack ${packId}`, err)
+          customToast.error(`Failed to download "${item.name}"`)
+        }
+      }
+    } finally {
+      setIsBulkDownloading(false)
+    }
+  }
+
+  const handleMergeAndDownload = async () => {
+    if (isMerging || selectedPackIds.length === 0) return
+    setIsMerging(true)
+    try {
+      const res = await axiosInstance.post(
+        '/scrib/packs/merge/',
+        { pack_ids: selectedPackIds },
+        { responseType: 'blob' }
+      )
+      const blobUrl = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = 'merged_notes.pdf'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000)
+      customToast.success('Merged PDF downloaded!')
+      exitSelectMode()
+    } catch (err) {
+      let message = 'Failed to merge PDFs. Please try again.'
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text()
+          const parsed = JSON.parse(text)
+          if (parsed?.message) message = parsed.message
+        } catch { /* keep default message */ }
+      }
+      console.error('Merge failed', err)
+      customToast.error(message)
+    } finally {
+      setIsMerging(false)
+    }
   }
 
   const copyShareLink = async () => {
@@ -1060,7 +1147,7 @@ const GeneratePage = () => {
         )}
 
         {activeTab === 'history' && (
-          <div className="space-y-4">
+          <div className={`space-y-4 ${selectMode && selectedPackIds.length > 0 ? 'pb-20' : ''}`}>
             <ShareStatsBanner isLoggedIn={isLoggedIn} className="mb-4 mt-2" />
             {!hideBanner && historyItems.some(i => i._isPending || i.status === 'generating' || i.status === 'pending') && (
               <div className="mb-6 rounded-xl border border-[#dbe8c3] bg-[#eef7df] p-4 text-[#557a3f] shadow-sm relative">
@@ -1163,6 +1250,29 @@ const GeneratePage = () => {
               </div>
             ) : (
               <>
+                {historyItems.some(i => i.type === 'pack' && i.status === 'ready') && (
+                  <div className="flex items-center justify-end gap-2 -mt-1 mb-1">
+                    {selectMode ? (
+                      <button
+                        onClick={exitSelectMode}
+                        className="text-xs font-semibold text-[#7b756d] hover:text-[#1f1f1f] transition-colors px-2 py-1"
+                      >
+                        Cancel
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setSelectMode(true)}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-[#4a6aa6] hover:text-[#1f1f1f] transition-colors px-2 py-1"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 11 12 14 22 4"></polyline>
+                          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                        </svg>
+                        Select
+                      </button>
+                    )}
+                  </div>
+                )}
                 {historyItems.slice(0, visibleCount).map((item) => {
                   const isPack = item.type === 'pack'
                 const url = isPack ? item.pdfUrl || item.pdf_url : item.imageUrl || item.image_url
@@ -1226,9 +1336,28 @@ const GeneratePage = () => {
                   })
                 }
 
+                const isSelectable = isPack && item.status === 'ready'
+                const selectionIndex = selectedPackIds.indexOf(item.id)
+                const rowClick = selectMode
+                  ? () => { if (isSelectable) togglePackSelection(item.id) }
+                  : openViewer
+
                 return (
                   <div key={id} className="flex flex-col gap-3 rounded-xl border border-[#e2dbd2] bg-[#fbfaf7] p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-1 items-start gap-3 overflow-hidden cursor-pointer" onClick={openViewer}>
+                    <div className={`flex flex-1 items-start gap-3 overflow-hidden ${selectMode && !isSelectable ? '' : 'cursor-pointer'}`} onClick={rowClick}>
+                      {selectMode && (
+                        <div
+                          className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border text-[11px] font-bold mt-1.5 transition-colors ${
+                            !isSelectable
+                              ? 'border-[#e2dbd2] bg-[#f5f2ec]'
+                              : selectionIndex !== -1
+                                ? 'border-[#6366f1] bg-[#6366f1] text-white'
+                                : 'border-[#c9c2b8] bg-white'
+                          }`}
+                        >
+                          {selectionIndex !== -1 ? selectionIndex + 1 : ''}
+                        </div>
+                      )}
                       <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-[#e2dbd2] bg-white shadow-sm mt-0.5">
                         {item._isPending || isGenerating ? (
                            <svg className="animate-spin text-[#a39b92]" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1402,6 +1531,39 @@ const GeneratePage = () => {
               )}
               </>
             )}
+          </div>
+        )}
+
+        {activeTab === 'history' && selectMode && selectedPackIds.length > 0 && (
+          <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-[#e2dbd2] bg-white px-5 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+            <span className="text-sm font-semibold text-[#1f1f1f]">{selectedPackIds.length} selected</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelectedPackIds([])}
+                className="text-xs font-medium text-[#7b756d] hover:text-[#1f1f1f] transition-colors px-2 py-2"
+              >
+                Clear
+              </button>
+              <button
+                onClick={handleDownloadAllSelected}
+                disabled={isBulkDownloading || isMerging}
+                className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f8f5f1] disabled:opacity-50"
+              >
+                {isBulkDownloading ? 'Downloading...' : 'Download all'}
+              </button>
+              <button
+                onClick={handleMergeAndDownload}
+                disabled={isMerging || isBulkDownloading}
+                className="flex items-center gap-2 rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {isMerging && (
+                  <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                )}
+                {isMerging ? 'Merging...' : 'Merge & Download'}
+              </button>
+            </div>
           </div>
         )}
       </main>

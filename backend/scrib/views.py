@@ -1465,6 +1465,104 @@ class StudyPackPdfView(APIView):
         return Response({'share_token': str(pack.share_token)})
 
 
+class MergeStudyPacksView(APIView):
+    """POST /api/scrib/packs/merge/
+
+    Body: {"pack_ids": [3, 7, 2]} — merges the given study packs' PDFs into a
+    single PDF, in the exact order the ids are given, and returns the merged
+    file directly as the response body. Only the owner's own READY packs may
+    be merged (ownership + status are re-checked server-side regardless of
+    what the frontend only shows as selectable).
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    MAX_MERGE_PACKS = 20
+
+    def post(self, request):
+        pack_ids = request.data.get('pack_ids')
+        if not isinstance(pack_ids, list) or not pack_ids:
+            return error_response('Provide at least one pack_id', code='no_packs')
+        if len(pack_ids) > self.MAX_MERGE_PACKS:
+            return error_response(
+                f'You can merge at most {self.MAX_MERGE_PACKS} PDFs at a time.',
+                code='too_many_packs',
+                details={'submitted': len(pack_ids), 'max_allowed': self.MAX_MERGE_PACKS},
+            )
+        try:
+            pack_ids = [int(p) for p in pack_ids]
+        except (TypeError, ValueError):
+            return error_response('Invalid pack_ids', code='invalid_pack_ids')
+
+        packs_by_id = {
+            p.id: p for p in StudyPack.objects.filter(
+                pk__in=pack_ids, user=request.user, status=StudyPack.STATUS_READY,
+            )
+        }
+        # Preserve the caller's requested order; reject if anything is missing,
+        # not owned by this user, or not READY — no silent partial merges.
+        missing = [pid for pid in pack_ids if pid not in packs_by_id]
+        if missing:
+            return error_response(
+                'One or more selected notes are not available for merging',
+                code='pack_not_ready',
+                details={'missing_pack_ids': missing},
+            )
+        ordered_packs = [packs_by_id[pid] for pid in pack_ids]
+
+        import io
+        import requests as pdf_requests
+        from PyPDF2 import PdfReader, PdfWriter
+
+        bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
+        region = getattr(settings, 'AWS_S3_REGION_NAME', 'ap-south-1')
+        access_key = getattr(settings, 'SCRIB_S3_ACCESS_KEY_ID', '')
+        secret_key = getattr(settings, 'SCRIB_S3_SECRET_ACCESS_KEY', '')
+
+        s3 = None
+        if bucket and access_key and secret_key:
+            import boto3
+            s3 = boto3.client(
+                's3',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=region,
+            )
+
+        writer = PdfWriter()
+        for pack in ordered_packs:
+            try:
+                if pack.s3_key and s3:
+                    obj = s3.get_object(Bucket=bucket, Key=pack.s3_key)
+                    pdf_bytes = obj['Body'].read()
+                elif pack.pdf_url:
+                    resp = pdf_requests.get(pack.pdf_url, timeout=30)
+                    resp.raise_for_status()
+                    pdf_bytes = resp.content
+                else:
+                    raise ValueError('No PDF source available for this pack')
+
+                reader = PdfReader(io.BytesIO(pdf_bytes))
+                for page in reader.pages:
+                    writer.add_page(page)
+            except Exception as exc:
+                logger.error(f'[scrib] Merge failed reading pack {pack.id}: {exc}')
+                return error_response(
+                    f'Could not read "{pack.title}" while merging. Please try again.',
+                    status_code=502,
+                    code='merge_read_failed',
+                )
+
+        output = io.BytesIO()
+        writer.write(output)
+        output.seek(0)
+
+        from django.http import HttpResponse
+        response = HttpResponse(output.read(), content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="merged_notes.pdf"'
+        return response
+
+
 class AdminStudyPackPdfView(APIView):
     """
     GET /api/scrib/admin/packs/<pack_id>/pdf/

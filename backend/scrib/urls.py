@@ -28,6 +28,7 @@ urlpatterns = [
     path('my-notes/', views.MyNotesView.as_view(), name='my-notes'),
     path('my-study-packs/', views.MyStudyPacksView.as_view(), name='my-study-packs'),
     path('packs/<int:pack_id>/pdf/', views.StudyPackPdfView.as_view(), name='pack-pdf'),
+    path('packs/merge/', views.MergeStudyPacksView.as_view(), name='pack-merge'),
     path('packs/<int:pack_id>/status/', views.StudyPackStatusView.as_view(), name='pack-status'),
     path('packs/share/<uuid:share_token>/', views.StudyPackShareView.as_view(), name='pack-share'),
     
