@@ -26,6 +26,8 @@ import ResetPasswordPage from './ResetPasswordPage.jsx'
 import GlobalGenerationIndicator from './components/GlobalGenerationIndicator.jsx'
 import ScrollToTop from './components/ScrollToTop.jsx'
 import ShareLandingPage from './ShareLandingPage.jsx'
+import InfluencerDashboardPage from './InfluencerDashboardPage.jsx'
+import InviteRedirect from './InviteRedirect.jsx'
 
 posthog.init(import.meta.env.VITE_POSTHOG_PROJECT_TOKEN, {
   api_host: import.meta.env.VITE_POSTHOG_HOST,
@@ -61,6 +63,8 @@ const AppContent = (
           <Route path="/reset-password/:uid/:token" element={<ResetPasswordPage />} />
           <Route path="/topic/:slug" element={<TopicPage />} />
           <Route path="/share/:shareCode" element={<ShareLandingPage />} />
+          <Route path="/influencer/:token" element={<InfluencerDashboardPage />} />
+          <Route path="/invite/:referralCode" element={<InviteRedirect />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
         <GlobalGenerationIndicator />

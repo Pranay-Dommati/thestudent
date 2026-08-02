@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.utils.text import slugify
+import uuid
 
 
 class PreviewNote(models.Model):
@@ -549,3 +550,102 @@ class SharedPackPurchase(models.Model):
 
     def __str__(self):
         return f'Purchase by {self.buyer_id} via {self.share_link.share_code}'
+
+
+# -----------------------------------------------------------------------------
+# Influencer Referral Program Models
+# -----------------------------------------------------------------------------
+
+class Influencer(models.Model):
+    STATUS_ACTIVE = 'active'
+    STATUS_PAUSED = 'paused'
+    STATUS_DISABLED = 'disabled'
+
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, 'Active'),
+        (STATUS_PAUSED, 'Paused'),
+        (STATUS_DISABLED, 'Disabled'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    email = models.EmailField(blank=True, null=True)
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    instagram_username = models.CharField(max_length=100, blank=True, null=True)
+
+    referral_code = models.CharField(max_length=50, unique=True, db_index=True)
+    dashboard_token = models.CharField(max_length=64, unique=True, db_index=True)
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.referral_code})"
+
+
+class InfluencerClick(models.Model):
+    influencer = models.ForeignKey(Influencer, on_delete=models.CASCADE, related_name='clicks')
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, null=True)
+    visitor_id = models.UUIDField(db_index=True, help_text='Frontend generated UUID for deduplication')
+    clicked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-clicked_at']
+        indexes = [
+            models.Index(fields=['influencer', 'visitor_id', 'clicked_at']),
+        ]
+
+    def __str__(self):
+        return f"Click on {self.influencer.referral_code} by {self.visitor_id}"
+
+
+class InfluencerReferral(models.Model):
+    influencer = models.ForeignKey(Influencer, on_delete=models.CASCADE, related_name='referrals')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='influencer_referral_record')
+    registered_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-registered_at']
+
+    def __str__(self):
+        return f"{self.user} referred by {self.influencer.name}"
+
+
+class InfluencerCommission(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_PAID = 'paid'
+    STATUS_CANCELLED = 'cancelled'
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_PAID, 'Paid'),
+        (STATUS_CANCELLED, 'Cancelled'),
+    ]
+
+    influencer = models.ForeignKey(Influencer, on_delete=models.CASCADE, related_name='commissions')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='generated_commissions')
+    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name='influencer_commission')
+    
+    payment_number = models.PositiveSmallIntegerField(help_text='1 for first payment, 2 for second payment')
+    payment_amount = models.PositiveIntegerField(help_text='Amount in paise')
+    
+    commission_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=10.0)
+    commission_amount = models.PositiveIntegerField(help_text='Commission in paise')
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    paid_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='paid_commissions')
+    notes = models.TextField(blank=True, null=True)
+    transaction_reference = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Commission for {self.influencer.name} ({self.status})"

@@ -57,4 +57,11 @@ urlpatterns = [
     path('share/<str:share_code>/pdf/',           SharePackPdfView.as_view(),        name='share-pack-pdf'),
     path('share/<str:share_code>/purchase/',      SharePurchaseOrderView.as_view(),  name='share-purchase'),
     path('share/<str:share_code>/',               ShareMetaView.as_view(),           name='share-meta'),
+    
+    # Influencer Referral System
+    path('influencers/click/', views.track_influencer_click, name='influencers-click'),
+    path('influencers/dashboard/<str:token>/', views.influencer_dashboard, name='influencer-dashboard'),
+    path('admin/influencers/', views.admin_influencers_list, name='admin-influencers-list'),
+    path('admin/influencers/<uuid:pk>/', views.admin_influencer_detail, name='admin-influencer-detail'),
+    path('admin/influencers/commissions/<int:pk>/pay/', views.admin_mark_commission_paid, name='admin-mark-commission-paid'),
 ]

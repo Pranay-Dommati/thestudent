@@ -1158,7 +1158,14 @@ class VerifyPaymentView(APIView):
                 payment.razorpay_signature = signature
                 payment.save(update_fields=['status', 'razorpay_payment_id', 'razorpay_signature', 'updated_at'])
 
+                # ── Influencer Commission Logic ──
+                try:
+                    process_influencer_commission(payment)
+                except Exception as e:
+                    logger.error(f"[influencer] Error processing commission: {e}")
+
                 # get_or_create prevents double-crediting if called twice
+
                 _, created = CreditTransaction.objects.get_or_create(
                     payment=payment,
                     defaults=dict(
@@ -3221,6 +3228,13 @@ class SharePaymentVerifyView(APIView):
                 payment.razorpay_payment_id = payment_id
                 payment.razorpay_signature = signature
                 payment.save(update_fields=['status', 'razorpay_payment_id', 'razorpay_signature', 'updated_at'])
+
+                # ── Influencer Commission Logic ──
+                try:
+                    process_influencer_commission(payment)
+                except Exception as e:
+                    logger.error(f"[influencer] Error processing commission: {e}")
+
             else:
                 logger.info('[share-verify] Payment already PAID order_id=%s (likely webhook)', order_id)
 
@@ -3446,3 +3460,341 @@ class SharePackPdfView(APIView):
             'title': pack.title,
             'total_pages': pack.total_pages,
         })
+
+
+# -----------------------------------------------------------------------------
+# Influencer Referral API
+# -----------------------------------------------------------------------------
+
+def process_influencer_commission(payment):
+    """
+    On every successful payment, calculate the user's successful payment number
+    (including the current payment). If the payment number is 1 or 2, create an
+    InfluencerCommission. Otherwise, do nothing.
+    """
+    from scrib.models import InfluencerCommission
+    user = payment.user
+    
+    if not hasattr(user, 'referred_by_influencer') or not user.referred_by_influencer:
+        return
+        
+    influencer = user.referred_by_influencer
+
+    if influencer.status != 'active':
+        return
+
+    # Count how many successful payments the user has
+    successful_payments_count = Payment.objects.filter(
+        user=user,
+        status=Payment.STATUS_PAID
+    ).count()
+
+    if successful_payments_count <= 2:
+        # Prevent duplicates for the same payment
+        if not InfluencerCommission.objects.filter(payment=payment).exists():
+            from decimal import Decimal
+            commission_percentage = Decimal('10.0')
+            commission_amount = int(payment.amount * (commission_percentage / Decimal('100.0')))
+            
+            InfluencerCommission.objects.create(
+                influencer=influencer,
+                user=user,
+                payment=payment,
+                payment_number=successful_payments_count,
+                payment_amount=payment.amount,
+                commission_percentage=commission_percentage,
+                commission_amount=commission_amount,
+                status=InfluencerCommission.STATUS_PENDING
+            )
+            logger.info(f'[influencer] Created commission for {influencer.referral_code} on payment {payment.id}')
+
+
+from scrib.models import Influencer, InfluencerClick, InfluencerReferral, InfluencerCommission
+import uuid
+from django.utils import timezone
+from django.db.models import Sum, Count, Q
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def track_influencer_click(request):
+    """
+    Tracks an influencer link click. Deduplicates by visitor_id + influencer within 24 hours.
+    """
+    referral_code = request.data.get('referral_code')
+    visitor_id_str = request.data.get('visitor_id')
+    
+    if not referral_code or not visitor_id_str:
+        return Response({'error': 'referral_code and visitor_id required'}, status=400)
+        
+    try:
+        visitor_id = uuid.UUID(visitor_id_str)
+    except ValueError:
+        return Response({'error': 'invalid visitor_id format'}, status=400)
+
+    influencer = Influencer.objects.filter(referral_code=referral_code).first()
+    if not influencer or influencer.status != 'active':
+        return Response({'success': False, 'message': 'Invalid or inactive influencer'}, status=200)
+
+    # 24 hour deduplication
+    time_threshold = timezone.now() - timezone.timedelta(hours=24)
+    recent_click = InfluencerClick.objects.filter(
+        influencer=influencer,
+        visitor_id=visitor_id,
+        clicked_at__gte=time_threshold
+    ).exists()
+
+    if not recent_click:
+        ip_address = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR'))
+        if ip_address:
+            ip_address = ip_address.split(',')[0].strip()
+            
+        InfluencerClick.objects.create(
+            influencer=influencer,
+            ip_address=ip_address,
+            user_agent=request.META.get('HTTP_USER_AGENT', '')[:2000],
+            visitor_id=visitor_id
+        )
+
+    return Response({'success': True}, status=200)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+@authentication_classes([])
+def influencer_dashboard(request, token):
+    """
+    Public read-only dashboard for influencers. 
+    Accessed via unguessable dashboard_token.
+    """
+    influencer = Influencer.objects.filter(dashboard_token=token).first()
+    if not influencer:
+        return Response({'error': 'Not found'}, status=404)
+
+    # Analytics
+    clicks = influencer.clicks.count()
+    registered_users = influencer.referrals.count()
+    
+    # We only care about users who have paid
+    paid_users = InfluencerCommission.objects.filter(influencer=influencer).values('user').distinct().count()
+    
+    # Sum of the first two successful payments made by referred users
+    revenue_generated = InfluencerCommission.objects.filter(influencer=influencer).aggregate(total=Sum('payment_amount'))['total'] or 0
+    
+    pending_commission = InfluencerCommission.objects.filter(influencer=influencer, status='pending').aggregate(total=Sum('commission_amount'))['total'] or 0
+    paid_commission = InfluencerCommission.objects.filter(influencer=influencer, status='paid').aggregate(total=Sum('commission_amount'))['total'] or 0
+    total_commission = pending_commission + paid_commission
+
+    # Recent Activity (last 20)
+    # Combine referrals and commissions, sort by date descending
+    recent_referrals = list(influencer.referrals.order_by('-registered_at')[:20])
+    recent_commissions = list(influencer.commissions.order_by('-created_at')[:20])
+    
+    activity = []
+    for ref in recent_referrals:
+        activity.append({
+            'type': 'signup',
+            'user_name': ref.user.full_name,
+            'date': ref.registered_at.isoformat()
+        })
+        
+    for comm in recent_commissions:
+        activity.append({
+            'type': 'commission',
+            'user_name': comm.user.full_name,
+            'payment_number': comm.payment_number,
+            'amount': comm.commission_amount / 100,  # convert paise to rupees for UI
+            'date': comm.created_at.isoformat()
+        })
+        
+    # Sort combined activity by date descending, take top 20
+    activity.sort(key=lambda x: x['date'], reverse=True)
+    activity = activity[:20]
+
+    return Response({
+        'name': influencer.name,
+        'referral_code': influencer.referral_code,
+        'status': influencer.status,
+        'analytics': {
+            'clicks': clicks,
+            'registered_users': registered_users,
+            'paid_users': paid_users,
+            'revenue_generated': revenue_generated / 100,
+            'pending_commission': pending_commission / 100,
+            'paid_commission': paid_commission / 100,
+            'total_commission': total_commission / 100,
+        },
+        'activity': activity
+    })
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def admin_influencers_list(request):
+    """
+    GET: List all influencers with metrics
+    POST: Create a new influencer
+    """
+    if not hasattr(request.user, 'is_staff') or not request.user.is_staff:
+        return Response({'error': 'Unauthorized'}, status=403)
+        
+    if request.method == 'GET':
+        influencers = Influencer.objects.all().order_by('-created_at')
+        
+        # Calculate stats for all in one go or iterate (iterator fine for small scale)
+        data = []
+        for inf in influencers:
+            stats = InfluencerCommission.objects.filter(influencer=inf).aggregate(
+                paid_users=Count('user', distinct=True),
+                revenue=Sum('payment_amount'),
+                pending=Sum('commission_amount', filter=Q(status='pending')),
+                paid=Sum('commission_amount', filter=Q(status='paid'))
+            )
+            data.append({
+                'id': str(inf.id),
+                'name': inf.name,
+                'referral_code': inf.referral_code,
+                'status': inf.status,
+                'clicks': inf.clicks.count(),
+                'registered_users': inf.referrals.count(),
+                'paid_users': stats['paid_users'] or 0,
+                'revenue_generated': (stats['revenue'] or 0) / 100,
+                'pending_commission': (stats['pending'] or 0) / 100,
+                'paid_commission': (stats['paid'] or 0) / 100,
+            })
+            
+        return Response(data)
+        
+    elif request.method == 'POST':
+        name = request.data.get('name')
+        referral_code = request.data.get('referral_code')
+        
+        if not name or not referral_code:
+            return Response({'error': 'name and referral_code required'}, status=400)
+            
+        if Influencer.objects.filter(referral_code=referral_code).exists():
+            return Response({'error': 'referral_code already exists'}, status=400)
+            
+        import secrets
+        dashboard_token = secrets.token_urlsafe(32)
+        
+        inf = Influencer.objects.create(
+            name=name,
+            email=request.data.get('email', ''),
+            phone=request.data.get('phone', ''),
+            instagram_username=request.data.get('instagram_username', ''),
+            referral_code=referral_code,
+            dashboard_token=dashboard_token,
+            status=request.data.get('status', 'active')
+        )
+        
+        return Response({
+            'id': str(inf.id),
+            'referral_code': inf.referral_code,
+            'dashboard_token': inf.dashboard_token
+        }, status=201)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_influencer_detail(request, pk):
+    """
+    GET details of a specific influencer for admin
+    """
+    if not hasattr(request.user, 'is_staff') or not request.user.is_staff:
+        return Response({'error': 'Unauthorized'}, status=403)
+        
+    try:
+        inf = Influencer.objects.get(pk=pk)
+    except Influencer.DoesNotExist:
+        return Response({'error': 'Not found'}, status=404)
+        
+    # Same stats as list
+    stats = InfluencerCommission.objects.filter(influencer=inf).aggregate(
+        paid_users=Count('user', distinct=True),
+        revenue=Sum('payment_amount'),
+        pending=Sum('commission_amount', filter=Q(status='pending')),
+        paid=Sum('commission_amount', filter=Q(status='paid'))
+    )
+    
+    # Referred users list
+    referrals_data = []
+    for ref in inf.referrals.select_related('user').all().order_by('-registered_at'):
+        user_stats = InfluencerCommission.objects.filter(influencer=inf, user=ref.user).aggregate(
+            payments_count=Count('id'),
+            revenue=Sum('payment_amount'),
+            commission=Sum('commission_amount')
+        )
+        referrals_data.append({
+            'user_name': ref.user.full_name,
+            'user_email': ref.user.email,
+            'registered_at': ref.registered_at,
+            'payments_count': user_stats['payments_count'] or 0,
+            'revenue': (user_stats['revenue'] or 0) / 100,
+            'commission': (user_stats['commission'] or 0) / 100,
+        })
+        
+    # Commission history
+    commissions_data = []
+    for comm in inf.commissions.select_related('user').all().order_by('-created_at'):
+        commissions_data.append({
+            'id': comm.id,
+            'user_name': comm.user.full_name,
+            'payment_number': comm.payment_number,
+            'payment_amount': comm.payment_amount / 100,
+            'commission_amount': comm.commission_amount / 100,
+            'status': comm.status,
+            'created_at': comm.created_at,
+            'paid_at': comm.paid_at,
+            'transaction_reference': comm.transaction_reference,
+            'notes': comm.notes
+        })
+        
+    return Response({
+        'id': str(inf.id),
+        'name': inf.name,
+        'email': inf.email,
+        'phone': inf.phone,
+        'instagram_username': inf.instagram_username,
+        'referral_code': inf.referral_code,
+        'dashboard_token': inf.dashboard_token,
+        'status': inf.status,
+        'created_at': inf.created_at,
+        'stats': {
+            'clicks': inf.clicks.count(),
+            'registered_users': inf.referrals.count(),
+            'paid_users': stats['paid_users'] or 0,
+            'revenue_generated': (stats['revenue'] or 0) / 100,
+            'pending_commission': (stats['pending'] or 0) / 100,
+            'paid_commission': (stats['paid'] or 0) / 100,
+        },
+        'referred_users': referrals_data,
+        'commission_history': commissions_data
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_mark_commission_paid(request, pk):
+    """
+    Mark a specific commission as paid
+    """
+    if not hasattr(request.user, 'is_staff') or not request.user.is_staff:
+        return Response({'error': 'Unauthorized'}, status=403)
+        
+    try:
+        comm = InfluencerCommission.objects.get(pk=pk)
+    except InfluencerCommission.DoesNotExist:
+        return Response({'error': 'Not found'}, status=404)
+        
+    if comm.status == 'paid':
+        return Response({'error': 'Already paid'}, status=400)
+        
+    comm.status = 'paid'
+    comm.paid_at = timezone.now()
+    comm.paid_by = request.user
+    comm.transaction_reference = request.data.get('transaction_reference', '')
+    comm.notes = request.data.get('notes', '')
+    comm.save()
+    
+    return Response({'success': True, 'status': comm.status, 'paid_at': comm.paid_at})

@@ -18,6 +18,7 @@ import ScrollManager from './components/Common/ScrollManager.jsx';
 import OnlineStatusToaster from './components/Common/OnlineStatusToaster.jsx';
 import OfflineRouterHandler from './components/Common/OfflineRouterHandler.jsx';
 import OfflinePage from './components/Common/OfflinePage.jsx';
+import InviteRedirect from './components/Referral/InviteRedirect.jsx';
 
 const Layout = ({ children, excludePaths = [] }) => {
     const location = useLocation();
@@ -56,47 +57,7 @@ const App = () => {
                 <Toaster
                     position="top-right"
                     toastOptions={{
-                        duration: Infinity,
-                        style: {
-                            background: 'transparent',
-                            color: 'inherit',
-                            padding: '0',
-                            margin: '0',
-                            borderRadius: '0',
-                            boxShadow: 'none',
-                            maxWidth: 'none',
-                            border: 'none',
-                            width: 'auto',
-                            minWidth: 'auto',
-                        },
-                        success: {
-                            duration: Infinity,
-                            style: {
-                                background: 'transparent',
-                                color: 'inherit',
-                                padding: '0',
-                                margin: '0',
-                                borderRadius: '0',
-                                boxShadow: 'none',
-                                border: 'none',
-                                width: 'auto',
-                                minWidth: 'auto',
-                            },
-                        },
-                        error: {
-                            duration: Infinity,
-                            style: {
-                                background: 'transparent',
-                                color: 'inherit',
-                                padding: '0',
-                                margin: '0',
-                                borderRadius: '0',
-                                boxShadow: 'none',
-                                border: 'none',
-                                width: 'auto',
-                                minWidth: 'auto',
-                            },
-                        },
+                        duration: 4000,
                     }}
                     containerStyle={{
                         top: '20px',
@@ -111,12 +72,15 @@ const App = () => {
                     {/* Auto-route to /offline when disconnected and back when restored */}
                     <OfflineRouterHandler />
 
-                    <Layout excludePaths={['/admin-p', '/offline', '/terms', '/privacy', '/reset-password']}>
+                    <Layout excludePaths={['/admin-p', '/offline', '/terms', '/privacy', '/reset-password', '/invite']}>
                         <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
                             <Routes>
                                 <Route path="/" element={<HomePage />} />
                                 {/* Offline fallback page */}
                                 <Route path="/offline" element={<OfflinePage />} />
+
+                                {/* Referral Redirect */}
+                                <Route path="/invite/:referralCode" element={<InviteRedirect />} />
 
                                 {/* User Auth Routes */}
                                 <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />

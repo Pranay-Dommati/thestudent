@@ -76,12 +76,17 @@ const SignupPage = () => {
 
     setIsSubmitting(true)
     try {
-      await otpSignup({
+      const payload = {
         full_name: fullName.trim(),
         email: email.trim(),
         password,
         agreed_to_terms: agreedToTerms,
-      })
+      }
+      const refCode = localStorage.getItem('influencer_ref')
+      if (refCode) {
+        payload.influencer_code = refCode
+      }
+      await otpSignup(payload)
       setOtpOpen(true)
     } catch (error) {
       const errorData = error.response?.data

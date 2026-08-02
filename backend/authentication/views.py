@@ -343,6 +343,16 @@ def otp_signup(request):
         )
         if created:
             user.set_password(password)
+            
+            # Influencer Referral Tracking
+            influencer_code = request.data.get('influencer_code')
+            if influencer_code:
+                from scrib.models import Influencer, InfluencerReferral
+                influencer = Influencer.objects.filter(referral_code=influencer_code, status=Influencer.STATUS_ACTIVE).first()
+                if influencer:
+                    user.referred_by_influencer = influencer
+                    InfluencerReferral.objects.create(influencer=influencer, user=user)
+                    
             user.save()
         else:
             # Update name/password if still inactive
@@ -1068,6 +1078,21 @@ def admin_broadcast_email(request):
         if not subject or not message_body:
             return Response({"error": "Subject and message are required."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # CRITICAL BUG FIX: Prevent duplicate broadcast submissions
+        # If the admin clicks multiple times (e.g. due to frontend timeout caused by ALWAYS_EAGER fallback),
+        # this lock ensures the same broadcast subject can't be sent more than once per hour.
+        from django.core.cache import cache
+        import hashlib
+        
+        lock_key = f"broadcast_lock_{hashlib.md5(subject.encode('utf-8')).hexdigest()}"
+        if cache.get(lock_key):
+            return Response(
+                {"error": "A broadcast with this exact subject was already sent recently. Please wait an hour or change the subject to send again."}, 
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+            
+        cache.set(lock_key, True, 3600)  # Lock for 1 hour
+
         # Determine target recipients
         if target_group == 'paid_users':
             try:
@@ -1261,6 +1286,17 @@ def google_auth_callback(request):
                 )
                 created = True
                 logger.info(f"Google Auth Token: New user created - {email}")
+                
+                # Influencer Referral Tracking
+                influencer_code = request.data.get('influencer_code')
+                if influencer_code:
+                    from scrib.models import Influencer, InfluencerReferral
+                    influencer = Influencer.objects.filter(referral_code=influencer_code, status=Influencer.STATUS_ACTIVE).first()
+                    if influencer:
+                        user.referred_by_influencer = influencer
+                        user.save(update_fields=['referred_by_influencer'])
+                        InfluencerReferral.objects.create(influencer=influencer, user=user)
+
                 tag_signup_cohort(user)
                 grant_signup_credits(user)
             except Exception as e:
@@ -1417,6 +1453,17 @@ def google_auth_token(request):
                 )
                 created = True
                 logger.info(f"Google token auth: New user created - {email}")
+                
+                # Influencer Referral Tracking
+                influencer_code = request.data.get('influencer_code')
+                if influencer_code:
+                    from scrib.models import Influencer, InfluencerReferral
+                    influencer = Influencer.objects.filter(referral_code=influencer_code, status=Influencer.STATUS_ACTIVE).first()
+                    if influencer:
+                        user.referred_by_influencer = influencer
+                        user.save(update_fields=['referred_by_influencer'])
+                        InfluencerReferral.objects.create(influencer=influencer, user=user)
+
                 tag_signup_cohort(user)
                 grant_signup_credits(user)
             except Exception as e:

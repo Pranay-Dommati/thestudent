@@ -74,6 +74,16 @@ class User(AbstractUser):
         help_text='Scrib marketing cohort active when this user first signed up (preview | free_credit | null if pre-dates cohort tracking)',
     )
 
+    # Influencer Referral Tracking
+    referred_by_influencer = models.ForeignKey(
+        'scrib.Influencer',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='referred_users',
+        help_text='The influencer who referred this user (set once at signup)'
+    )
+
     date_joined = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
