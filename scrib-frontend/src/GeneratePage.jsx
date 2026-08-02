@@ -88,7 +88,7 @@ const GeneratePage = () => {
       executeDownloadClick(item, isPack, storedUrl, titleStr)
     }
   }
-  const MAX_PAGES = 8
+  const MAX_PAGES = 24
   const MAX_TOPICS_PER_PAGE = 2
 
   const [mode, setMode] = useState(() => sessionStorage.getItem('scrib_draft_mode') || 'manual')
@@ -133,6 +133,7 @@ const GeneratePage = () => {
     sessionStorage.setItem('scrib_draft_remaining', JSON.stringify(remainingTopics))
   }, [mode, pages, pasteText, remainingTopics])
   const [isOrganizing, setIsOrganizing] = useState(false)
+  const [forceTwoPerPage, setForceTwoPerPage] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [latestCreditBalance, setLatestCreditBalance] = useState(null)
   const [shareModalPackId, setShareModalPackId] = useState(null)
@@ -434,7 +435,10 @@ const GeneratePage = () => {
       if (!Array.isArray(rawTopics) || !rawTopics.length) throw new Error('No topics found')
 
       // Step 2: Enrich + pack via organize-topics (2-step pipeline)
-      const organizeRes = await axiosInstance.post('/scrib/organize-topics/', { topics: rawTopics })
+      const organizeRes = await axiosInstance.post('/scrib/organize-topics/', {
+        topics: rawTopics,
+        force_two_per_page: forceTwoPerPage,
+      })
       const groups = organizeRes.data?.groups
       if (!Array.isArray(groups) || !groups.length) throw new Error('Empty groups')
 
@@ -889,7 +893,7 @@ const GeneratePage = () => {
                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                         <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                       </svg>
-                      Max 8 pages per generation. Generate this batch first.
+                      Max {MAX_PAGES} pages per generation. Generate this batch first.
                     </div>
                     
                     {remainingTopics.length > 0 && (
@@ -936,7 +940,16 @@ const GeneratePage = () => {
                   onChange={e => { setPasteText(e.target.value); setInvalidTopics([]) }}
                 />
                 {pasteText && (
-                  <div className="mt-4 flex justify-end">
+                  <div className="mt-4 flex items-center justify-end gap-3">
+                    <label className="flex items-center gap-2 text-xs text-[#6f6a63] cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={forceTwoPerPage}
+                        onChange={e => setForceTwoPerPage(e.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-[#c9c2b8] accent-[#1f1f1f]"
+                      />
+                      Organize every page with two topics (optimizes cost, but makes explanations concise)
+                    </label>
                     <button
                       onClick={handleOrganizeTopics}
                       disabled={isOrganizing}
@@ -1317,9 +1330,16 @@ const GeneratePage = () => {
                               ~{Math.ceil(item._remainingSeconds / 60)} min remaining
                             </span>
                           ) : item._elapsedSeconds != null ? (
-                            <span className="text-[10px] text-[#a39b92]">
-                              {Math.floor(item._elapsedSeconds / 60)}m {item._elapsedSeconds % 60}s elapsed
-                            </span>
+                            <>
+                              <span className="text-[10px] text-[#a39b92]">
+                                {Math.floor(item._elapsedSeconds / 60)}m {item._elapsedSeconds % 60}s elapsed
+                              </span>
+                              {item._estimatedSeconds != null && item._elapsedSeconds > item._estimatedSeconds && (
+                                <span className="text-[10px] text-[#a39b92] italic">
+                                  Taking longer than usual — feel free to close this tab, we'll email you when it's ready (or if it fails).
+                                </span>
+                              )}
+                            </>
                           ) : null}
                         </div>
                       ) : isFailed ? (

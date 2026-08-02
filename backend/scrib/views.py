@@ -73,6 +73,9 @@ def is_admin_user(user):
     return bool(getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False))
 
 
+MAX_PAGES_PER_GENERATION = 24
+
+
 def get_credit_balance(user):
     if is_admin_user(user):
         return 10 ** 9
@@ -172,8 +175,42 @@ def _pack_topics_into_pages(enriched_topics, capacity=90, max_per_page=3):
     return pages
 
 
-def _build_enrichment_prompt(topics):
+def _pack_topics_forced_pairs(enriched_topics):
+    """Deterministic packer for 'force two per page' mode.
+
+    Unlike _pack_topics_into_pages (which may split to 1-topic pages when
+    complexity/cluster don't fit), this guarantees every page gets exactly
+    2 topics (except a possible trailing single if the count is odd).
+
+    To keep pairs sensible rather than arbitrary, topics are first grouped by
+    the cluster label Gemini assigned during enrichment (stable sort keeps
+    each cluster's topics in their original relative order), so adjacent,
+    related topics end up paired together before the strict 2-at-a-time chunk.
+    """
+    sortable = [t for t in enriched_topics if (t.get('name') or '').strip()]
+    sortable.sort(key=lambda t: (t.get('cluster') or 'general').lower())
+
+    pages = []
+    for i in range(0, len(sortable), 2):
+        chunk = sortable[i:i + 2]
+        pages.append({'topics': [
+            {'name': (t.get('name') or '').strip(), 'instruction': ''} for t in chunk
+        ]})
+    return pages
+
+
+def _build_enrichment_prompt(topics, force_two_per_page=False):
     """Build the Vertex AI prompt for Step 1: topic enrichment."""
+    extra_rule = ''
+    if force_two_per_page:
+        extra_rule = (
+            "5. IMPORTANT: The user has enabled compact mode — a downstream step will "
+            "group topics by 'cluster' and pair them up strictly two per page to "
+            "minimize total pages/cost. Prefer broader, less granular cluster labels "
+            "so that closely related topics share the same cluster and end up paired "
+            "together; only give a topic its own unique cluster if it truly has no "
+            "reasonable pairing partner among the given topics.\n"
+        )
     return (
         "You are an academic content analyser. "
         "For each topic below, estimate its complexity on a 0-100 scale and assign a subject cluster.\n\n"
@@ -186,7 +223,8 @@ def _build_enrichment_prompt(topics):
         "1. Every topic must appear exactly once in the output.\n"
         "2. 'cluster' must be a short 1-3 word label grouping related topics (e.g. 'Android Intents', 'DBMS Normalisation').\n"
         "3. Unrelated topics must get different clusters.\n"
-        "4. Return ONLY a valid JSON array. No markdown. No explanation.\n\n"
+        "4. Return ONLY a valid JSON array. No markdown. No explanation.\n"
+        f"{extra_rule}\n"
         "Output format:\n"
         "[\n"
         "  {\"name\": \"Explicit Intent\", \"estimated_complexity\": 25, \"cluster\": \"Android Intents\"},\n"
@@ -326,8 +364,10 @@ class OrganizeTopicsView(APIView):
         if not topics:
             return error_response('Provide at least one topic')
 
+        force_two_per_page = serializer.validated_data.get('force_two_per_page', False)
+
         # ── Step 1: LLM enrichment ──────────────────────────────────────────
-        prompt = _build_enrichment_prompt(topics)
+        prompt = _build_enrichment_prompt(topics, force_two_per_page=force_two_per_page)
         enriched = None
         try:
             response_text = call_scrib_vertex_ai(prompt, response_mime_type='application/json')
@@ -350,9 +390,14 @@ class OrganizeTopicsView(APIView):
             for t in topics:
                 key = t.lower()
                 ordered_enriched.append(name_map.get(key, {'name': t, 'estimated_complexity': 40, 'cluster': 'general'}))
-            pages = _pack_topics_into_pages(ordered_enriched, capacity=90, max_per_page=2)
+            if force_two_per_page:
+                # Guarantee exactly 2 topics/page (using Gemini's cluster labels
+                # to pick sensible pairs) instead of the complexity-based packer.
+                pages = _pack_topics_forced_pairs(ordered_enriched)
+            else:
+                pages = _pack_topics_into_pages(ordered_enriched, capacity=90, max_per_page=2)
         else:
-            # Fallback: naive 2-per-page chunking
+            # Fallback: naive 2-per-page chunking (already guarantees pairs)
             pages = _build_groups_fallback(topics)
 
         # Ensure no page exceeds 2 topics (safety cap)
@@ -376,11 +421,15 @@ class OrganizeTopicsView(APIView):
             topic_names = [t.get('name') for t in page.get('topics', [])]
             logger.info(f'[scrib] Organized page {i+1}: {topic_names}')
 
+        source = 'vertex_ai' if enriched else 'fallback'
+        if force_two_per_page:
+            source += '_forced_pairs'
+
         return Response({
             'groups': pages,
             'total_pages': total_pages,
             'credit_savings': credit_savings,
-            'source': 'vertex_ai' if enriched else 'fallback',
+            'source': source,
         })
 
 class ParseSyllabusView(APIView):
@@ -859,9 +908,8 @@ class GenerateStudyPackView(APIView):
         if not pages:
             return error_response('Provide at least one topic or page')
 
-        # Hard server-side cap: max 8 pages per generation to protect server resources.
-        # The frontend enforces this too, but we double-check here against API abuse.
-        MAX_PAGES_PER_GENERATION = 8
+        # Hard server-side cap: protects server resources against API abuse.
+        # The frontend enforces this too, but we double-check here.
         if len(pages) > MAX_PAGES_PER_GENERATION:
             return error_response(
                 f'You can generate a maximum of {MAX_PAGES_PER_GENERATION} topics at a time. '
@@ -964,17 +1012,33 @@ def cleanup_stuck_packs(user):
     """
     Find packs stuck in PENDING or GENERATING and mark them as FAILED + refund credits.
 
-    Timeout is calculated dynamically per pack based on total_pages:
-      - Base: 8 minutes + 90 seconds per page
-      - Minimum: 12 minutes (covers a single slow page + queue wait)
-      - Maximum: 45 minutes (safety ceiling)
+    Two independent triggers:
 
-    This prevents the common false-failure where a large pack is still legitimately
-    running (or waiting in the Celery queue) but gets killed by a flat 10-min cutoff.
+    1. Hard ceiling on total elapsed time, calculated dynamically per pack based on
+       total_pages:
+         - Base: 8 minutes + 90 seconds per page
+         - Minimum: 12 minutes (covers a single slow page + queue wait)
+         - Maximum: 90 minutes (safety ceiling; covers the 24-page cap
+           plus Celery queue wait)
+       This prevents the common false-failure where a large pack is still legitimately
+       running (or waiting in the Celery queue) but gets killed by a flat 10-min cutoff.
+       With concurrency=1 on the Celery worker, a queued job could wait as long as the
+       current job takes, so we add generous headroom.
 
-    With concurrency=1 on the Celery worker, a queued job could wait as long as the
-    current job takes (~6-8 min for 5 pages), so we add generous headroom.
+    2. Stall detection, independent of the hard ceiling: once a pack has actually
+       started GENERATING (past the queue), the progress callback bumps
+       `updated_at` roughly once per completed page (~every 90s). If `updated_at`
+       hasn't moved in STALL_MINUTES, the background task almost certainly died
+       (e.g. crashed, or an infra blip like a DB outage killed the worker) without
+       ever reaching its own except-block to mark itself FAILED. Without this,
+       a pack that died 2 minutes in would otherwise sit as "Generating... 0%"
+       for the full 90-minute ceiling before the user gets any resolution/refund.
+       MIN_GRACE_MINUTES avoids false positives on packs still within their
+       normal per-batch processing window.
     """
+    STALL_MINUTES = 10
+    MIN_GRACE_MINUTES = 12
+
     now = timezone.now()
     stuck_packs = StudyPack.objects.filter(
         user=user,
@@ -982,13 +1046,22 @@ def cleanup_stuck_packs(user):
     )
     cache_invalidated = False
     for pack in stuck_packs:
-        # Dynamic timeout: base 8 min + 90s per page, clamped to [12, 45] minutes
+        # Dynamic timeout: base 8 min + 90s per page, clamped to [12, 90] minutes
         pages = pack.total_pages or 1
-        timeout_minutes = max(12, min(45, 8 + (pages * 90 // 60)))
-        cutoff = pack.created_at + timedelta(minutes=timeout_minutes)
+        timeout_minutes = max(12, min(90, 8 + (pages * 90 // 60)))
+        age = now - pack.created_at
+        past_hard_ceiling = age > timedelta(minutes=timeout_minutes)
 
-        if now <= cutoff:
-            continue  # Still within the allowed window — leave it alone
+        stalled = (
+            pack.status == StudyPack.STATUS_GENERATING
+            and age >= timedelta(minutes=MIN_GRACE_MINUTES)
+            and (now - pack.updated_at) >= timedelta(minutes=STALL_MINUTES)
+        )
+
+        if not past_hard_ceiling and not stalled:
+            continue  # Still within the allowed window and making progress — leave it alone
+
+        fail_reason = 'stalled (no progress)' if stalled and not past_hard_ceiling else f'stuck for >{timeout_minutes}min'
 
         with transaction.atomic():
             pack.status = StudyPack.STATUS_FAILED
@@ -1003,9 +1076,12 @@ def cleanup_stuck_packs(user):
             cache_invalidated = True
             logger.info(
                 f"[scrib] Marked StudyPack {pack.id} as FAILED "
-                f"(stuck for >{timeout_minutes}min, pages={pages}). "
+                f"({fail_reason}, pages={pages}). "
                 f"Refunded {pack.credits_used} credits to user {user.id}."
             )
+
+        from scrib.tasks import send_generation_failed_email
+        send_generation_failed_email(user, pack.title, pack.credits_used)
 
     if cache_invalidated:
         from django.core.cache import cache

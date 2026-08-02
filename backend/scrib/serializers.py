@@ -108,6 +108,7 @@ class OrganizeTopicsRequestSerializer(serializers.Serializer):
         child=serializers.CharField(max_length=255),
         min_length=1,
     )
+    force_two_per_page = serializers.BooleanField(required=False, default=False)
 
 
 class ScribMeSerializer(serializers.Serializer):

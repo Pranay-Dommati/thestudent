@@ -10,6 +10,46 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
+
+def send_generation_failed_email(user, pack_title, credits_refunded):
+    """Notify the user their study pack generation failed and credits were refunded.
+
+    Called both from this task's own except-block and from cleanup_stuck_packs
+    (views.py) when a pack is detected as stalled/timed-out — without this,
+    a failed generation was silent: the user would only find out by reopening
+    the History tab themselves.
+    """
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+    plural = 's' if credits_refunded != 1 else ''
+    html_content = f"""
+    <html>
+      <body>
+        <h2>We couldn't generate your Scrib notes</h2>
+        <p>Hi {user.full_name or 'there'},</p>
+        <p>Something went wrong while generating your study pack <strong>"{pack_title}"</strong>, so we've stopped it.</p>
+        <p>{credits_refunded} credit{plural} {'have' if plural else 'has'} been refunded to your account — no charge for this attempt.</p>
+        <p>
+          <a href="{frontend_url}/generate" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;border:1px solid #1d4ed8;">
+            Try again
+          </a>
+        </p>
+        <br/>
+        <p>Sorry for the trouble!</p>
+        <p>The Scrib Team</p>
+      </body>
+    </html>
+    """
+    try:
+        email_sent = send_email_via_ses(
+            to_email=user.email,
+            subject="Your Scrib generation didn't complete",
+            html_content=html_content,
+        )
+        if not email_sent:
+            logger.warning(f"Failure-notification email not sent to {user.email}")
+    except Exception as exc:
+        logger.warning(f"Error sending failure-notification email to {user.email}: {exc}")
+
 @shared_task(bind=True, max_retries=1)
 def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
     logger.info(f"Starting async generation for StudyPack {study_pack_id}")
@@ -29,11 +69,12 @@ def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
             # The DB connection can go stale during the long AI generation (75s+ per batch).
             # close_old_connections() recycles any timed-out connection before writing.
             from django.db import close_old_connections
+            from django.utils import timezone
             close_old_connections()
             StudyPack.objects.filter(
                 id=study_pack_id,
                 status=StudyPack.STATUS_GENERATING
-            ).update(pages_done=pages_done_count)
+            ).update(pages_done=pages_done_count, updated_at=timezone.now())
 
         # Generate the PDF
         pdf_result = generate_study_pack_pdf(
@@ -135,7 +176,9 @@ def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
                 study_pack=pack,
             )
             logger.info(f"Refunded {pack.credits_used} credits to user {user_id} for failed StudyPack {study_pack_id}")
-            
+
+        send_generation_failed_email(user, pack.title, pack.credits_used)
+
         # Optionally retry
         # raise self.retry(exc=exc, countdown=60)
 
