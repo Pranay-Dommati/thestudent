@@ -98,7 +98,7 @@ def _openai_image_bytes(prompt):
         'model': settings.OPENAI_IMAGE_MODEL,
         'prompt': prompt,
         'n': 1,
-        'size': '1024x1024',
+        'size': '1024x1536',
     }
 
     try:
