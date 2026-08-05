@@ -608,6 +608,7 @@ const GeneratePage = () => {
     }))
   }
 
+
   const handleGenerate = async () => {
     if (!isLoggedIn) {
       customToast.error('Please log in to generate notes.', { id: 'gen-login' })
@@ -961,7 +962,7 @@ const GeneratePage = () => {
                   </div>
                 ))}
 
-                {/* Add page button */}
+                {/* Add page button / max pages warning */}
                 {pages.length < MAX_PAGES ? (
                   <button
                     type="button"
@@ -975,40 +976,40 @@ const GeneratePage = () => {
                     <span className="text-xs text-[#b0a9a0]">({pages.length}/{MAX_PAGES})</span>
                   </button>
                 ) : (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 rounded-xl border border-[#f3d9a9] bg-[#fdf9f0] px-4 py-3 text-xs text-[#b47a26] font-medium">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                      </svg>
-                      Max {MAX_PAGES} pages per generation. Generate this batch first.
+                  <div className="flex items-center gap-2 rounded-xl border border-[#f3d9a9] bg-[#fdf9f0] px-4 py-3 text-xs text-[#b47a26] font-medium">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    Max {MAX_PAGES} pages per generation. Generate this batch first.
+                  </div>
+                )}
+
+                {/* Remaining excluded topics — stays visible regardless of page count so it's
+                    never lost after removing a page to make room. */}
+                {remainingTopics.length > 0 && (
+                  <div className="rounded-xl border border-[#e6e2db] bg-[#f9f7f2] p-4 mt-2 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[11px] font-semibold tracking-wide text-[#5f5a54] uppercase">
+                        Remaining Excluded Topics ({remainingTopics.length})
+                      </p>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(remainingTopics.join('\n'))
+                          customToast.success('Copied to clipboard!')
+                        }}
+                        className="text-[11px] font-medium text-[#7a746d] hover:text-[#1f1f1f] flex items-center gap-1.5 transition-colors bg-white px-2.5 py-1.5 rounded border border-[#e6e2db] shadow-sm"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Copy for next batch
+                      </button>
                     </div>
-                    
-                    {remainingTopics.length > 0 && (
-                      <div className="rounded-xl border border-[#e6e2db] bg-[#f9f7f2] p-4 mt-2 shadow-sm">
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="text-[11px] font-semibold tracking-wide text-[#5f5a54] uppercase">
-                            Remaining Excluded Topics ({remainingTopics.length})
-                          </p>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(remainingTopics.join('\n'))
-                              customToast.success('Copied to clipboard!')
-                            }}
-                            className="text-[11px] font-medium text-[#7a746d] hover:text-[#1f1f1f] flex items-center gap-1.5 transition-colors bg-white px-2.5 py-1.5 rounded border border-[#e6e2db] shadow-sm"
-                          >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                            </svg>
-                            Copy for next batch
-                          </button>
-                        </div>
-                        <p className="text-xs text-[#807a73] leading-relaxed max-h-32 overflow-y-auto">
-                          {remainingTopics.join(', ')}
-                        </p>
-                      </div>
-                    )}
+                    <p className="text-xs text-[#807a73] leading-relaxed max-h-32 overflow-y-auto">
+                      {remainingTopics.join(', ')}
+                    </p>
                   </div>
                 )}
 
