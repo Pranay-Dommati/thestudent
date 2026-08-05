@@ -67,7 +67,7 @@ def call_gemini_api(prompt, max_retries=5):
     if not isinstance(prompt, str):
         try: prompt = str(prompt)
         except Exception: prompt = ''
-        
+
     client = _get_vertex_client()
     models = ['gemini-2.5-flash', 'gemini-2.0-flash']
     last_error = None
@@ -102,7 +102,7 @@ def call_gemini_flash_api(prompt, max_retries=3):
     if not isinstance(prompt, str):
         try: prompt = str(prompt)
         except Exception: prompt = ''
-        
+
     client = _get_vertex_client()
     models = ['gemini-2.5-flash', 'gemini-2.0-flash']
     last_error = None
@@ -213,7 +213,7 @@ def call_intent_classifier(user_query: str, max_retries: int = 3):
     client = _get_vertex_client()
     models = ['gemini-2.5-flash', 'gemini-2.0-flash']
     last_error = None
-    
+
     for model_name in models:
         for attempt in range(max_retries):
             try:
@@ -252,7 +252,7 @@ def call_gemini_api_stream(prompt):
     client = _get_vertex_client()
     models = ['gemini-2.5-flash', 'gemini-2.0-flash']
     last_error = None
-    
+
     for model_name in models:
         try:
             print(f"⚡ Streaming from Vertex AI {model_name}...")

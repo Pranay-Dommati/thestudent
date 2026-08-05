@@ -6,7 +6,10 @@ from google import genai
 from django.conf import settings
 
 logger = logging.getLogger('scrib')
-MODEL_NAME = "gemini-2.5-flash-lite"
+MODEL_NAME = "gemini-3.1-flash-lite"
+# gemini-3.1-flash-lite (Preview) is only served from the "global" Vertex AI
+# endpoint, not regional ones like us-central1 — confirmed via direct test.
+LOCATION = "global"
 
 def _setup_credentials():
     """
@@ -58,19 +61,19 @@ def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=6
         valid output in that format — dramatically reducing truncation and
         markdown-wrapping issues.
     max_output_tokens : int
-        Maximum tokens in the response.  Default 65 535 (Gemini 2.5 Flash Lite
+        Maximum tokens in the response.  Default 65 535 (Gemini 3.1 Flash Lite
         supports up to 65 536 output tokens exclusive).
     """
     _setup_credentials()
 
     logger.info("[SCRIB AI] *** USING GOOGLE VERTEX AI ***")
     logger.info(f"[SCRIB AI] Model: {MODEL_NAME}")
-    logger.info(f"[SCRIB AI] Project: easylearnova | Location: us-central1")
+    logger.info(f"[SCRIB AI] Project: easylearnova | Location: {LOCATION}")
 
     client = genai.Client(
         vertexai=True,
         project="easylearnova",
-        location="us-central1",
+        location=LOCATION,
     )
 
     # Build generation config — always include max_output_tokens to avoid
