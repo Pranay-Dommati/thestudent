@@ -80,6 +80,25 @@ def build_prompt(page: dict) -> str:
     return visual + "\n\n" + context
 
 
+def build_strict_prompt(page: dict) -> str:
+    """Fallback prompt used only after a moderation rejection.
+
+    Strips anything that could read as depicting human bodies, so a
+    borderline topic (e.g. infant/neonatal care) can still render as
+    an abstract diagram instead of failing the whole page.
+    """
+    base = build_prompt(page)
+    return base + (
+        "\n\nSTRICT SAFETY CONSTRAINTS: "
+        "Do not depict any human figure, body, skin, or body parts — "
+        "including infants/babies. "
+        "Represent any body-related concept using abstract diagrams only: "
+        "labeled boxes, arrows, icons, simple silhouette outlines fully "
+        "covered by a blanket/swaddle shape, or flowcharts. "
+        "Do not draw undressed, partially clothed, or close-up figures of any kind."
+    )
+
+
 # ──────────────────────────────────────────────
 # OpenAI image generation
 # ──────────────────────────────────────────────
@@ -168,13 +187,15 @@ def _save_image_bytes(image_bytes):
 # Public API — new page-based interface
 # ──────────────────────────────────────────────
 
-def generate_handwritten_image_bytes_page(page: dict) -> bytes:
+def generate_handwritten_image_bytes_page(page: dict, strict: bool = False) -> bytes:
     """Generate image bytes for a page object.
 
     Args:
         page: dict with 'topics': [{'name': str, 'instruction': str}, ...]
+        strict: use the safety-constrained prompt (moderation-rejection retry)
     """
-    return _openai_image_bytes(build_prompt(page))
+    prompt = build_strict_prompt(page) if strict else build_prompt(page)
+    return _openai_image_bytes(prompt)
 
 
 # ──────────────────────────────────────────────

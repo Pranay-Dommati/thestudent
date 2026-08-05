@@ -107,6 +107,12 @@ class StudyPack(models.Model):
     pages_done = models.PositiveIntegerField(default=0)  # incremented after each image completes
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Set the moment a Celery worker actually picks up the task (as opposed to
+    # created_at, which is set when the row is submitted — status is already
+    # GENERATING at that point even while still queued behind busy workers).
+    # Lets cleanup_stuck_packs tell "legitimately queued" apart from "started
+    # then died" so it never fails a job that's merely waiting for a free worker.
+    started_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_at']

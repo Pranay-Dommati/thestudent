@@ -61,6 +61,15 @@ def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
         logger.error(f"StudyPack {study_pack_id} or User {user_id} not found.")
         return
 
+    # Mark the moment a worker actually dequeued this task — distinct from
+    # created_at, which is set the instant the user hits Generate (status is
+    # already GENERATING then, even while queued behind other busy workers).
+    # cleanup_stuck_packs relies on this to never fail a pack that's merely
+    # waiting for a free worker slot, not actually stuck/dead.
+    from django.utils import timezone
+    now = timezone.now()
+    StudyPack.objects.filter(id=study_pack_id).update(started_at=now, updated_at=now)
+
     try:
         # Progress callback: called once per completed image (from inside the
         # ThreadPoolExecutor as_completed loop). Writes pages_done to the DB

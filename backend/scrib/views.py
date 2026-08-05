@@ -1012,32 +1012,46 @@ def cleanup_stuck_packs(user):
     """
     Find packs stuck in PENDING or GENERATING and mark them as FAILED + refund credits.
 
-    Two independent triggers:
+    IMPORTANT: `status` is set to GENERATING the instant the row is created
+    (see GenerateStudyPackView), before the task is even dispatched to Celery —
+    so a pack sitting in the queue behind busy workers looks identical, in the
+    DB, to one a worker has already picked up. With only a handful of Celery
+    workers, a burst of concurrent 24-page requests can legitimately leave a
+    job queued for a long time; that must never be confused with "started,
+    then died". `started_at` (set by generate_study_pack_task itself, the
+    moment a worker actually dequeues the job — see tasks.py) is the signal
+    that distinguishes the two, so every check below branches on it first.
 
-    1. Hard ceiling on total elapsed time, calculated dynamically per pack based on
+    Phase A — still queued (`started_at` is None): a worker has never touched
+    this job yet. This is normal under load and must NOT be penalized by the
+    per-page ceiling below (that ceiling models processing time, not queue
+    wait). Only fail it if it's been queued for QUEUE_CEILING_HOURS — at that
+    point something is fundamentally broken (e.g. Celery/broker is down), not
+    just busy.
+
+    Phase B — actually started (`started_at` is set): two independent triggers,
+    both measured from `started_at` (not `created_at`, which would double-count
+    queue wait as if it were processing time):
+
+    1. Hard ceiling on processing time, calculated dynamically per pack based on
        total_pages:
          - Base: 8 minutes + 90 seconds per page
-         - Minimum: 12 minutes (covers a single slow page + queue wait)
-         - Maximum: 90 minutes (safety ceiling; covers the 24-page cap
-           plus Celery queue wait)
-       This prevents the common false-failure where a large pack is still legitimately
-       running (or waiting in the Celery queue) but gets killed by a flat 10-min cutoff.
-       With concurrency=1 on the Celery worker, a queued job could wait as long as the
-       current job takes, so we add generous headroom.
+         - Minimum: 12 minutes (covers a single slow page)
+         - Maximum: 90 minutes (safety ceiling; covers the 24-page cap)
 
-    2. Stall detection, independent of the hard ceiling: once a pack has actually
-       started GENERATING (past the queue), the progress callback bumps
-       `updated_at` roughly once per completed page (~every 90s). If `updated_at`
-       hasn't moved in STALL_MINUTES, the background task almost certainly died
-       (e.g. crashed, or an infra blip like a DB outage killed the worker) without
-       ever reaching its own except-block to mark itself FAILED. Without this,
-       a pack that died 2 minutes in would otherwise sit as "Generating... 0%"
+    2. Stall detection: the progress callback bumps `updated_at` roughly once
+       per completed page (~every 90s). If `updated_at` hasn't moved in
+       STALL_MINUTES, the background task almost certainly died (e.g. crashed,
+       or an infra blip like a DB outage killed the worker) without ever
+       reaching its own except-block to mark itself FAILED. Without this, a
+       pack that died 2 minutes in would otherwise sit as "Generating... 0%"
        for the full 90-minute ceiling before the user gets any resolution/refund.
-       MIN_GRACE_MINUTES avoids false positives on packs still within their
-       normal per-batch processing window.
+       MIN_GRACE_MINUTES avoids false positives while still in the normal
+       per-batch processing window.
     """
     STALL_MINUTES = 10
     MIN_GRACE_MINUTES = 12
+    QUEUE_CEILING_HOURS = 3
 
     now = timezone.now()
     stuck_packs = StudyPack.objects.filter(
@@ -1046,22 +1060,30 @@ def cleanup_stuck_packs(user):
     )
     cache_invalidated = False
     for pack in stuck_packs:
-        # Dynamic timeout: base 8 min + 90s per page, clamped to [12, 90] minutes
-        pages = pack.total_pages or 1
-        timeout_minutes = max(12, min(90, 8 + (pages * 90 // 60)))
-        age = now - pack.created_at
-        past_hard_ceiling = age > timedelta(minutes=timeout_minutes)
+        if pack.started_at is None:
+            # Phase A — never picked up by a worker. Leave it alone unless the
+            # queue wait itself is absurd (broker/worker likely dead).
+            queued_for = now - pack.created_at
+            if queued_for <= timedelta(hours=QUEUE_CEILING_HOURS):
+                continue
+            fail_reason = f'never started after {QUEUE_CEILING_HOURS}h queued — worker/broker likely down'
+        else:
+            # Phase B — a worker actually started processing this pack.
+            pages = pack.total_pages or 1
+            timeout_minutes = max(12, min(90, 8 + (pages * 90 // 60)))
+            processing_age = now - pack.started_at
+            past_hard_ceiling = processing_age > timedelta(minutes=timeout_minutes)
 
-        stalled = (
-            pack.status == StudyPack.STATUS_GENERATING
-            and age >= timedelta(minutes=MIN_GRACE_MINUTES)
-            and (now - pack.updated_at) >= timedelta(minutes=STALL_MINUTES)
-        )
+            stalled = (
+                pack.status == StudyPack.STATUS_GENERATING
+                and processing_age >= timedelta(minutes=MIN_GRACE_MINUTES)
+                and (now - pack.updated_at) >= timedelta(minutes=STALL_MINUTES)
+            )
 
-        if not past_hard_ceiling and not stalled:
-            continue  # Still within the allowed window and making progress — leave it alone
+            if not past_hard_ceiling and not stalled:
+                continue  # Still within the allowed window and making progress — leave it alone
 
-        fail_reason = 'stalled (no progress)' if stalled and not past_hard_ceiling else f'stuck for >{timeout_minutes}min'
+            fail_reason = 'stalled (no progress)' if stalled and not past_hard_ceiling else f'stuck for >{timeout_minutes}min'
 
         with transaction.atomic():
             pack.status = StudyPack.STATUS_FAILED
@@ -1076,7 +1098,7 @@ def cleanup_stuck_packs(user):
             cache_invalidated = True
             logger.info(
                 f"[scrib] Marked StudyPack {pack.id} as FAILED "
-                f"({fail_reason}, pages={pages}). "
+                f"({fail_reason}, pages={pack.total_pages}). "
                 f"Refunded {pack.credits_used} credits to user {user.id}."
             )
 
@@ -1098,12 +1120,25 @@ class StudyPackStatusView(APIView):
 
         try:
             pack = StudyPack.objects.get(pk=pack_id, user=request.user)
-            elapsed_seconds = int((timezone.now() - pack.created_at).total_seconds())
+            now = timezone.now()
             import math
             # Generation is done in concurrent batches of 4 pages.
             # Each batch takes roughly 90s for OpenAI image generation.
             batches = math.ceil((pack.total_pages or 1) / 4)
             estimated_seconds = batches * 90
+
+            # Still queued (no worker has picked this up yet) vs. actually
+            # processing — report both cases honestly instead of counting
+            # queue wait as if it were "generating" progress. See
+            # cleanup_stuck_packs for why this distinction matters.
+            queued = pack.started_at is None
+            if queued:
+                elapsed_seconds = int((now - pack.created_at).total_seconds())
+                remaining_seconds = estimated_seconds  # processing hasn't started yet
+            else:
+                elapsed_seconds = int((now - pack.started_at).total_seconds())
+                remaining_seconds = max(0, estimated_seconds - elapsed_seconds)
+
             return Response({
                 'id': pack.id,
                 'status': pack.status,
@@ -1111,9 +1146,10 @@ class StudyPackStatusView(APIView):
                 's3_key': pack.s3_key,
                 'total_pages': pack.total_pages,
                 'pages_done': pack.pages_done,
+                'queued': queued,
                 'estimated_seconds': estimated_seconds,
                 'elapsed_seconds': elapsed_seconds,
-                'remaining_seconds': max(0, estimated_seconds - elapsed_seconds),
+                'remaining_seconds': remaining_seconds,
             })
         except StudyPack.DoesNotExist:
             return Response({'error': 'Not found'}, status=404)

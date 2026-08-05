@@ -476,6 +476,7 @@ const GeneratePage = () => {
                   ...item,
                   status: res.data.status,
                   _pagesDone: res.data.pages_done ?? item._pagesDone ?? 0,
+                  _queued: res.data.queued ?? false,
                   _remainingSeconds: res.data.remaining_seconds ?? null,
                   _estimatedSeconds: res.data.estimated_seconds ?? null,
                   _elapsedSeconds: res.data.elapsed_seconds ?? null,
@@ -1416,7 +1417,7 @@ const GeneratePage = () => {
                       {item._isPending || isGenerating ? (
                         <div className="flex flex-col items-end gap-1.5 px-2 min-w-[120px]">
                           <span className="flex items-center gap-1.5 text-xs font-semibold text-[#7b756d]">
-                            {item.status === 'pending' ? (
+                            {item._queued || item.status === 'pending' ? (
                               <>
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#a39b92]">
                                   <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
@@ -1433,43 +1434,54 @@ const GeneratePage = () => {
                             )}
                           </span>
 
-                          {/* Progress bar — shows per-image progress once pages_done is available */}
-                          {(() => {
-                            const done = item._pagesDone ?? 0
-                            const total = item.total_pages ?? item._estimatedPages ?? 0
-                            const pct = total > 0 ? Math.round((done / total) * 100) : 0
-                            return (
-                              <div className="w-full">
-                                <div className="flex justify-between text-[10px] text-[#a39b92] mb-0.5">
-                                  <span>{done}/{total} pages</span>
-                                  <span>{pct}%</span>
-                                </div>
-                                <div className="h-1.5 w-full rounded-full bg-[#e8e2d9] overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full bg-[#6366f1] transition-all duration-700"
-                                    style={{ width: `${pct}%` }}
-                                  />
-                                </div>
-                              </div>
-                            )
-                          })()}
-
-                          {item._remainingSeconds != null && item._remainingSeconds > 0 ? (
-                            <span className="text-[10px] text-[#a39b92]">
-                              ~{Math.ceil(item._remainingSeconds / 60)} min remaining
+                          {item._queued ? (
+                            // Genuinely waiting for a free Celery worker — show that honestly
+                            // instead of a 0%/0-pages progress bar, which would look stalled/broken.
+                            <span className="text-[10px] text-[#a39b92] text-right">
+                              Waiting for a free slot
+                              {item._elapsedSeconds != null && ` — ${Math.floor(item._elapsedSeconds / 60)}m ${item._elapsedSeconds % 60}s`}
                             </span>
-                          ) : item._elapsedSeconds != null ? (
+                          ) : (
                             <>
-                              <span className="text-[10px] text-[#a39b92]">
-                                {Math.floor(item._elapsedSeconds / 60)}m {item._elapsedSeconds % 60}s elapsed
-                              </span>
-                              {item._estimatedSeconds != null && item._elapsedSeconds > item._estimatedSeconds && (
-                                <span className="text-[10px] text-[#a39b92] italic">
-                                  Taking longer than usual — feel free to close this tab, we'll email you when it's ready (or if it fails).
+                              {/* Progress bar — shows per-image progress once pages_done is available */}
+                              {(() => {
+                                const done = item._pagesDone ?? 0
+                                const total = item.total_pages ?? item._estimatedPages ?? 0
+                                const pct = total > 0 ? Math.round((done / total) * 100) : 0
+                                return (
+                                  <div className="w-full">
+                                    <div className="flex justify-between text-[10px] text-[#a39b92] mb-0.5">
+                                      <span>{done}/{total} pages</span>
+                                      <span>{pct}%</span>
+                                    </div>
+                                    <div className="h-1.5 w-full rounded-full bg-[#e8e2d9] overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full bg-[#6366f1] transition-all duration-700"
+                                        style={{ width: `${pct}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                )
+                              })()}
+
+                              {item._remainingSeconds != null && item._remainingSeconds > 0 ? (
+                                <span className="text-[10px] text-[#a39b92]">
+                                  ~{Math.ceil(item._remainingSeconds / 60)} min remaining
                                 </span>
-                              )}
+                              ) : item._elapsedSeconds != null ? (
+                                <>
+                                  <span className="text-[10px] text-[#a39b92]">
+                                    {Math.floor(item._elapsedSeconds / 60)}m {item._elapsedSeconds % 60}s elapsed
+                                  </span>
+                                  {item._estimatedSeconds != null && item._elapsedSeconds > item._estimatedSeconds && (
+                                    <span className="text-[10px] text-[#a39b92] italic">
+                                      Taking longer than usual — feel free to close this tab, we'll email you when it's ready (or if it fails).
+                                    </span>
+                                  )}
+                                </>
+                              ) : null}
                             </>
-                          ) : null}
+                          )}
                         </div>
                       ) : isFailed ? (
                         <div className="text-xs font-medium text-[#ef4444] italic px-2">Failed</div>

@@ -243,14 +243,16 @@ def generate_study_pack_pdf(pages, title, user_id=None, progress_callback=None):
         if not page.get('topics'):
             page = {'topics': [{'name': 'General study notes', 'instruction': ''}]}
         max_retries = 3
+        use_strict = False
         for attempt in range(max_retries):
             page_start = time.time()
             try:
                 topic_names = ', '.join(t.get('name', '') for t in page['topics'])
                 logger.info(
-                    f'[scrib]   Page {index+1}/{total_pages} — sending to OpenAI (attempt {attempt+1}): [{topic_names}]'
+                    f'[scrib]   Page {index+1}/{total_pages} — sending to OpenAI '
+                    f'(attempt {attempt+1}{", strict" if use_strict else ""}): [{topic_names}]'
                 )
-                image_bytes = generate_handwritten_image_bytes_page(page)
+                image_bytes = generate_handwritten_image_bytes_page(page, strict=use_strict)
                 elapsed = time.time() - page_start
                 logger.info(
                     f'[scrib]   Page {index+1}/{total_pages} — DONE in {elapsed:.1f}s '
@@ -263,6 +265,15 @@ def generate_study_pack_pdf(pages, title, user_id=None, progress_callback=None):
                 err_lower = err_str.lower()
                 is_rate_limit = '429' in err_lower or 'rate limit' in err_lower or 'too many' in err_lower
                 is_timeout = 'timed out' in err_lower or 'timeout' in err_lower
+                is_moderation = 'moderation_blocked' in err_lower or 'moderation' in err_lower
+
+                if is_moderation and not use_strict and attempt < max_retries - 1:
+                    use_strict = True
+                    logger.warning(
+                        f'[scrib]   Page {index+1}/{total_pages} — MODERATION BLOCKED after {elapsed:.1f}s, '
+                        f'retrying with stricter prompt (attempt {attempt+1}/{max_retries})'
+                    )
+                    continue
 
                 if (is_rate_limit or is_timeout) and attempt < max_retries - 1:
                     wait = (attempt + 1) * 15  # 15s, 30s backoff
