@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from './context/AuthContext'
@@ -125,6 +125,19 @@ const GeneratePage = () => {
     } catch { return [{ topics: [{ name: '', instruction: '' }] }] }
   })
   const [pasteText, setPasteText] = useState(() => sessionStorage.getItem('scrib_draft_paste') || '')
+  const pasteTextareaRef = useRef(null)
+  const PASTE_TEXTAREA_MIN_HEIGHT = 140
+  const PASTE_TEXTAREA_MAX_HEIGHT = 420
+
+  // Grow the syllabus textarea to fit its content (within min/max) instead of
+  // leaving blank space for short pastes or clipping long ones behind a fixed box.
+  useEffect(() => {
+    const el = pasteTextareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    const next = Math.min(Math.max(el.scrollHeight, PASTE_TEXTAREA_MIN_HEIGHT), PASTE_TEXTAREA_MAX_HEIGHT)
+    el.style.height = `${next}px`
+  }, [pasteText, mode])
   const [remainingTopics, setRemainingTopics] = useState(() => {
     try {
       const saved = sessionStorage.getItem('scrib_draft_remaining')
@@ -579,6 +592,22 @@ const GeneratePage = () => {
     handleOrganizeTopics(incoming)
   }, [location.search, navigate])
 
+  // Rendered once, placed twice (mobile/desktop) below — same handler either way.
+  const organizeAIButton = (
+    <button
+      onClick={handleOrganizeTopics}
+      disabled={isOrganizing}
+      className="flex w-full items-center justify-center gap-2 rounded-full bg-[#1f1f1f] px-4 py-2.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto sm:py-2"
+    >
+      {isOrganizing && (
+        <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        </svg>
+      )}
+      {isOrganizing ? 'Organizing...' : '✦ Organize with AI'}
+    </button>
+  )
+
   // ── Page builder helpers ────────────────────────────────────────────────
   const validPages = pages
     .map(p => ({ ...p, topics: (p.topics || []).filter(t => t.name.trim()).slice(0, MAX_TOPICS_PER_PAGE) }))
@@ -1031,15 +1060,17 @@ const GeneratePage = () => {
                   Paste your syllabus topics — one per line or comma separated
                 </p>
                 <textarea
-                  className="min-h-[120px] w-full resize-none border-none bg-transparent text-sm outline-none"
+                  ref={pasteTextareaRef}
+                  className="w-full resize-none overflow-y-auto border-none bg-transparent text-sm outline-none"
+                  style={{ minHeight: PASTE_TEXTAREA_MIN_HEIGHT, maxHeight: PASTE_TEXTAREA_MAX_HEIGHT }}
                   placeholder="e.g. Explicit Intents, Implicit Intents, Activity Lifecycle, Fragments..."
                   value={pasteText}
                   onChange={e => { setPasteText(e.target.value); setInvalidTopics([]) }}
                 />
                 {pasteText && (
-                  <div className="mt-4 flex flex-col gap-2.5">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5">
+                  <div className="mt-3 flex flex-col gap-2.5">
+                    <div className="flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between md:gap-3">
+                      <div className="flex flex-wrap items-center gap-2.5">
                         <span className="text-xs font-semibold text-[#5f5a54] whitespace-nowrap">Topics per page</span>
                         <div className="inline-flex rounded-full border border-[#d9d1c7] bg-[#faf8f4] p-0.5">
                           {TOPICS_PER_PAGE_OPTIONS.map(opt => (
@@ -1058,22 +1089,12 @@ const GeneratePage = () => {
                           ))}
                         </div>
                       </div>
-                      <button
-                        onClick={handleOrganizeTopics}
-                        disabled={isOrganizing}
-                        className="rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center gap-2 shrink-0"
-                      >
-                        {isOrganizing && (
-                          <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                          </svg>
-                        )}
-                        {isOrganizing ? 'Organizing...' : '✦ Organize with AI'}
-                      </button>
+                      <div className="hidden md:block">{organizeAIButton}</div>
                     </div>
                     <p className="text-[11px] text-[#8a847c] leading-relaxed">
                       {TOPICS_PER_PAGE_OPTIONS.find(o => o.value === forceTopicsPerPage)?.hint}
                     </p>
+                    <div className="md:hidden">{organizeAIButton}</div>
                   </div>
                 )}
               </div>
