@@ -178,17 +178,12 @@ def _pack_topics_into_pages(enriched_topics, capacity=90, max_per_page=3):
 def _pack_topics_forced_pairs(enriched_topics):
     """Deterministic packer for 'force two per page' mode.
 
-    Unlike _pack_topics_into_pages (which may split to 1-topic pages when
-    complexity/cluster don't fit), this guarantees every page gets exactly
-    2 topics (except a possible trailing single if the count is odd).
-
-    To keep pairs sensible rather than arbitrary, topics are first grouped by
-    the cluster label Gemini assigned during enrichment (stable sort keeps
-    each cluster's topics in their original relative order), so adjacent,
-    related topics end up paired together before the strict 2-at-a-time chunk.
+    Guarantees every page gets exactly 2 topics (except a possible trailing
+    single if the count is odd). Topics are paired strictly in the order the
+    user supplied them — reordering by cluster would scatter topics that were
+    meant to stay together (e.g. a syllabus already grouped by section).
     """
     sortable = [t for t in enriched_topics if (t.get('name') or '').strip()]
-    sortable.sort(key=lambda t: (t.get('cluster') or 'general').lower())
 
     pages = []
     for i in range(0, len(sortable), 2):
@@ -447,7 +442,8 @@ class ParseSyllabusView(APIView):
             f"Extract all specific study topics from the following syllabus. Rules:\n"
             f"1. Make each topic standalone and understandable out of context. If it's a sub-topic, prepend its parent category (e.g., 'Testing Strategies: Strategic issues', 'Testing: Testing Concepts').\n"
             f"2. Do NOT exclude sub-topics. For example, in 'Testing Strategies: A Strategic approach to software testing', the topic is 'Testing Strategies: A Strategic approach to software testing'.\n"
-            f"3. Return ONLY a valid JSON array of strings, and nothing else. No markdown or code block tags.\n\n"
+            f"3. Preserve the exact order the topics appear in the syllabus below. Do NOT reorder, group, or sort them.\n"
+            f"4. Return ONLY a valid JSON array of strings, and nothing else. No markdown or code block tags.\n\n"
             f"Syllabus:\n{syllabus}"
         )
         
