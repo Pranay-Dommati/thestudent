@@ -89,7 +89,14 @@ const GeneratePage = () => {
     }
   }
   const MAX_PAGES = 24
-  const MAX_TOPICS_PER_PAGE = 2
+  const MAX_TOPICS_PER_PAGE = 4
+  const TOPICS_PER_PAGE_OPTIONS = [
+    { value: null, label: 'Auto', hint: 'AI balances detail vs. page count automatically, based on how complex each topic is.' },
+    { value: 1, label: '1', hint: 'Most detailed — one topic per page with deep explanations, examples and diagrams. Most pages, highest cost.' },
+    { value: 2, label: '2', hint: 'Balanced — two topics per page with solid explanations. A good default for most syllabi.' },
+    { value: 3, label: '3', hint: 'Compact — three topics per page, more concise explanations. Fewer pages, lower cost.' },
+    { value: 4, label: '4', hint: 'Most concise — four topics per page, brief bullet-point explanations. Fewest pages, lowest cost.' },
+  ]
 
   const [mode, setMode] = useState(() => sessionStorage.getItem('scrib_draft_mode') || 'manual')
 
@@ -133,7 +140,8 @@ const GeneratePage = () => {
     sessionStorage.setItem('scrib_draft_remaining', JSON.stringify(remainingTopics))
   }, [mode, pages, pasteText, remainingTopics])
   const [isOrganizing, setIsOrganizing] = useState(false)
-  const [forceTwoPerPage, setForceTwoPerPage] = useState(false)
+  // null = Auto (AI decides page density from topic complexity); 1-4 = force exactly N topics/page
+  const [forceTopicsPerPage, setForceTopicsPerPage] = useState(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [latestCreditBalance, setLatestCreditBalance] = useState(null)
   const [shareModalPackId, setShareModalPackId] = useState(null)
@@ -525,7 +533,7 @@ const GeneratePage = () => {
       // Step 2: Enrich + pack via organize-topics (2-step pipeline)
       const organizeRes = await axiosInstance.post('/scrib/organize-topics/', {
         topics: rawTopics,
-        force_two_per_page: forceTwoPerPage,
+        force_topics_per_page: forceTopicsPerPage,
       })
       const groups = organizeRes.data?.groups
       if (!Array.isArray(groups) || !groups.length) throw new Error('Empty groups')
@@ -845,7 +853,7 @@ const GeneratePage = () => {
                   <svg className="mt-0.5 shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
                   </svg>
-                  <span>We recommend <strong>1 topic per page</strong> for detailed notes. Up to 2 concise topics can fit comfortably on a single page.</span>
+                  <span>We recommend <strong>1 topic per page</strong> for detailed notes. Up to 4 concise topics can fit comfortably on a single page.</span>
                 </div>
               </div>
 
@@ -955,7 +963,7 @@ const GeneratePage = () => {
                             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                             <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                           </svg>
-                          Max 2 topics per page
+                          Max {MAX_TOPICS_PER_PAGE} topics per page
                         </span>
                       )}
                     </div>
@@ -1029,28 +1037,43 @@ const GeneratePage = () => {
                   onChange={e => { setPasteText(e.target.value); setInvalidTopics([]) }}
                 />
                 {pasteText && (
-                  <div className="mt-4 flex items-center justify-end gap-3">
-                    <label className="flex items-center gap-2 text-xs text-[#6f6a63] cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={forceTwoPerPage}
-                        onChange={e => setForceTwoPerPage(e.target.checked)}
-                        className="h-3.5 w-3.5 rounded border-[#c9c2b8] accent-[#1f1f1f]"
-                      />
-                      Organize every page with two topics (optimizes cost, but makes explanations concise)
-                    </label>
-                    <button
-                      onClick={handleOrganizeTopics}
-                      disabled={isOrganizing}
-                      className="rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {isOrganizing && (
-                        <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                        </svg>
-                      )}
-                      {isOrganizing ? 'Organizing...' : '✦ Organize with AI'}
-                    </button>
+                  <div className="mt-4 flex flex-col gap-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xs font-semibold text-[#5f5a54] whitespace-nowrap">Topics per page</span>
+                        <div className="inline-flex rounded-full border border-[#d9d1c7] bg-[#faf8f4] p-0.5">
+                          {TOPICS_PER_PAGE_OPTIONS.map(opt => (
+                            <button
+                              key={String(opt.value)}
+                              type="button"
+                              onClick={() => setForceTopicsPerPage(opt.value)}
+                              className={`min-w-[2rem] rounded-full px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                                forceTopicsPerPage === opt.value
+                                  ? 'bg-[#1f1f1f] text-white'
+                                  : 'text-[#6f6a63] hover:text-[#1f1f1f] hover:bg-white'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleOrganizeTopics}
+                        disabled={isOrganizing}
+                        className="rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center gap-2 shrink-0"
+                      >
+                        {isOrganizing && (
+                          <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                          </svg>
+                        )}
+                        {isOrganizing ? 'Organizing...' : '✦ Organize with AI'}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-[#8a847c] leading-relaxed">
+                      {TOPICS_PER_PAGE_OPTIONS.find(o => o.value === forceTopicsPerPage)?.hint}
+                    </p>
                   </div>
                 )}
               </div>

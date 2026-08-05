@@ -51,6 +51,10 @@ from .vertex_ai import call_scrib_vertex_ai
 
 logger = logging.getLogger(__name__)
 
+# Max topics allowed on a single generated page — must match MAX_TOPICS_PER_PAGE
+# in scrib-frontend/src/GeneratePage.jsx.
+MAX_TOPICS_PER_PAGE = 4
+
 # ─── Credit pack definitions — SINGLE SOURCE OF TRUTH ───────────────────────
 # Amounts stored in paise (1 INR = 100 paise).
 # These values are NEVER trusted from the frontend.
@@ -112,13 +116,13 @@ def _extract_gemini_text(response_data):
     return parts[0].get('text') or ''
 
 
-def _build_groups_fallback(topics):
-    """Naive fallback: pack topics into pages of up to 2 each.
+def _build_groups_fallback(topics, group_size=MAX_TOPICS_PER_PAGE):
+    """Naive fallback: pack topics into pages of up to `group_size` each.
     Returns v2 page dicts: {'topics': [{'name': ..., 'instruction': ''}, ...]}.
     """
     pages = []
-    for i in range(0, len(topics), 2):
-        chunk = topics[i:i + 2]
+    for i in range(0, len(topics), group_size):
+        chunk = topics[i:i + group_size]
         pages.append({
             'topics': [{'name': str(t).strip(), 'instruction': ''} for t in chunk if str(t).strip()]
         })
@@ -175,37 +179,28 @@ def _pack_topics_into_pages(enriched_topics, capacity=90, max_per_page=3):
     return pages
 
 
-def _pack_topics_forced_pairs(enriched_topics):
-    """Deterministic packer for 'force two per page' mode.
+def _pack_topics_forced_groups(enriched_topics, group_size):
+    """Deterministic packer for 'force N topics per page' mode.
 
-    Guarantees every page gets exactly 2 topics (except a possible trailing
-    single if the count is odd). Topics are paired strictly in the order the
-    user supplied them — reordering by cluster would scatter topics that were
-    meant to stay together (e.g. a syllabus already grouped by section).
+    Guarantees every page gets exactly `group_size` topics (except a possible
+    trailing partial group if the count doesn't divide evenly). Topics are
+    grouped strictly in the order the user supplied them — reordering by
+    cluster would scatter topics that were meant to stay together (e.g. a
+    syllabus already grouped by section).
     """
     sortable = [t for t in enriched_topics if (t.get('name') or '').strip()]
 
     pages = []
-    for i in range(0, len(sortable), 2):
-        chunk = sortable[i:i + 2]
+    for i in range(0, len(sortable), group_size):
+        chunk = sortable[i:i + group_size]
         pages.append({'topics': [
             {'name': (t.get('name') or '').strip(), 'instruction': ''} for t in chunk
         ]})
     return pages
 
 
-def _build_enrichment_prompt(topics, force_two_per_page=False):
+def _build_enrichment_prompt(topics):
     """Build the Vertex AI prompt for Step 1: topic enrichment."""
-    extra_rule = ''
-    if force_two_per_page:
-        extra_rule = (
-            "5. IMPORTANT: The user has enabled compact mode — a downstream step will "
-            "group topics by 'cluster' and pair them up strictly two per page to "
-            "minimize total pages/cost. Prefer broader, less granular cluster labels "
-            "so that closely related topics share the same cluster and end up paired "
-            "together; only give a topic its own unique cluster if it truly has no "
-            "reasonable pairing partner among the given topics.\n"
-        )
     return (
         "You are an academic content analyser. "
         "For each topic below, estimate its complexity on a 0-100 scale and assign a subject cluster.\n\n"
@@ -218,8 +213,7 @@ def _build_enrichment_prompt(topics, force_two_per_page=False):
         "1. Every topic must appear exactly once in the output.\n"
         "2. 'cluster' must be a short 1-3 word label grouping related topics (e.g. 'Android Intents', 'DBMS Normalisation').\n"
         "3. Unrelated topics must get different clusters.\n"
-        "4. Return ONLY a valid JSON array. No markdown. No explanation.\n"
-        f"{extra_rule}\n"
+        "4. Return ONLY a valid JSON array. No markdown. No explanation.\n\n"
         "Output format:\n"
         "[\n"
         "  {\"name\": \"Explicit Intent\", \"estimated_complexity\": 25, \"cluster\": \"Android Intents\"},\n"
@@ -359,10 +353,10 @@ class OrganizeTopicsView(APIView):
         if not topics:
             return error_response('Provide at least one topic')
 
-        force_two_per_page = serializer.validated_data.get('force_two_per_page', False)
+        force_topics_per_page = serializer.validated_data.get('force_topics_per_page')
 
         # ── Step 1: LLM enrichment ──────────────────────────────────────────
-        prompt = _build_enrichment_prompt(topics, force_two_per_page=force_two_per_page)
+        prompt = _build_enrichment_prompt(topics)
         enriched = None
         try:
             response_text = call_scrib_vertex_ai(prompt, response_mime_type='application/json')
@@ -385,22 +379,23 @@ class OrganizeTopicsView(APIView):
             for t in topics:
                 key = t.lower()
                 ordered_enriched.append(name_map.get(key, {'name': t, 'estimated_complexity': 40, 'cluster': 'general'}))
-            if force_two_per_page:
-                # Guarantee exactly 2 topics/page (using Gemini's cluster labels
-                # to pick sensible pairs) instead of the complexity-based packer.
-                pages = _pack_topics_forced_pairs(ordered_enriched)
+            if force_topics_per_page:
+                # Guarantee exactly N topics/page, strictly in the order given.
+                pages = _pack_topics_forced_groups(ordered_enriched, force_topics_per_page)
             else:
-                pages = _pack_topics_into_pages(ordered_enriched, capacity=90, max_per_page=2)
+                pages = _pack_topics_into_pages(ordered_enriched, capacity=90, max_per_page=MAX_TOPICS_PER_PAGE)
         else:
-            # Fallback: naive 2-per-page chunking (already guarantees pairs)
-            pages = _build_groups_fallback(topics)
+            # Fallback: naive chunking (already guarantees fixed-size groups)
+            pages = _build_groups_fallback(topics, group_size=force_topics_per_page or MAX_TOPICS_PER_PAGE)
 
-        # Ensure no page exceeds 2 topics (safety cap)
+        # Safety cap: forced mode must stay at exactly N/page; everything
+        # else is capped at MAX_TOPICS_PER_PAGE.
+        page_cap = force_topics_per_page or MAX_TOPICS_PER_PAGE
         capped_pages = []
         for p in pages:
             page_topics = p.get('topics', [])
-            for i in range(0, max(len(page_topics), 1), 2):
-                chunk = page_topics[i:i + 2]
+            for i in range(0, max(len(page_topics), 1), page_cap):
+                chunk = page_topics[i:i + page_cap]
                 if chunk:
                     capped_pages.append({'topics': chunk})
         pages = capped_pages
@@ -417,8 +412,8 @@ class OrganizeTopicsView(APIView):
             logger.info(f'[scrib] Organized page {i+1}: {topic_names}')
 
         source = 'vertex_ai' if enriched else 'fallback'
-        if force_two_per_page:
-            source += '_forced_pairs'
+        if force_topics_per_page:
+            source += f'_forced_{force_topics_per_page}'
 
         return Response({
             'groups': pages,
@@ -641,14 +636,14 @@ def parse_topics_from_request(data):
                     if name:
                         page_topics.append({'name': name, 'instruction': instruction})
                 if page_topics:
-                    for i in range(0, len(page_topics), 2):
-                        parsed_pages.append({'topics': page_topics[i:i + 2]})
+                    for i in range(0, len(page_topics), MAX_TOPICS_PER_PAGE):
+                        parsed_pages.append({'topics': page_topics[i:i + MAX_TOPICS_PER_PAGE]})
             elif isinstance(entry, (list, tuple)):
                 # v1 list of strings
                 page_topics = [{'name': str(t).strip(), 'instruction': ''} for t in entry if str(t).strip()]
                 if page_topics:
-                    for i in range(0, len(page_topics), 2):
-                        parsed_pages.append({'topics': page_topics[i:i + 2]})
+                    for i in range(0, len(page_topics), MAX_TOPICS_PER_PAGE):
+                        parsed_pages.append({'topics': page_topics[i:i + MAX_TOPICS_PER_PAGE]})
             else:
                 # v1 bare string
                 name = str(entry).strip()
@@ -2832,7 +2827,7 @@ from .share_constants import (
 
 
 def _get_topics_per_page(topics_json):
-    """Extract up to 2 topic names per page from the StudyPack.topics_json structure.
+    """Extract up to 4 topic names per page from the StudyPack.topics_json structure.
 
     Handles both the legacy list-of-strings format and the v2 page-dict format.
     Returns a list of {page, topics} dicts suitable for the share landing page.
@@ -2847,9 +2842,9 @@ def _get_topics_per_page(topics_json):
                 (t.get('name') or t.get('topic') or str(t)).strip()
                 for t in page['topics']
                 if t
-            ][:2]
+            ][:4]
         elif isinstance(page, list):
-            names = [str(t).strip() for t in page][:2]
+            names = [str(t).strip() for t in page][:4]
         elif isinstance(page, str):
             names = [page.strip()]
         else:
