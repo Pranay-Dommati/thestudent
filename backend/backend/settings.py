@@ -376,6 +376,13 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
+# Reserve only as many tasks as there are free child processes (default is 4x).
+# generate_study_pack_task runs for minutes, so the default made a worker hoard
+# tasks it could not start yet — a second pack would sit reserved behind the
+# first while another worker sat idle, making two concurrent packs run strictly
+# one after the other. With 1, an idle worker can always pick up queued work.
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+
 # If no remote Redis URL is provided and we are running locally without Redis installed,
 # run tasks synchronously so development is not blocked.
 if not os.environ.get('CELERY_BROKER_URL'):

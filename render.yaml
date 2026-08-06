@@ -171,16 +171,24 @@ services:
   # Celery Worker Service
   # Handles PDF generation completely outside gunicorn.
   # Gunicorn timeouts can NEVER kill this process.
-  # --concurrency=1  keeps RAM usage to a single task at a time on the free tier.
-  # --max-tasks-per-child=5  recycles the process every 5 tasks to flush any leaks.
+  #
+  # NOTE: `name` must stay in sync with the service name in the Render dashboard
+  # — Render binds blueprint entries to services by name, and a mismatch means
+  # these settings silently never apply, which is exactly what happened between
+  # de8b9a42 and now.
+  #
+  # --concurrency=2  a 24-page pack peaks around 520MB RSS and each pool child is
+  #   its own process: 2 x 520MB ~= 1.04GB fits the 2GB plan with headroom,
+  #   3 is tight (~1.7GB with the parent), 4 exceeds it outright.
+  # --max-tasks-per-child=10  recycles the process every 10 tasks to flush leaks.
   - type: worker
-    name: easylearnova-celery-worker
+    name: thestudent
     runtime: python
-    plan: starter
+    plan: standard
     region: singapore
     branch: dep-backend
     buildCommand: ./build.sh
-    startCommand: cd backend && celery -A backend worker --loglevel=info --concurrency=4 --max-tasks-per-child=10
+    startCommand: cd backend && celery -A backend worker --loglevel=info --concurrency=2 --max-tasks-per-child=10
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0

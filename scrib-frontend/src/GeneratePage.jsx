@@ -138,6 +138,60 @@ const GeneratePage = () => {
     const next = Math.min(Math.max(el.scrollHeight, PASTE_TEXTAREA_MIN_HEIGHT), PASTE_TEXTAREA_MAX_HEIGHT)
     el.style.height = `${next}px`
   }, [pasteText, mode])
+
+  // Upload-PDF-syllabus state
+  const pdfFileInputRef = useRef(null)
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false)
+  const [isDraggingPdf, setIsDraggingPdf] = useState(false)
+  const [uploadedPdfName, setUploadedPdfName] = useState(null)
+  const MAX_PDF_PAGES = 50
+  const MAX_PDF_SIZE_MB = 50 // mirrors Vertex AI's document understanding limit
+
+  const handlePdfFile = async (file) => {
+    if (!file || isUploadingPdf) return
+
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    if (!isPdf) {
+      customToast.error('Please upload a PDF file.')
+      return
+    }
+    if (file.size > MAX_PDF_SIZE_MB * 1024 * 1024) {
+      customToast.error(`PDF is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Max size is ${MAX_PDF_SIZE_MB}MB.`)
+      return
+    }
+    if (pasteText.trim() && !window.confirm('This will replace the text currently in the box. Continue?')) {
+      return
+    }
+
+    setIsUploadingPdf(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await axiosInstance.post('/scrib/parse-syllabus/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      const topics = res.data
+      if (!Array.isArray(topics) || !topics.length) throw new Error('No topics found in this PDF.')
+      setPasteText(topics.join('\n'))
+      setUploadedPdfName(file.name)
+      setInvalidTopics([])
+      customToast.success(`Extracted ${topics.length} topics from ${file.name}`)
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Failed to extract topics from PDF.'
+      customToast.error(message)
+    } finally {
+      setIsUploadingPdf(false)
+      if (pdfFileInputRef.current) pdfFileInputRef.current.value = ''
+    }
+  }
+
+  const handlePdfDrop = (e) => {
+    e.preventDefault()
+    setIsDraggingPdf(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) handlePdfFile(file)
+  }
+
   const [remainingTopics, setRemainingTopics] = useState(() => {
     try {
       const saved = sessionStorage.getItem('scrib_draft_remaining')
@@ -836,7 +890,7 @@ const GeneratePage = () => {
                 </h1>
                 <p className="mt-1 md:mt-0 text-[13px] md:text-sm text-[#8a847c] md:text-[#7b756d] leading-relaxed">
                   <span className="md:hidden">Add topics below — each becomes one handwritten page in the PDF.</span>
-                  <span className="hidden md:inline">Type topics one by one, or paste your full syllabus — AI will organise it.</span>
+                  <span className="hidden md:inline">Type topics one by one, paste your full syllabus, or upload a syllabus PDF — AI will organise it.</span>
                 </p>
 
                 {(!isLoggedIn || (!isLoadingHistory && creditBalance === 0 && historyItems.length === 0)) && (
@@ -906,7 +960,7 @@ const GeneratePage = () => {
                     : 'border-[#d9d1c7] bg-white text-[#5f5a54] hover:bg-[#f5f2ec]'
                 }`}
               >
-                Paste syllabus
+                Paste or Upload
               </button>
             </div>
 
@@ -1055,18 +1109,57 @@ const GeneratePage = () => {
                 )}
               </div>
             ) : (
-              <div className="rounded-xl border border-[#ded6cc] bg-white p-4 shadow-sm">
-                <p className="mb-2 text-xs font-semibold text-[#5f5a54] tracking-wide">
-                  Paste your syllabus topics — one per line or comma separated
-                </p>
+              <div
+                className={`rounded-xl border p-4 shadow-sm transition-colors ${
+                  isDraggingPdf ? 'border-[#9b93e7] bg-[#f7f5ff]' : 'border-[#ded6cc] bg-white'
+                }`}
+                onDragOver={e => { e.preventDefault(); setIsDraggingPdf(true) }}
+                onDragLeave={() => setIsDraggingPdf(false)}
+                onDrop={handlePdfDrop}
+              >
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-[#5f5a54] tracking-wide">
+                    Paste your syllabus topics — one per line or comma separated
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => pdfFileInputRef.current?.click()}
+                    disabled={isUploadingPdf}
+                    title={`Upload a syllabus PDF — max ${MAX_PDF_PAGES} pages, ${MAX_PDF_SIZE_MB}MB`}
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg border border-[#d9d1c7] bg-[#faf8f4] px-2.5 py-1.5 text-[11px] font-semibold text-[#5f5a54] transition-colors hover:border-[#9b93e7] hover:bg-[#f7f5ff] hover:text-[#5a52a0] disabled:opacity-60"
+                  >
+                    {isUploadingPdf ? (
+                      <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                      </svg>
+                    ) : (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                    )}
+                    {isUploadingPdf ? 'Extracting topics…' : 'Upload PDF'}
+                  </button>
+                  <input
+                    ref={pdfFileInputRef}
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="hidden"
+                    onChange={e => handlePdfFile(e.target.files?.[0])}
+                  />
+                </div>
                 <textarea
                   ref={pasteTextareaRef}
                   className="w-full resize-none overflow-y-auto border-none bg-transparent text-sm outline-none"
                   style={{ minHeight: PASTE_TEXTAREA_MIN_HEIGHT, maxHeight: PASTE_TEXTAREA_MAX_HEIGHT }}
-                  placeholder="e.g. Explicit Intents, Implicit Intents, Activity Lifecycle, Fragments..."
+                  placeholder="e.g. Explicit Intents, Implicit Intents, Activity Lifecycle, Fragments... — or drop a syllabus PDF here"
                   value={pasteText}
                   onChange={e => { setPasteText(e.target.value); setInvalidTopics([]) }}
                 />
+                {uploadedPdfName && !isUploadingPdf && (
+                  <p className="mt-1.5 text-[11px] text-[#8a847c]">
+                    ✓ Extracted from <span className="font-medium text-[#5f5a54]">{uploadedPdfName}</span> — review and edit below if needed.
+                  </p>
+                )}
                 {pasteText && (
                   <div className="mt-3 flex flex-col gap-2.5">
                     <div className="flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between md:gap-3">

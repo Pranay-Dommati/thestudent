@@ -49,7 +49,8 @@ def _setup_credentials():
     )
 
 
-def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=65535):
+def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=65535,
+                          file_bytes=None, file_mime_type=None):
     """Call Vertex AI Gemini and return the response text.
 
     Parameters
@@ -63,6 +64,12 @@ def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=6
     max_output_tokens : int
         Maximum tokens in the response.  Default 65 535 (Gemini 3.1 Flash Lite
         supports up to 65 536 output tokens exclusive).
+    file_bytes : bytes | None
+        Raw bytes of a file (e.g. a PDF) to send alongside the prompt for
+        multimodal document understanding. When set, ``file_mime_type`` must
+        also be provided.
+    file_mime_type : str | None
+        MIME type of ``file_bytes`` (e.g. ``'application/pdf'``).
     """
     _setup_credentials()
 
@@ -86,9 +93,17 @@ def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=6
     if response_mime_type:
         gen_config.response_mime_type = response_mime_type
 
+    if file_bytes:
+        contents = [
+            genai_types.Part.from_bytes(data=file_bytes, mime_type=file_mime_type),
+            prompt,
+        ]
+    else:
+        contents = prompt
+
     response = client.models.generate_content(
         model=MODEL_NAME,
-        contents=prompt,
+        contents=contents,
         config=gen_config,
     )
 

@@ -2,6 +2,7 @@ from django.db import models
 import datetime
 import json
 import logging
+import os
 import uuid
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -428,12 +429,70 @@ class ParseSyllabusView(APIView):
     # Maximum number of Vertex AI retries on malformed JSON
     MAX_RETRIES = 2
 
+    # PDF upload constraints. The page cap bounds cost/latency, not token
+    # truncation (Gemini's 1M-token context window handles 50 pages easily).
+    # The size cap mirrors Vertex AI's own document-understanding ceiling —
+    # rejecting early gives a clean error instead of a raw API failure.
+    MAX_PDF_PAGES = 50
+    MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024  # 50MB — Vertex AI's document understanding limit
+
     def post(self, request):
+        uploaded_file = request.FILES.get('file')
+        if uploaded_file:
+            return self._parse_from_pdf(uploaded_file)
+
         syllabus = request.data.get('syllabus')
         if not syllabus:
             return error_response('Syllabus text is required', status_code=400)
-            
-        prompt = (
+
+        prompt = self._build_text_prompt(syllabus)
+        return self._extract_topics(prompt)
+
+    def _parse_from_pdf(self, uploaded_file):
+        is_pdf = (
+            uploaded_file.content_type == 'application/pdf'
+            or uploaded_file.name.lower().endswith('.pdf')
+        )
+        if not is_pdf:
+            return error_response('Only PDF files are supported', status_code=400)
+
+        if uploaded_file.size > self.MAX_PDF_SIZE_BYTES:
+            return error_response(
+                f"PDF is too large ({uploaded_file.size / (1024 * 1024):.1f}MB). "
+                f"Max size is {self.MAX_PDF_SIZE_BYTES // (1024 * 1024)}MB.",
+                status_code=400,
+            )
+
+        pdf_bytes = uploaded_file.read()
+
+        import io
+        from PyPDF2 import PdfReader
+        try:
+            page_count = len(PdfReader(io.BytesIO(pdf_bytes)).pages)
+        except Exception as exc:
+            logger.error(f"[SCRIB API] Failed to read uploaded PDF: {exc}")
+            return error_response(
+                'Could not read the uploaded PDF — it may be corrupted or password-protected.',
+                status_code=400,
+            )
+
+        if page_count == 0:
+            return error_response('The uploaded PDF has no pages.', status_code=400)
+        if page_count > self.MAX_PDF_PAGES:
+            return error_response(
+                f"PDF has {page_count} pages, which exceeds the {self.MAX_PDF_PAGES}-page limit. "
+                f"Please split it or upload a shorter syllabus.",
+                status_code=400,
+            )
+
+        logger.info(f"[SCRIB API] /parse-syllabus/ called with PDF upload "
+                    f"({page_count} pages, {len(pdf_bytes)} bytes)")
+        prompt = self._build_pdf_prompt()
+        return self._extract_topics(prompt, file_bytes=pdf_bytes, file_mime_type='application/pdf')
+
+    @staticmethod
+    def _build_text_prompt(syllabus):
+        return (
             f"Extract all specific study topics from the following syllabus. Rules:\n"
             f"1. Make each topic standalone and understandable out of context. If it's a sub-topic, prepend its parent category (e.g., 'Testing Strategies: Strategic issues', 'Testing: Testing Concepts').\n"
             f"2. Do NOT exclude sub-topics. For example, in 'Testing Strategies: A Strategic approach to software testing', the topic is 'Testing Strategies: A Strategic approach to software testing'.\n"
@@ -441,7 +500,20 @@ class ParseSyllabusView(APIView):
             f"4. Return ONLY a valid JSON array of strings, and nothing else. No markdown or code block tags.\n\n"
             f"Syllabus:\n{syllabus}"
         )
-        
+
+    @staticmethod
+    def _build_pdf_prompt():
+        return (
+            "Extract all specific study topics from the attached syllabus PDF document. Rules:\n"
+            "1. Make each topic standalone and understandable out of context. If it's a sub-topic, prepend its parent category (e.g., 'Testing Strategies: Strategic issues', 'Testing: Testing Concepts').\n"
+            "2. Do NOT exclude sub-topics.\n"
+            "3. Preserve the exact order topics appear in the document, top to bottom, page by page. Do NOT reorder, group, or sort them.\n"
+            "4. The document may span up to 50 pages — extract EVERY topic and subtopic across the ENTIRE document, from the first page to the last. Do not summarize, skip, or omit any section.\n"
+            "5. Ignore headers, footers, and page numbers — they are not topics.\n"
+            "6. Return ONLY a valid JSON array of strings, and nothing else. No markdown or code block tags.\n"
+        )
+
+    def _extract_topics(self, prompt, **vertex_kwargs):
         last_error = None
         for attempt in range(1, self.MAX_RETRIES + 1):
             try:
@@ -450,14 +522,15 @@ class ParseSyllabusView(APIView):
                 response_text = call_scrib_vertex_ai(
                     prompt,
                     response_mime_type='application/json',
+                    **vertex_kwargs,
                 )
-                
+
                 # Clean up the markdown if present (shouldn't happen with JSON mode, but defensive)
                 if response_text.startswith('```json'):
                     response_text = response_text[7:-3].strip()
                 elif response_text.startswith('```'):
                     response_text = response_text[3:-3].strip()
-                
+
                 try:
                     parsed = json.loads(response_text)
                 except json.JSONDecodeError as json_err:
@@ -1492,6 +1565,10 @@ class StudyPackPdfView(APIView):
         return Response({'share_token': str(pack.share_token)})
 
 
+class _MergeTooLarge(Exception):
+    """Combined size of the selected packs exceeded MAX_MERGE_BYTES."""
+
+
 class MergeStudyPacksView(APIView):
     """POST /api/scrib/packs/merge/
 
@@ -1505,6 +1582,13 @@ class MergeStudyPacksView(APIView):
     permission_classes = [IsAuthenticated]
 
     MAX_MERGE_PACKS = 20
+
+    # PyPDF2 assembles the output document in memory, so the combined size of
+    # the selected packs sets the peak for the whole request. Left unbounded,
+    # a large merge could exhaust the web process and take every in-flight
+    # request down with it; a clear error is a far better outcome than an OOM.
+    MAX_MERGE_BYTES = int(os.environ.get('SCRIB_MAX_MERGE_BYTES', 250 * 1024 * 1024))
+    DOWNLOAD_CHUNK = 1024 * 1024
 
     def post(self, request):
         pack_ids = request.data.get('pack_ids')
@@ -1537,9 +1621,10 @@ class MergeStudyPacksView(APIView):
             )
         ordered_packs = [packs_by_id[pid] for pid in pack_ids]
 
-        import io
+        import tempfile
         import requests as pdf_requests
         from PyPDF2 import PdfReader, PdfWriter
+        from django.http import FileResponse
 
         bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', '')
         region = getattr(settings, 'AWS_S3_REGION_NAME', 'ap-south-1')
@@ -1556,37 +1641,127 @@ class MergeStudyPacksView(APIView):
                 region_name=region,
             )
 
-        writer = PdfWriter()
-        for pack in ordered_packs:
-            try:
-                if pack.s3_key and s3:
-                    obj = s3.get_object(Bucket=bucket, Key=pack.s3_key)
-                    pdf_bytes = obj['Body'].read()
-                elif pack.pdf_url:
-                    resp = pdf_requests.get(pack.pdf_url, timeout=30)
-                    resp.raise_for_status()
-                    pdf_bytes = resp.content
-                else:
-                    raise ValueError('No PDF source available for this pack')
+        # Sources are spooled to disk rather than read into bytes. A generated
+        # page is ~1.5MB, so the previous approach held every source PDF in
+        # memory at once, then the assembled result twice more (the BytesIO and
+        # the response body) — several times the combined size, inside the
+        # process also serving the API.
+        open_sources = []   # handles PdfWriter reads pages from; keep until write()
+        temp_paths = []
+        merged_path = None
+        total_bytes = 0
+        current_pack = None   # so a read failure can still name the pack that broke
 
-                reader = PdfReader(io.BytesIO(pdf_bytes))
-                for page in reader.pages:
+        def _release_sources():
+            for handle in open_sources:
+                try:
+                    handle.close()
+                except OSError:
+                    pass
+            for path in temp_paths:
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
+
+        try:
+            writer = PdfWriter()
+
+            for pack in ordered_packs:
+                current_pack = pack
+                spool = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
+                temp_paths.append(spool.name)
+                try:
+                    if pack.s3_key and s3:
+                        body = s3.get_object(Bucket=bucket, Key=pack.s3_key)['Body']
+                        while True:
+                            chunk = body.read(self.DOWNLOAD_CHUNK)
+                            if not chunk:
+                                break
+                            total_bytes += len(chunk)
+                            if total_bytes > self.MAX_MERGE_BYTES:
+                                raise _MergeTooLarge()
+                            spool.write(chunk)
+                    elif pack.pdf_url:
+                        resp = pdf_requests.get(pack.pdf_url, timeout=30, stream=True)
+                        resp.raise_for_status()
+                        for chunk in resp.iter_content(self.DOWNLOAD_CHUNK):
+                            total_bytes += len(chunk)
+                            if total_bytes > self.MAX_MERGE_BYTES:
+                                raise _MergeTooLarge()
+                            spool.write(chunk)
+                    else:
+                        raise ValueError('No PDF source available for this pack')
+                finally:
+                    spool.close()
+
+                # Reopened read-only so PdfReader pulls pages off disk on demand
+                # instead of us holding the file's bytes.
+                handle = open(spool.name, 'rb')
+                open_sources.append(handle)
+                for page in PdfReader(handle).pages:
                     writer.add_page(page)
-            except Exception as exc:
-                logger.error(f'[scrib] Merge failed reading pack {pack.id}: {exc}')
-                return error_response(
-                    f'Could not read "{pack.title}" while merging. Please try again.',
-                    status_code=502,
-                    code='merge_read_failed',
-                )
 
-        output = io.BytesIO()
-        writer.write(output)
-        output.seek(0)
+            merged = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
+            merged_path = merged.name
+            try:
+                writer.write(merged)
+            finally:
+                merged.close()
 
-        from django.http import HttpResponse
-        response = HttpResponse(output.read(), content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename="merged_notes.pdf"'
+        except _MergeTooLarge:
+            if merged_path:
+                try:
+                    os.unlink(merged_path)
+                except OSError:
+                    pass
+            return error_response(
+                'The selected notes are too large to merge in one go. '
+                'Please select fewer notes and try again.',
+                status_code=413,
+                code='merge_too_large',
+                details={
+                    'max_bytes': self.MAX_MERGE_BYTES,
+                    'submitted_packs': len(ordered_packs),
+                },
+            )
+        except Exception as exc:
+            label = f'pack {current_pack.id}' if current_pack else f'{len(ordered_packs)} packs'
+            logger.error(f'[scrib] Merge failed on {label}: {exc}')
+            if merged_path:
+                try:
+                    os.unlink(merged_path)
+                except OSError:
+                    pass
+            message = (
+                f'Could not read "{current_pack.title}" while merging. Please try again.'
+                if current_pack else
+                'Could not merge the selected notes. Please try again.'
+            )
+            return error_response(message, status_code=502, code='merge_read_failed')
+        finally:
+            # Only needed until writer.write() has resolved every page; the
+            # merged file on disk is self-contained from that point on.
+            _release_sources()
+
+        # Streamed off disk and removed once the response is fully written, so
+        # the merged PDF is never resident in memory as a single buffer.
+        response = FileResponse(
+            open(merged_path, 'rb'),
+            content_type='application/pdf',
+            as_attachment=True,
+            filename='merged_notes.pdf',
+        )
+        _django_close = response.close
+
+        def _close_and_discard():
+            _django_close()
+            try:
+                os.unlink(merged_path)
+            except OSError:
+                pass
+
+        response.close = _close_and_discard
         return response
 
 
