@@ -2742,6 +2742,58 @@ class AdminPaidUsersAnalyticsView(APIView):
         })
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Note generations for a single day (IST)
+# GET /api/scrib/admin/packs-by-date/?date=YYYY-MM-DD
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AdminPacksByDateView(APIView):
+    """Returns all StudyPacks created on a given IST calendar day (default: today)."""
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not is_admin_user(request.user):
+            return error_response('Forbidden', status_code=403, code='forbidden')
+
+        from django.utils import timezone
+        import datetime
+
+        ist_offset = datetime.timedelta(hours=5, minutes=30)
+        date_str = request.query_params.get('date')
+        if date_str:
+            try:
+                day = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return error_response('Invalid date, expected YYYY-MM-DD', status_code=400, code='invalid_date')
+        else:
+            day = (timezone.now() + ist_offset).date()
+
+        # IST midnight boundaries expressed in UTC
+        day_start = datetime.datetime.combine(day, datetime.time.min, tzinfo=datetime.timezone.utc) - ist_offset
+        day_end = day_start + datetime.timedelta(days=1)
+
+        day_filter = {'created_at__gte': day_start, 'created_at__lt': day_end}
+        packs_qs = StudyPack.objects.select_related('user').filter(**day_filter).order_by('-created_at')[:200]
+        packs = [
+            {
+                'id': rp.id,
+                'title': rp.title,
+                'email': rp.user.email,
+                'created_at': rp.created_at.isoformat() if rp.created_at else None,
+                'status': rp.status,
+                'total_pages': rp.total_pages,
+                'share_token': str(rp.share_token) if rp.share_token else None,
+                'topics_json': rp.topics_json or [],
+            }
+            for rp in packs_qs
+        ]
+        count = StudyPack.objects.filter(**day_filter).count()
+
+        return Response({'date': day.isoformat(), 'packs': packs, 'count': count})
+
+
 # ─── Scrib Config (Cohort Toggle) ────────────────────────────────────────────
 
 class ScribConfigPublicView(APIView):

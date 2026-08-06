@@ -707,6 +707,87 @@ const PaidUsersTable = ({ users, isDarkMode, onSelectUser }) => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+// IST "today" as YYYY-MM-DD, regardless of the browser's timezone
+const istToday = () => new Date(Date.now() + 5.5 * 3600_000).toISOString().split('T')[0];
+
+const DayNoteGenerations = ({ isDarkMode, handleViewPdf, pdfLoadingId }) => {
+  const [day, setDay] = useState(istToday);
+  const [packs, setPacks] = useState([]);
+  const [count, setCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await authService.makeAuthenticatedRequest(`/scrib/admin/packs-by-date/?date=${day}`);
+        if (cancelled) return;
+        setPacks(res.data?.packs ?? []);
+        setCount(res.data?.count ?? res.data?.packs?.length ?? 0);
+      } catch (err) {
+        if (!cancelled) setError(err?.response?.data?.message || 'Failed to load note generations.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [day]);
+
+  const textMain = isDarkMode ? 'text-white' : 'text-gray-900';
+  const isToday = day === istToday();
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <h3 className={`text-sm font-semibold ${textMain}`}>📅 Note Generations by Day</h3>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={day}
+            max={istToday()}
+            onChange={(e) => e.target.value && setDay(e.target.value)}
+            className={`text-xs px-2 py-1.5 rounded-lg border ${isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+          />
+          {!isToday && (
+            <button
+              onClick={() => setDay(istToday())}
+              className={`text-xs px-2.5 py-1.5 rounded-lg border font-medium ${
+                isDarkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Today
+            </button>
+          )}
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+            isDarkMode ? 'bg-indigo-900/50 text-indigo-300 border border-indigo-700/50' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+          }`}>
+            {loading ? '…' : `${count} generated`}
+          </span>
+        </div>
+      </div>
+      {loading ? (
+        <div className={`h-32 rounded-2xl animate-pulse ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`} />
+      ) : error ? (
+        <div className={`rounded-2xl p-6 text-center text-sm ${isDarkMode ? 'bg-gray-800 text-red-400' : 'bg-white text-red-600'}`}>
+          {error}
+        </div>
+      ) : (
+        <NoteGenerationsTable
+          packs={packs}
+          emptyMessage={`No note generations on ${fmt.date(day)}.`}
+          isDarkMode={isDarkMode}
+          handleViewPdf={handleViewPdf}
+          pdfLoadingId={pdfLoadingId}
+          maxH="max-h-80 overflow-y-auto"
+        />
+      )}
+    </div>
+  );
+};
+
 const ScribPaidAnalytics = ({ isDarkMode = false }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -900,25 +981,12 @@ const ScribPaidAnalytics = ({ isDarkMode = false }) => {
         </div>
       </div>
 
-      {/* ── Today's Note Generations ── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className={`text-sm font-semibold ${textMain}`}>📅 Today's Note Generations</h3>
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-            isDarkMode ? 'bg-indigo-900/50 text-indigo-300 border border-indigo-700/50' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
-          }`}>
-            {data?.today_packs_count ?? data?.today_packs?.length ?? 0} generated today
-          </span>
-        </div>
-        <NoteGenerationsTable
-          packs={data?.today_packs ?? []}
-          emptyMessage="No note generations today yet."
-          isDarkMode={isDarkMode}
-          handleViewPdf={handleViewPdf}
-          pdfLoadingId={pdfLoadingId}
-          maxH="max-h-80 overflow-y-auto"
-        />
-      </div>
+      {/* ── Note Generations by Day ── */}
+      <DayNoteGenerations
+        isDarkMode={isDarkMode}
+        handleViewPdf={handleViewPdf}
+        pdfLoadingId={pdfLoadingId}
+      />
 
       {/* ── Recent Note Generations ── */}
       <div>
