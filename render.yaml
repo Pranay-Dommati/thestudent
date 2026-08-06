@@ -10,7 +10,15 @@ services:
     region: singapore
     branch: dep-backend  # Deploy from this branch
     buildCommand: ./build.sh
-    startCommand: cd backend && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --worker-class gevent --worker-connections 100 --timeout 30 --max-requests 500 --max-requests-jitter 50 --keep-alive 5
+    # NOTE: gthread, not gevent. gevent monkey-patches threading.get_ident() to
+    # return greenlet identity instead of real thread identity — combined with
+    # CONN_MAX_AGE (persistent DB connections, see DB_CONN_MAX_AGE below) and
+    # mysqlclient (a C extension, not gevent-cooperative to begin with), a
+    # connection opened by one greenlet gets handed to another and Django's
+    # validate_thread_sharing() correctly rejects it: "DatabaseWrapper objects
+    # created in a thread can only be used in that same thread." Real OS
+    # threads don't have this problem — Django's connection model assumes them.
+    startCommand: cd backend && gunicorn backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --worker-class gthread --threads 4 --timeout 30 --max-requests 500 --max-requests-jitter 50 --keep-alive 5
     healthCheckPath: /api/chatbot/health/
     
     envVars:
