@@ -50,6 +50,43 @@ def send_generation_failed_email(user, pack_title, credits_refunded):
     except Exception as exc:
         logger.warning(f"Error sending failure-notification email to {user.email}: {exc}")
 
+
+def send_payment_success_email(user, credits_added):
+    """Notify the user their Razorpay payment succeeded and credits were added.
+
+    Razorpay's own email only confirms the charge — this is our side's
+    confirmation that the credits actually landed on the account. Called from
+    the credit-adding branch in both VerifyPaymentView and razorpay_webhook,
+    so whichever of those two wins the race to create the CreditTransaction
+    is the one that sends it (no duplicate emails).
+    """
+    html_content = f"""
+    <html>
+      <body>
+        <p>Hi {user.full_name or 'there'},</p>
+        <p>Thank you for your purchase! Your payment was successful, and your credits have been added to your Scrib account.</p>
+        <p>If you face any issues with your purchase or while using Scrib, please don't hesitate to reach out to us at easylearnova@gmail.com. We're happy to help!</p>
+        <p>Thank you for choosing Scrib.</p>
+        <br/>
+        <p>
+          Pranay<br/>
+          Founder, EasyLearnova<br/>
+          Scrib – AI Handwritten Notes Generator
+        </p>
+      </body>
+    </html>
+    """
+    try:
+        email_sent = send_email_via_ses(
+            to_email=user.email,
+            subject="Payment Successful! 🎉",
+            html_content=html_content,
+        )
+        if not email_sent:
+            logger.warning(f"Payment-success email not sent to {user.email}")
+    except Exception as exc:
+        logger.warning(f"Error sending payment-success email to {user.email}: {exc}")
+
 @shared_task(bind=True, max_retries=1)
 def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
     logger.info(f"Starting async generation for StudyPack {study_pack_id}")

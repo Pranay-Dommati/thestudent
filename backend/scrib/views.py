@@ -1322,6 +1322,7 @@ class VerifyPaymentView(APIView):
             return error_response('Payment signature verification failed', status_code=400, code='verification_failed')
 
         # ── Atomically mark paid + credit the user ─────────────────────────────────
+        credited = False
         with transaction.atomic():
             # Re-fetch with row lock to prevent race conditions
             payment = Payment.objects.select_for_update().get(pk=payment.pk)
@@ -1354,8 +1355,17 @@ class VerifyPaymentView(APIView):
                 if created:
                     logger.info('[payments] Credits added order_id=%s credits=%d user=%s',
                                 order_id, payment.credits_added, payment.user_id)
+                    credited = True
                 else:
                     logger.warning('[payments] Credit tx already existed for order_id=%s', order_id)
+
+        # Sent outside the transaction so the SES network call doesn't hold the row lock
+        if credited:
+            try:
+                from scrib.tasks import send_payment_success_email
+                send_payment_success_email(payment.user, payment.credits_added)
+            except Exception as email_exc:
+                logger.warning('[payments] Failed to send payment-success email order_id=%s: %s', order_id, email_exc)
 
         new_balance = get_credit_balance(request.user)
         logger.info('[payments] Verification complete order_id=%s new_balance=%d user=%s',
@@ -1417,6 +1427,7 @@ def razorpay_webhook(request):
             rzp_payment_id = payment_entity.get('id', '')
 
             payment = Payment.objects.filter(razorpay_order_id=rzp_order_id).first()
+            credited = False
             if payment and payment.status != Payment.STATUS_PAID:
                 with transaction.atomic():
                     p = Payment.objects.select_for_update().get(pk=payment.pk)
@@ -1424,7 +1435,7 @@ def razorpay_webhook(request):
                         p.status = Payment.STATUS_PAID
                         p.razorpay_payment_id = rzp_payment_id
                         p.save(update_fields=['status', 'razorpay_payment_id', 'updated_at'])
-                        CreditTransaction.objects.get_or_create(
+                        _, created = CreditTransaction.objects.get_or_create(
                             payment=p,
                             defaults=dict(
                                 user=p.user,
@@ -1433,8 +1444,17 @@ def razorpay_webhook(request):
                                 reason=CreditTransaction.REASON_PAYMENT,
                             ),
                         )
+                        credited = created
                         logger.info(f'[webhook] payment.captured processed order_id={rzp_order_id} credits={p.credits_added} user={p.user_id}')
-        
+
+                # Sent outside the transaction so the SES network call doesn't hold the row lock
+                if credited:
+                    try:
+                        from scrib.tasks import send_payment_success_email
+                        send_payment_success_email(payment.user, payment.credits_added)
+                    except Exception as email_exc:
+                        logger.warning('[webhook] Failed to send payment-success email order_id=%s: %s', rzp_order_id, email_exc)
+
         return Response(
             {"success": True},
             status=200
