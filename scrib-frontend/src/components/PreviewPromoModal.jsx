@@ -84,7 +84,7 @@ const PreviewPromoModal = ({ isLoggedIn, loading }) => {
 
           {/* CTA button */}
           <Link
-            to="/previews"
+            to="/library"
             onClick={dismiss}
             className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#1f1f1f] px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-[#333] hover:shadow-lg"
           >

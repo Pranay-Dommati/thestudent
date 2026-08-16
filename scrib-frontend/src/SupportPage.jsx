@@ -75,7 +75,7 @@ const SupportPage = () => {
           </div>
           
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
-            <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
+            <Link to="/library" className="hover:text-[#1f1f1f]">Library</Link>
             <Link to="/generate" className="hover:text-[#1f1f1f]">Generate</Link>
             <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
           </nav>

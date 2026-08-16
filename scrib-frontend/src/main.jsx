@@ -1,12 +1,13 @@
 import { StrictMode } from 'react'
 import { createRoot, hydrateRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster, toast, ToastBar } from 'react-hot-toast'
 import posthog from 'posthog-js'
 import { PostHogErrorBoundary, PostHogProvider } from '@posthog/react'
 import './index.css'
 import App from './App.jsx'
-import PreviewsPage from './PreviewsPage.jsx'
+import LibraryPage from './LibraryPage.jsx'
+import InterviewPrepPage from './InterviewPrepPage.jsx'
 import GeneratePage from './GeneratePage.jsx'
 import SignupPage from './SignupPage.jsx'
 import LoginPage from './LoginPage.jsx'
@@ -46,7 +47,11 @@ const AppContent = (
           <ScrollToTop />
           <Routes>
           <Route path="/" element={<App />} />
-          <Route path="/previews" element={<PreviewsPage />} />
+          <Route path="/library" element={<LibraryPage />} />
+          {/* /previews was the old name for this page — keep the link working. */}
+          <Route path="/previews" element={<Navigate to="/library" replace />} />
+          <Route path="/interview-prep" element={<InterviewPrepPage />} />
+          <Route path="/interview-prep/:slug" element={<InterviewPrepPage />} />
           <Route path="/generate" element={<GeneratePage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/login" element={<LoginPage />} />

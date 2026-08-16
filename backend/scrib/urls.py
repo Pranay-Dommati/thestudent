@@ -7,6 +7,8 @@ from .views import (
     SharePurchaseOrderView, SharePaymentVerifyView, SharingStatsView,
     SharePackPdfView,
 )
+# pyrefly: ignore [missing-import]
+from . import pack_views
 
 app_name = 'scrib'
 
@@ -60,6 +62,32 @@ urlpatterns = [
     path('share/<str:share_code>/purchase/',      SharePurchaseOrderView.as_view(),  name='share-purchase'),
     path('share/<str:share_code>/',               ShareMetaView.as_view(),           name='share-meta'),
     
+    # ── Content packs (Interview Prep) ────────────────────────────────────────
+    # Static segments first — 'mine', 'purchase' and 'quizzes' must not be
+    # swallowed by the <slug:slug> pattern below them.
+    path('packs/catalogue/',                     pack_views.PackListView.as_view(),          name='pack-list'),
+    path('packs/mine/',                          pack_views.MyPacksView.as_view(),           name='pack-mine'),
+    path('packs/purchase/',                      pack_views.PackPurchaseOrderView.as_view(), name='pack-purchase'),
+    path('packs/purchase/verify/',               pack_views.PackPurchaseVerifyView.as_view(),name='pack-purchase-verify'),
+    path('packs/quizzes/<int:quiz_id>/',         pack_views.PackQuizQuestionsView.as_view(), name='pack-quiz'),
+    path('packs/quizzes/<int:quiz_id>/submit/',  pack_views.PackQuizSubmitView.as_view(),    name='pack-quiz-submit'),
+    path('packs/<slug:slug>/',                   pack_views.PackDetailView.as_view(),        name='pack-detail'),
+    path('packs/<slug:slug>/pdf/',               pack_views.PackPdfView.as_view(),           name='pack-pdf-public'),
+
+    # Content pack administration (/admin-p → Interview Prep)
+    path('admin/packs/',                         pack_views.AdminPackListView.as_view(),      name='admin-pack-list'),
+    path('admin/packs/analytics/',               pack_views.AdminPackAnalyticsView.as_view(), name='admin-pack-analytics'),
+    path('admin/packs/<int:pk>/',                pack_views.AdminPackDetailView.as_view(),    name='admin-pack-detail'),
+    path('admin/packs/<int:pk>/pdf-upload/',     pack_views.AdminPackPdfUploadView.as_view(), name='admin-pack-pdf-upload'),
+    path('admin/packs/<int:pk>/quizzes/',        pack_views.AdminPackQuizListView.as_view(),  name='admin-pack-quizzes'),
+    path('admin/packs/<int:pk>/quizzes/import-csv/', pack_views.AdminPackQuizCsvImportView.as_view(), name='admin-pack-quiz-csv-import'),
+    path('admin/quizzes/<int:pk>/',              pack_views.AdminQuizDetailView.as_view(),    name='admin-quiz-detail'),
+    path('admin/quizzes/<int:pk>/shuffle-options/', pack_views.AdminQuizShuffleOptionsView.as_view(), name='admin-quiz-shuffle-options'),
+    path('admin/quizzes/<int:pk>/questions/',    pack_views.AdminQuizQuestionsView.as_view(), name='admin-quiz-questions'),
+    path('admin/questions/<int:pk>/',            pack_views.AdminQuestionDetailView.as_view(),name='admin-question-detail'),
+    path('admin/bundles/',                       pack_views.AdminBundleListView.as_view(),    name='admin-bundle-list'),
+    path('admin/bundles/<int:pk>/',              pack_views.AdminBundleDetailView.as_view(),  name='admin-bundle-detail'),
+
     # Influencer Referral System
     path('influencers/click/', views.track_influencer_click, name='influencers-click'),
     path('influencers/dashboard/<str:token>/', views.influencer_dashboard, name='influencer-dashboard'),

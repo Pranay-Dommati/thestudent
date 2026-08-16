@@ -14,7 +14,7 @@
     "source": "dist",
     "include": [
       "/",
-      "/previews",
+      "/library",
       "/pricing",
       "/generate"
     ],

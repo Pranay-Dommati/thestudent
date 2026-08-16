@@ -137,7 +137,7 @@ const PricingPage = () => {
             ]} />
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
-            <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
+            <Link to="/library" className="hover:text-[#1f1f1f]">Library</Link>
             <Link to="/generate" className="hover:text-[#1f1f1f]">Generate</Link>
             <Link to="/generate?tab=history" className="hover:text-[#1f1f1f]">My Scribs</Link>
             <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
@@ -184,7 +184,7 @@ const PricingPage = () => {
         <div className="mt-6 flex items-center justify-between rounded-xl border border-[#e2dbd2] bg-white px-4 py-3 sm:hidden">
           <p className="text-[13px] text-[#1f1f1f]">New here? See notes before buying</p>
           <Link
-            to="/previews"
+            to="/library"
             className="flex-shrink-0 rounded-full border border-[#e2dbd2] bg-white px-3 py-1.5 text-[11px] font-medium text-[#1f1f1f] hover:bg-[#faf8f3] transition-colors"
           >
             Preview →
@@ -205,7 +205,7 @@ const PricingPage = () => {
             </div>
           </div>
           <Link
-            to="/previews"
+            to="/library"
             className="flex-shrink-0 rounded-full border border-[#1f1f1f] bg-white px-4 py-2 text-xs font-semibold text-[#1f1f1f] hover:bg-[#1f1f1f] hover:text-white transition-colors whitespace-nowrap"
           >
             Browse free previews →

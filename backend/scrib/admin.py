@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction,
     PromoCode, PromoCodeRedemption, NoteShareLink, SharedPackPurchase,
+    ContentPack, PackBundle, PackQuiz, PackQuizQuestion, PackPurchase, QuizAttempt,
 )
 
 
@@ -148,3 +149,95 @@ class SharedPackPurchaseAdmin(admin.ModelAdmin):
     def referrer_short(self, obj):
         return (obj.referrer or '')[:60] + ('…' if len(obj.referrer or '') > 60 else '')
 
+
+
+# ── Content packs (Interview Prep) ────────────────────────────────────────────
+
+class PackQuizQuestionInline(admin.TabularInline):
+    model = PackQuizQuestion
+    extra = 0
+    fields = ('order', 'text', 'options', 'correct_index', 'explanation')
+
+
+class PackQuizInline(admin.TabularInline):
+    model = PackQuiz
+    extra = 0
+    fields = ('number', 'title', 'topic', 'is_active')
+    show_change_link = True
+
+
+@admin.register(ContentPack)
+class ContentPackAdmin(admin.ModelAdmin):
+    list_display = (
+        'title', 'section', 'category', 'price_inr', 'page_count',
+        'free_page_count', 'quiz_total', 'has_pdf', 'is_active', 'sort_order',
+    )
+    list_filter = ('section', 'is_active', 'theme')
+    search_fields = ('title', 'category', 'slug')
+    prepopulated_fields = {'slug': ('title',)}
+    inlines = [PackQuizInline]
+    readonly_fields = ('page_count', 's3_key', 's3_free_key', 'created_at', 'updated_at')
+
+    @admin.display(description='Price')
+    def price_inr(self, obj):
+        return f'₹{obj.price_paise / 100:g}'
+
+    @admin.display(description='Quizzes')
+    def quiz_total(self, obj):
+        return obj.quizzes.count()
+
+    @admin.display(boolean=True, description='PDF')
+    def has_pdf(self, obj):
+        return bool(obj.s3_key)
+
+
+@admin.register(PackBundle)
+class PackBundleAdmin(admin.ModelAdmin):
+    list_display = ('name', 'section', 'price_inr', 'pack_total', 'is_active')
+    list_filter = ('section', 'is_active')
+    filter_horizontal = ('packs',)
+    prepopulated_fields = {'slug': ('name',)}
+
+    @admin.display(description='Price')
+    def price_inr(self, obj):
+        return f'₹{obj.price_paise / 100:g}'
+
+    @admin.display(description='Packs')
+    def pack_total(self, obj):
+        return obj.packs.count()
+
+
+@admin.register(PackQuiz)
+class PackQuizAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'pack', 'number', 'topic', 'question_total', 'is_active')
+    list_filter = ('is_active', 'pack__section', 'pack')
+    search_fields = ('title', 'topic', 'pack__title')
+    inlines = [PackQuizQuestionInline]
+
+    @admin.display(description='Questions')
+    def question_total(self, obj):
+        return obj.questions.count()
+
+
+@admin.register(PackPurchase)
+class PackPurchaseAdmin(admin.ModelAdmin):
+    list_display = ('user', 'target', 'amount_inr', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('user__email', 'pack__title', 'bundle__name')
+    raw_id_fields = ('user', 'pack', 'bundle', 'payment')
+
+    @admin.display(description='Item')
+    def target(self, obj):
+        return obj.pack.title if obj.pack else (obj.bundle.name if obj.bundle else '—')
+
+    @admin.display(description='Amount')
+    def amount_inr(self, obj):
+        return f'₹{obj.amount_paise / 100:g}'
+
+
+@admin.register(QuizAttempt)
+class QuizAttemptAdmin(admin.ModelAdmin):
+    list_display = ('user', 'quiz', 'score', 'total', 'created_at')
+    list_filter = ('created_at', 'quiz__pack')
+    search_fields = ('user__email',)
+    raw_id_fields = ('user', 'quiz')

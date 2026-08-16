@@ -7,6 +7,9 @@ import axiosInstance from './utils/axios'
 import Breadcrumb from './components/Breadcrumb'
 import MobileMenu from './components/MobileMenu'
 import PreviewCard from './components/PreviewCard'
+import InterviewPackCard from './components/InterviewPackCard'
+import InterviewPackCardSkeleton from './components/InterviewPackCardSkeleton'
+import { fetchCatalogue } from './services/packs'
 import { usePostHog } from '@posthog/react'
 
 const fallbackPreviewCards = [
@@ -17,13 +20,16 @@ const fallbackPreviewCards = [
   { id: 'thermodynamics', title: 'Thermodynamics', subject: 'Physics', pdfUrl: null, pageCount: 1 },
 ]
 
-const PreviewsPage = () => {
+const LibraryPage = () => {
   const { user, logout, isLoggedIn } = useAuth()
   const posthog = usePostHog()
   const navigate = useNavigate()
   const [previewCards, setPreviewCards] = useState(fallbackPreviewCards)
   const [query, setQuery] = useState('')
   const [visibleCount, setVisibleCount] = useState(10)
+  const [packs, setPacks] = useState([])
+  const [bundle, setBundle] = useState(null)
+  const [packsLoading, setPacksLoading] = useState(true)
 
   // Reset visible count on new search
   useEffect(() => {
@@ -57,12 +63,26 @@ const PreviewsPage = () => {
     return () => { isMounted = false }
   }, [])
 
-  const featuredTitles = ['software engineering', 'vlsi fabrication steps', 'ray optics']
-  const featuredItems = useMemo(() => {
-    return featuredTitles
-      .map(t => previewCards.find(item => item.title.toLowerCase() === t))
-      .filter(Boolean)
-  }, [previewCards])
+  // Interview Picks — the paid packs shown above the free grid.
+  useEffect(() => {
+    let isMounted = true
+
+    const loadPacks = async () => {
+      try {
+        const data = await fetchCatalogue('interview')
+        if (!isMounted) return
+        setPacks(data.packs || [])
+        setBundle(data.bundle || null)
+      } catch {
+        // Library still works as a free-notes browser if this fails.
+      } finally {
+        if (isMounted) setPacksLoading(false)
+      }
+    }
+
+    loadPacks()
+    return () => { isMounted = false }
+  }, [isLoggedIn])
 
   // Live search: filter by title or subject
   const filtered = useMemo(() => {
@@ -75,13 +95,19 @@ const PreviewsPage = () => {
     )
   }, [query, previewCards])
 
-  const displayFiltered = useMemo(() => {
-    if (!query) {
-      const featuredIds = new Set(featuredItems.map(item => item.id))
-      return filtered.filter(item => !featuredIds.has(item.id))
-    }
-    return filtered
-  }, [filtered, query, featuredItems])
+  // Everything free lives under "All topics" now — the slot above it belongs to
+  // Interview Picks, so nothing is held back from this grid any more.
+  const displayFiltered = filtered
+
+  const visiblePacks = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return packs
+    return packs.filter(
+      (p) =>
+        p.title.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q)
+    )
+  }, [packs, query])
 
   const renderNote = (note) => (
     <div
@@ -100,7 +126,7 @@ const PreviewsPage = () => {
             topics: [note.subject || note.title],
             totalPages: note.pageCount || 1,
             isPack: true,
-            returnUrl: '/previews'
+            returnUrl: '/library'
           }
         })
       }}
@@ -126,9 +152,9 @@ const PreviewsPage = () => {
   return (
     <div className="min-h-screen bg-[#f8f7f3] text-[#1f1f1f]">
       <Helmet>
-        <title>Browse Topics - Scrib by EasyLearnova</title>
-        <meta name="description" content="Browse hundreds of free AI-generated handwritten exam notes for Computer Science, Engineering, Physics, and Mathematics." />
-        <link rel="canonical" href="https://scrib.easylearnova.com/previews" />
+        <title>Library - Scrib by EasyLearnova</title>
+        <meta name="description" content="Interview-ready handwritten note packs with practice quizzes, plus hundreds of free AI-generated exam notes for Computer Science, Engineering, Physics and Mathematics." />
+        <link rel="canonical" href="https://scrib.easylearnova.com/library" />
       </Helmet>
       <header className="sticky top-0 z-50 border-b border-[#e4ddd4] bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
@@ -138,7 +164,7 @@ const PreviewsPage = () => {
             </Link>
             <Breadcrumb crumbs={[
               { label: 'Home', to: '/' },
-              { label: 'Previews' },
+              { label: 'Library' },
             ]} />
           </div>
           {isLoggedIn ? (
@@ -231,32 +257,71 @@ const PreviewsPage = () => {
               to="/generate" 
               className="flex-shrink-0 inline-flex items-center justify-center rounded-xl bg-[#1f1f1f] px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-black transition-colors"
             >
-              Try for ₹19 &rarr;
+              Try now &rarr;
             </Link>
           </div>
         </div>
 
-        {/* Featured Previews (if no query) */}
-        {!query && featuredItems.length > 0 && (
-          <div className="mt-10 mb-12">
-            <div className="mb-5 flex items-center gap-4">
-              <h2 className="text-xs font-bold tracking-widest text-[#1f1f1f] uppercase flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                </svg>
-                Featured Picks
-              </h2>
-              <div className="h-[1px] flex-1 bg-gradient-to-r from-[#e4ddd4] to-transparent"></div>
+        {/* Interview Picks — the paid subject packs. Shown while loading too
+            (as skeletons) so this doesn't just pop into existence once the
+            fetch resolves — a real fetch failure still hides it entirely. */}
+        {(packsLoading || visiblePacks.length > 0) && (
+          <section className="mt-11">
+            <div className="flex flex-wrap items-end justify-between gap-6 border-b border-[#e2dbd2] pb-4">
+              <div className="flex flex-col gap-1.5">
+                <h2 className="text-[21px] font-bold tracking-tight text-[#1f1f1f]">
+                  Interview Prep Packs
+                </h2>
+                <p className="text-[13px] text-[#7b756d]">
+                  Complete handwritten notes + quizzes for each core SDE subject
+                </p>
+              </div>
+
+              {bundle && !bundle.owned && (
+                <div className="flex flex-shrink-0 items-center gap-3 text-[13px] text-[#7b756d]">
+                  <span>
+                    All {bundle.pack_count} packs{' '}
+                    {bundle.original_price > bundle.price && (
+                      <span className="text-[12.5px] text-[#9a9289] line-through">
+                        ₹{bundle.original_price}
+                      </span>
+                    )}{' '}
+                    <b className="text-[15px] font-bold text-[#1f1f1f]" style={{ fontFamily: 'Sora, sans-serif' }}>
+                      ₹{bundle.price}
+                    </b>
+                  </span>
+                  <Link
+                    to="/interview-prep"
+                    className="whitespace-nowrap rounded-[10px] bg-[#1f3a5f] px-4 py-2.5 text-[12.5px] font-bold text-white hover:bg-[#2d5fa6] transition-colors"
+                  >
+                    Get the bundle
+                  </Link>
+                </div>
+              )}
             </div>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-              {featuredItems.map((note) => renderNote(note))}
+
+            <div className="mt-5 grid gap-[18px] grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+              {packsLoading
+                ? Array.from({ length: 3 }).map((_, index) => (
+                    <InterviewPackCardSkeleton key={index} />
+                  ))
+                : visiblePacks.map((pack) => (
+                    <InterviewPackCard key={pack.id} pack={pack} />
+                  ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Preview cards grid */}
-        <div className="mt-8">
-          {!query && <h2 className="mb-5 text-xs font-bold tracking-widest text-[#9a9289] uppercase">All Topics</h2>}
+        {/* Free preview cards grid */}
+        <div className="mt-12">
+          {!query && (
+            <div className="mb-5 border-b border-[#e2dbd2] pb-4">
+              <h2 className="text-[18px] font-bold tracking-tight text-[#1f1f1f]">Explore Free Notes</h2>
+              <p className="mt-1 text-[12.5px] text-[#7b756d]">
+                Individual handwritten notes on various topics
+              </p>
+            </div>
+          )}
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
             {displayFiltered.length === 0 && (
               <div className="col-span-3 py-16 text-center text-sm text-[#9a9289]">
@@ -287,4 +352,4 @@ const PreviewsPage = () => {
   )
 }
 
-export default PreviewsPage
+export default LibraryPage

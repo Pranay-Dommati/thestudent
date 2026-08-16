@@ -655,3 +655,316 @@ class InfluencerCommission(models.Model):
 
     def __str__(self):
         return f"Commission for {self.influencer.name} ({self.status})"
+
+
+# -----------------------------------------------------------------------------
+# Content Packs — curated, paid PDF + quiz bundles (Interview Prep and beyond)
+# -----------------------------------------------------------------------------
+
+class ContentPack(models.Model):
+    """One purchasable pack: a full handwritten PDF plus a set of quizzes.
+
+    Deliberately generic. `section` is the top-level grouping shown in the
+    Library ('interview' today); `category` is the subject inside it. Neither is
+    an enum, so a whole new section of paid content can be added from the admin
+    without a migration or a frontend deploy.
+
+    The PDF lives in S3 under `interview-packs/` (see s3_key). Only the first
+    `free_page_count` pages are ever served to a user who has not bought the
+    pack — those pages are extracted once into a separate S3 object
+    (s3_free_key) so the full file is never handed to the browser.
+    """
+
+    SECTION_INTERVIEW = 'interview'
+
+    # Card/swatch theme keys — mirror the palette in PreviewCard.jsx so a pack
+    # renders in the same visual language as the rest of Scrib.
+    THEME_CHOICES = [
+        ('blue', 'Blue'),
+        ('green', 'Green'),
+        ('purple', 'Purple'),
+        ('orange', 'Orange'),
+        ('red', 'Red'),
+        ('olive', 'Olive'),
+    ]
+
+    section = models.CharField(
+        max_length=40,
+        default=SECTION_INTERVIEW,
+        db_index=True,
+        help_text="Top-level Library grouping, e.g. 'interview'.",
+    )
+    category = models.CharField(
+        max_length=80,
+        help_text="Subject shown above the title, e.g. 'Operating Systems'.",
+    )
+    title = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=True)
+    description = models.TextField(blank=True, default='')
+
+    price_paise = models.PositiveIntegerField(
+        default=9900,
+        help_text='Price for this single pack, in paise (9900 = ₹99).',
+    )
+    theme = models.CharField(max_length=20, choices=THEME_CHOICES, default='blue')
+
+    s3_key = models.CharField(
+        max_length=1024,
+        blank=True,
+        default='',
+        help_text='S3 object key of the full PDF.',
+    )
+    s3_free_key = models.CharField(
+        max_length=1024,
+        blank=True,
+        default='',
+        help_text='S3 key of the extracted free-preview PDF. Regenerated when the source PDF changes.',
+    )
+    page_count = models.PositiveIntegerField(default=0)
+    free_page_count = models.PositiveIntegerField(
+        default=10,
+        help_text='How many pages a user can read before paying.',
+    )
+
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'title']
+        indexes = [
+            models.Index(fields=['section', 'is_active'], name='scrib_pack_section_idx'),
+            models.Index(fields=['slug'], name='scrib_cpack_slug_idx'),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.title)[:240] or 'pack'
+            slug = base_slug
+            counter = 1
+            while ContentPack.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f'{base_slug}-{counter}'
+                counter += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+    @property
+    def quiz_count(self):
+        return self.quizzes.filter(is_active=True).count()
+
+    @property
+    def question_count(self):
+        return PackQuizQuestion.objects.filter(quiz__pack=self, quiz__is_active=True).count()
+
+    def __str__(self):
+        return f'{self.title} ({self.section})'
+
+
+class PackBundle(models.Model):
+    """A discounted 'buy everything' offer over a set of packs.
+
+    Buying a bundle entitles the user to every pack in `packs` — including packs
+    added to the bundle later, so the offer keeps its promise as the library grows.
+    """
+
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255, unique=True)
+    section = models.CharField(max_length=40, default=ContentPack.SECTION_INTERVIEW, db_index=True)
+    price_paise = models.PositiveIntegerField(
+        default=39900,
+        help_text='Bundle price in paise (39900 = ₹399).',
+    )
+    packs = models.ManyToManyField(ContentPack, related_name='bundles', blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.name)[:240] or 'bundle'
+            slug = base_slug
+            counter = 1
+            while PackBundle.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f'{base_slug}-{counter}'
+                counter += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+    @property
+    def original_price_paise(self):
+        """Sum of the individual prices — what the bundle is discounted against."""
+        return sum(p.price_paise for p in self.packs.filter(is_active=True))
+
+    def __str__(self):
+        return f'{self.name} (₹{self.price_paise / 100:g})'
+
+
+class PackQuiz(models.Model):
+    """One quiz inside a pack. Ten per pack in the launch catalogue."""
+
+    pack = models.ForeignKey(ContentPack, on_delete=models.CASCADE, related_name='quizzes')
+    number = models.PositiveSmallIntegerField(help_text='Position within the pack, starting at 1.')
+    title = models.CharField(max_length=255, blank=True, default='')
+    topic = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="Sub-line shown on the quiz card, e.g. 'Processes & scheduling'.",
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['pack', 'number']
+        unique_together = [('pack', 'number')]
+        verbose_name_plural = 'Pack quizzes'
+
+    @property
+    def question_count(self):
+        return self.questions.count()
+
+    def display_title(self):
+        return self.title or f'Quiz {self.number}'
+
+    def __str__(self):
+        return f'{self.pack.title} — {self.display_title()}'
+
+
+class PackQuizQuestion(models.Model):
+    """A single multiple-choice question.
+
+    `options` is a list of answer strings and `correct_index` points into it, so
+    a quiz can carry three or five options without a schema change.
+    """
+
+    quiz = models.ForeignKey(PackQuiz, on_delete=models.CASCADE, related_name='questions')
+    order = models.PositiveSmallIntegerField(default=0)
+    text = models.TextField()
+    options = models.JSONField(default=list)
+    correct_index = models.PositiveSmallIntegerField(default=0)
+    explanation = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['quiz', 'order', 'id']
+
+    def __str__(self):
+        return f'{self.quiz} Q{self.order}'
+
+
+class PackPurchase(models.Model):
+    """Proof that a user owns a pack — the entitlement the paywall checks.
+
+    Exactly one of `pack` / `bundle` is set. A bundle row grants access to every
+    pack in that bundle, so `user_owns_pack()` must check both shapes.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='pack_purchases',
+    )
+    pack = models.ForeignKey(
+        ContentPack,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='purchases',
+    )
+    bundle = models.ForeignKey(
+        PackBundle,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='purchases',
+    )
+    payment = models.ForeignKey(
+        Payment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pack_purchases',
+    )
+    amount_paise = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            # A user buys any given pack (or bundle) once. No `condition=` here —
+            # MariaDB doesn't support conditional unique constraints and silently
+            # drops them (see migration 0019's W036 warning). Plain constraints
+            # work everywhere instead, because every supported DB (MySQL/MariaDB,
+            # PostgreSQL, SQLite) treats NULL as distinct in a unique index: rows
+            # where `pack` is NULL (bundle-only purchases) never collide with each
+            # other, so this still only blocks a genuine duplicate (user, pack).
+            models.UniqueConstraint(
+                fields=['user', 'pack'],
+                name='scrib_uniq_user_pack_purchase',
+            ),
+            models.UniqueConstraint(
+                fields=['user', 'bundle'],
+                name='scrib_uniq_user_bundle_purchase',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'created_at'], name='scrib_packpurch_user_idx'),
+        ]
+
+    def __str__(self):
+        target = self.pack.title if self.pack else (self.bundle.name if self.bundle else '?')
+        return f'{self.user_id} owns {target}'
+
+
+class QuizAttempt(models.Model):
+    """One submitted attempt. Retakes create new rows; the card shows the best."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='quiz_attempts',
+    )
+    quiz = models.ForeignKey(PackQuiz, on_delete=models.CASCADE, related_name='attempts')
+    score = models.PositiveSmallIntegerField(default=0)
+    total = models.PositiveSmallIntegerField(default=0)
+    answers = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='{question_id: chosen_index} as submitted.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'quiz'], name='scrib_attempt_user_quiz_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.user_id} {self.quiz_id}: {self.score}/{self.total}'
+
+
+def user_owns_pack(user, pack):
+    """True when `user` has bought `pack` outright or inside a bundle."""
+    if not user or not user.is_authenticated:
+        return False
+    return PackPurchase.objects.filter(
+        Q(pack=pack) | Q(bundle__packs=pack),
+        user=user,
+    ).exists()
+
+
+def owned_pack_ids(user):
+    """Set of pack ids `user` can read in full — direct buys plus bundle grants."""
+    if not user or not user.is_authenticated:
+        return set()
+    direct = PackPurchase.objects.filter(
+        user=user, pack__isnull=False
+    ).values_list('pack_id', flat=True)
+    via_bundle = ContentPack.objects.filter(
+        bundles__purchases__user=user
+    ).values_list('id', flat=True)
+    return set(direct) | set(via_bundle)

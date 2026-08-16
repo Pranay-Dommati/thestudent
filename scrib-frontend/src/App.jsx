@@ -8,17 +8,13 @@ import MobileMenu from './components/MobileMenu'
 import BuyCreditsModal from './components/BuyCreditsModal'
 import PreviewPromoModal from './components/PreviewPromoModal'
 import FreeCreditsModal from './components/FreeCreditsModal'
-import PreviewCard from './components/PreviewCard'
+import InterviewPackCard from './components/InterviewPackCard'
+import InterviewPackCardSkeleton from './components/InterviewPackCardSkeleton'
+import { fetchCatalogue } from './services/packs'
 import { startPaymentFlow } from './services/paymentService'
 import customToast from './utils/customToast'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 import NetworkIndicator from './components/NetworkIndicator'
-
-const fallbackPreviewStrip = [
-  { id: 'osi-model', title: 'OSI Model', pdfUrl: null },
-  { id: 'linked-lists', title: 'Linked Lists', pdfUrl: null },
-  { id: 'dbms-normalization', title: 'DBMS Normalization', pdfUrl: null },
-]
 
 const pricingTiers = [
   {
@@ -58,11 +54,12 @@ const topicChips = ['Cloud Computing', 'Photosynthesis', "Ohm's Law", 'Recursion
 
 const App = () => {
   const { user, refreshUser, logout, isLoggedIn, loading } = useAuth()
-  const [previewStrip, setPreviewStrip] = useState(fallbackPreviewStrip)
   const [topicInput, setTopicInput] = useState('')
   const [showBuyModal, setShowBuyModal] = useState(false)
   const [processingPack, setProcessingPack] = useState(null)
-  const [activePreviewIndex, setActivePreviewIndex] = useState(0)
+  const [packStrip, setPackStrip] = useState([])
+  const [packsLoading, setPacksLoading] = useState(true)
+  const [packBundle, setPackBundle] = useState(null)
   const [showNoticeBanner, setShowNoticeBanner] = useState(() => {
     // Don't show again if user already dismissed it this session
     return sessionStorage.getItem('notice_banner_dismissed') !== 'true'
@@ -116,50 +113,20 @@ const App = () => {
   useEffect(() => {
     let isMounted = true
 
-    const loadPreviews = async () => {
+    const loadPacks = async () => {
       try {
-        const response = await axiosInstance.get('/scrib/previews/')
-        const data = response.data
-        if (!isMounted || !Array.isArray(data)) {
-          return
-        }
-        const desiredTitles = [
-          'software engineering',
-          'vlsi fabrication steps',
-          'ray optics'
-        ]
-        
-        const selectedItems = desiredTitles.map(t => data.find(item => item.title.toLowerCase() === t)).filter(Boolean)
-        
-        // Fallback to top items if any are missing
-        if (selectedItems.length < 3) {
-          const usedIds = new Set(selectedItems.map(i => i.id || i.slug || i.title))
-          for (const item of data) {
-            if (selectedItems.length >= 3) break
-            const id = item.id || item.slug || item.title
-            if (!usedIds.has(id)) {
-              selectedItems.push(item)
-              usedIds.add(id)
-            }
-          }
-        }
-        
-        const mapped = selectedItems.map((item) => ({
-          id: item.id ?? item.slug ?? item.title,
-          slug: item.slug,
-          title: item.title,
-          pdfUrl: item.pdf_url || null,
-          imageUrl: item.image_url || null,
-        }))
-        if (mapped.length) {
-          setPreviewStrip(mapped)
-        }
+        const data = await fetchCatalogue('interview')
+        if (!isMounted) return
+        setPackStrip((data.packs || []).slice(0, 3))
+        setPackBundle(data.bundle || null)
       } catch {
-        // Keep fallback previews if API is unavailable.
+        // Homepage still renders without the Interview Notes strip.
+      } finally {
+        if (isMounted) setPacksLoading(false)
       }
     }
 
-    loadPreviews()
+    loadPacks()
 
     return () => {
       isMounted = false
@@ -205,7 +172,7 @@ const App = () => {
             </div>
           </div>
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
-            <Link to="/previews" className="hover:text-[#1f1f1f]">Previews</Link>
+            <Link to="/library" className="hover:text-[#1f1f1f]">Library</Link>
             <Link to="/generate" className="hover:text-[#1f1f1f]">Generate</Link>
             <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
             {isLoggedIn && (
@@ -264,15 +231,15 @@ const App = () => {
               </span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-base text-[#6f6a63] md:text-xl leading-relaxed">
-              Search 50+ free previews or generate your own custom <br className="hidden sm:block" />
-              handwritten notes for any topic — in seconds.
+              Interview notes, free previews, or generate custom <br className="hidden sm:block" />
+              handwritten notes for any topic
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <Link
-                to="/previews"
+                to="/library"
                 className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold text-[#1f1f1f] hover:bg-[#faf8f3] transition-colors"
               >
-                Browse free previews
+                Browse the Library
               </Link>
               <button
                 onClick={() => navigate('/generate')}
@@ -295,84 +262,46 @@ const App = () => {
           </div>
         </section>
 
-        <section id="landing-previews" className="py-10">
+        <section id="landing-library" className="py-10">
           <div className="mx-auto max-w-6xl px-6">
-            <div>
-              <Link to="/previews" className="inline-block hover:opacity-80">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7b756d]">
-                  Free previews - browse and download &rarr;
-                </p>
-              </Link>
-              <div 
-                className="mt-4 flex overflow-x-auto gap-4 pb-4 snap-x hide-scrollbar md:grid md:grid-cols-4 md:overflow-x-visible md:pb-0" 
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                onScroll={(e) => {
-                  const scrollLeft = e.target.scrollLeft;
-                  const itemWidth = 296; // 280px width + 16px gap
-                  const index = Math.round(scrollLeft / itemWidth);
-                  setActivePreviewIndex(index);
-                }}
-              >
-                {previewStrip.map((note) => (
-                  <div
-                    key={note.id}
-                    className={`shrink-0 w-[280px] md:w-auto snap-start transition-transform duration-200 ${note.pdfUrl ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg rounded-xl' : 'opacity-70'}`}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      if (!note.pdfUrl) return
-                      navigate(`/view/${note.slug}`, {
-                        state: {
-                          pdfUrl: note.pdfUrl,
-                          title: note.title,
-                          topics: [note.title],
-                          totalPages: 1,
-                          isPack: true,
-                          returnUrl: '/'
-                        }
-                      })
-                    }}
-                  >
-                    {!note.pdfUrl && !note.imageUrl ? (
-                      <div className="animate-pulse h-full flex flex-col rounded-xl border border-[#e2dbd2] bg-white overflow-hidden">
-                        <div className="h-28 w-full bg-[#e8e2d9]"></div>
-                        <div className="flex flex-1 flex-col p-4">
-                          <div className="mb-2 h-3 w-1/3 rounded bg-[#e8e2d9]"></div>
-                          <div className="h-4 w-3/4 rounded bg-[#e8e2d9]"></div>
-                          <div className="mt-auto pt-4 flex justify-between">
-                            <div className="h-3 w-16 rounded bg-[#e8e2d9]"></div>
-                            <div className="h-5 w-12 rounded-full bg-[#e8e2d9]"></div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <PreviewCard title={note.title} subject={note.subject || 'Preview'} />
-                    )}
-                  </div>
-                ))}
-                
-                {/* 50+ more card */}
-                <Link to="/previews" className="shrink-0 w-[280px] md:w-auto snap-start flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[#d6cfc6] bg-[#f4f1ea] p-4 transition-colors hover:bg-[#f0ece5]">
-                  <div className="grid grid-cols-3 gap-1">
-                    {Array.from({ length: 9 }).map((_, index) => (
-                      <span key={index} className="h-1 w-1 rounded-full bg-[#cfc7bd]" />
-                    ))}
-                  </div>
-                  <p className="text-sm font-medium text-[#8a847c]">50+ more</p>
+            {/* Interview Notes — the paid packs lead the Library on the homepage */}
+            {(packsLoading || packStrip.length > 0) && (
+              <div className="mb-12">
+                <Link to="/library" className="inline-block hover:opacity-80">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7b756d]">
+                    Interview Notes Library - browse all packs &rarr;
+                  </p>
                 </Link>
+                <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
+                  {packsLoading ? (
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <InterviewPackCardSkeleton key={index} />
+                    ))
+                  ) : (
+                  <>
+                  {packStrip.map((pack) => (
+                    <InterviewPackCard key={pack.id} pack={pack} />
+                  ))}
+                  <Link
+                    to="/library"
+                    className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border border-dashed border-[#d6cfc6] bg-[#f4f1ea] p-5 text-center transition-colors hover:bg-[#f0ece5]"
+                  >
+                    <div className="grid grid-cols-3 gap-1">
+                      {Array.from({ length: 9 }).map((_, index) => (
+                        <span key={index} className="h-1 w-1 rounded-full bg-[#cfc7bd]" />
+                      ))}
+                    </div>
+                    <p className="text-sm font-medium text-[#8a847c]">
+                      {packBundle
+                        ? `All ${packBundle.pack_count} packs \u00b7 \u20b9${packBundle.price}`
+                        : 'See all packs'}
+                    </p>
+                  </Link>
+                  </>
+                  )}
+                </div>
               </div>
-
-              {/* Scroll indicators (Dots) for mobile only */}
-              <div className="mt-2 flex justify-center gap-1.5 md:hidden">
-                {Array.from({ length: previewStrip.length + 1 }).map((_, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`h-1.5 rounded-full transition-all ${
-                      idx === activePreviewIndex ? 'w-4 bg-[#1f1f1f]' : 'w-1.5 bg-[#d6cfc6]'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
+            )}
           </div>
         </section>
 

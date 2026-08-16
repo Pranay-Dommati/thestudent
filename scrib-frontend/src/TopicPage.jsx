@@ -155,7 +155,7 @@ const TopicPage = () => {
         <div className="flex items-center gap-2 text-sm text-[#7b756d] mb-6">
           <Link to="/" className="hover:text-[#1f1f1f]">Home</Link>
           <span>/</span>
-          <Link to="/previews" className="hover:text-[#1f1f1f]">Topics</Link>
+          <Link to="/library" className="hover:text-[#1f1f1f]">Library</Link>
           <span>/</span>
           <span className="text-[#1f1f1f] truncate">{topic.title}</span>
         </div>

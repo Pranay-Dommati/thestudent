@@ -1,6 +1,10 @@
 from rest_framework import serializers
 # pyrefly: ignore [missing-import]
-from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction, PromoCode, PromoCodeRedemption
+from .models import (
+    PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction,
+    PromoCode, PromoCodeRedemption,
+    ContentPack, PackBundle, PackQuiz, PackQuizQuestion,
+)
 
 
 class PreviewNoteSerializer(serializers.ModelSerializer):
@@ -161,3 +165,163 @@ class PromoCodeListSerializer(serializers.ModelSerializer):
             'max_redemptions', 'times_redeemed', 'remaining_redemptions',
             'is_active', 'expires_at', 'created_at', 'status',
         ]
+
+
+# ── Content packs (Interview Prep) ────────────────────────────────────────────
+
+def _counted(obj, annotated_attr, property_attr):
+    """Prefer the queryset annotation; fall back to the model property.
+
+    Views annotate these counts to avoid a query per row, but a serializer may
+    also be handed a plain instance — this keeps both paths working.
+    """
+    value = getattr(obj, annotated_attr, None)
+    return getattr(obj, property_attr) if value is None else value
+
+
+class ContentPackCardSerializer(serializers.ModelSerializer):
+    """Grid/rail card. Never exposes S3 keys."""
+
+    quiz_count = serializers.SerializerMethodField()
+    question_count = serializers.SerializerMethodField()
+    price = serializers.SerializerMethodField()
+    owned = serializers.SerializerMethodField()
+
+    def get_quiz_count(self, obj):
+        return _counted(obj, 'annotated_quiz_count', 'quiz_count')
+
+    def get_question_count(self, obj):
+        return _counted(obj, 'annotated_question_count', 'question_count')
+
+    class Meta:
+        model = ContentPack
+        fields = [
+            'id', 'slug', 'section', 'category', 'title', 'description',
+            'theme', 'page_count', 'free_page_count',
+            'price_paise', 'price', 'quiz_count', 'question_count', 'owned',
+        ]
+
+    def get_price(self, obj):
+        return obj.price_paise / 100
+
+    def get_owned(self, obj):
+        return obj.id in self.context.get('owned_ids', set())
+
+
+class PackQuizCardSerializer(serializers.ModelSerializer):
+    """Quiz card — question count and the user's best score, never the answers."""
+
+    title = serializers.CharField(source='display_title', read_only=True)
+    question_count = serializers.SerializerMethodField()
+    best_score = serializers.SerializerMethodField()
+    attempts = serializers.SerializerMethodField()
+
+    def get_question_count(self, obj):
+        return _counted(obj, 'annotated_question_count', 'question_count')
+
+    class Meta:
+        model = PackQuiz
+        fields = ['id', 'number', 'title', 'topic', 'question_count', 'best_score', 'attempts']
+
+    def get_best_score(self, obj):
+        return self.context.get('best_scores', {}).get(obj.id)
+
+    def get_attempts(self, obj):
+        return self.context.get('attempt_counts', {}).get(obj.id, 0)
+
+
+class PackQuizQuestionSerializer(serializers.ModelSerializer):
+    """Question as sent to the browser — correct_index and explanation withheld
+    until the attempt is submitted and graded server-side."""
+
+    class Meta:
+        model = PackQuizQuestion
+        fields = ['id', 'order', 'text', 'options']
+
+
+class PackBundleSerializer(serializers.ModelSerializer):
+    price = serializers.SerializerMethodField()
+    original_price = serializers.SerializerMethodField()
+    pack_count = serializers.SerializerMethodField()
+    owned = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PackBundle
+        fields = [
+            'id', 'slug', 'name', 'section',
+            'price_paise', 'price', 'original_price', 'pack_count', 'owned',
+        ]
+
+    def get_price(self, obj):
+        return obj.price_paise / 100
+
+    def get_original_price(self, obj):
+        return obj.original_price_paise / 100
+
+    def get_pack_count(self, obj):
+        return obj.packs.filter(is_active=True).count()
+
+    def get_owned(self, obj):
+        return obj.id in self.context.get('owned_bundle_ids', set())
+
+
+# ── Admin-side serializers (expose the fields the admin panel edits) ──────────
+
+class AdminContentPackSerializer(serializers.ModelSerializer):
+    quiz_count = serializers.SerializerMethodField()
+    question_count = serializers.SerializerMethodField()
+    has_pdf = serializers.SerializerMethodField()
+    purchase_count = serializers.SerializerMethodField()
+
+    def get_quiz_count(self, obj):
+        return _counted(obj, 'annotated_quiz_count', 'quiz_count')
+
+    def get_question_count(self, obj):
+        return _counted(obj, 'annotated_question_count', 'question_count')
+
+    class Meta:
+        model = ContentPack
+        fields = [
+            'id', 'slug', 'section', 'category', 'title', 'description',
+            'theme', 'price_paise', 'page_count', 'free_page_count',
+            'sort_order', 'is_active', 'has_pdf', 'quiz_count', 'question_count',
+            'purchase_count', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['slug', 'page_count', 'created_at', 'updated_at']
+
+    def get_has_pdf(self, obj):
+        return bool(obj.s3_key)
+
+    def get_purchase_count(self, obj):
+        return obj.purchases.count()
+
+
+class AdminPackQuizSerializer(serializers.ModelSerializer):
+    question_count = serializers.SerializerMethodField()
+
+    def get_question_count(self, obj):
+        return _counted(obj, 'annotated_question_count', 'question_count')
+
+    class Meta:
+        model = PackQuiz
+        fields = ['id', 'pack', 'number', 'title', 'topic', 'is_active', 'question_count', 'created_at']
+        read_only_fields = ['created_at']
+
+
+class AdminPackQuizQuestionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PackQuizQuestion
+        fields = ['id', 'quiz', 'order', 'text', 'options', 'correct_index', 'explanation']
+
+    def validate(self, attrs):
+        options = attrs.get('options', getattr(self.instance, 'options', None)) or []
+        if not isinstance(options, list) or len(options) < 2:
+            raise serializers.ValidationError({'options': 'Give at least two answer options.'})
+        if any(not str(o).strip() for o in options):
+            raise serializers.ValidationError({'options': 'Answer options cannot be blank.'})
+        correct = attrs.get('correct_index', getattr(self.instance, 'correct_index', 0))
+        if correct is None or correct < 0 or correct >= len(options):
+            raise serializers.ValidationError(
+                {'correct_index': f'Pick the correct answer (0–{len(options) - 1}).'}
+            )
+        return attrs
