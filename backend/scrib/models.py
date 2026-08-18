@@ -762,10 +762,21 @@ class ContentPack(models.Model):
 
 
 class PackBundle(models.Model):
-    """A discounted 'buy everything' offer over a set of packs.
+    """A discounted 'buy the rest' offer over a set of packs.
 
-    Buying a bundle entitles the user to every pack in `packs` — including packs
-    added to the bundle later, so the offer keeps its promise as the library grows.
+    Two shapes, told apart by `covers_count`:
+
+    * **Full offer** (`covers_count = 0`): a fixed set of packs listed in
+      `packs`. Buying it entitles the user to every pack in that set — including
+      packs added to the bundle later, so the offer keeps its promise as the
+      library grows. Only shown to users who own none of the section.
+    * **Top-up tier** (`covers_count = N`): shown to a user who still needs
+      exactly N packs, whichever ones those are. `packs` stays empty because the
+      set is per-user, so buying it grants an explicit PackPurchase row per pack
+      the buyer was missing (see `grant_bundle`).
+
+    Without the tiers, someone who had already bought one pack was still shown
+    "unlock all 3 packs" — an offer that re-sold them what they owned.
     """
 
     name = models.CharField(max_length=255)
@@ -774,6 +785,16 @@ class PackBundle(models.Model):
     price_paise = models.PositiveIntegerField(
         default=39900,
         help_text='Bundle price in paise (39900 = ₹399).',
+    )
+    covers_count = models.PositiveSmallIntegerField(
+        default=0,
+        help_text=(
+            'How many still-unowned packs this offer covers. 0 = the full offer '
+            'over the packs picked below, shown only to users who own none of '
+            'them. Set 2 to price the "already owns one, sell the other two" '
+            'top-up — leave the pack list empty for those, the packs are '
+            'whichever ones the buyer is missing.'
+        ),
     )
     packs = models.ManyToManyField(ContentPack, related_name='bundles', blank=True)
     is_active = models.BooleanField(default=True)
@@ -968,3 +989,73 @@ def owned_pack_ids(user):
         bundles__purchases__user=user
     ).values_list('id', flat=True)
     return set(direct) | set(via_bundle)
+
+
+def bundle_offer_for(user, section):
+    """The bundle offer to show `user` in `section`, as `(bundle, packs)`.
+
+    `packs` is exactly what the offer would unlock — the packs they don't own
+    yet — so the price, the count and the "instead of ₹X" strike-through all
+    describe what they'd actually be buying.
+
+    Returns `(None, [])` when there is nothing sensible to offer: fewer than two
+    packs left (one pack is just that pack's own price, and zero means they own
+    the section), or no active tier priced for the number they still need.
+    """
+    active = list(ContentPack.objects.filter(section=section, is_active=True))
+    owned = owned_pack_ids(user)
+    remaining = [p for p in active if p.id not in owned]
+
+    if len(remaining) < 2:
+        return None, []
+
+    bundles = PackBundle.objects.filter(section=section, is_active=True)
+
+    # A tier priced for exactly this many packs wins. Falling back to the full
+    # offer is only correct when they own none of it — that is what it is priced
+    # against, and its `packs` grant would hand over the whole set regardless.
+    bundle = bundles.filter(covers_count=len(remaining)).first()
+    if not bundle and len(remaining) == len(active):
+        bundle = bundles.filter(covers_count=0).first()
+
+    if not bundle:
+        return None, []
+
+    # The full offer's own pack list is the authority on what it unlocks; a tier
+    # has no list of its own, so it unlocks whatever the buyer is missing.
+    if bundle.covers_count == 0:
+        offer_packs = [p for p in bundle.packs.filter(is_active=True)] or remaining
+    else:
+        offer_packs = remaining
+
+    return bundle, offer_packs
+
+
+def grant_bundle(user, bundle, payment=None, amount_paise=0):
+    """Record a bundle purchase and make sure it actually unlocks something.
+
+    A full offer entitles through its own `packs`, so the single bundle row is
+    the entitlement. A top-up tier has no pack list — its row exists for
+    revenue and for the once-only constraint — so the packs the buyer was
+    missing are granted explicitly here, at the moment of purchase.
+    """
+    purchase, created = PackPurchase.objects.get_or_create(
+        user=user,
+        pack=None,
+        bundle=bundle,
+        defaults={'payment': payment, 'amount_paise': amount_paise},
+    )
+
+    if bundle.covers_count:
+        owned = owned_pack_ids(user)
+        for pack in ContentPack.objects.filter(section=bundle.section, is_active=True):
+            if pack.id in owned:
+                continue
+            # amount stays on the bundle row above, so per-pack rows carry 0 and
+            # revenue isn't counted twice.
+            PackPurchase.objects.get_or_create(
+                user=user, pack=pack, bundle=None,
+                defaults={'payment': payment, 'amount_paise': 0},
+            )
+
+    return purchase, created

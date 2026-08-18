@@ -27,6 +27,7 @@ const LibraryPage = () => {
   const [previewCards, setPreviewCards] = useState(fallbackPreviewCards)
   const [query, setQuery] = useState('')
   const [visibleCount, setVisibleCount] = useState(10)
+  const [activePackIndex, setActivePackIndex] = useState(0)
   const [packs, setPacks] = useState([])
   const [bundle, setBundle] = useState(null)
   const [packsLoading, setPacksLoading] = useState(true)
@@ -244,18 +245,18 @@ const LibraryPage = () => {
             <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-black/[0.08] to-transparent -skew-x-12" />
           </div>
 
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="relative z-10 flex flex-col items-start sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 className="text-lg font-bold text-[#1f1f1f]">
                 Wanna generate your own custom notes?
               </h3>
-              <p className="mt-1 text-[13px] text-[#6f6a63]">
+              <p className="mt-1 hidden text-[13px] text-[#6f6a63] sm:block">
                 Try it for ₹19 · ready in a minute · 2 PDF pages
               </p>
             </div>
-            <Link 
-              to="/generate" 
-              className="flex-shrink-0 inline-flex items-center justify-center rounded-xl bg-[#1f1f1f] px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-black transition-colors"
+            <Link
+              to="/generate"
+              className="flex-shrink-0 inline-flex items-center justify-center rounded-lg bg-[#1f1f1f] px-5 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-black transition-colors sm:rounded-xl sm:px-6 sm:py-2.5 sm:text-sm sm:font-bold"
             >
               Try now &rarr;
             </Link>
@@ -267,7 +268,7 @@ const LibraryPage = () => {
             fetch resolves — a real fetch failure still hides it entirely. */}
         {(packsLoading || visiblePacks.length > 0) && (
           <section className="mt-11">
-            <div className="flex flex-wrap items-end justify-between gap-6 border-b border-[#e2dbd2] pb-4">
+            <div className="flex flex-col items-start gap-4 border-b border-[#e2dbd2] pb-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-6">
               <div className="flex flex-col gap-1.5">
                 <h2 className="text-[21px] font-bold tracking-tight text-[#1f1f1f]">
                   Interview Prep Packs
@@ -277,22 +278,32 @@ const LibraryPage = () => {
                 </p>
               </div>
 
+              {/* On mobile the bundle offer becomes its own bounded card with a
+                  full-width CTA — floating it as loose text next to a button read
+                  as an afterthought. From sm: up the card chrome is stripped back
+                  off so the desktop header row is unchanged. */}
               {bundle && !bundle.owned && (
-                <div className="flex flex-shrink-0 items-center gap-3 text-[13px] text-[#7b756d]">
-                  <span>
-                    All {bundle.pack_count} packs{' '}
-                    {bundle.original_price > bundle.price && (
-                      <span className="text-[12.5px] text-[#9a9289] line-through">
-                        ₹{bundle.original_price}
-                      </span>
-                    )}{' '}
-                    <b className="text-[15px] font-bold text-[#1f1f1f]" style={{ fontFamily: 'Sora, sans-serif' }}>
-                      ₹{bundle.price}
-                    </b>
+                <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-[#e2dbd2] bg-white p-3 sm:w-auto sm:flex-shrink-0 sm:gap-3 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0">
+                  <span className="flex flex-col text-[13px] text-[#7b756d] sm:flex-row sm:items-baseline sm:gap-1.5">
+                    {/* The offer only ever covers packs this user hasn't bought,
+                        so "all" would be a lie once they own one of them. */}
+                    <span>
+                      {bundle.pack_count >= packs.length ? 'All' : 'Remaining'} {bundle.pack_count} packs
+                    </span>
+                    <span className="flex items-baseline gap-1.5">
+                      {bundle.original_price > bundle.price && (
+                        <span className="text-[12.5px] text-[#9a9289] line-through">
+                          ₹{bundle.original_price}
+                        </span>
+                      )}
+                      <b className="text-[15px] font-bold text-[#1f1f1f]" style={{ fontFamily: 'Sora, sans-serif' }}>
+                        ₹{bundle.price}
+                      </b>
+                    </span>
                   </span>
                   <Link
                     to="/interview-prep"
-                    className="whitespace-nowrap rounded-[10px] bg-[#1f3a5f] px-4 py-2.5 text-[12.5px] font-bold text-white hover:bg-[#2d5fa6] transition-colors"
+                    className="flex-shrink-0 whitespace-nowrap rounded-lg bg-[#1f3a5f] px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-[#2d5fa6] transition-colors sm:rounded-[10px] sm:px-4 sm:py-2.5 sm:text-[12.5px] sm:font-bold"
                   >
                     Get the bundle
                   </Link>
@@ -300,15 +311,40 @@ const LibraryPage = () => {
               )}
             </div>
 
-            <div className="mt-5 grid gap-[18px] grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+            <div
+              className="mt-5 flex gap-4 overflow-x-auto pb-2 snap-x hide-scrollbar sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:pb-0 md:grid-cols-3"
+              onScroll={(e) => {
+                const scrollLeft = e.target.scrollLeft
+                const itemWidth = 264 // 248px card + 16px gap
+                setActivePackIndex(Math.round(scrollLeft / itemWidth))
+              }}
+            >
               {packsLoading
                 ? Array.from({ length: 3 }).map((_, index) => (
-                    <InterviewPackCardSkeleton key={index} />
+                    <div key={index} className="w-[248px] shrink-0 snap-start sm:w-auto">
+                      <InterviewPackCardSkeleton />
+                    </div>
                   ))
                 : visiblePacks.map((pack) => (
-                    <InterviewPackCard key={pack.id} pack={pack} />
+                    <div key={pack.id} className="w-[248px] shrink-0 snap-start sm:w-auto">
+                      <InterviewPackCard pack={pack} />
+                    </div>
                   ))}
             </div>
+
+            {/* Scroll indicators (dots) — mobile only */}
+            {!packsLoading && visiblePacks.length > 1 && (
+              <div className="mt-2 flex justify-center gap-1.5 sm:hidden">
+                {visiblePacks.map((pack, idx) => (
+                  <div
+                    key={pack.id}
+                    className={`h-1.5 rounded-full transition-all ${
+                      idx === activePackIndex ? 'w-4 bg-[#1f1f1f]' : 'w-1.5 bg-[#d6cfc6]'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
           </section>
         )}
 

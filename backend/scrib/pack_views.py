@@ -31,6 +31,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from .models import (
     ContentPack, PackBundle, PackQuiz, PackQuizQuestion,
     PackPurchase, Payment, QuizAttempt, owned_pack_ids,
+    bundle_offer_for, grant_bundle,
 )
 # pyrefly: ignore [missing-import]
 from .serializers import (
@@ -200,7 +201,7 @@ class PackListView(APIView):
             .values_list('bundle_id', flat=True)
         ) if request.user.is_authenticated else set()
 
-        bundle = PackBundle.objects.filter(section=section, is_active=True).first()
+        bundle, offer_packs = bundle_offer_for(request.user, section)
 
         return Response({
             'section': section,
@@ -208,7 +209,8 @@ class PackListView(APIView):
                 packs, many=True, context={'owned_ids': owned_ids}
             ).data,
             'bundle': PackBundleSerializer(
-                bundle, context={'owned_bundle_ids': owned_bundle_ids}
+                bundle,
+                context={'owned_bundle_ids': owned_bundle_ids, 'offer_packs': offer_packs},
             ).data if bundle else None,
         })
 
@@ -259,7 +261,7 @@ class PackDetailView(APIView):
                 best_scores[row['quiz_id']] = row['best']
                 attempt_counts[row['quiz_id']] = row['n']
 
-        bundle = PackBundle.objects.filter(section=pack.section, is_active=True).first()
+        bundle, offer_packs = bundle_offer_for(request.user, pack.section)
         owned_bundle_ids = set(
             PackPurchase.objects
             .filter(user=request.user.id, bundle__isnull=False)
@@ -285,7 +287,8 @@ class PackDetailView(APIView):
                 context={'best_scores': best_scores, 'attempt_counts': attempt_counts},
             ).data,
             'bundle': PackBundleSerializer(
-                bundle, context={'owned_bundle_ids': owned_bundle_ids}
+                bundle,
+                context={'owned_bundle_ids': owned_bundle_ids, 'offer_packs': offer_packs},
             ).data if bundle else None,
         })
 
@@ -471,6 +474,16 @@ class PackPurchaseOrderView(APIView):
                 return error_response('Bundle not found', status_code=404, code='not_found')
             if PackPurchase.objects.filter(user=request.user, bundle=bundle).exists():
                 return error_response('You already own this bundle', status_code=409, code='already_owned')
+            # Tiers are priced per number of packs still needed, so the only
+            # bundle a user may buy is the one currently offered to them —
+            # otherwise someone owning two packs could post the 3-pack slug and
+            # pay the bulk price for the one pack they're missing.
+            offered, _ = bundle_offer_for(request.user, bundle.section)
+            if not offered or offered.id != bundle.id:
+                return error_response(
+                    'That offer is not available for your account',
+                    status_code=409, code='offer_unavailable',
+                )
             amount_paise, label = bundle.price_paise, bundle.name
 
         if amount_paise <= 0:
@@ -579,12 +592,20 @@ class PackPurchaseVerifyView(APIView):
                     'status', 'razorpay_payment_id', 'razorpay_signature', 'updated_at',
                 ])
 
-            purchase, created = PackPurchase.objects.get_or_create(
-                user=request.user,
-                pack=pack,
-                bundle=bundle,
-                defaults={'payment': locked, 'amount_paise': expected},
-            )
+            if bundle:
+                # Deliberately not re-checking that the offer is still on the
+                # table: the money has already moved, so the only safe move here
+                # is to hand over whatever it bought.
+                purchase, created = grant_bundle(
+                    request.user, bundle, payment=locked, amount_paise=expected,
+                )
+            else:
+                purchase, created = PackPurchase.objects.get_or_create(
+                    user=request.user,
+                    pack=pack,
+                    bundle=None,
+                    defaults={'payment': locked, 'amount_paise': expected},
+                )
 
         logger.info(
             '[packs] purchase %s user=%s item=%s',
@@ -1237,10 +1258,10 @@ class AdminQuestionDetailView(_AdminView):
 
 
 class AdminBundleListView(_AdminView):
-    """GET / POST /api/scrib/admin/bundles/ — the 'buy everything' offer."""
+    """GET / POST /api/scrib/admin/bundles/ — the full offer and its top-up tiers."""
 
     def get(self, request):
-        bundles = PackBundle.objects.all()
+        bundles = PackBundle.objects.all().order_by('covers_count', 'name')
         return Response({
             'results': [
                 {
@@ -1261,6 +1282,7 @@ class AdminBundleListView(_AdminView):
             name=name,
             section=str(request.data.get('section') or ContentPack.SECTION_INTERVIEW).strip(),
             price_paise=int(request.data.get('price_paise') or 39900),
+            covers_count=int(request.data.get('covers_count') or 0),
             is_active=bool(request.data.get('is_active', True)),
         )
         pack_ids = request.data.get('pack_ids')
@@ -1284,6 +1306,8 @@ class AdminBundleDetailView(_AdminView):
                 setattr(bundle, field, str(request.data[field]).strip())
         if 'price_paise' in request.data:
             bundle.price_paise = int(request.data['price_paise'] or 0)
+        if 'covers_count' in request.data:
+            bundle.covers_count = int(request.data['covers_count'] or 0)
         if 'is_active' in request.data:
             bundle.is_active = bool(request.data['is_active'])
         bundle.save()

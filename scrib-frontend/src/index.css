@@ -37,6 +37,16 @@ input, textarea, select {
   font-size: 16px;
 }
 
+/* Hides the scrollbar on horizontally-scrollable strips (mobile card carousels)
+   while keeping native touch/momentum scrolling. */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 h1, h2, h3 {
   font-family: "Sora", sans-serif;
   letter-spacing: -0.02em;

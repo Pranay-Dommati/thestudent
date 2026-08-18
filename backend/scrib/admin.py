@@ -193,14 +193,20 @@ class ContentPackAdmin(admin.ModelAdmin):
 
 @admin.register(PackBundle)
 class PackBundleAdmin(admin.ModelAdmin):
-    list_display = ('name', 'section', 'price_inr', 'pack_total', 'is_active')
-    list_filter = ('section', 'is_active')
+    list_display = ('name', 'section', 'price_inr', 'offer_scope', 'pack_total', 'is_active')
+    list_filter = ('section', 'is_active', 'covers_count')
     filter_horizontal = ('packs',)
     prepopulated_fields = {'slug': ('name',)}
 
     @admin.display(description='Price')
     def price_inr(self, obj):
         return f'₹{obj.price_paise / 100:g}'
+
+    @admin.display(description='Shown to')
+    def offer_scope(self, obj):
+        if not obj.covers_count:
+            return 'Users who own none of it'
+        return f'Users still missing {obj.covers_count} packs'
 
     @admin.display(description='Packs')
     def pack_total(self, obj):

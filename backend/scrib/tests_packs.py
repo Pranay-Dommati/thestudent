@@ -13,6 +13,7 @@ from rest_framework.test import APIClient
 from .models import (
     ContentPack, PackBundle, PackQuiz, PackQuizQuestion,
     PackPurchase, QuizAttempt, owned_pack_ids, user_owns_pack,
+    bundle_offer_for, grant_bundle,
 )
 
 User = get_user_model()
@@ -728,3 +729,160 @@ class QuizShuffleOptionsTests(TestCase):
     def test_unknown_quiz_is_404(self):
         res = self.client.post('/api/scrib/admin/quizzes/999999/shuffle-options/')
         self.assertEqual(res.status_code, 404)
+
+
+class BundleOfferTests(TestCase):
+    """The bundle shown must describe what the buyer still needs.
+
+    Before tiers existed a user who owned one pack was still pitched "unlock all
+    3 packs" at the full price — an offer that re-sold them something they had
+    already paid for.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='tier@example.com', full_name='Tier', password='pw12345!'
+        )
+        self.os = make_pack(slug='os-t', title='OS', price=9900)
+        self.oop = make_pack(slug='oop-t', title='OOP', price=9900)
+        self.cn = make_pack(slug='cn-t', title='CN', price=9900)
+
+        self.full = PackBundle.objects.create(
+            name='All Interview Packs', slug='all-t',
+            section=ContentPack.SECTION_INTERVIEW,
+            price_paise=19900, covers_count=0,
+        )
+        self.full.packs.set([self.os, self.oop, self.cn])
+
+        self.two = PackBundle.objects.create(
+            name='Any 2 Interview Packs', slug='two-t',
+            section=ContentPack.SECTION_INTERVIEW,
+            price_paise=14900, covers_count=2,
+        )
+
+    def offer(self):
+        return bundle_offer_for(self.user, ContentPack.SECTION_INTERVIEW)
+
+    def test_owning_nothing_gets_the_full_offer(self):
+        bundle, packs = self.offer()
+        self.assertEqual(bundle, self.full)
+        self.assertEqual(len(packs), 3)
+
+    def test_owning_one_gets_the_two_pack_tier_over_the_remaining_packs(self):
+        PackPurchase.objects.create(user=self.user, pack=self.os)
+
+        bundle, packs = self.offer()
+
+        self.assertEqual(bundle, self.two)
+        self.assertEqual(bundle.price_paise, 14900)
+        self.assertEqual({p.slug for p in packs}, {'oop-t', 'cn-t'})
+
+    def test_owning_two_offers_nothing_a_single_pack_is_its_own_price(self):
+        PackPurchase.objects.create(user=self.user, pack=self.os)
+        PackPurchase.objects.create(user=self.user, pack=self.oop)
+
+        bundle, packs = self.offer()
+
+        self.assertIsNone(bundle)
+        self.assertEqual(packs, [])
+
+    def test_owning_everything_removes_the_offer(self):
+        for pack in (self.os, self.oop, self.cn):
+            PackPurchase.objects.create(user=self.user, pack=pack)
+
+        bundle, _ = self.offer()
+
+        self.assertIsNone(bundle)
+
+    def test_full_bundle_purchase_still_grants_every_pack(self):
+        bundle, _ = self.offer()
+        grant_bundle(self.user, bundle, amount_paise=19900)
+
+        self.assertEqual(
+            owned_pack_ids(self.user), {self.os.id, self.oop.id, self.cn.id},
+        )
+
+    def test_tier_purchase_grants_exactly_the_missing_packs(self):
+        PackPurchase.objects.create(user=self.user, pack=self.os)
+        bundle, _ = self.offer()
+
+        grant_bundle(self.user, bundle, amount_paise=14900)
+
+        self.assertEqual(
+            owned_pack_ids(self.user), {self.os.id, self.oop.id, self.cn.id},
+        )
+
+    def test_tier_revenue_is_recorded_once_not_per_granted_pack(self):
+        PackPurchase.objects.create(user=self.user, pack=self.os)
+        bundle, _ = self.offer()
+
+        grant_bundle(self.user, bundle, amount_paise=14900)
+
+        total = sum(
+            PackPurchase.objects.filter(user=self.user)
+            .exclude(pk__in=[])
+            .values_list('amount_paise', flat=True)
+        )
+        self.assertEqual(total, 14900)
+
+    def test_missing_tier_shows_no_offer_rather_than_a_misleading_one(self):
+        self.two.delete()
+        PackPurchase.objects.create(user=self.user, pack=self.os)
+
+        bundle, _ = self.offer()
+
+        self.assertIsNone(bundle)
+
+    def test_inactive_pack_is_not_counted_as_something_left_to_sell(self):
+        PackPurchase.objects.create(user=self.user, pack=self.os)
+        self.cn.is_active = False
+        self.cn.save()
+
+        # Only OOP remains, so there is nothing to bundle.
+        bundle, _ = self.offer()
+
+        self.assertIsNone(bundle)
+
+
+class BundleOfferPurchaseGuardTests(TestCase):
+    """A user must not be able to buy an offer that isn't on the table for them."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            email='guard@example.com', full_name='Guard', password='pw12345!'
+        )
+        self.client.force_authenticate(self.user)
+        self.os = make_pack(slug='os-g', title='OS', price=9900)
+        self.oop = make_pack(slug='oop-g', title='OOP', price=9900)
+        self.cn = make_pack(slug='cn-g', title='CN', price=9900)
+        self.full = PackBundle.objects.create(
+            name='All', slug='all-g', section=ContentPack.SECTION_INTERVIEW,
+            price_paise=19900, covers_count=0,
+        )
+        self.full.packs.set([self.os, self.oop, self.cn])
+        PackBundle.objects.create(
+            name='Any 2', slug='two-g', section=ContentPack.SECTION_INTERVIEW,
+            price_paise=14900, covers_count=2,
+        )
+
+    def test_owner_of_two_packs_cannot_order_the_three_pack_bundle(self):
+        PackPurchase.objects.create(user=self.user, pack=self.os)
+        PackPurchase.objects.create(user=self.user, pack=self.oop)
+
+        res = self.client.post(
+            '/api/scrib/packs/purchase/', {'bundle': 'all-g'}, format='json',
+        )
+
+        self.assertEqual(res.status_code, 409)
+        self.assertEqual(res.data.get('code'), 'offer_unavailable')
+
+    def test_owner_of_one_pack_cannot_order_the_full_bundle_at_its_price(self):
+        PackPurchase.objects.create(user=self.user, pack=self.os)
+
+        res = self.client.post(
+            '/api/scrib/packs/purchase/', {'bundle': 'all-g'}, format='json',
+        )
+
+        self.assertEqual(res.status_code, 409)
+        self.assertEqual(res.data.get('code'), 'offer_unavailable')

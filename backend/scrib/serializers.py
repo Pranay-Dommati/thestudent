@@ -243,23 +243,45 @@ class PackBundleSerializer(serializers.ModelSerializer):
     price = serializers.SerializerMethodField()
     original_price = serializers.SerializerMethodField()
     pack_count = serializers.SerializerMethodField()
+    question_count = serializers.SerializerMethodField()
     owned = serializers.SerializerMethodField()
 
     class Meta:
         model = PackBundle
         fields = [
-            'id', 'slug', 'name', 'section',
-            'price_paise', 'price', 'original_price', 'pack_count', 'owned',
+            'id', 'slug', 'name', 'section', 'covers_count',
+            'price_paise', 'price', 'original_price', 'pack_count',
+            'question_count', 'owned',
         ]
+
+    def _offer_packs(self, obj):
+        """What this offer unlocks for the user being served.
+
+        A top-up tier has no pack list of its own, so the view passes the packs
+        the user is actually missing; without that context (the admin list, for
+        instance) fall back to the bundle's own set.
+        """
+        packs = self.context.get('offer_packs')
+        if packs is None:
+            return list(obj.packs.filter(is_active=True))
+        return list(packs)
 
     def get_price(self, obj):
         return obj.price_paise / 100
 
     def get_original_price(self, obj):
-        return obj.original_price_paise / 100
+        return sum(p.price_paise for p in self._offer_packs(obj)) / 100
 
     def get_pack_count(self, obj):
-        return obj.packs.filter(is_active=True).count()
+        return len(self._offer_packs(obj))
+
+    def get_question_count(self, obj):
+        packs = self._offer_packs(obj)
+        if not packs:
+            return 0
+        return PackQuizQuestion.objects.filter(
+            quiz__pack__in=packs, quiz__is_active=True,
+        ).count()
 
     def get_owned(self, obj):
         return obj.id in self.context.get('owned_bundle_ids', set())

@@ -28,6 +28,8 @@ const PackList = ({ isDarkMode }) => {
   const [draft, setDraft] = useState(EMPTY_PACK);
   const [saving, setSaving] = useState(false);
   const [bundleDraft, setBundleDraft] = useState(null);
+  // Top-up offers, keyed by how many packs they cover.
+  const [tierDrafts, setTierDrafts] = useState({});
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const navigate = useNavigate();
@@ -48,13 +50,21 @@ const PackList = ({ isDarkMode }) => {
         axios.get('/scrib/admin/bundles/'),
       ]);
       setPacks(packRes.data.results || []);
-      const first = (bundleRes.data.results || [])[0] || null;
-      setBundle(first);
+      const bundles = bundleRes.data.results || [];
+      // covers_count 0 is the full offer; anything above it is a top-up tier
+      // priced for buyers who already own some of the packs.
+      const full = bundles.find((b) => !b.covers_count) || null;
+      setBundle(full);
       setBundleDraft(
-        first
-          ? { ...first, price_rupees: first.price_paise / 100 }
+        full
+          ? { ...full, price_rupees: full.price_paise / 100 }
           : { name: 'All Interview Packs', price_rupees: 399, pack_ids: [], is_active: true },
       );
+      const tiers = {};
+      bundles
+        .filter((b) => b.covers_count > 0)
+        .forEach((t) => { tiers[t.covers_count] = { ...t, price_rupees: t.price_paise / 100 }; });
+      setTierDrafts(tiers);
     } catch (error) {
       toast.error('Could not load interview packs');
       console.error(error);
@@ -106,6 +116,7 @@ const PackList = ({ isDarkMode }) => {
       name: bundleDraft.name,
       section: 'interview',
       price_paise: Math.round(Number(bundleDraft.price_rupees) * 100),
+      covers_count: 0,
       pack_ids: bundleDraft.pack_ids,
       is_active: bundleDraft.is_active,
     };
@@ -122,6 +133,31 @@ const PackList = ({ isDarkMode }) => {
     }
   };
 
+  const saveTier = async (size) => {
+    const draft = tierDrafts[size] || {};
+    const payload = {
+      name: `Any ${size} Interview Packs`,
+      section: 'interview',
+      covers_count: size,
+      price_paise: Math.round(Number(draft.price_rupees || 0) * 100),
+      // Deliberately empty: a tier unlocks whichever packs the buyer is still
+      // missing, so pinning a fixed list here would be wrong.
+      pack_ids: [],
+      is_active: draft.is_active ?? true,
+    };
+    try {
+      if (draft.id) {
+        await axios.patch(`/scrib/admin/bundles/${draft.id}/`, payload);
+      } else {
+        await axios.post('/scrib/admin/bundles/', payload);
+      }
+      toast.success(`${size}-pack offer saved`);
+      load();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Could not save the offer');
+    }
+  };
+
   const toggleBundlePack = (packId) => {
     setBundleDraft((prev) => {
       const ids = prev.pack_ids || [];
@@ -135,6 +171,18 @@ const PackList = ({ isDarkMode }) => {
   const totalIndividual = packs
     .filter((p) => (bundleDraft?.pack_ids || []).includes(p.id))
     .reduce((sum, p) => sum + p.price_paise, 0) / 100;
+
+  // A tier is only meaningful between "two left" and "one short of everything" —
+  // one pack left is just that pack's own price, and needing them all is what
+  // the full bundle above is for. Grows on its own as packs are added.
+  const activePacks = packs.filter((p) => p.is_active);
+  const tierSizes = Array.from(
+    { length: Math.max(activePacks.length - 2, 0) },
+    (_, i) => i + 2,
+  );
+  const singlePackPrice = activePacks.length
+    ? Math.round(activePacks.reduce((sum, p) => sum + p.price_paise, 0) / activePacks.length) / 100
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -394,6 +442,91 @@ const PackList = ({ isDarkMode }) => {
             >
               Save bundle
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Top-up offers ── */}
+      {tierSizes.length > 0 && (
+        <div className={`rounded-xl border shadow-sm p-6 ${card}`}>
+          <div className="flex items-center gap-2 mb-1">
+            <FaLayerGroup className={isDarkMode ? 'text-gray-400' : 'text-gray-500'} />
+            <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+              Top-up offers
+            </h3>
+          </div>
+          <p className={`text-sm mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            For buyers who already own some packs. Someone missing this many packs sees this
+            price instead of the full bundle, and it unlocks exactly the ones they don&apos;t
+            have. Leave a price empty or switch it off to show them nothing.
+          </p>
+
+          <div className="space-y-3">
+            {tierSizes.map((size) => {
+              const draft = tierDrafts[size] || {};
+              const saved = Boolean(draft.id);
+              return (
+                <div
+                  key={size}
+                  className={`flex flex-wrap items-end gap-4 rounded-lg border p-4 ${
+                    isDarkMode ? 'border-gray-700 bg-gray-900/40' : 'border-gray-200 bg-gray-50'
+                  }`}
+                >
+                  <div className="min-w-[190px] flex-1">
+                    <p className={`text-sm font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                      Still missing {size} packs
+                    </p>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Bought separately: ₹{singlePackPrice * size}
+                      {Number(draft.price_rupees) > 0 && (
+                        <> · saves ₹{Math.max(singlePackPrice * size - Number(draft.price_rupees), 0)}</>
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="w-32">
+                    <label className={label}>Price (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className={input}
+                      value={draft.price_rupees ?? ''}
+                      onChange={(e) =>
+                        setTierDrafts((prev) => ({
+                          ...prev,
+                          [size]: { ...prev[size], price_rupees: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <label
+                    className={`flex items-center gap-2 pb-2 text-sm ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={draft.is_active ?? true}
+                      onChange={(e) =>
+                        setTierDrafts((prev) => ({
+                          ...prev,
+                          [size]: { ...prev[size], is_active: e.target.checked },
+                        }))
+                      }
+                    />
+                    Show on the site
+                  </label>
+
+                  <button
+                    onClick={() => saveTier(size)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
+                  >
+                    {saved ? 'Save' : 'Create'}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

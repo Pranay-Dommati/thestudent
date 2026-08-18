@@ -60,6 +60,7 @@ const App = () => {
   const [packStrip, setPackStrip] = useState([])
   const [packsLoading, setPacksLoading] = useState(true)
   const [packBundle, setPackBundle] = useState(null)
+  const [activePackIndex, setActivePackIndex] = useState(0)
   const [showNoticeBanner, setShowNoticeBanner] = useState(() => {
     // Don't show again if user already dismissed it this session
     return sessionStorage.getItem('notice_banner_dismissed') !== 'true'
@@ -266,25 +267,36 @@ const App = () => {
           <div className="mx-auto max-w-6xl px-6">
             {/* Interview Notes — the paid packs lead the Library on the homepage */}
             {(packsLoading || packStrip.length > 0) && (
-              <div className="mb-12">
+              <div className="mb-6">
                 <Link to="/library" className="inline-block hover:opacity-80">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#7b756d]">
                     Interview Notes Library - browse all packs &rarr;
                   </p>
                 </Link>
-                <div className="mt-4 grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
+                <div
+                  className="mt-4 flex gap-4 overflow-x-auto pb-2 snap-x hide-scrollbar md:grid md:grid-cols-4 md:overflow-x-visible md:pb-0"
+                  onScroll={(e) => {
+                    const scrollLeft = e.target.scrollLeft
+                    const itemWidth = 264 // 248px card + 16px gap
+                    setActivePackIndex(Math.round(scrollLeft / itemWidth))
+                  }}
+                >
                   {packsLoading ? (
                     Array.from({ length: 3 }).map((_, index) => (
-                      <InterviewPackCardSkeleton key={index} />
+                      <div key={index} className="w-[248px] shrink-0 snap-start md:w-auto">
+                        <InterviewPackCardSkeleton />
+                      </div>
                     ))
                   ) : (
                   <>
                   {packStrip.map((pack) => (
-                    <InterviewPackCard key={pack.id} pack={pack} />
+                    <div key={pack.id} className="w-[248px] shrink-0 snap-start md:w-auto">
+                      <InterviewPackCard pack={pack} />
+                    </div>
                   ))}
                   <Link
                     to="/library"
-                    className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border border-dashed border-[#d6cfc6] bg-[#f4f1ea] p-5 text-center transition-colors hover:bg-[#f0ece5]"
+                    className="flex w-[248px] shrink-0 snap-start flex-col items-center justify-center gap-2.5 rounded-2xl border border-dashed border-[#d6cfc6] bg-[#f4f1ea] p-5 text-center transition-colors hover:bg-[#f0ece5] md:w-auto"
                   >
                     <div className="grid grid-cols-3 gap-1">
                       {Array.from({ length: 9 }).map((_, index) => (
@@ -300,6 +312,20 @@ const App = () => {
                   </>
                   )}
                 </div>
+
+                {/* Scroll indicators (dots) \u2014 mobile only, mirrors the free-previews strip */}
+                {!packsLoading && (
+                  <div className="mt-2 flex justify-center gap-1.5 md:hidden">
+                    {Array.from({ length: packStrip.length + 1 }).map((_, idx) => (
+                      <div
+                        key={idx}
+                        className={`h-1.5 rounded-full transition-all ${
+                          idx === activePackIndex ? 'w-4 bg-[#1f1f1f]' : 'w-1.5 bg-[#d6cfc6]'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
