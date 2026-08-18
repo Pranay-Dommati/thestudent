@@ -1182,12 +1182,15 @@ const GeneratePage = () => {
                           ))}
                         </div>
                       </div>
+                      {/* Mobile's equivalent action lives in the sticky bottom
+                          bar instead of here — this box can run tall with pasted
+                          text, and a button living below it there means someone
+                          has to know to scroll down to find their next step. */}
                       <div className="hidden md:block">{organizeAIButton}</div>
                     </div>
                     <p className="text-[11px] text-[#8a847c] leading-relaxed">
                       {TOPICS_PER_PAGE_OPTIONS.find(o => o.value === forceTopicsPerPage)?.hint}
                     </p>
-                    <div className="md:hidden">{organizeAIButton}</div>
                   </div>
                 )}
               </div>
@@ -1246,33 +1249,55 @@ const GeneratePage = () => {
               </div>
 
               <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-                <button
-                  onClick={
-                    !isLoggedIn
-                      ? handleAuthClick
-                      : (creditBalance < Math.max(1, validPages.length))
-                        ? () => navigate('/pricing?next=/generate')
-                        : handleGenerate
-                  }
-                  disabled={isGenerating || mode === 'paste' || isOrganizing}
-                  className={`w-full md:w-auto rounded-xl px-5 py-2.5 md:py-2 text-sm md:text-bold font-bold transition-all ${
-                    isGenerating || mode === 'paste' || isOrganizing
-                      ? 'border border-[#f0ece5] bg-transparent text-[#e0d9ce] md:border-none md:bg-[#e7e2db] md:text-[#b1aaa0]'
-                      : !isLoggedIn
-                        ? 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black hover:-translate-y-0.5'
-                        : 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black'
-                  }`}
-                >
-                  {isGenerating
-                    ? 'Generating...'
-                    : mode === 'paste'
-                      ? 'Organize topics first'
+                {mode === 'paste' ? (
+                  // The paste flow's real next step (organize) lives in this same
+                  // sticky slot instead of a disabled placeholder — on mobile the
+                  // topics box can be tall enough that the inline button below it
+                  // is off-screen, so this bar is the only next-step CTA guaranteed
+                  // to be visible without scrolling.
+                  <button
+                    onClick={handleOrganizeTopics}
+                    disabled={isOrganizing || !pasteText.trim()}
+                    className={`flex w-full md:w-auto items-center justify-center gap-2 rounded-xl px-5 py-2.5 md:py-2 text-sm md:text-bold font-bold transition-all ${
+                      isOrganizing || !pasteText.trim()
+                        ? 'border border-[#f0ece5] bg-transparent text-[#e0d9ce] md:border-none md:bg-[#e7e2db] md:text-[#b1aaa0]'
+                        : 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black hover:-translate-y-0.5'
+                    }`}
+                  >
+                    {isOrganizing && (
+                      <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                      </svg>
+                    )}
+                    {isOrganizing ? 'Organizing...' : pasteText.trim() ? '✦ Organize with AI' : 'Add topics first'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={
+                      !isLoggedIn
+                        ? handleAuthClick
+                        : (creditBalance < Math.max(1, validPages.length))
+                          ? () => navigate('/pricing?next=/generate')
+                          : handleGenerate
+                    }
+                    disabled={isGenerating}
+                    className={`w-full md:w-auto rounded-xl px-5 py-2.5 md:py-2 text-sm md:text-bold font-bold transition-all ${
+                      isGenerating
+                        ? 'border border-[#f0ece5] bg-transparent text-[#e0d9ce] md:border-none md:bg-[#e7e2db] md:text-[#b1aaa0]'
+                        : !isLoggedIn
+                          ? 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black hover:-translate-y-0.5'
+                          : 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black'
+                    }`}
+                  >
+                    {isGenerating
+                      ? 'Generating...'
                       : !isLoggedIn
                         ? 'Sign up to Generate'
                         : (creditBalance < Math.max(1, validPages.length))
                           ? 'Add credits to generate'
                           : 'Generate PDF'}
-                </button>
+                  </button>
+                )}
 
                 <p className="mt-0.5 text-center text-[11px] text-[#a39b92] md:hidden">
                   {mode !== 'paste'

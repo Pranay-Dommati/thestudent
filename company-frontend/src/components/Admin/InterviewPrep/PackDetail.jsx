@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from '../../../utils/axios';
 import { toast } from 'react-hot-toast';
-import { FaArrowLeft, FaUpload, FaTrash, FaPlus, FaChevronDown, FaChevronRight, FaFileCsv, FaDownload, FaRandom } from 'react-icons/fa';
+import { FaArrowLeft, FaUpload, FaTrash, FaPlus, FaChevronDown, FaChevronRight, FaFileCsv, FaDownload, FaRandom, FaCopy } from 'react-icons/fa';
 import QuizQuestions from './QuizQuestions';
 
 const CSV_TEMPLATE = `quiz_number,question_number,question,option1,option2,option3,option4,answer,explanation,quiz_topic
@@ -38,6 +38,7 @@ const PackDetail = ({ isDarkMode }) => {
   const [uploading, setUploading] = useState(false);
   const [openQuizId, setOpenQuizId] = useState(null);
   const [shufflingId, setShufflingId] = useState(null);
+  const [copyingId, setCopyingId] = useState(null);
   const [refreshTokens, setRefreshTokens] = useState({});
   const [importingCsv, setImportingCsv] = useState(false);
   const [csvErrors, setCsvErrors] = useState(null);
@@ -186,6 +187,28 @@ const PackDetail = ({ isDarkMode }) => {
       toast.error(error.response?.data?.message || 'Could not shuffle this quiz');
     } finally {
       setShufflingId(null);
+    }
+  };
+
+  // Same shape the "Bulk import JSON" box in QuizQuestions.jsx accepts — id,
+  // quiz and order are this quiz's own bookkeeping, not useful to whoever
+  // pastes this in (a new quiz gets its own ids/order), so they're dropped.
+  const copyQuizJson = async (quiz) => {
+    try {
+      setCopyingId(quiz.id);
+      const res = await axios.get(`/scrib/admin/quizzes/${quiz.id}/questions/`);
+      const questions = (res.data.results || []).map(({ text, options, correct_index, explanation }) => ({
+        text,
+        options,
+        correct_index,
+        explanation,
+      }));
+      await navigator.clipboard.writeText(JSON.stringify(questions, null, 2));
+      toast.success(`Copied ${questions.length} question(s) to clipboard`);
+    } catch (error) {
+      toast.error('Could not copy this quiz');
+    } finally {
+      setCopyingId(null);
     }
   };
 
@@ -522,6 +545,18 @@ const PackDetail = ({ isDarkMode }) => {
                     aria-label="Shuffle option order"
                   >
                     <FaRandom className={shufflingId === quiz.id ? 'animate-spin' : ''} />
+                  </button>
+
+                  <button
+                    onClick={() => copyQuizJson(quiz)}
+                    disabled={copyingId === quiz.id || quiz.question_count === 0}
+                    title="Copy this quiz's questions, options and answers as JSON"
+                    className={`p-1 disabled:opacity-40 ${
+                      isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-800'
+                    }`}
+                    aria-label="Copy quiz as JSON"
+                  >
+                    <FaCopy />
                   </button>
 
                   <button
