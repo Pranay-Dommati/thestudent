@@ -1435,16 +1435,22 @@ def razorpay_webhook(request):
                         p.status = Payment.STATUS_PAID
                         p.razorpay_payment_id = rzp_payment_id
                         p.save(update_fields=['status', 'razorpay_payment_id', 'updated_at'])
-                        _, created = CreditTransaction.objects.get_or_create(
-                            payment=p,
-                            defaults=dict(
-                                user=p.user,
-                                direction=CreditTransaction.DIRECTION_CREDIT,
-                                credits=p.credits_added,
-                                reason=CreditTransaction.REASON_PAYMENT,
-                            ),
-                        )
-                        credited = created
+                        # credits_added is 0 for an Interview Prep pack/bundle
+                        # order (see PackPurchaseOrderView) — that path grants
+                        # its own entitlement and sends its own confirmation
+                        # email via PackPurchaseVerifyView, so this webhook's
+                        # job here is done once the row is marked paid.
+                        if p.credits_added > 0:
+                            _, created = CreditTransaction.objects.get_or_create(
+                                payment=p,
+                                defaults=dict(
+                                    user=p.user,
+                                    direction=CreditTransaction.DIRECTION_CREDIT,
+                                    credits=p.credits_added,
+                                    reason=CreditTransaction.REASON_PAYMENT,
+                                ),
+                            )
+                            credited = created
                         logger.info(f'[webhook] payment.captured processed order_id={rzp_order_id} credits={p.credits_added} user={p.user_id}')
 
                 # Sent outside the transaction so the SES network call doesn't hold the row lock

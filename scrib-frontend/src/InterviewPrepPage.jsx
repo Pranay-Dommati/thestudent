@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from './context/AuthContext'
 import customToast from './utils/customToast'
 import QuizRunner from './components/QuizRunner'
+import PrepLoadingScreen from './components/PrepLoadingScreen'
 import PackPdfReader from './components/PackPdfReader'
 import { fetchCatalogue, fetchPack, fetchPackPdf, purchasePack } from './services/packs'
 import { usePostHog } from '@posthog/react'
@@ -34,6 +35,13 @@ const BackArrowIcon = ({ size = 15 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
     <line x1="19" y1="12" x2="5" y2="12" />
     <polyline points="12 19 5 12 12 5" />
+  </svg>
+)
+
+const UpArrowIcon = ({ size = 15 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="19" x2="12" y2="5" />
+    <polyline points="5 12 12 5 19 12" />
   </svg>
 )
 
@@ -73,8 +81,14 @@ const getDefaultZoom = () => (
 const InterviewPrepPage = () => {
   const { slug } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const posthog = usePostHog()
   const { user, isLoggedIn, refreshUser } = useAuth()
+
+  // location.key is 'default' when this entry has no in-app history to go
+  // back to (a fresh tab, a shared link) — navigate(-1) there would leave the
+  // app entirely, so fall back to the Library instead of wherever they came from.
+  const goBack = () => (location.key === 'default' ? navigate('/library') : navigate(-1))
 
   const [detail, setDetail] = useState(null)
   const [catalogue, setCatalogue] = useState(null)
@@ -205,7 +219,7 @@ const InterviewPrepPage = () => {
   const buy = async ({ bundleSlug } = {}) => {
     if (!isLoggedIn) {
       customToast.error('Log in to unlock this pack')
-      navigate('/login', { state: { next: `/interview-prep/${slug || ''}` } })
+      navigate(`/login?next=${encodeURIComponent(`/interview-prep/${slug || ''}`)}`)
       return
     }
     if (buying) return  // a purchase is already in flight — don't open a second checkout
@@ -232,11 +246,7 @@ const InterviewPrepPage = () => {
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f8f7f3] text-sm text-[#7b756d]">
-        Loading your prep workspace…
-      </div>
-    )
+    return <PrepLoadingScreen />
   }
 
   if (!pack) {
@@ -391,10 +401,10 @@ const InterviewPrepPage = () => {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-2.5">
                     <button
-                      onClick={() => navigate('/library')}
+                      onClick={goBack}
                       className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-[#e2dbd2] bg-white text-[#1f1f1f] transition-colors hover:bg-[#f4f1ea]"
-                      title="Back to Library"
-                      aria-label="Back to Library"
+                      title="Back"
+                      aria-label="Back"
                     >
                       <BackArrowIcon />
                     </button>
@@ -416,9 +426,9 @@ const InterviewPrepPage = () => {
                       <button
                         onClick={() => buy()}
                         disabled={buying}
-                        className="flex-1 rounded-full bg-[#1f3a5f] px-3 py-2 text-[11px] font-bold text-white hover:bg-[#2d5fa6] disabled:opacity-60 transition-colors md:flex-none md:py-1.5"
+                        className="flex-1 rounded-full bg-[#1f3a5f] px-4 py-2.5 text-[12.5px] font-bold text-white shadow-md shadow-[#1f3a5f]/25 ring-1 ring-[#1f3a5f]/40 transition-all hover:bg-[#2d5fa6] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 md:flex-none"
                       >
-                        {buyingTarget === 'pack' ? 'Opening checkout…' : `🔓 Unlock this pack + ${pack.quiz_count} quizzes · ₹${pack.price}`}
+                        {buyingTarget === 'pack' ? 'Opening checkout…' : `🔓 Unlock ${pack.category} · ₹${pack.price}`}
                       </button>
                     )}
                   </div>
@@ -481,17 +491,18 @@ const InterviewPrepPage = () => {
               surface left once the header/sidebar are hidden. ── */}
           <div className="sticky top-0 z-20 flex flex-nowrap items-center justify-between gap-2 border-b border-[#e2dbd2] bg-white/95 px-4 py-2 backdrop-blur md:flex-wrap md:gap-3 md:px-7">
             <div className="flex min-w-0 items-center gap-1">
-              {/* Exits fullscreen while in it; otherwise stands in for the
-                  header's back-to-library button once scroll has carried
-                  that header out of view. */}
+              {/* Exits fullscreen while in it; otherwise scrolls back to the
+                  header (with the real back button) instead of navigating —
+                  scrolled this far down, "back" reads as "take me up", not
+                  "leave the page". */}
               {(fullscreen || scrolled) && (
                 <button
-                  onClick={() => (fullscreen ? setFullscreen(false) : navigate('/library'))}
+                  onClick={() => (fullscreen ? setFullscreen(false) : window.scrollTo({ top: 0, behavior: 'smooth' }))}
                   className="mr-1 flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full border border-[#e2dbd2] bg-white transition-colors hover:bg-[#f4f1ea]"
-                  title={fullscreen ? 'Exit full screen (Esc)' : 'Back to Library'}
-                  aria-label={fullscreen ? 'Exit full screen' : 'Back to Library'}
+                  title={fullscreen ? 'Exit full screen (Esc)' : 'Scroll to top'}
+                  aria-label={fullscreen ? 'Exit full screen' : 'Scroll to top'}
                 >
-                  <BackArrowIcon />
+                  {fullscreen ? <BackArrowIcon /> : <UpArrowIcon />}
                 </button>
               )}
               <button
@@ -524,14 +535,14 @@ const InterviewPrepPage = () => {
                 <button
                   onClick={() => buy()}
                   disabled={buying}
-                  className="mr-0.5 whitespace-nowrap rounded-full bg-[#1f3a5f] px-2.5 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-[#2d5fa6] disabled:opacity-60 md:px-3"
+                  className="mr-0.5 whitespace-nowrap rounded-full bg-[#1f3a5f] px-4 py-2.5 text-[13px] font-bold text-white shadow-md shadow-[#1f3a5f]/25 ring-1 ring-[#1f3a5f]/40 transition-all hover:bg-[#2d5fa6] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 md:px-5"
                 >
                   {/* The full pitch only fits once the column is wide enough —
                       below lg the sidebar still takes 264px, so the price
                       alone carries the bar and keeps it to one row. */}
                   <span className="lg:hidden">{buyingTarget === 'pack' ? '…' : `🔓 ₹${pack.price}`}</span>
                   <span className="hidden lg:inline">
-                    {buyingTarget === 'pack' ? 'Opening checkout…' : `🔓 Unlock this pack + ${pack.quiz_count} quizzes · ₹${pack.price}`}
+                    {buyingTarget === 'pack' ? 'Opening checkout…' : `🔓 Unlock ${pack.category} · ₹${pack.price}`}
                   </span>
                 </button>
               )}
@@ -584,6 +595,11 @@ const InterviewPrepPage = () => {
             <div className="flex flex-1 flex-col">
               {pdf?.pdf_url ? (
                 <PackPdfReader
+                  // A different document deserves a clean reader: without this
+                  // the previous pack's rendered-page set, page counter and
+                  // scroll anchor survive the switch and describe a PDF that is
+                  // no longer on screen.
+                  key={pack.slug}
                   url={pdf.pdf_url}
                   totalPages={pdf.total_pages}
                   accessiblePages={pdf.accessible_pages}

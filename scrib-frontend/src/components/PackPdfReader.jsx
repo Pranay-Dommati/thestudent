@@ -194,6 +194,13 @@ const PackPdfReader = ({ url, totalPages, accessiblePages, onUnlock, zoom = 1, p
       isFirstZoomRun.current = false
       return
     }
+    // At the top there is no reading position to preserve, and re-anchoring
+    // from here actively hurts: `pageRatio` resolves a beat after the document
+    // loads, so this would fire on arrival and align page 1 with the viewport
+    // top — scrolling the pack header out of view before the reader has even
+    // touched anything.
+    if (window.scrollY <= 0) return
+
     const { page, fraction } = scrollAnchorRef.current
     const el = containerRef.current?.querySelector(`[data-page-number="${page}"]`)
     if (!el) return

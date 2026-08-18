@@ -87,6 +87,50 @@ def send_payment_success_email(user, credits_added):
     except Exception as exc:
         logger.warning(f"Error sending payment-success email to {user.email}: {exc}")
 
+
+def send_pack_purchase_success_email(user, item_label, quiz_count=None):
+    """Notify the user their Interview Prep pack/bundle purchase succeeded.
+
+    A pack purchase grants access to notes + quizzes, not credits — reusing
+    send_payment_success_email's "credits have been added" copy for this was
+    misleading buyers into thinking they'd bought credits. Called from
+    PackPurchaseVerifyView once the entitlement is actually granted.
+    """
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
+    quizzes_line = f' and all {quiz_count} quizzes' if quiz_count else ''
+    html_content = f"""
+    <html>
+      <body>
+        <p>Hi {user.full_name or 'there'},</p>
+        <p>Thank you for your purchase! <strong>{item_label}</strong> is now unlocked on your Scrib account — the full handwritten notes{quizzes_line} are ready whenever you are.</p>
+        <p>
+          <a href="{frontend_url}/interview-prep" style="display:inline-block;padding:12px 24px;background-color:#1f3a5f;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;">
+            Start studying
+          </a>
+        </p>
+        <p>If you face any issues with your purchase or while using Scrib, please don't hesitate to reach out to us at easylearnova@gmail.com. We're happy to help!</p>
+        <p>Thank you for choosing Scrib.</p>
+        <br/>
+        <p>
+          Pranay<br/>
+          Founder, EasyLearnova<br/>
+          Scrib – AI Handwritten Notes Generator
+        </p>
+      </body>
+    </html>
+    """
+    try:
+        email_sent = send_email_via_ses(
+            to_email=user.email,
+            subject="Your pack is unlocked! 🎉",
+            html_content=html_content,
+        )
+        if not email_sent:
+            logger.warning(f"Pack-purchase email not sent to {user.email}")
+    except Exception as exc:
+        logger.warning(f"Error sending pack-purchase email to {user.email}: {exc}")
+
+
 @shared_task(bind=True, max_retries=1)
 def generate_study_pack_task(self, study_pack_id, pages, title, user_id):
     logger.info(f"Starting async generation for StudyPack {study_pack_id}")

@@ -15,6 +15,8 @@ from .models import (
     PackPurchase, QuizAttempt, owned_pack_ids, user_owns_pack,
     bundle_offer_for, grant_bundle,
 )
+# pyrefly: ignore [missing-import]
+from .serializers import PackBundleSerializer
 
 User = get_user_model()
 
@@ -886,3 +888,61 @@ class BundleOfferPurchaseGuardTests(TestCase):
 
         self.assertEqual(res.status_code, 409)
         self.assertEqual(res.data.get('code'), 'offer_unavailable')
+
+
+class BundleStrikethroughPriceTests(TestCase):
+    """The 'instead of ₹X' figure must total only the packs still being sold.
+
+    Charging ₹149 for two ₹99 packs has to read as ₹149 instead of ₹198 — not
+    ₹297, which is what summing every pack in the section would give once the
+    buyer already owns one.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='strike@example.com', full_name='Strike', password='pw12345!'
+        )
+        self.os = make_pack(slug='os-s', title='OS', price=9900)
+        self.oop = make_pack(slug='oop-s', title='OOP', price=9900)
+        self.cn = make_pack(slug='cn-s', title='CN', price=9900)
+        full = PackBundle.objects.create(
+            name='All', slug='all-s', section=ContentPack.SECTION_INTERVIEW,
+            price_paise=19900, covers_count=0,
+        )
+        full.packs.set([self.os, self.oop, self.cn])
+        PackBundle.objects.create(
+            name='Any 2', slug='two-s', section=ContentPack.SECTION_INTERVIEW,
+            price_paise=14900, covers_count=2,
+        )
+
+    def serialized(self):
+        bundle, packs = bundle_offer_for(self.user, ContentPack.SECTION_INTERVIEW)
+        return PackBundleSerializer(
+            bundle, context={'owned_bundle_ids': set(), 'offer_packs': packs},
+        ).data
+
+    def test_full_offer_strikes_the_price_of_all_three(self):
+        data = self.serialized()
+        self.assertEqual(data['price'], 199)
+        self.assertEqual(data['original_price'], 297)
+
+    def test_top_up_strikes_only_the_two_packs_it_sells(self):
+        PackPurchase.objects.create(user=self.user, pack=self.os)
+
+        data = self.serialized()
+
+        self.assertEqual(data['price'], 149)
+        self.assertEqual(data['original_price'], 198)
+        # The frontend only draws the strike-through when there's a real saving.
+        self.assertGreater(data['original_price'], data['price'])
+
+    def test_strikethrough_is_suppressed_when_the_tier_is_not_a_saving(self):
+        # Mirrors the live test-pricing state: ₹2 packs make a ₹149 tier a worse
+        # deal than buying both, and the UI must not claim a discount.
+        ContentPack.objects.filter(is_active=True).update(price_paise=200)
+        PackPurchase.objects.create(user=self.user, pack=self.os)
+
+        data = self.serialized()
+
+        self.assertEqual(data['original_price'], 4)
+        self.assertLess(data['original_price'], data['price'])

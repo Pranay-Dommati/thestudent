@@ -114,16 +114,25 @@ const App = () => {
   useEffect(() => {
     let isMounted = true
 
-    const loadPacks = async () => {
+    // A transient failure (cold-starting API, one dropped request) shouldn't
+    // blank the whole section with no explanation — retry a couple of times
+    // before accepting that there really is nothing to show, so the skeleton
+    // stays up through the blip instead of silently vanishing.
+    const loadPacks = async (attempt = 0) => {
       try {
         const data = await fetchCatalogue('interview')
         if (!isMounted) return
         setPackStrip((data.packs || []).slice(0, 3))
         setPackBundle(data.bundle || null)
+        setPacksLoading(false)
       } catch {
-        // Homepage still renders without the Interview Notes strip.
-      } finally {
-        if (isMounted) setPacksLoading(false)
+        if (!isMounted) return
+        if (attempt < 2) {
+          setTimeout(() => loadPacks(attempt + 1), 1000 * (attempt + 1))
+        } else {
+          // Genuinely unreachable — homepage renders without the strip.
+          setPacksLoading(false)
+        }
       }
     }
 
@@ -282,7 +291,7 @@ const App = () => {
                   }}
                 >
                   {packsLoading ? (
-                    Array.from({ length: 3 }).map((_, index) => (
+                    Array.from({ length: 4 }).map((_, index) => (
                       <div key={index} className="w-[248px] shrink-0 snap-start md:w-auto">
                         <InterviewPackCardSkeleton />
                       </div>

@@ -48,13 +48,16 @@ logger = logging.getLogger(__name__)
 
 # Browsers stream large PDFs with HTTP Range requests rather than downloading
 # them up front, so a URL that expires mid-session breaks pages the reader has
-# not scrolled to yet. StudyPack reader URLs already use 7 days for this reason
-# (see StudyPackPdfView) — packs follow the same convention.
+# not scrolled to yet. Two days clears any realistic reading session with room
+# to spare while narrowing the window in which an owner's URL — lifted from the
+# network tab and pasted into a group chat — keeps working for people who never
+# paid. StudyPack reader URLs still use 7 days (see StudyPackPdfView); packs
+# deliberately diverge because a pack URL is worth far more when leaked.
 #
-# A short expiry would buy little anyway: owners can download the file outright,
-# so the real protection is that non-owners are served a *different* S3 object
-# containing only the free pages.
-DEFAULT_PDF_URL_EXPIRY_SECONDS = 604800  # 7 days
+# This can't stop an owner from keeping their own copy — nothing served to a
+# browser can. The real protection is that non-owners are handed a *different*
+# S3 object containing only the free pages.
+DEFAULT_PDF_URL_EXPIRY_SECONDS = 172800  # 2 days
 MAX_PDF_BYTES = 100 * 1024 * 1024
 
 
@@ -611,6 +614,25 @@ class PackPurchaseVerifyView(APIView):
             '[packs] purchase %s user=%s item=%s',
             'granted' if created else 'already present', request.user.id, pack_slug or bundle_slug,
         )
+
+        # Sent outside the transaction so the SES network call doesn't hold the row lock
+        if created:
+            try:
+                from scrib.tasks import send_pack_purchase_success_email
+                if bundle:
+                    label = bundle.name
+                    # A bundle purchase (full offer or top-up tier) always leaves
+                    # the buyer owning the whole section — see grant_bundle — so
+                    # every active pack's quizzes are theirs now, not just the
+                    # ones listed on the bundle row itself (empty for top-ups).
+                    section_packs = ContentPack.objects.filter(section=bundle.section, is_active=True)
+                    quiz_total = sum(p.quiz_count for p in section_packs) or None
+                else:
+                    label = pack.title
+                    quiz_total = pack.quiz_count or None
+                send_pack_purchase_success_email(request.user, label, quiz_total)
+            except Exception as email_exc:
+                logger.warning('[packs] Failed to send pack-purchase email order_id=%s: %s', order_id, email_exc)
 
         return Response({
             'success': True,
