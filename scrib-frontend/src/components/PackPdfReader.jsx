@@ -46,7 +46,7 @@ const PAGE_RATIO = 1.414 // A4
  * A real sharpness gain has to come from the note-generation step producing
  * larger source images, not from anything in this component.
  */
-const PackPdfReader = ({ url, totalPages, accessiblePages, onUnlock, zoom = 1, price, quizCount }) => {
+const PackPdfReader = ({ url, totalPages, accessiblePages, onUnlock, zoom = 1, price, quizCount, unlocking = false }) => {
   const [numPages, setNumPages] = useState(null)
   const [pageRatio, setPageRatio] = useState(PAGE_RATIO)
   const [fitWidth, setFitWidth] = useState(null)
@@ -346,9 +346,12 @@ const PackPdfReader = ({ url, totalPages, accessiblePages, onUnlock, zoom = 1, p
             {onUnlock && (
               <button
                 onClick={onUnlock}
-                className="rounded-full bg-[#1f3a5f] px-6 py-3 text-xs font-bold text-white shadow-lg transition-colors hover:bg-[#2d5fa6]"
+                disabled={unlocking}
+                className="rounded-full bg-[#1f3a5f] px-6 py-3 text-xs font-bold text-white shadow-lg transition-colors hover:bg-[#2d5fa6] disabled:opacity-60"
               >
-                🔓 Unlock full pack{quizCount ? ` + ${quizCount} quizzes` : ''}{price ? ` · ₹${price}` : ''}
+                {unlocking
+                  ? 'Opening checkout…'
+                  : `🔓 Unlock full pack${quizCount ? ` + ${quizCount} quizzes` : ''}${price ? ` · ₹${price}` : ''}`}
               </button>
             )}
           </div>

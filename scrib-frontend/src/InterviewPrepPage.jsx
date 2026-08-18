@@ -604,6 +604,7 @@ const InterviewPrepPage = () => {
                   totalPages={pdf.total_pages}
                   accessiblePages={pdf.accessible_pages}
                   onUnlock={() => buy()}
+                  unlocking={buyingTarget === 'pack'}
                   zoom={zoom}
                   price={pack.price}
                   quizCount={pack.quiz_count}
@@ -668,7 +669,7 @@ const InterviewPrepPage = () => {
                               disabled={buying}
                               className="rounded-full border border-[#e2dbd2] bg-white px-3.5 py-[7px] text-xs font-bold text-[#1f1f1f] hover:bg-[#f4f1ea] disabled:opacity-40 transition-colors"
                             >
-                              Unlock to start
+                              {buyingTarget === 'pack' ? 'Opening…' : 'Unlock to start'}
                             </button>
                           </div>
                         </div>

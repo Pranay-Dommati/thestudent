@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from './context/AuthContext'
@@ -9,8 +9,9 @@ import MobileMenu from './components/MobileMenu'
 import PreviewCard from './components/PreviewCard'
 import InterviewPackCard from './components/InterviewPackCard'
 import InterviewPackCardSkeleton from './components/InterviewPackCardSkeleton'
-import { fetchCatalogue } from './services/packs'
+import { fetchCatalogue, purchasePack } from './services/packs'
 import { usePostHog } from '@posthog/react'
+import customToast from './utils/customToast'
 
 const fallbackPreviewCards = [
   { id: 'osi-model', title: 'OSI Model', subject: 'Computer Networks', pdfUrl: null, pageCount: 1 },
@@ -21,7 +22,7 @@ const fallbackPreviewCards = [
 ]
 
 const LibraryPage = () => {
-  const { user, logout, isLoggedIn } = useAuth()
+  const { user, logout, isLoggedIn, refreshUser } = useAuth()
   const posthog = usePostHog()
   const navigate = useNavigate()
   const [previewCards, setPreviewCards] = useState(fallbackPreviewCards)
@@ -31,6 +32,7 @@ const LibraryPage = () => {
   const [packs, setPacks] = useState([])
   const [bundle, setBundle] = useState(null)
   const [packsLoading, setPacksLoading] = useState(true)
+  const [buyingBundle, setBuyingBundle] = useState(false)
 
   // Reset visible count on new search
   useEffect(() => {
@@ -65,25 +67,46 @@ const LibraryPage = () => {
   }, [])
 
   // Interview Picks — the paid packs shown above the free grid.
-  useEffect(() => {
-    let isMounted = true
-
-    const loadPacks = async () => {
-      try {
-        const data = await fetchCatalogue('interview')
-        if (!isMounted) return
-        setPacks(data.packs || [])
-        setBundle(data.bundle || null)
-      } catch {
-        // Library still works as a free-notes browser if this fails.
-      } finally {
-        if (isMounted) setPacksLoading(false)
-      }
+  const loadPacks = useCallback(async () => {
+    try {
+      const data = await fetchCatalogue('interview')
+      setPacks(data.packs || [])
+      setBundle(data.bundle || null)
+    } catch {
+      // Library still works as a free-notes browser if this fails.
+    } finally {
+      setPacksLoading(false)
     }
+  }, [])
 
+  useEffect(() => {
     loadPacks()
-    return () => { isMounted = false }
-  }, [isLoggedIn])
+  }, [loadPacks, isLoggedIn])
+
+  const buyBundle = async () => {
+    if (!isLoggedIn) {
+      customToast.error('Log in to unlock the bundle')
+      navigate('/login?next=/library')
+      return
+    }
+    if (buyingBundle || !bundle) return
+    try {
+      setBuyingBundle(true)
+      const result = await purchasePack({ bundle: bundle.slug, user })
+      if (!result) return  // checkout dismissed
+
+      posthog?.capture('interview_pack_purchased', { pack: null, bundle: bundle.slug })
+      customToast.success('All packs unlocked!')
+      await Promise.all([loadPacks(), refreshUser?.()])
+      // Land them straight in the reader — /interview-prep with no slug opens
+      // the first pack in the catalogue, now actually unlocked.
+      navigate('/interview-prep')
+    } catch (error) {
+      customToast.error(error?.response?.data?.message || error.message || 'The purchase did not go through')
+    } finally {
+      setBuyingBundle(false)
+    }
+  }
 
   // Live search: filter by title or subject
   const filtered = useMemo(() => {
@@ -301,12 +324,13 @@ const LibraryPage = () => {
                       </b>
                     </span>
                   </span>
-                  <Link
-                    to="/interview-prep"
-                    className="flex-shrink-0 whitespace-nowrap rounded-lg bg-[#1f3a5f] px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-[#2d5fa6] transition-colors sm:rounded-[10px] sm:px-4 sm:py-2.5 sm:text-[12.5px] sm:font-bold"
+                  <button
+                    onClick={buyBundle}
+                    disabled={buyingBundle}
+                    className="flex-shrink-0 whitespace-nowrap rounded-lg bg-[#1f3a5f] px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-[#2d5fa6] disabled:opacity-60 transition-colors sm:rounded-[10px] sm:px-4 sm:py-2.5 sm:text-[12.5px] sm:font-bold"
                   >
-                    Get the bundle
-                  </Link>
+                    {buyingBundle ? 'Opening checkout…' : 'Get the bundle'}
+                  </button>
                 </div>
               )}
             </div>

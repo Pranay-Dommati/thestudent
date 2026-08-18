@@ -129,6 +129,16 @@ const GeneratePage = () => {
   const PASTE_TEXTAREA_MIN_HEIGHT = 140
   const PASTE_TEXTAREA_MAX_HEIGHT = 420
 
+  // The "Topics per page" + organize controls only mount once topics land in
+  // the box, and on a long extracted/pasted list they end up below the fold —
+  // nudge the view down to them instead of leaving it to be discovered by luck.
+  const topicsControlsRef = useRef(null)
+  const scrollToTopicsControls = () => {
+    setTimeout(() => {
+      topicsControlsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 60)
+  }
+
   // Grow the syllabus textarea to fit its content (within min/max) instead of
   // leaving blank space for short pastes or clipping long ones behind a fixed box.
   useEffect(() => {
@@ -176,6 +186,7 @@ const GeneratePage = () => {
       setUploadedPdfName(file.name)
       setInvalidTopics([])
       customToast.success(`Extracted ${topics.length} topics from ${file.name}`)
+      scrollToTopicsControls()
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Failed to extract topics from PDF.'
       customToast.error(message)
@@ -1154,6 +1165,7 @@ const GeneratePage = () => {
                   placeholder="e.g. Explicit Intents, Implicit Intents, Activity Lifecycle, Fragments... — or drop a syllabus PDF here"
                   value={pasteText}
                   onChange={e => { setPasteText(e.target.value); setInvalidTopics([]) }}
+                  onPaste={e => { if (!e.target.value.trim()) scrollToTopicsControls() }}
                 />
                 {uploadedPdfName && !isUploadingPdf && (
                   <p className="mt-1.5 text-[11px] text-[#8a847c]">
@@ -1161,7 +1173,7 @@ const GeneratePage = () => {
                   </p>
                 )}
                 {pasteText && (
-                  <div className="mt-3 flex flex-col gap-2.5">
+                  <div ref={topicsControlsRef} className="mt-3 flex flex-col gap-2.5">
                     <div className="flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between md:gap-3">
                       <div className="flex flex-wrap items-center gap-2.5">
                         <span className="text-xs font-semibold text-[#5f5a54] whitespace-nowrap">Topics per page</span>
