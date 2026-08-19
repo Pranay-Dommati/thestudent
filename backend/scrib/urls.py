@@ -66,6 +66,8 @@ urlpatterns = [
     # Static segments first — 'mine', 'purchase' and 'quizzes' must not be
     # swallowed by the <slug:slug> pattern below them.
     path('packs/catalogue/',                     pack_views.PackListView.as_view(),          name='pack-list'),
+    path('packs/free-offer/',                    pack_views.FreeOfferView.as_view(),         name='pack-free-offer'),
+    path('packs/claim-free/',                    pack_views.FreePackClaimView.as_view(),     name='pack-claim-free'),
     path('packs/mine/',                          pack_views.MyPacksView.as_view(),           name='pack-mine'),
     path('packs/purchase/',                      pack_views.PackPurchaseOrderView.as_view(), name='pack-purchase'),
     path('packs/purchase/verify/',               pack_views.PackPurchaseVerifyView.as_view(),name='pack-purchase-verify'),
@@ -77,6 +79,7 @@ urlpatterns = [
     # Content pack administration (/admin-p → Interview Prep)
     path('admin/packs/',                         pack_views.AdminPackListView.as_view(),      name='admin-pack-list'),
     path('admin/packs/analytics/',               pack_views.AdminPackAnalyticsView.as_view(), name='admin-pack-analytics'),
+    path('admin/packs/free-offer/',              pack_views.AdminFreeOfferView.as_view(),     name='admin-pack-free-offer'),
     path('admin/packs/<int:pk>/',                pack_views.AdminPackDetailView.as_view(),    name='admin-pack-detail'),
     path('admin/packs/<int:pk>/pdf-upload/',     pack_views.AdminPackPdfUploadView.as_view(), name='admin-pack-pdf-upload'),
     path('admin/packs/<int:pk>/quizzes/',        pack_views.AdminPackQuizListView.as_view(),  name='admin-pack-quizzes'),

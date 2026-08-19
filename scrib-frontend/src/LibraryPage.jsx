@@ -9,6 +9,7 @@ import MobileMenu from './components/MobileMenu'
 import PreviewCard from './components/PreviewCard'
 import InterviewPackCard from './components/InterviewPackCard'
 import InterviewPackCardSkeleton from './components/InterviewPackCardSkeleton'
+import FreeOfferBanner from './components/FreeOfferBanner'
 import { fetchCatalogue, purchasePack } from './services/packs'
 import { usePostHog } from '@posthog/react'
 import customToast from './utils/customToast'
@@ -32,6 +33,7 @@ const LibraryPage = () => {
   const [packs, setPacks] = useState([])
   const [bundle, setBundle] = useState(null)
   const [packsLoading, setPacksLoading] = useState(true)
+  const [freeOffer, setFreeOffer] = useState(null)
   const [buyingBundle, setBuyingBundle] = useState(false)
 
   // Reset visible count on new search
@@ -72,6 +74,7 @@ const LibraryPage = () => {
       const data = await fetchCatalogue('interview')
       setPacks(data.packs || [])
       setBundle(data.bundle || null)
+      setFreeOffer(data.free_offer || null)
     } catch {
       // Library still works as a free-notes browser if this fails.
     } finally {
@@ -210,11 +213,11 @@ const LibraryPage = () => {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Link to="/login" className="hidden sm:inline-flex rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold">
+              <Link to="/login" className="hidden sm:inline-flex rounded-full border border-[#d9d1c7] bg-white px-3 py-1.5 text-xs font-semibold md:px-4 md:py-2">
                 Log in
               </Link>
-              <Link to="/signup" className="rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white">
-                Get started free
+              <Link to="/signup" className="rounded-full bg-[#1f3a5f] px-3 py-1.5 text-xs font-semibold text-white md:px-4 md:py-2">
+                Get started
               </Link>
               <MobileMenu isLoggedIn={isLoggedIn} user={user} logout={logout} />
             </div>
@@ -291,6 +294,11 @@ const LibraryPage = () => {
             fetch resolves — a real fetch failure still hides it entirely. */}
         {(packsLoading || visiblePacks.length > 0) && (
           <section className="mt-11">
+            <FreeOfferBanner
+              offer={freeOffer}
+              variant="strip"
+              className="mb-5 rounded-2xl border border-[#f0dfba]"
+            />
             <div className="flex flex-col items-start gap-4 border-b border-[#e2dbd2] pb-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-6">
               <div className="flex flex-col gap-1.5">
                 <h2 className="text-[21px] font-bold tracking-tight text-[#1f1f1f]">
@@ -351,7 +359,7 @@ const LibraryPage = () => {
                   ))
                 : visiblePacks.map((pack) => (
                     <div key={pack.id} className="w-[248px] shrink-0 snap-start sm:w-auto">
-                      <InterviewPackCard pack={pack} />
+                      <InterviewPackCard pack={pack} freeOffer={freeOffer} />
                     </div>
                   ))}
             </div>

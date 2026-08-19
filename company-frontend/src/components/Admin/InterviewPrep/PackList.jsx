@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../../../utils/axios';
 import { toast } from 'react-hot-toast';
-import { FaPlus, FaFilePdf, FaExclamationTriangle, FaLayerGroup, FaChartLine } from 'react-icons/fa';
+import { FaPlus, FaFilePdf, FaExclamationTriangle, FaLayerGroup, FaChartLine, FaGift } from 'react-icons/fa';
 
 const rupees = (paise) => `₹${Math.round((paise || 0) / 100).toLocaleString('en-IN')}`;
 
@@ -32,6 +32,9 @@ const PackList = ({ isDarkMode }) => {
   const [tierDrafts, setTierDrafts] = useState({});
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [offer, setOffer] = useState(null);
+  const [offerDraft, setOfferDraft] = useState({ total_slots: '', remaining: '' });
+  const [offerSaving, setOfferSaving] = useState(false);
   const navigate = useNavigate();
 
   const card = isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
@@ -73,9 +76,40 @@ const PackList = ({ isDarkMode }) => {
     }
   }, []);
 
+  const applyOffer = useCallback((data) => {
+    setOffer(data);
+    // The inputs mirror the server's numbers on every load, so a save that the
+    // server adjusted (claims moved while the form sat open) shows the real
+    // result rather than the stale thing that was typed.
+    setOfferDraft({ total_slots: String(data.total_slots), remaining: String(data.remaining) });
+  }, []);
+
+  const loadOffer = useCallback(async () => {
+    try {
+      const res = await axios.get('/scrib/admin/packs/free-offer/');
+      applyOffer(res.data);
+    } catch (error) {
+      console.error(error);
+    }
+  }, [applyOffer]);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadOffer();
+  }, [load, loadOffer]);
+
+  const saveOffer = async (patch) => {
+    try {
+      setOfferSaving(true);
+      const res = await axios.patch('/scrib/admin/packs/free-offer/', patch);
+      applyOffer(res.data);
+      toast.success('Free pack offer updated');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Could not update the offer');
+    } finally {
+      setOfferSaving(false);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -264,6 +298,214 @@ const PackList = ({ isDarkMode }) => {
                 </table>
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Launch offer: first N users get one pack free ── */}
+      {offer && (
+        <div className={`rounded-xl border shadow-sm p-6 ${card}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+            <div className="flex items-center gap-2">
+              <FaGift className={isDarkMode ? 'text-gray-400' : 'text-gray-500'} />
+              <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                Free pack launch offer
+              </h3>
+              <span
+                className={`px-2 py-0.5 text-xs rounded-full font-semibold ${
+                  offer.open
+                    ? 'bg-green-100 text-green-800'
+                    : offer.active
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                {offer.open ? 'Running' : offer.active ? 'All claimed' : 'Off'}
+              </span>
+            </div>
+            <button
+              onClick={() => saveOffer({ is_active: !offer.active })}
+              disabled={offerSaving}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${
+                offer.active
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+            >
+              {offer.active ? 'Stop the offer' : 'Start the offer'}
+            </button>
+          </div>
+          <p className={`text-sm mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            Each of the first {offer.total_slots} users can take one interview pack of their
+            choice for nothing. One per person, and only as their first pack &mdash; anyone who
+            has already bought one is not eligible.
+          </p>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+            {[
+              { label: 'Given away', value: offer.claimed, sub: 'packs claimed free' },
+              { label: 'Remaining', value: offer.remaining, sub: 'slots still open' },
+              { label: 'Total slots', value: offer.total_slots, sub: 'the cap' },
+              {
+                label: 'Used',
+                value: offer.total_slots
+                  ? `${Math.round((offer.claimed / offer.total_slots) * 100)}%`
+                  : '—',
+                sub: 'of the offer',
+              },
+            ].map((tile) => (
+              <div
+                key={tile.label}
+                className={`rounded-lg border p-3 ${
+                  isDarkMode ? 'border-gray-700 bg-gray-900/40' : 'border-gray-200 bg-gray-50'
+                }`}
+              >
+                <div className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {tile.value}
+                </div>
+                <div className={`text-xs font-medium mt-0.5 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {tile.label}
+                </div>
+                <div className={`text-[11px] mt-0.5 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                  {tile.sub}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className={`h-2 w-full rounded-full overflow-hidden mb-5 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+            <div
+              className="h-full rounded-full bg-amber-500 transition-all"
+              style={{
+                width: `${
+                  offer.total_slots ? Math.min(100, (offer.claimed / offer.total_slots) * 100) : 0
+                }%`,
+              }}
+            />
+          </div>
+
+          {/* Two ways to resize it, because both are natural things to want:
+              set the overall cap, or let N more people through from here. */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className={label}>Total free packs to give (all-time cap)</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  className={input}
+                  value={offerDraft.total_slots}
+                  onChange={(e) => setOfferDraft({ ...offerDraft, total_slots: e.target.value })}
+                />
+                <button
+                  onClick={() => saveOffer({ total_slots: Number(offerDraft.total_slots) })}
+                  disabled={offerSaving}
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50 whitespace-nowrap"
+                >
+                  Set cap
+                </button>
+              </div>
+              <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                Setting this at or below {offer.claimed} closes the offer. Packs already given
+                away are never taken back.
+              </p>
+            </div>
+
+            <div>
+              <label className={label}>Or: let this many more through</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  className={input}
+                  value={offerDraft.remaining}
+                  onChange={(e) => setOfferDraft({ ...offerDraft, remaining: e.target.value })}
+                />
+                <button
+                  onClick={() => saveOffer({ remaining: Number(offerDraft.remaining) })}
+                  disabled={offerSaving}
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50 whitespace-nowrap"
+                >
+                  Set remaining
+                </button>
+              </div>
+              <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                Raises the cap to {offer.claimed} + this number, so it means &ldquo;from here
+                on&rdquo; rather than resetting what has already gone out.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className={label}>Banner headline (shown across the site)</label>
+            <input
+              className={input}
+              defaultValue={offer.headline}
+              onBlur={(e) => {
+                const next = e.target.value.trim();
+                if (next && next !== offer.headline) saveOffer({ headline: next });
+              }}
+            />
+          </div>
+
+          {offer.by_pack?.length > 0 && (
+            <div className="mt-5">
+              <h4
+                className={`text-xs font-bold uppercase tracking-wider mb-2 ${
+                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}
+              >
+                Which packs people picked
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {offer.by_pack.map((row) => (
+                  <span
+                    key={row.slug}
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      isDarkMode
+                        ? 'bg-gray-900 text-gray-300 border border-gray-700'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {row.title} &middot; {row.claims}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {offer.recent_claims?.length > 0 && (
+            <details className="mt-4">
+              <summary
+                className={`cursor-pointer text-sm font-semibold ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                }`}
+              >
+                Latest {offer.recent_claims.length} claims
+              </summary>
+              <div className="overflow-x-auto mt-2">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <th className="py-2 font-medium">User</th>
+                      <th className="py-2 font-medium">Pack</th>
+                      <th className="py-2 font-medium text-right">Claimed</th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                    {offer.recent_claims.map((claim) => (
+                      <tr key={claim.id} className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <td className="py-2">{claim.user_name || claim.user_email || `#${claim.id}`}</td>
+                        <td className="py-2">{claim.pack_title}</td>
+                        <td className="py-2 text-right text-xs">
+                          {new Date(claim.claimed_at).toLocaleString('en-IN')}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
           )}
         </div>
       )}

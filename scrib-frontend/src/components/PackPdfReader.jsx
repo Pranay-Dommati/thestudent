@@ -46,7 +46,7 @@ const PAGE_RATIO = 1.414 // A4
  * A real sharpness gain has to come from the note-generation step producing
  * larger source images, not from anything in this component.
  */
-const PackPdfReader = ({ url, totalPages, accessiblePages, onUnlock, zoom = 1, price, quizCount, unlocking = false }) => {
+const PackPdfReader = ({ url, totalPages, accessiblePages, onUnlock, zoom = 1, price, quizCount, unlocking = false, free = false }) => {
   const [numPages, setNumPages] = useState(null)
   const [pageRatio, setPageRatio] = useState(PAGE_RATIO)
   const [fitWidth, setFitWidth] = useState(null)
@@ -211,15 +211,24 @@ const PackPdfReader = ({ url, totalPages, accessiblePages, onUnlock, zoom = 1, p
   // The slot heights below are what make scrolling and zooming stable, so they
   // have to match the canvases that land in them exactly — take the ratio from
   // the PDF rather than assuming a paper size.
+  //
+  // Page count is published *with* the ratio, never before it. Setting
+  // numPages first paints every slot at the A4 guess, and the real ratio
+  // landing a beat later then resizes all of them at once — a visible re-layout
+  // of the whole reader a second after the notes have already appeared.
+  // Committing both together costs one promise tick and paints once, correctly.
   const handleDocumentLoad = useCallback((pdf) => {
-    setNumPages(pdf.numPages)
+    const commit = (ratio) => {
+      if (ratio) setPageRatio(ratio)
+      setNumPages(pdf.numPages)
+    }
     pdf
       .getPage(1)
       .then((page) => {
         const { width, height } = page.getViewport({ scale: 1 })
-        if (width > 0 && height > 0) setPageRatio(height / width)
+        commit(width > 0 && height > 0 ? height / width : null)
       })
-      .catch(() => {})  // keep the A4 fallback
+      .catch(() => commit(null))  // keep the A4 fallback
   }, [])
 
   if (!url) return null
@@ -331,27 +340,37 @@ const PackPdfReader = ({ url, totalPages, accessiblePages, onUnlock, zoom = 1, p
             ))}
           </div>
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/70 p-6 text-center backdrop-blur-[3px]">
-            <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#1f3a5f] text-white shadow-md">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
+            <span className={`mb-3 flex h-11 w-11 items-center justify-center rounded-full text-white shadow-md ${free ? 'bg-[#c2542f]' : 'bg-[#1f3a5f]'}`}>
+              {free ? (
+                <span className="text-lg leading-none">🎁</span>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              )}
             </span>
             <span className="mb-1 text-sm font-bold text-[#1f1f1f]">
               {lockedCount} more page{lockedCount === 1 ? '' : 's'} locked
             </span>
             <span className="mb-4 max-w-[220px] text-xs text-[#7b756d]">
-              Unlock this pack to keep reading the full handwritten notes.
+              {free
+                ? 'Launch offer — take this whole pack for free, no card needed.'
+                : 'Unlock this pack to keep reading the full handwritten notes.'}
             </span>
             {onUnlock && (
               <button
                 onClick={onUnlock}
                 disabled={unlocking}
-                className="rounded-full bg-[#1f3a5f] px-6 py-3 text-xs font-bold text-white shadow-lg transition-colors hover:bg-[#2d5fa6] disabled:opacity-60"
+                className={`rounded-full px-6 py-3 text-xs font-bold text-white shadow-lg transition-colors disabled:opacity-60 ${
+                  free ? 'bg-[#c2542f] hover:bg-[#a94526]' : 'bg-[#1f3a5f] hover:bg-[#2d5fa6]'
+                }`}
               >
                 {unlocking
-                  ? 'Opening checkout…'
-                  : `🔓 Unlock full pack${quizCount ? ` + ${quizCount} quizzes` : ''}${price ? ` · ₹${price}` : ''}`}
+                  ? (free ? 'Claiming…' : 'Opening checkout…')
+                  : free
+                    ? `🎁 Get the full pack${quizCount ? ` + ${quizCount} quizzes` : ''} FREE`
+                    : `🔓 Unlock full pack${quizCount ? ` + ${quizCount} quizzes` : ''}${price ? ` · ₹${price}` : ''}`}
               </button>
             )}
           </div>

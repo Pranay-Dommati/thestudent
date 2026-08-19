@@ -14,6 +14,7 @@ from .models import (
     ContentPack, PackBundle, PackQuiz, PackQuizQuestion,
     PackPurchase, QuizAttempt, owned_pack_ids, user_owns_pack,
     bundle_offer_for, grant_bundle,
+    FreePackOffer, FreePackClaim, free_offer_state,
 )
 # pyrefly: ignore [missing-import]
 from .serializers import PackBundleSerializer
@@ -946,3 +947,141 @@ class BundleStrikethroughPriceTests(TestCase):
 
         self.assertEqual(data['original_price'], 4)
         self.assertLess(data['original_price'], data['price'])
+
+
+class FreePackOfferTests(TestCase):
+    """The launch promo: one pack, free, for each of the first N users.
+
+    The cap is the whole point — an offer that hands out 151 packs has failed
+    at the only job it had — so most of these are about the ways the count
+    could be got wrong.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='free@example.com', full_name='Free User', password='pw12345!'
+        )
+        self.os_pack = make_pack('os', 'OS')
+        self.cn_pack = make_pack('cn', 'CN')
+        self.offer = FreePackOffer.get()
+        self.offer.is_active = True
+        self.offer.total_slots = 2
+        self.offer.save()
+
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def claim(self, slug='os'):
+        return self.client.post('/api/scrib/packs/claim-free/', {'pack': slug}, format='json')
+
+    def test_claim_grants_the_pack_for_nothing(self):
+        res = self.claim()
+
+        self.assertEqual(res.status_code, 201)
+        self.assertTrue(user_owns_pack(self.user, self.os_pack))
+        purchase = PackPurchase.objects.get(user=self.user, pack=self.os_pack)
+        self.assertEqual(purchase.amount_paise, 0)
+        self.assertIsNone(purchase.payment)
+
+    def test_claim_is_recorded_against_the_cap(self):
+        self.claim()
+
+        self.assertEqual(FreePackClaim.objects.count(), 1)
+        self.assertEqual(FreePackOffer.get().remaining, 1)
+
+    def test_one_claim_per_user(self):
+        self.assertEqual(self.claim('os').status_code, 201)
+
+        res = self.claim('cn')
+
+        self.assertEqual(res.status_code, 409)
+        self.assertEqual(res.json()['code'], 'already_claimed')
+        self.assertFalse(user_owns_pack(self.user, self.cn_pack))
+        self.assertEqual(FreePackClaim.objects.count(), 1)
+
+    def test_offer_stops_dead_at_the_cap(self):
+        # Two slots, two other users take them both.
+        for i in range(2):
+            other = User.objects.create_user(
+                email=f'taken{i}@example.com', full_name='T', password='pw12345!'
+            )
+            FreePackClaim.objects.create(user=other, pack=self.os_pack)
+
+        res = self.claim()
+
+        self.assertEqual(res.status_code, 409)
+        self.assertEqual(res.json()['code'], 'exhausted')
+        self.assertFalse(user_owns_pack(self.user, self.os_pack))
+        self.assertEqual(FreePackClaim.objects.count(), 2)
+
+    def test_inactive_offer_refuses(self):
+        self.offer.is_active = False
+        self.offer.save()
+
+        res = self.claim()
+
+        self.assertEqual(res.status_code, 409)
+        self.assertEqual(res.json()['code'], 'offer_off')
+
+    def test_only_a_first_pack_is_free(self):
+        # Already a paying customer — the promo exists to remove the friction
+        # they have evidently already got past.
+        PackPurchase.objects.create(user=self.user, pack=self.cn_pack, amount_paise=9900)
+
+        res = self.claim('os')
+
+        self.assertEqual(res.status_code, 409)
+        self.assertEqual(res.json()['code'], 'already_owns')
+        self.assertFalse(user_owns_pack(self.user, self.os_pack))
+
+    def test_anonymous_cannot_claim(self):
+        anon = APIClient()
+
+        res = anon.post('/api/scrib/packs/claim-free/', {'pack': 'os'}, format='json')
+
+        self.assertIn(res.status_code, (401, 403))
+        self.assertEqual(FreePackClaim.objects.count(), 0)
+
+    def test_inactive_pack_cannot_be_claimed(self):
+        self.os_pack.is_active = False
+        self.os_pack.save()
+
+        res = self.claim('os')
+
+        self.assertEqual(res.status_code, 404)
+
+    def test_state_tells_an_anonymous_visitor_the_counts(self):
+        FreePackClaim.objects.create(
+            user=User.objects.create_user(email='x@example.com', full_name='X', password='pw12345!'),
+            pack=self.os_pack,
+        )
+
+        res = APIClient().get('/api/scrib/packs/free-offer/')
+        body = res.json()
+
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(body['open'])
+        self.assertEqual(body['claimed'], 1)
+        self.assertEqual(body['remaining'], 1)
+        # The counts advertise; only eligibility is withheld.
+        self.assertFalse(body['eligible'])
+        self.assertEqual(body['reason'], 'anonymous')
+
+    def test_catalogue_carries_the_offer(self):
+        res = self.client.get('/api/scrib/packs/catalogue/')
+
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json()['free_offer']['eligible'])
+
+    def test_remaining_never_goes_negative_when_the_cap_is_lowered(self):
+        self.claim()
+        self.offer.refresh_from_db()
+        self.offer.total_slots = 0
+        self.offer.save()
+
+        state = free_offer_state(self.user)
+
+        self.assertEqual(state['remaining'], 0)
+        self.assertFalse(state['open'])
+        # The pack already handed out stays handed out.
+        self.assertTrue(user_owns_pack(self.user, self.os_pack))

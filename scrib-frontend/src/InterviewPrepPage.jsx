@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from './context/AuthContext'
@@ -6,7 +6,11 @@ import customToast from './utils/customToast'
 import QuizRunner from './components/QuizRunner'
 import PrepLoadingScreen from './components/PrepLoadingScreen'
 import PackPdfReader from './components/PackPdfReader'
-import { fetchCatalogue, fetchPack, fetchPackPdf, purchasePack } from './services/packs'
+import FreeOfferBanner from './components/FreeOfferBanner'
+import CelebrationBurst from './components/CelebrationBurst'
+import FreeClaimConfirmModal from './components/FreeClaimConfirmModal'
+import SpotlightTour from './components/SpotlightTour'
+import { claimFreePack, fetchCatalogue, fetchPack, fetchPackPdf, purchasePack } from './services/packs'
 import { usePostHog } from '@posthog/react'
 
 const SWATCHES = {
@@ -67,6 +71,10 @@ const PlusIcon = ({ size = 14 }) => (
   </svg>
 )
 
+// Orientation is a one-time thing: once someone knows the packs are
+// switchable, saying so again on every visit is noise.
+const INTRO_SEEN_KEY = 'scrib_prep_intro_seen'
+
 const ZOOM_MIN = 0.5
 const ZOOM_MAX = 2
 const ZOOM_STEP = 0.1
@@ -85,10 +93,10 @@ const InterviewPrepPage = () => {
   const posthog = usePostHog()
   const { user, isLoggedIn, refreshUser } = useAuth()
 
-  // location.key is 'default' when this entry has no in-app history to go
-  // back to (a fresh tab, a shared link) — navigate(-1) there would leave the
-  // app entirely, so fall back to the Library instead of wherever they came from.
-  const goBack = () => (location.key === 'default' ? navigate('/library') : navigate(-1))
+  // Always the Library, never navigate(-1): the pack page is reached from a
+  // dozen places (a shared link, the welcome modal, a quiz), and "back" from a
+  // pack means "back to the shelf" every time rather than retracing history.
+  const goBack = () => navigate('/library')
 
   const [detail, setDetail] = useState(null)
   const [catalogue, setCatalogue] = useState(null)
@@ -100,15 +108,39 @@ const InterviewPrepPage = () => {
   // stay disabled (to block a second checkout popup) but keep their label.
   const [buyingTarget, setBuyingTarget] = useState(null)
   const buying = buyingTarget !== null
+  const [claiming, setClaiming] = useState(false)
+  const [celebrating, setCelebrating] = useState(false)
+  const [confirmingFree, setConfirmingFree] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [activeQuiz, setActiveQuiz] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [zoom, setZoom] = useState(getDefaultZoom)
   const [scrolled, setScrolled] = useState(false)
+  const [showIntro, setShowIntro] = useState(false)
+  // Each control exists twice — once in the desktop rail, once in the mobile
+  // row — and only one is ever on screen. The tour picks whichever measures.
+  const railRef = useRef(null)
+  const packRowRef = useRef(null)
+  const bundleCardRef = useRef(null)
+  const bundleChipRef = useRef(null)
 
   const zoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, +(z - ZOOM_STEP).toFixed(2)))
   const zoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2)))
   const resetZoom = () => setZoom(getDefaultZoom())
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('intro') !== '1') return
+    if (localStorage.getItem(INTRO_SEEN_KEY)) return
+    setShowIntro(true)
+  }, [location.search])
+
+  const dismissIntro = () => {
+    setShowIntro(false)
+    localStorage.setItem(INTRO_SEEN_KEY, '1')
+    // Drop the flag so a refresh — or a shared copy of this URL — doesn't
+    // re-open the tip for someone who has already read it.
+    navigate(location.pathname, { replace: true })
+  }
 
   // With no slug in the URL, send the reader to the first pack so the workspace
   // always opens on something readable.
@@ -173,6 +205,38 @@ const InterviewPrepPage = () => {
   const siblings = useMemo(() => detail?.siblings || [], [detail])
   const quizzes = useMemo(() => detail?.quizzes || [], [detail])
   const bundle = detail?.bundle || catalogue?.bundle
+  const freeOffer = detail?.free_offer || catalogue?.free_offer
+
+  // Logged-out visitors see the free CTA too. The offer is the whole reason to
+  // sign up, so hiding it until after login would bury the pitch behind the
+  // friction it exists to remove — the button routes them to /login instead.
+  const canClaimFree = Boolean(
+    !owned && freeOffer?.open && (freeOffer.eligible || freeOffer.reason === 'anonymous'),
+  )
+
+  // Built here rather than inside the tour so the copy can quote this pack's
+  // real numbers — a tour that says "3 packs" when there are four is worse
+  // than no tour.
+  const tourSteps = useMemo(() => {
+    const list = [{
+      targets: [railRef, packRowRef],
+      title: `${siblings.length} subjects, not just this one`,
+      body: 'Jump between packs from here. Each one keeps its own free preview, so you can read before you decide.',
+    }]
+
+    if (bundle && !bundle.owned) {
+      const saving = bundle.original_price - bundle.price
+      list.push({
+        targets: [bundleCardRef, bundleChipRef],
+        title: `Take ${bundle.pack_count >= siblings.length ? 'all' : 'the remaining'} ${bundle.pack_count} for ₹${bundle.price}`,
+        body: saving > 0
+          ? `Buying them separately costs ₹${bundle.original_price}, so the bundle saves you ₹${saving}.`
+          : 'One purchase unlocks every pack, notes and quizzes included.',
+      })
+    }
+
+    return list
+  }, [siblings.length, bundle])
 
   // The backend scopes the offer to the packs this user doesn't own yet, so its
   // counts describe what they'd actually be buying — summing the siblings here
@@ -245,6 +309,64 @@ const InterviewPrepPage = () => {
     }
   }
 
+  // What the free CTA does: ask, don't claim. The entitlement is one per
+  // person for good, so the last thing between a curious click and spending it
+  // on whichever pack happened to be open is a modal naming the pack.
+  const requestClaimFree = () => {
+    if (!isLoggedIn) {
+      customToast.success('Create a free account to claim your pack')
+      navigate(`/login?next=${encodeURIComponent(`/interview-prep/${slug || ''}`)}`)
+      return
+    }
+    if (claiming || buying) return
+    setConfirmingFree(true)
+  }
+
+  // Only ever called from the confirmation modal.
+  const claimFree = async () => {
+    if (claiming || buying) return
+    try {
+      setClaiming(true)
+      const result = await claimFreePack(pack.slug)
+      posthog?.capture('interview_pack_claimed_free', {
+        pack: pack.slug,
+        remaining: result?.free_offer?.remaining,
+      })
+      setConfirmingFree(false)
+      customToast.success(`${pack.title} is yours — free!`)
+      // Confetti instead of a "you already claimed yours" strip that would
+      // otherwise sit on the page for good after a one-time offer is spent.
+      setCelebrating(true)
+      await Promise.all([load(), refreshUser?.()])
+    } catch (error) {
+      customToast.error(
+        error?.response?.data?.message || error.message || 'Could not claim the free pack',
+      )
+      // The last slot may have gone between render and click. Reload so the
+      // page stops advertising an offer that is no longer there, and drop the
+      // confirmation with it — there is nothing left to confirm.
+      setConfirmingFree(false)
+      load()
+    } finally {
+      setClaiming(false)
+    }
+  }
+
+  // Every paywall CTA on the page reads from these, so the free offer never
+  // shows up in one place and a price in another.
+  const unlockBusy = canClaimFree ? claiming : buyingTarget === 'pack'
+  const onUnlock = canClaimFree ? requestClaimFree : () => buy()
+  const unlockBusyLabel = canClaimFree ? 'Claiming…' : 'Opening checkout…'
+  const unlockLabel = canClaimFree
+    ? `🎁 Get ${pack?.category || 'this pack'} FREE`
+    : `🔓 Unlock ${pack?.category || 'this pack'} · ₹${pack?.price}`
+  const unlockShortLabel = canClaimFree ? '🎁 FREE' : `🔓 ₹${pack?.price}`
+  // Amber for the giveaway, navy for a sale — the colour is doing the work of
+  // saying "this one costs nothing" before the label is read.
+  const unlockButtonClass = canClaimFree
+    ? 'bg-[#c2542f] shadow-md shadow-[#c2542f]/25 ring-1 ring-[#c2542f]/40 hover:bg-[#a94526]'
+    : 'bg-[#1f3a5f] shadow-md shadow-[#1f3a5f]/25 ring-1 ring-[#1f3a5f]/40 hover:bg-[#2d5fa6]'
+
   if (loading) {
     return <PrepLoadingScreen />
   }
@@ -263,6 +385,21 @@ const InterviewPrepPage = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f7f3] text-[#1f1f1f]">
+      {showIntro && <SpotlightTour steps={tourSteps} onFinish={dismissIntro} />}
+      <CelebrationBurst active={celebrating} onDone={() => setCelebrating(false)} />
+      <FreeClaimConfirmModal
+        open={confirmingFree}
+        pack={pack}
+        siblings={siblings}
+        offer={freeOffer}
+        claiming={claiming}
+        onConfirm={claimFree}
+        onPick={(nextSlug) => {
+          setConfirmingFree(false)
+          navigate(`/interview-prep/${nextSlug}`)
+        }}
+        onClose={() => setConfirmingFree(false)}
+      />
       <Helmet>
         <title>{pack.title} — Interview Prep | Scrib</title>
         <meta name="description" content={pack.description || `Handwritten ${pack.category} interview notes with ${pack.quiz_count} practice quizzes.`} />
@@ -273,6 +410,7 @@ const InterviewPrepPage = () => {
         {/* ── Left rail: every pack, always one click away ── */}
         {!fullscreen && (
           <aside
+            ref={railRef}
             className={`sticky top-0 hidden h-screen flex-col gap-1 overflow-y-auto border-r border-[#e2dbd2] bg-white pb-5 pt-4 md:flex ${
               sidebarOpen ? 'px-3' : 'px-2'
             }`}
@@ -356,8 +494,25 @@ const InterviewPrepPage = () => {
               )
             })}
 
-            {bundle && !bundle.owned && sidebarOpen && (
-              <div className="mt-auto flex flex-col gap-2 rounded-xl border border-[#d8e2ec] bg-gradient-to-b from-[#eef2f7] to-[#f4f1ea] p-3.5">
+            {/* Pinned to the bottom of the rail. One wrapper rather than an
+                `mt-auto` on each, so the bundle still sits at the foot on its
+                own when the free offer is off and renders nothing. */}
+            {sidebarOpen && (
+              <div className="mt-auto flex flex-col gap-3">
+              {!owned && (
+              <FreeOfferBanner
+                offer={freeOffer}
+                variant="inline"
+                onCta={canClaimFree ? onUnlock : undefined}
+                ctaLabel={claiming ? 'Claiming…' : `Claim ${pack.category} free`}
+              />
+            )}
+
+            {bundle && !bundle.owned && (
+              <div
+                ref={bundleCardRef}
+                className="flex flex-col gap-2 rounded-xl border border-[#d8e2ec] bg-gradient-to-b from-[#eef2f7] to-[#f4f1ea] p-3.5"
+              >
                 <span className="text-[14px] font-extrabold leading-snug tracking-tight text-[#1f1f1f]">
                   {bundleLabel}
                   {bundleQuestionTotal > 0 && <> + {bundleQuestionTotal} quiz q's</>}
@@ -377,6 +532,8 @@ const InterviewPrepPage = () => {
                 >
                   {buyingTarget === bundle.slug ? 'Opening…' : 'Get the bundle'}
                 </button>
+              </div>
+            )}
               </div>
             )}
 
@@ -424,21 +581,36 @@ const InterviewPrepPage = () => {
                       </span>
                     ) : (
                       <button
-                        onClick={() => buy()}
-                        disabled={buying}
-                        className="flex-1 rounded-full bg-[#1f3a5f] px-4 py-2.5 text-[12.5px] font-bold text-white shadow-md shadow-[#1f3a5f]/25 ring-1 ring-[#1f3a5f]/40 transition-all hover:bg-[#2d5fa6] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 md:flex-none"
+                        onClick={onUnlock}
+                        disabled={buying || claiming}
+                        className={`flex-1 rounded-full px-4 py-2.5 text-[12.5px] font-bold text-white transition-all hover:shadow-lg active:scale-[0.98] disabled:opacity-60 md:flex-none ${unlockButtonClass}`}
                       >
-                        {buyingTarget === 'pack' ? 'Opening checkout…' : `🔓 Unlock ${pack.category} · ₹${pack.price}`}
+                        {unlockBusy ? unlockBusyLabel : unlockLabel}
                       </button>
                     )}
                   </div>
                 </div>
               </div>
 
+              {/* The rail carries the offer on desktop; on a phone there is no
+                  rail, so it needs its own strip under the header. */}
+              {!owned && (
+                <FreeOfferBanner
+                  offer={freeOffer}
+                  variant="strip"
+                  className="md:hidden"
+                  onCta={canClaimFree ? onUnlock : undefined}
+                  ctaLabel={claiming ? 'Claiming…' : 'Claim free'}
+                />
+              )}
+
               {/* ── Mobile pack switcher — the left rail is desktop-only, so on a
                   phone this is the only way to move between packs or reach the
                   bundle offer. One scrollable row keeps it cheap vertically. ── */}
-              <div className="flex gap-2 overflow-x-auto px-4 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden">
+              <div
+                ref={packRowRef}
+                className="flex gap-2 overflow-x-auto px-4 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden"
+              >
                 {siblings.map((item) => {
                   const swatch = SWATCHES[item.theme] || SWATCHES.blue
                   const active = item.slug === pack.slug
@@ -470,6 +642,7 @@ const InterviewPrepPage = () => {
 
                 {bundle && !bundle.owned && (
                   <button
+                    ref={bundleChipRef}
                     onClick={() => buy({ bundleSlug: bundle.slug })}
                     disabled={buying}
                     className="flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#d8e2ec] bg-[#eef2f7] px-3 py-1.5 text-[11.5px] font-bold text-[#1f3a5f] transition-colors disabled:opacity-60"
@@ -533,16 +706,16 @@ const InterviewPrepPage = () => {
             <div className="flex flex-shrink-0 items-center gap-1.5">
               {!owned && (scrolled || fullscreen) && (
                 <button
-                  onClick={() => buy()}
-                  disabled={buying}
-                  className="mr-0.5 whitespace-nowrap rounded-full bg-[#1f3a5f] px-4 py-2.5 text-[13px] font-bold text-white shadow-md shadow-[#1f3a5f]/25 ring-1 ring-[#1f3a5f]/40 transition-all hover:bg-[#2d5fa6] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 md:px-5"
+                  onClick={onUnlock}
+                  disabled={buying || claiming}
+                  className={`mr-0.5 whitespace-nowrap rounded-full px-4 py-2.5 text-[13px] font-bold text-white transition-all hover:shadow-lg active:scale-[0.98] disabled:opacity-60 md:px-5 ${unlockButtonClass}`}
                 >
                   {/* The full pitch only fits once the column is wide enough —
                       below lg the sidebar still takes 264px, so the price
                       alone carries the bar and keeps it to one row. */}
-                  <span className="lg:hidden">{buyingTarget === 'pack' ? '…' : `🔓 ₹${pack.price}`}</span>
+                  <span className="lg:hidden">{unlockBusy ? '…' : unlockShortLabel}</span>
                   <span className="hidden lg:inline">
-                    {buyingTarget === 'pack' ? 'Opening checkout…' : `🔓 Unlock ${pack.category} · ₹${pack.price}`}
+                    {unlockBusy ? unlockBusyLabel : unlockLabel}
                   </span>
                 </button>
               )}
@@ -603,10 +776,11 @@ const InterviewPrepPage = () => {
                   url={pdf.pdf_url}
                   totalPages={pdf.total_pages}
                   accessiblePages={pdf.accessible_pages}
-                  onUnlock={() => buy()}
-                  unlocking={buyingTarget === 'pack'}
+                  onUnlock={onUnlock}
+                  unlocking={unlockBusy}
                   zoom={zoom}
                   price={pack.price}
+                  free={canClaimFree}
                   quizCount={pack.quiz_count}
                 />
               ) : (
@@ -635,11 +809,15 @@ const InterviewPrepPage = () => {
                       </div>
                     </div>
                     <button
-                      onClick={() => buy()}
-                      disabled={buying}
-                      className="flex-shrink-0 rounded-[11px] bg-[#1f3a5f] px-6 py-3 text-[13px] font-bold text-white hover:bg-[#2d5fa6] disabled:opacity-60 transition-colors"
+                      onClick={onUnlock}
+                      disabled={buying || claiming}
+                      className={`flex-shrink-0 rounded-[11px] px-6 py-3 text-[13px] font-bold text-white disabled:opacity-60 transition-colors ${
+                        canClaimFree ? 'bg-[#c2542f] hover:bg-[#a94526]' : 'bg-[#1f3a5f] hover:bg-[#2d5fa6]'
+                      }`}
                     >
-                      {buyingTarget === 'pack' ? 'Opening checkout…' : `Unlock — ₹${pack.price}`}
+                      {unlockBusy
+                        ? unlockBusyLabel
+                        : canClaimFree ? '🎁 Unlock free' : `Unlock — ₹${pack.price}`}
                     </button>
                   </div>
 
@@ -665,11 +843,13 @@ const InterviewPrepPage = () => {
 
                           <div className="mt-auto pt-1">
                             <button
-                              onClick={() => buy()}
-                              disabled={buying}
+                              onClick={onUnlock}
+                              disabled={buying || claiming}
                               className="rounded-full border border-[#e2dbd2] bg-white px-3.5 py-[7px] text-xs font-bold text-[#1f1f1f] hover:bg-[#f4f1ea] disabled:opacity-40 transition-colors"
                             >
-                              {buyingTarget === 'pack' ? 'Opening…' : 'Unlock to start'}
+                              {unlockBusy
+                                ? 'Opening…'
+                                : canClaimFree ? 'Unlock free' : 'Unlock to start'}
                             </button>
                           </div>
                         </div>

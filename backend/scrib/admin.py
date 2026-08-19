@@ -4,6 +4,7 @@ from .models import (
     PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction,
     PromoCode, PromoCodeRedemption, NoteShareLink, SharedPackPurchase,
     ContentPack, PackBundle, PackQuiz, PackQuizQuestion, PackPurchase, QuizAttempt,
+    FreePackOffer, FreePackClaim,
 )
 
 
@@ -247,3 +248,34 @@ class QuizAttemptAdmin(admin.ModelAdmin):
     list_filter = ('created_at', 'quiz__pack')
     search_fields = ('user__email',)
     raw_id_fields = ('user', 'quiz')
+
+
+@admin.register(FreePackOffer)
+class FreePackOfferAdmin(admin.ModelAdmin):
+    """The promo is normally driven from /admin-p; this is the fallback."""
+
+    list_display = ('__str__', 'is_active', 'total_slots', 'claimed', 'left', 'updated_at')
+    readonly_fields = ('updated_at',)
+
+    @admin.display(description='Claimed')
+    def claimed(self, obj):
+        return obj.claimed_count
+
+    @admin.display(description='Remaining')
+    def left(self, obj):
+        return obj.remaining
+
+    def has_add_permission(self, request):
+        # Singleton — pk=1 is created on first access by FreePackOffer.get().
+        return not FreePackOffer.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(FreePackClaim)
+class FreePackClaimAdmin(admin.ModelAdmin):
+    list_display = ('user', 'pack', 'created_at')
+    list_filter = ('created_at', 'pack')
+    search_fields = ('user__email', 'pack__title')
+    raw_id_fields = ('user', 'pack', 'purchase')

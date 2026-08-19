@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { offerVisible } from '../services/packs'
 
 // Same palette as PreviewCard so a paid pack sits in the same visual language
 // as the free notes around it. Keyed by ContentPack.theme.
@@ -11,8 +12,14 @@ const THEMES = {
   olive:  { bg: '#f4f5ee', pattern: '#e3e6d0', badgeBg: '#e3e6d0', badgeText: '#7a824a' },
 }
 
-const InterviewPackCard = ({ pack }) => {
+const InterviewPackCard = ({ pack, freeOffer }) => {
   const theme = THEMES[pack.theme] || THEMES.blue
+
+  // Only badge a pack the viewer could actually take for free. A card shouting
+  // FREE at someone who has already used their claim is a broken promise.
+  const claimable = Boolean(
+    !pack.owned && offerVisible(freeOffer) && (freeOffer.eligible || freeOffer.reason === 'anonymous'),
+  )
 
   return (
     <Link
@@ -26,7 +33,14 @@ const InterviewPackCard = ({ pack }) => {
           backgroundImage: `repeating-linear-gradient(-45deg, transparent, transparent 4px, ${theme.pattern} 4px, ${theme.pattern} 5px)`,
         }}
       >
-        <div className="flex justify-end">
+        <div className="flex items-start justify-between gap-2">
+          {claimable ? (
+            <span className="rounded-full bg-[#c2542f] px-2.5 py-1 text-[10px] font-bold tracking-wider text-white shadow-sm">
+              FREE
+            </span>
+          ) : (
+            <span />
+          )}
           <span
             className="rounded-full px-3 py-1 text-[10px] font-bold tracking-wider"
             style={{ backgroundColor: theme.badgeBg, color: theme.badgeText }}
@@ -61,13 +75,22 @@ const InterviewPackCard = ({ pack }) => {
             <span className="rounded-full bg-[#eef7df] px-3 py-1 text-[10.5px] font-bold text-[#557a3f]">
               ✓ Owned
             </span>
+          ) : claimable ? (
+            <span className="flex items-baseline gap-1.5">
+              <span className="font-semibold text-[17px] text-[#c2542f]" style={{ fontFamily: 'Sora, sans-serif' }}>
+                ₹0
+              </span>
+              <span className="text-[11.5px] text-[#9a9289] line-through decoration-[#c05252]">
+                ₹{pack.price}
+              </span>
+            </span>
           ) : (
             <span className="font-semibold text-[17px] text-[#1f1f1f]" style={{ fontFamily: 'Sora, sans-serif' }}>
               ₹{pack.price}
             </span>
           )}
           <span className="rounded-[9px] border border-[#e2dbd2] bg-white px-3.5 py-2 text-xs font-bold text-[#1f1f1f]">
-            {pack.owned ? 'Open →' : 'Preview →'}
+            {pack.owned ? 'Open →' : claimable ? 'Claim →' : 'Preview →'}
           </span>
         </div>
       </div>

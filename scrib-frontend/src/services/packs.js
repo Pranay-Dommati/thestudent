@@ -13,6 +13,47 @@ export const fetchCatalogue = async (section = 'interview') => {
   return data
 }
 
+/**
+ * Launch promo state — how many free packs are left and whether this caller can
+ * take one. Safe to call logged-out: the counts are the advertisement.
+ */
+/**
+ * Should this viewer be shown the launch promo at all?
+ *
+ * One rule for every promo surface — the header strip, the hero pill, the pack
+ * card badges, the welcome modal — so they can never disagree. Anyone who has
+ * already claimed or bought a pack is past the offer for good and sees the site
+ * exactly as it looks with the offer switched off; a logged-out visitor still
+ * sees it, since signing in is the next step rather than a rejection.
+ *
+ * The server decides this (`show_to_user`); the local checks are a fallback for
+ * a cached response from before that field existed.
+ */
+export const offerVisible = (offer) =>
+  Boolean(offer?.open) &&
+  offer.show_to_user !== false &&
+  !offer.user_claimed &&
+  !offer.user_owns_pack &&
+  offer.reason !== 'already_claimed' &&
+  offer.reason !== 'already_owns'
+
+export const fetchFreeOffer = async () => {
+  const { data } = await axiosInstance.get('/scrib/packs/free-offer/')
+  return data
+}
+
+/**
+ * Claim the free pack. No Razorpay round-trip — there is no money to move.
+ *
+ * The server re-checks every rule under a lock, so a 409 here is normal and
+ * expected (someone took the last slot first); surface its message rather than
+ * trusting whatever the banner last rendered.
+ */
+export const claimFreePack = async (slug) => {
+  const { data } = await axiosInstance.post('/scrib/packs/claim-free/', { pack: slug })
+  return data
+}
+
 export const fetchPack = async (slug) => {
   const { data } = await axiosInstance.get(`/scrib/packs/${slug}/`)
   return data

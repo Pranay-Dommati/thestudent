@@ -6,11 +6,12 @@ import axiosInstance from './utils/axios'
 import { getInitials } from './utils/user'
 import MobileMenu from './components/MobileMenu'
 import BuyCreditsModal from './components/BuyCreditsModal'
-import PreviewPromoModal from './components/PreviewPromoModal'
+import WelcomeChoiceModal from './components/WelcomeChoiceModal'
 import FreeCreditsModal from './components/FreeCreditsModal'
 import InterviewPackCard from './components/InterviewPackCard'
+import FreeOfferBanner from './components/FreeOfferBanner'
 import InterviewPackCardSkeleton from './components/InterviewPackCardSkeleton'
-import { fetchCatalogue } from './services/packs'
+import { fetchCatalogue, offerVisible } from './services/packs'
 import { startPaymentFlow } from './services/paymentService'
 import customToast from './utils/customToast'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
@@ -60,12 +61,13 @@ const App = () => {
   const [packStrip, setPackStrip] = useState([])
   const [packsLoading, setPacksLoading] = useState(true)
   const [packBundle, setPackBundle] = useState(null)
+  const [freeOffer, setFreeOffer] = useState(null)
   const [activePackIndex, setActivePackIndex] = useState(0)
   const [showNoticeBanner, setShowNoticeBanner] = useState(() => {
     // Don't show again if user already dismissed it this session
     return sessionStorage.getItem('notice_banner_dismissed') !== 'true'
   })
-  // Cohort A = 'preview' (PreviewPromoModal), Cohort B = 'free_credit' (FreeCreditsModal)
+  // Cohort A = 'preview' (WelcomeChoiceModal), Cohort B = 'free_credit' (FreeCreditsModal)
   const [scribCohort, setScribCohort] = useState('preview')
   const navigate = useNavigate()
 
@@ -124,6 +126,7 @@ const App = () => {
         if (!isMounted) return
         setPackStrip((data.packs || []).slice(0, 3))
         setPackBundle(data.bundle || null)
+        setFreeOffer(data.free_offer || null)
         setPacksLoading(false)
       } catch {
         if (!isMounted) return
@@ -226,14 +229,24 @@ const App = () => {
 
 
       <main>
+        {/* Directly under the header: the promo is the strongest thing on the
+            page while it lasts, and it disappears on its own when it runs out. */}
+        <FreeOfferBanner offer={freeOffer} variant="strip" />
+
         <section className="border-b border-[#e4ddd4]">
           <div className="mx-auto max-w-5xl px-6 py-16 text-center">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e8eefb] px-4 py-1.5 text-sm font-medium text-[#4a6aa6]">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-              </svg>
-              Free previews available now
-            </span>
+            {offerVisible(freeOffer) ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fdf4e3] px-4 py-1.5 text-sm font-medium text-[#8a6524] ring-1 ring-[#f0dfba]">
+                🎁 First {freeOffer.total_slots} students get an interview pack free
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#e8eefb] px-4 py-1.5 text-sm font-medium text-[#4a6aa6]">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                </svg>
+                Free previews available now
+              </span>
+            )}
             <h1 className="mt-6 text-4xl font-semibold leading-tight md:text-5xl lg:text-6xl">
               Turn any topic into <br className="hidden sm:block" />
               <span className="inline-block border-b-[4px] border-[#f0c06a] pb-1 mt-2">
@@ -300,7 +313,7 @@ const App = () => {
                   <>
                   {packStrip.map((pack) => (
                     <div key={pack.id} className="w-[248px] shrink-0 snap-start md:w-auto">
-                      <InterviewPackCard pack={pack} />
+                      <InterviewPackCard pack={pack} freeOffer={freeOffer} />
                     </div>
                   ))}
                   <Link
@@ -557,7 +570,7 @@ const App = () => {
       {/* Landing Modal — cohort-controlled */}
       {scribCohort === 'free_credit'
         ? <FreeCreditsModal isLoggedIn={isLoggedIn} loading={loading} />
-        : <PreviewPromoModal isLoggedIn={isLoggedIn} loading={loading} />
+        : <WelcomeChoiceModal isLoggedIn={isLoggedIn} loading={loading} />
       }
     </div>
   )

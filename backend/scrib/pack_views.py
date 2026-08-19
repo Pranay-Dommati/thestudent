@@ -19,7 +19,7 @@ import random
 import uuid
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Max, Q, Sum
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -32,6 +32,7 @@ from .models import (
     ContentPack, PackBundle, PackQuiz, PackQuizQuestion,
     PackPurchase, Payment, QuizAttempt, owned_pack_ids,
     bundle_offer_for, grant_bundle,
+    FreePackOffer, FreePackClaim, free_offer_state,
 )
 # pyrefly: ignore [missing-import]
 from .serializers import (
@@ -58,6 +59,15 @@ logger = logging.getLogger(__name__)
 # browser can. The real protection is that non-owners are handed a *different*
 # S3 object containing only the free pages.
 DEFAULT_PDF_URL_EXPIRY_SECONDS = 172800  # 2 days
+
+# Why a free claim was refused, in the words the user should see. Keyed by the
+# reason codes in models.free_offer_state so the two never drift apart.
+_CLAIM_REFUSAL_COPY = {
+    'offer_off': 'The free pack offer has ended',
+    'exhausted': 'All the free packs have been claimed',
+    'already_claimed': 'You have already claimed your free pack',
+    'already_owns': 'The free pack is for your first pack only',
+}
 MAX_PDF_BYTES = 100 * 1024 * 1024
 
 
@@ -215,6 +225,7 @@ class PackListView(APIView):
                 bundle,
                 context={'owned_bundle_ids': owned_bundle_ids, 'offer_packs': offer_packs},
             ).data if bundle else None,
+            'free_offer': free_offer_state(request.user),
         })
 
 
@@ -293,6 +304,7 @@ class PackDetailView(APIView):
                 bundle,
                 context={'owned_bundle_ids': owned_bundle_ids, 'offer_packs': offer_packs},
             ).data if bundle else None,
+            'free_offer': free_offer_state(request.user),
         })
 
 
@@ -641,6 +653,109 @@ class PackPurchaseVerifyView(APIView):
             'bundle': bundle.slug if bundle else None,
             'unlocked_pack_ids': sorted(owned_pack_ids(request.user)),
         })
+
+
+class FreeOfferView(APIView):
+    """GET /api/scrib/packs/free-offer/
+
+    The launch promo as it applies to the caller. Anonymous-safe: the counts
+    are the advertisement, so they render for logged-out visitors too — only
+    `eligible` differs.
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response(free_offer_state(request.user))
+
+
+class FreePackClaimView(APIView):
+    """POST /api/scrib/packs/claim-free/  {pack: <slug>}
+
+    Grants one pack, free, to one of the first N users. No Razorpay round-trip
+    — there is no money to move — so this is the only path that mints a
+    PackPurchase without a Payment behind it.
+
+    Every eligibility rule is re-checked here under a row lock. The banner's
+    "63 left" is a render of state that may already be stale by the time the
+    button is clicked, so it is a hint, never the authority.
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        pack_slug = str(request.data.get('pack', '') or '').strip()
+        if not pack_slug:
+            return error_response('Send the pack to claim')
+
+        pack = ContentPack.objects.filter(slug=pack_slug, is_active=True).first()
+        if not pack:
+            return error_response('Pack not found', status_code=404, code='not_found')
+
+        # Make sure the singleton exists before trying to lock it — SELECT FOR
+        # UPDATE on a missing row locks nothing.
+        FreePackOffer.get()
+
+        try:
+            with transaction.atomic():
+                offer = FreePackOffer.objects.select_for_update().get(pk=1)
+
+                if pack.section != offer.section:
+                    return error_response(
+                        'This pack is not part of the free offer',
+                        status_code=409, code='not_in_offer',
+                    )
+
+                # Counted inside the lock, so the last slot is handed to exactly
+                # one of two simultaneous claimants.
+                state = free_offer_state(request.user, offer)
+                if not state['eligible']:
+                    return error_response(
+                        _CLAIM_REFUSAL_COPY.get(state['reason'], 'This offer is not available'),
+                        status_code=409,
+                        code=state['reason'] or 'not_eligible',
+                        details={'free_offer': state},
+                    )
+
+                purchase, _created = PackPurchase.objects.get_or_create(
+                    user=request.user,
+                    pack=pack,
+                    bundle=None,
+                    defaults={'payment': None, 'amount_paise': 0},
+                )
+                FreePackClaim.objects.create(
+                    user=request.user, pack=pack, purchase=purchase,
+                )
+        except IntegrityError:
+            # The OneToOne fired: this user claimed in a parallel request.
+            logger.info('[packs] duplicate free claim user=%s pack=%s', request.user.id, pack_slug)
+            return error_response(
+                'You have already claimed your free pack',
+                status_code=409, code='already_claimed',
+                details={'free_offer': free_offer_state(request.user)},
+            )
+
+        state = free_offer_state(request.user)
+        logger.info(
+            '[packs] free pack claimed user=%s pack=%s (%d/%d)',
+            request.user.id, pack_slug, state['claimed'], state['total_slots'],
+        )
+
+        try:
+            from scrib.tasks import send_pack_purchase_success_email
+            send_pack_purchase_success_email(request.user, pack.title, pack.quiz_count or None)
+        except Exception as email_exc:
+            logger.warning('[packs] free-claim email failed user=%s: %s', request.user.id, email_exc)
+
+        return Response({
+            'success': True,
+            'purchase_id': purchase.id,
+            'pack': pack.slug,
+            'unlocked_pack_ids': sorted(owned_pack_ids(request.user)),
+            'free_offer': state,
+        }, status=201)
 
 
 class MyPacksView(APIView):
@@ -1277,6 +1392,102 @@ class AdminQuestionDetailView(_AdminView):
             return error_response('Question not found', status_code=404, code='not_found')
         question.delete()
         return Response({'success': True})
+
+
+class AdminFreeOfferView(_AdminView):
+    """GET/PATCH /api/scrib/admin/packs/free-offer/
+
+    The /admin-p Interview Prep panel's control for the launch promo: how many
+    packs have gone out, how many are left, and the ability to resize or stop
+    it. Claims themselves are never edited here — they are the record of what
+    was actually given away, and rewriting them would desynchronise the
+    entitlements users already hold.
+    """
+
+    def _payload(self):
+        offer = FreePackOffer.get()
+        state = free_offer_state(None, offer)
+
+        recent = (
+            FreePackClaim.objects
+            .select_related('user', 'pack')
+            .order_by('-created_at')[:25]
+        )
+        by_pack = (
+            FreePackClaim.objects
+            .values('pack__title', 'pack__slug')
+            .annotate(claims=Count('id'))
+            .order_by('-claims')
+        )
+
+        return {
+            **state,
+            'by_pack': [
+                {'title': row['pack__title'], 'slug': row['pack__slug'], 'claims': row['claims']}
+                for row in by_pack
+            ],
+            'recent_claims': [
+                {
+                    'id': claim.id,
+                    'user_email': getattr(claim.user, 'email', '') or '',
+                    'user_name': getattr(claim.user, 'full_name', '') or '',
+                    'pack_title': claim.pack.title,
+                    'claimed_at': claim.created_at,
+                }
+                for claim in recent
+            ],
+        }
+
+    def get(self, request):
+        return Response(self._payload())
+
+    def patch(self, request):
+        offer = FreePackOffer.get()
+        fields = []
+
+        if 'is_active' in request.data:
+            offer.is_active = bool(request.data.get('is_active'))
+            fields.append('is_active')
+
+        if 'headline' in request.data:
+            headline = str(request.data.get('headline') or '').strip()
+            if not headline:
+                return error_response('The headline cannot be empty')
+            offer.headline = headline[:120]
+            fields.append('headline')
+
+        # Two ways to size the promo, because admins think in both. `total_slots`
+        # is "give away 150 in all"; `remaining` is "let 40 more through from
+        # here" — which has to be added on top of what has already gone out, or
+        # setting it would silently revoke nothing and hand out too many.
+        claimed = offer.claimed_count
+        if 'total_slots' in request.data:
+            try:
+                total = int(request.data.get('total_slots'))
+            except (TypeError, ValueError):
+                return error_response('total_slots must be a whole number')
+            if total < 0:
+                return error_response('total_slots cannot be negative')
+            offer.total_slots = total
+            fields.append('total_slots')
+        elif 'remaining' in request.data:
+            try:
+                remaining = int(request.data.get('remaining'))
+            except (TypeError, ValueError):
+                return error_response('remaining must be a whole number')
+            if remaining < 0:
+                return error_response('remaining cannot be negative')
+            offer.total_slots = claimed + remaining
+            fields.append('total_slots')
+
+        if fields:
+            offer.save(update_fields=[*dict.fromkeys(fields), 'updated_at'])
+            logger.info(
+                '[packs] free offer updated by admin=%s active=%s slots=%s',
+                request.user.id, offer.is_active, offer.total_slots,
+            )
+
+        return Response(self._payload())
 
 
 class AdminBundleListView(_AdminView):

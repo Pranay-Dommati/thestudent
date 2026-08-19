@@ -1059,3 +1059,175 @@ def grant_bundle(user, bundle, payment=None, amount_paise=0):
             )
 
     return purchase, created
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Launch offer — the first N users get one interview pack free
+# ──────────────────────────────────────────────────────────────────────────────
+
+class FreePackOffer(models.Model):
+    """Singleton (pk=1): the launch promo handing the first N users a free pack.
+
+    Deliberately a row and not a setting, so the cap can be raised, lowered or
+    switched off from /admin-p without a deploy — and so `select_for_update` on
+    it gives the claim endpoint a lock to serialise on. Without that lock two
+    simultaneous claims on the last slot would both read "1 remaining" and both
+    grant, handing out 151 packs.
+
+    The claims themselves live in FreePackClaim. `total_slots` is the only
+    number stored; "claimed" and "remaining" are always derived from the claim
+    rows, so the counter can never drift away from what was actually given.
+    """
+
+    is_active = models.BooleanField(
+        default=False,
+        help_text='Master switch. Turn off to end the promo immediately.',
+    )
+    total_slots = models.PositiveIntegerField(
+        default=150,
+        help_text='How many users may claim a free pack in total.',
+    )
+    section = models.CharField(
+        max_length=40,
+        default=ContentPack.SECTION_INTERVIEW,
+        help_text="Which Library section the offer covers, e.g. 'interview'.",
+    )
+    headline = models.CharField(
+        max_length=120,
+        default='Your first interview pack is free',
+        help_text='Shown on the promo banner across the site.',
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Free Pack Offer'
+        verbose_name_plural = 'Free Pack Offer'
+
+    @classmethod
+    def get(cls):
+        """The singleton, created with defaults on first access."""
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def claimed_count(self):
+        return FreePackClaim.objects.count()
+
+    @property
+    def remaining(self):
+        return max(self.total_slots - self.claimed_count, 0)
+
+    @property
+    def is_open(self):
+        """Live and with slots left — the promo is still giving packs away."""
+        return self.is_active and self.remaining > 0
+
+    def __str__(self):
+        state = 'on' if self.is_active else 'off'
+        return f'FreePackOffer ({state}): {self.claimed_count}/{self.total_slots} claimed'
+
+
+class FreePackClaim(models.Model):
+    """One user's free pack. The OneToOne is the "one per person" rule.
+
+    Enforced in the database rather than in the view, because the view runs
+    concurrently: two tabs firing the claim at once both pass an `exists()`
+    check, and only a unique index stops the second row from being written.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='free_pack_claim',
+    )
+    pack = models.ForeignKey(
+        ContentPack,
+        on_delete=models.CASCADE,
+        related_name='free_claims',
+    )
+    purchase = models.ForeignKey(
+        PackPurchase,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='free_claims',
+        help_text='The entitlement row this claim created.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['created_at'], name='scrib_freeclaim_created_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.user_id} claimed {self.pack.title} free'
+
+
+# Why a user cannot claim right now. The frontend switches its copy on these,
+# so they are part of the API contract, not just log text.
+FREE_CLAIM_OFFER_OFF = 'offer_off'
+FREE_CLAIM_EXHAUSTED = 'exhausted'
+FREE_CLAIM_ANONYMOUS = 'anonymous'
+FREE_CLAIM_ALREADY_CLAIMED = 'already_claimed'
+FREE_CLAIM_ALREADY_OWNS = 'already_owns'
+
+
+def free_offer_state(user, offer=None):
+    """What the promo looks like to `user`, as a dict the API returns verbatim.
+
+    `eligible` answers one question only: would a claim posted right now
+    succeed? `show_to_user` answers a different one: should this person be shown
+    the promo at all. The two differ for a logged-out visitor — not eligible
+    until they sign in, but the whole point of advertising to them — and the
+    counts render for anyone who is shown it, because the scarcity is the
+    advertisement.
+    """
+    offer = offer or FreePackOffer.get()
+    claimed = offer.claimed_count
+    remaining = max(offer.total_slots - claimed, 0)
+
+    authed = bool(user and user.is_authenticated)
+    user_claimed = (
+        FreePackClaim.objects.filter(user=user).exists() if authed else False
+    )
+    owns_any = bool(owned_pack_ids(user)) if authed else False
+
+    if not offer.is_active:
+        reason = FREE_CLAIM_OFFER_OFF
+    elif remaining <= 0:
+        reason = FREE_CLAIM_EXHAUSTED
+    elif not authed:
+        # Not a rejection so much as a prompt: signing in is the next step.
+        reason = FREE_CLAIM_ANONYMOUS
+    elif user_claimed:
+        reason = FREE_CLAIM_ALREADY_CLAIMED
+    elif owns_any:
+        # The promo is for a first pack. Someone who already bought one has
+        # passed the moment it was meant to remove friction from.
+        reason = FREE_CLAIM_ALREADY_OWNS
+    else:
+        reason = None
+
+    return {
+        'active': offer.is_active,
+        'open': offer.is_active and remaining > 0,
+        'section': offer.section,
+        'headline': offer.headline,
+        'total_slots': offer.total_slots,
+        'claimed': claimed,
+        'remaining': remaining,
+        'eligible': reason is None,
+        'reason': reason,
+        'user_claimed': user_claimed,
+        'user_owns_pack': owns_any,
+        # Someone who already claimed or bought a pack is past this promo for
+        # good. Advertising a giveaway they cannot take is noise at best and
+        # reads as a bait at worst, so every promo surface — banner, hero pill,
+        # card badges — hides for them and the site renders exactly as it would
+        # with the offer switched off.
+        'show_to_user': (
+            offer.is_active and remaining > 0 and not (user_claimed or owns_any)
+        ),
+    }
