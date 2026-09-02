@@ -18,7 +18,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # pyrefly: ignore [missing-import]
-from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction, PromoCode, PromoCodeRedemption, ScribConfig, CohortPeriod
+from .models import PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction, PromoCode, PromoCodeRedemption, ScribConfig, CohortPeriod, ExternalClientPayment
 # pyrefly: ignore [missing-import]
 from .serializers import (
     PreviewNoteSerializer,
@@ -33,6 +33,7 @@ from .serializers import (
     PromoCodeSerializer,
     PromoCodeListSerializer,
     PromoCodeRedemptionSerializer,
+    ExternalClientPaymentSerializer,
 )
 # pyrefly: ignore [missing-import]
 from .services.cache import normalize_prompt, find_cached_note
@@ -2295,6 +2296,60 @@ class AdminPromoCodeStatsView(APIView):
             'total_remaining': total_remaining,
             'campaigns': campaign_data,
         })
+
+
+class AdminExternalClientPaymentListView(APIView):
+    """
+    GET  /api/scrib/admin/external-client-payments/  — list all manually-logged
+         external client payments (+ total revenue), newest first.
+    POST /api/scrib/admin/external-client-payments/  — log a new one
+         (name, email, date, amount[, notes]) for a client who reached out
+         and paid outside the normal in-app checkout flow.
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not is_admin_user(request.user):
+            return error_response('Forbidden', status_code=403, code='forbidden')
+
+        qs = ExternalClientPayment.objects.all()
+        total = qs.aggregate(total=Sum('amount'))['total'] or 0
+        serializer = ExternalClientPaymentSerializer(qs, many=True)
+        return Response({
+            'results': serializer.data,
+            'count': qs.count(),
+            'total_amount': total,
+        })
+
+    def post(self, request):
+        if not is_admin_user(request.user):
+            return error_response('Forbidden', status_code=403, code='forbidden')
+
+        serializer = ExternalClientPaymentSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response('Invalid data', details=serializer.errors)
+        serializer.save(created_by=request.user)
+        return Response(serializer.data, status=201)
+
+
+class AdminExternalClientPaymentDetailView(APIView):
+    """DELETE /api/scrib/admin/external-client-payments/<pk>/ — remove an entry."""
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        if not is_admin_user(request.user):
+            return error_response('Forbidden', status_code=403, code='forbidden')
+
+        try:
+            obj = ExternalClientPayment.objects.get(pk=pk)
+        except ExternalClientPayment.DoesNotExist:
+            return error_response('Not found', status_code=404, code='not_found')
+        obj.delete()
+        return Response({'success': True}, status=200)
 
 
 class AdminUserInsightsView(APIView):

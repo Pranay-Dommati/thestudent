@@ -2,7 +2,7 @@ from django.contrib import admin
 # pyrefly: ignore [missing-import]
 from .models import (
     PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction,
-    PromoCode, PromoCodeRedemption, NoteShareLink, SharedPackPurchase,
+    PromoCode, PromoCodeRedemption, ExternalClientPayment, NoteShareLink, SharedPackPurchase,
     ContentPack, PackBundle, PackQuiz, PackQuizQuestion, PackPurchase, QuizAttempt,
     FreePackOffer, FreePackClaim,
 )
@@ -67,6 +67,14 @@ class PromoCodeRedemptionAdmin(admin.ModelAdmin):
     list_filter = ('promo_code__campaign_name',)
     search_fields = ('promo_code__code', 'user__email')
     readonly_fields = ('redeemed_at',)
+
+
+@admin.register(ExternalClientPayment)
+class ExternalClientPaymentAdmin(admin.ModelAdmin):
+    list_display = ('name', 'email', 'amount', 'date', 'created_by', 'created_at')
+    list_filter = ('date',)
+    search_fields = ('name', 'email', 'notes')
+    readonly_fields = ('created_at',)
 
 
 # ─── Earn While Learning ─────────────────────────────────────────────────────

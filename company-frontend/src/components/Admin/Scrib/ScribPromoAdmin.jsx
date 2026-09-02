@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FaTicketAlt, FaPlus, FaArrowLeft, FaSearch, FaCopy, FaCheck, FaUsers, FaFileAlt, FaCreditCard, FaChevronDown, FaChevronUp, FaChartBar } from 'react-icons/fa';
+import { FaTicketAlt, FaPlus, FaArrowLeft, FaSearch, FaCopy, FaCheck, FaUsers, FaFileAlt, FaCreditCard, FaChevronDown, FaChevronUp, FaChartBar, FaBuilding } from 'react-icons/fa';
 import authService from '../../../services/authService';
 import ScribPaidAnalytics from './ScribPaidAnalytics';
+import ScribExternalClients from './ScribExternalClients';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -590,6 +591,13 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
           <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Cohort
         </button>
+        <button
+          id="tab-external-clients"
+          onClick={() => setActiveTab('external')}
+          className={`${tabBase} ${activeTab === 'external' ? tabActive : tabInactive}`}
+        >
+          <FaBuilding className="h-3.5 w-3.5" /> External Clients
+        </button>
       </div>
 
       {/* ── Cohort Toggle & Economics tab ── */}
@@ -1096,6 +1104,11 @@ const ScribPromoAdmin = ({ isDarkMode = false }) => {
       {/* ── Paid Analytics tab ── */}
       {activeTab === 'analytics' && (
         <ScribPaidAnalytics isDarkMode={isDarkMode} />
+      )}
+
+      {/* ── External Clients tab ── */}
+      {activeTab === 'external' && (
+        <ScribExternalClients isDarkMode={isDarkMode} />
       )}
 
       {/* ── Promo Codes tab ── */}

@@ -2,7 +2,7 @@ from rest_framework import serializers
 # pyrefly: ignore [missing-import]
 from .models import (
     PreviewNote, GeneratedNote, StudyPack, Payment, CreditTransaction,
-    PromoCode, PromoCodeRedemption,
+    PromoCode, PromoCodeRedemption, ExternalClientPayment,
     ContentPack, PackBundle, PackQuiz, PackQuizQuestion,
 )
 
@@ -151,6 +151,29 @@ class PromoCodeSerializer(serializers.ModelSerializer):
             'is_active', 'expires_at', 'created_at', 'status',
             'redemptions',
         ]
+
+
+class ExternalClientPaymentSerializer(serializers.ModelSerializer):
+    created_by_email = serializers.CharField(source='created_by.email', read_only=True, default=None)
+
+    class Meta:
+        model = ExternalClientPayment
+        fields = [
+            'id', 'name', 'email', 'date', 'amount', 'notes',
+            'created_at', 'created_by_email',
+        ]
+        read_only_fields = ['id', 'created_at', 'created_by_email']
+
+    def validate_amount(self, value):
+        if value is None or value <= 0:
+            raise serializers.ValidationError('Amount must be greater than 0.')
+        return value
+
+    def validate_name(self, value):
+        value = (value or '').strip()
+        if not value:
+            raise serializers.ValidationError('Name is required.')
+        return value
 
 
 class PromoCodeListSerializer(serializers.ModelSerializer):

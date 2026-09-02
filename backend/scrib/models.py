@@ -313,6 +313,39 @@ class PromoCodeRedemption(models.Model):
         return f"{self.user_id} redeemed {self.promo_code.code}"
 
 
+class ExternalClientPayment(models.Model):
+    """Manually-logged revenue from an external/offline client (e.g. someone who
+    reached out directly — bulk deal, institution, custom order — and paid
+    outside the normal in-app checkout flow).
+
+    Entered by hand from the admin panel so this revenue still shows up
+    alongside the automated payment analytics. Never affects credits/access.
+    """
+
+    name = models.CharField(max_length=150)
+    email = models.EmailField(blank=True, default='')
+    date = models.DateField(help_text='Date the payment was received.')
+    amount = models.DecimalField(max_digits=10, decimal_places=2, help_text='Amount in INR (₹).')
+    notes = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='logged_external_client_payments',
+    )
+
+    class Meta:
+        ordering = ['-date', '-created_at']
+        indexes = [
+            models.Index(fields=['date'], name='scrib_extclient_date_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.name} — ₹{self.amount} ({self.date})"
+
+
 class ScribConfig(models.Model):
     """Singleton (pk=1) that controls the active marketing cohort.
 
