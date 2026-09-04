@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from '../../../utils/axios';
 import { toast } from 'react-hot-toast';
 import { FaTimes, FaCopy } from 'react-icons/fa';
+import { getScribOrigin } from '../../../utils/scribOrigin';
 
 const CreateInfluencerModal = ({ isOpen, onClose, onSuccess, isDarkMode }) => {
   const [formData, setFormData] = useState({
@@ -10,6 +11,8 @@ const CreateInfluencerModal = ({ isOpen, onClose, onSuccess, isDarkMode }) => {
     email: '',
     phone: '',
     instagram_username: '',
+    commission_rate: '10',
+    commission_eligible_payments: '2',
     status: 'active'
   });
   const [loading, setLoading] = useState(false);
@@ -18,10 +21,12 @@ const CreateInfluencerModal = ({ isOpen, onClose, onSuccess, isDarkMode }) => {
   if (!isOpen) return null;
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    let { name, value } = e.target;
+    if (name === 'referral_code') {
+      // Keep it URL-safe: lowercase, only a-z 0-9 _ -
+      value = value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    }
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -31,9 +36,30 @@ const CreateInfluencerModal = ({ isOpen, onClose, onSuccess, isDarkMode }) => {
       return;
     }
 
+    if (formData.referral_code.length < 3) {
+      toast.error('Referral code must be at least 3 characters');
+      return;
+    }
+
+    const rate = parseFloat(formData.commission_rate);
+    if (isNaN(rate) || rate < 0 || rate > 100) {
+      toast.error('Commission rate must be between 0 and 100');
+      return;
+    }
+
+    const eligiblePayments = parseInt(formData.commission_eligible_payments, 10);
+    if (isNaN(eligiblePayments) || eligiblePayments < 0 || eligiblePayments > 50) {
+      toast.error('Eligible payments must be a whole number between 0 and 50');
+      return;
+    }
+
     try {
       setLoading(true);
-      const res = await axios.post('/scrib/admin/influencers/', formData);
+      const res = await axios.post('/scrib/admin/influencers/', {
+        ...formData,
+        commission_rate: rate,
+        commission_eligible_payments: eligiblePayments,
+      });
       setSuccessData(res.data);
       onSuccess();
       toast.success('Influencer created successfully!');
@@ -50,16 +76,7 @@ const CreateInfluencerModal = ({ isOpen, onClose, onSuccess, isDarkMode }) => {
     toast.success('Copied to clipboard');
   };
 
-  const getBaseUrl = () => {
-    // Assuming scrib is mounted at scrib.easylearnova.com
-    return window.location.origin.replace('admin', 'scrib'); 
-    // In local dev this might just be the current origin but you can hardcode or rely on env vars.
-    // For now we will construct it manually if needed, or just rely on origin.
-  };
-
-  const domain = window.location.hostname.includes('easylearnova.com') 
-    ? 'https://scrib.easylearnova.com' 
-    : window.location.origin.replace('5173', '5174');
+  const domain = getScribOrigin();
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
@@ -115,6 +132,48 @@ const CreateInfluencerModal = ({ isOpen, onClose, onSuccess, isDarkMode }) => {
                 </div>
 
                 <div>
+                  <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Commission Rate *</label>
+                  <div className="mt-1 flex rounded-md shadow-sm">
+                    <input
+                      type="number"
+                      name="commission_rate"
+                      value={formData.commission_rate}
+                      onChange={handleChange}
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      className={`flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-l-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`}
+                      required
+                    />
+                    <span className={`inline-flex items-center px-3 rounded-r-md border border-l-0 sm:text-sm ${isDarkMode ? 'bg-gray-600 border-gray-600 text-gray-300' : 'bg-gray-50 border-gray-300 text-gray-500'}`}>
+                      % per payment
+                    </span>
+                  </div>
+                  <p className={`mt-1 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Percent paid on each qualifying payment. Default 10%.</p>
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Commission-Eligible Payments *</label>
+                  <div className="mt-1 flex rounded-md shadow-sm">
+                    <input
+                      type="number"
+                      name="commission_eligible_payments"
+                      value={formData.commission_eligible_payments}
+                      onChange={handleChange}
+                      min="0"
+                      max="50"
+                      step="1"
+                      className={`flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-l-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'}`}
+                      required
+                    />
+                    <span className={`inline-flex items-center px-3 rounded-r-md border border-l-0 sm:text-sm ${isDarkMode ? 'bg-gray-600 border-gray-600 text-gray-300' : 'bg-gray-50 border-gray-300 text-gray-500'}`}>
+                      payments per user
+                    </span>
+                  </div>
+                  <p className={`mt-1 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>How many of each referred user's payments earn commission, counted from their first. e.g. 2 = only their 1st and 2nd payments. 0 disables commissions.</p>
+                </div>
+
+                <div>
                   <label className={`block text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Email</label>
                   <input
                     type="email"
@@ -160,7 +219,8 @@ const CreateInfluencerModal = ({ isOpen, onClose, onSuccess, isDarkMode }) => {
               <div className={`p-4 rounded-md ${isDarkMode ? 'bg-green-900/30 border border-green-800' : 'bg-green-50 border border-green-200'}`}>
                 <h4 className={`text-sm font-medium ${isDarkMode ? 'text-green-400' : 'text-green-800'}`}>Success!</h4>
                 <p className={`mt-1 text-sm ${isDarkMode ? 'text-green-300/80' : 'text-green-700'}`}>
-                  The influencer has been created. Please copy these links and send them to the influencer. You will not be able to see the Dashboard Token again.
+                  The influencer has been created. Copy these links and send them to the influencer.
+                  Both links are always available again from this influencer's detail page.
                 </p>
               </div>
 
@@ -189,12 +249,12 @@ const CreateInfluencerModal = ({ isOpen, onClose, onSuccess, isDarkMode }) => {
                   <input
                     type="text"
                     readOnly
-                    value={`${domain}/scrib/influencer/${successData.dashboard_token}`}
+                    value={`${domain}/influencer/${successData.dashboard_token}`}
                     className={`flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-l-md sm:text-sm border ${isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-300' : 'bg-gray-50 border-gray-300 text-gray-500'}`}
                   />
                   <button
                     type="button"
-                    onClick={() => handleCopy(`${domain}/scrib/influencer/${successData.dashboard_token}`)}
+                    onClick={() => handleCopy(`${domain}/influencer/${successData.dashboard_token}`)}
                     className={`inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 rounded-r-md bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${isDarkMode ? 'bg-gray-600 border-gray-600 text-gray-200 hover:bg-gray-500' : ''}`}
                   >
                     <FaCopy className="mr-2" /> Copy

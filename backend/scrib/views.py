@@ -1436,6 +1436,17 @@ def razorpay_webhook(request):
                         p.status = Payment.STATUS_PAID
                         p.razorpay_payment_id = rzp_payment_id
                         p.save(update_fields=['status', 'razorpay_payment_id', 'updated_at'])
+
+                        # ── Influencer Commission Logic ──
+                        # The client-side verify call also does this, but the webhook
+                        # is the reliable path (fires even if the buyer closes the tab),
+                        # so run it here too. process_influencer_commission is
+                        # idempotent per-payment.
+                        try:
+                            process_influencer_commission(p)
+                        except Exception as e:
+                            logger.error(f"[influencer] webhook commission error order_id={rzp_order_id}: {e}")
+
                         # credits_added is 0 for an Interview Prep pack/bundle
                         # order (see PackPurchaseOrderView) — that path grants
                         # its own entitlement and sends its own confirmation
@@ -3975,10 +3986,34 @@ class SharePackPdfView(APIView):
 # Influencer Referral API
 # -----------------------------------------------------------------------------
 
+def _parse_commission_rate(raw):
+    """Returns (Decimal, None) on success or (None, error_message)."""
+    from decimal import Decimal, InvalidOperation
+    try:
+        rate = Decimal(str(raw))
+    except (InvalidOperation, TypeError):
+        return None, 'commission_rate must be a number'
+    if rate < 0 or rate > 100:
+        return None, 'commission_rate must be between 0 and 100'
+    return rate, None
+
+
+def _parse_eligible_payments(raw):
+    """Returns (int, None) on success or (None, error_message)."""
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return None, 'commission_eligible_payments must be a whole number'
+    if n < 0 or n > 50:
+        return None, 'commission_eligible_payments must be between 0 and 50'
+    return n, None
+
+
 def process_influencer_commission(payment):
     """
     On every successful payment, calculate the user's successful payment number
-    (including the current payment). If the payment number is 1 or 2, create an
+    (including the current payment). If that number is within the influencer's
+    configured `commission_eligible_payments` window, create an
     InfluencerCommission. Otherwise, do nothing.
     """
     from scrib.models import InfluencerCommission
@@ -3998,11 +4033,15 @@ def process_influencer_commission(payment):
         status=Payment.STATUS_PAID
     ).count()
 
-    if successful_payments_count <= 2:
+    eligible_payments = influencer.commission_eligible_payments
+    if eligible_payments is None:
+        eligible_payments = 2
+
+    if 0 < successful_payments_count <= eligible_payments:
         # Prevent duplicates for the same payment
         if not InfluencerCommission.objects.filter(payment=payment).exists():
             from decimal import Decimal
-            commission_percentage = Decimal('10.0')
+            commission_percentage = Decimal(str(influencer.commission_rate or '10.0'))
             commission_amount = int(payment.amount * (commission_percentage / Decimal('100.0')))
             
             InfluencerCommission.objects.create(
@@ -4037,8 +4076,8 @@ def track_influencer_click(request):
         return Response({'error': 'referral_code and visitor_id required'}, status=400)
         
     try:
-        visitor_id = uuid.UUID(visitor_id_str)
-    except ValueError:
+        visitor_id = uuid.UUID(str(visitor_id_str))
+    except (ValueError, TypeError, AttributeError):
         return Response({'error': 'invalid visitor_id format'}, status=400)
 
     influencer = Influencer.objects.filter(referral_code=referral_code).first()
@@ -4078,62 +4117,58 @@ def influencer_dashboard(request, token):
     """
     influencer = Influencer.objects.filter(dashboard_token=token).first()
     if not influencer:
-        return Response({'error': 'Not found'}, status=404)
+        return Response({'success': False, 'message': 'Dashboard not found'}, status=404)
 
     # Analytics
     clicks = influencer.clicks.count()
     registered_users = influencer.referrals.count()
-    
+
     # We only care about users who have paid
     paid_users = InfluencerCommission.objects.filter(influencer=influencer).values('user').distinct().count()
-    
+
     # Sum of the first two successful payments made by referred users
     revenue_generated = InfluencerCommission.objects.filter(influencer=influencer).aggregate(total=Sum('payment_amount'))['total'] or 0
-    
+
     pending_commission = InfluencerCommission.objects.filter(influencer=influencer, status='pending').aggregate(total=Sum('commission_amount'))['total'] or 0
     paid_commission = InfluencerCommission.objects.filter(influencer=influencer, status='paid').aggregate(total=Sum('commission_amount'))['total'] or 0
-    total_commission = pending_commission + paid_commission
 
-    # Recent Activity (last 20)
-    # Combine referrals and commissions, sort by date descending
-    recent_referrals = list(influencer.referrals.order_by('-registered_at')[:20])
-    recent_commissions = list(influencer.commissions.order_by('-created_at')[:20])
-    
-    activity = []
-    for ref in recent_referrals:
-        activity.append({
-            'type': 'signup',
-            'user_name': ref.user.full_name,
-            'date': ref.registered_at.isoformat()
-        })
-        
-    for comm in recent_commissions:
-        activity.append({
-            'type': 'commission',
-            'user_name': comm.user.full_name,
-            'payment_number': comm.payment_number,
-            'amount': comm.commission_amount / 100,  # convert paise to rupees for UI
-            'date': comm.created_at.isoformat()
-        })
-        
-    # Sort combined activity by date descending, take top 20
-    activity.sort(key=lambda x: x['date'], reverse=True)
-    activity = activity[:20]
+    # Recent activity (last 20 of each)
+    recent_referrals = list(influencer.referrals.select_related('user').order_by('-registered_at')[:20])
+    recent_commissions = list(influencer.commissions.select_related('user').order_by('-created_at')[:20])
 
     return Response({
-        'name': influencer.name,
-        'referral_code': influencer.referral_code,
-        'status': influencer.status,
-        'analytics': {
-            'clicks': clicks,
-            'registered_users': registered_users,
-            'paid_users': paid_users,
-            'revenue_generated': revenue_generated / 100,
-            'pending_commission': pending_commission / 100,
-            'paid_commission': paid_commission / 100,
-            'total_commission': total_commission / 100,
-        },
-        'activity': activity
+        'success': True,
+        'data': {
+            'name': influencer.name,
+            'referral_code': influencer.referral_code,
+            'status': influencer.status,
+            'commission_eligible_payments': influencer.commission_eligible_payments,
+            'stats': {
+                'clicks': clicks,
+                'registered_users': registered_users,
+                'paid_users': paid_users,
+                'revenue_generated': revenue_generated / 100,
+                'pending_commission': pending_commission / 100,
+                'paid_commission': paid_commission / 100,
+            },
+            'recent_referrals': [
+                {
+                    'id': ref.id,
+                    'user_name': ref.user.full_name,
+                    'registered_at': ref.registered_at.isoformat(),
+                }
+                for ref in recent_referrals
+            ],
+            'recent_commissions': [
+                {
+                    'id': comm.id,
+                    'commission_amount': comm.commission_amount / 100,
+                    'status': comm.status,
+                    'created_at': comm.created_at.isoformat(),
+                }
+                for comm in recent_commissions
+            ],
+        }
     })
 
 
@@ -4164,6 +4199,8 @@ def admin_influencers_list(request):
                 'name': inf.name,
                 'referral_code': inf.referral_code,
                 'status': inf.status,
+                'commission_rate': float(inf.commission_rate),
+                'commission_eligible_payments': inf.commission_eligible_payments,
                 'clicks': inf.clicks.count(),
                 'registered_users': inf.referrals.count(),
                 'paid_users': stats['paid_users'] or 0,
@@ -4175,18 +4212,34 @@ def admin_influencers_list(request):
         return Response(data)
         
     elif request.method == 'POST':
-        name = request.data.get('name')
-        referral_code = request.data.get('referral_code')
-        
+        import re
+        name = (request.data.get('name') or '').strip()
+        referral_code = (request.data.get('referral_code') or '').strip().lower()
+
         if not name or not referral_code:
             return Response({'error': 'name and referral_code required'}, status=400)
-            
+
+        if not re.fullmatch(r'[a-z0-9_-]{3,50}', referral_code):
+            return Response({'error': 'referral_code must be 3-50 chars: lowercase letters, numbers, hyphen or underscore'}, status=400)
+
         if Influencer.objects.filter(referral_code=referral_code).exists():
             return Response({'error': 'referral_code already exists'}, status=400)
-            
+
+        status_val = request.data.get('status', 'active')
+        if status_val not in dict(Influencer.STATUS_CHOICES):
+            return Response({'error': 'invalid status'}, status=400)
+
+        commission_rate, err = _parse_commission_rate(request.data.get('commission_rate', 10))
+        if err:
+            return Response({'error': err}, status=400)
+
+        eligible_payments, err = _parse_eligible_payments(request.data.get('commission_eligible_payments', 2))
+        if err:
+            return Response({'error': err}, status=400)
+
         import secrets
         dashboard_token = secrets.token_urlsafe(32)
-        
+
         inf = Influencer.objects.create(
             name=name,
             email=request.data.get('email', ''),
@@ -4194,30 +4247,93 @@ def admin_influencers_list(request):
             instagram_username=request.data.get('instagram_username', ''),
             referral_code=referral_code,
             dashboard_token=dashboard_token,
-            status=request.data.get('status', 'active')
+            commission_rate=commission_rate,
+            commission_eligible_payments=eligible_payments,
+            status=status_val
         )
-        
+
         return Response({
             'id': str(inf.id),
             'referral_code': inf.referral_code,
-            'dashboard_token': inf.dashboard_token
+            'dashboard_token': inf.dashboard_token,
+            'commission_rate': float(inf.commission_rate),
+            'commission_eligible_payments': inf.commission_eligible_payments
         }, status=201)
 
 
-@api_view(['GET'])
+@api_view(['GET', 'PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def admin_influencer_detail(request, pk):
     """
-    GET details of a specific influencer for admin
+    GET   : full details of a specific influencer for admin
+    PATCH : update name / email / phone / instagram_username / commission_rate /
+            commission_eligible_payments / status
+    DELETE: permanently remove the influencer. Cascades to their clicks, referral
+            records and commission history; referred users are kept but unlinked
+            (referred_by_influencer set to NULL). Refused when the influencer has
+            any paid commissions unless ?force=true is passed.
     """
     if not hasattr(request.user, 'is_staff') or not request.user.is_staff:
         return Response({'error': 'Unauthorized'}, status=403)
-        
+
     try:
         inf = Influencer.objects.get(pk=pk)
     except Influencer.DoesNotExist:
         return Response({'error': 'Not found'}, status=404)
-        
+
+    if request.method == 'DELETE':
+        force = str(request.query_params.get('force', '')).lower() in ('1', 'true', 'yes')
+        commissions = InfluencerCommission.objects.filter(influencer=inf)
+        paid_count = commissions.filter(status=InfluencerCommission.STATUS_PAID).count()
+
+        if paid_count and not force:
+            return Response({
+                'error': f'This influencer has {paid_count} paid commission(s). '
+                         f'Deleting will erase that payout history. Pass force=true to confirm.',
+                'requires_force': True,
+                'paid_commissions': paid_count,
+            }, status=409)
+
+        removed = {
+            'clicks': inf.clicks.count(),
+            'referrals': inf.referrals.count(),
+            'commissions': commissions.count(),
+            'users_unlinked': inf.referred_users.count(),
+        }
+        name = inf.name
+        inf.delete()
+        logger.info(f'[influencer] Admin {request.user.id} deleted influencer "{name}" ({pk}); removed={removed}')
+        return Response({'success': True, 'deleted': name, 'removed': removed})
+
+    if request.method == 'PATCH':
+        update_fields = []
+        for field in ('name', 'email', 'phone', 'instagram_username'):
+            if field in request.data:
+                setattr(inf, field, (request.data.get(field) or '').strip())
+                update_fields.append(field)
+        if 'commission_rate' in request.data:
+            rate, err = _parse_commission_rate(request.data.get('commission_rate'))
+            if err:
+                return Response({'error': err}, status=400)
+            inf.commission_rate = rate
+            update_fields.append('commission_rate')
+        if 'commission_eligible_payments' in request.data:
+            n, err = _parse_eligible_payments(request.data.get('commission_eligible_payments'))
+            if err:
+                return Response({'error': err}, status=400)
+            inf.commission_eligible_payments = n
+            update_fields.append('commission_eligible_payments')
+        if 'status' in request.data:
+            new_status = request.data.get('status')
+            if new_status not in dict(Influencer.STATUS_CHOICES):
+                return Response({'error': 'invalid status'}, status=400)
+            inf.status = new_status
+            update_fields.append('status')
+        if not update_fields:
+            return Response({'error': 'no updatable fields provided'}, status=400)
+        inf.save(update_fields=update_fields)
+        return Response({'success': True, 'updated': update_fields})
+
     # Same stats as list
     stats = InfluencerCommission.objects.filter(influencer=inf).aggregate(
         paid_users=Count('user', distinct=True),
@@ -4267,6 +4383,8 @@ def admin_influencer_detail(request, pk):
         'instagram_username': inf.instagram_username,
         'referral_code': inf.referral_code,
         'dashboard_token': inf.dashboard_token,
+        'commission_rate': float(inf.commission_rate),
+        'commission_eligible_payments': inf.commission_eligible_payments,
         'status': inf.status,
         'created_at': inf.created_at,
         'stats': {
@@ -4298,12 +4416,18 @@ def admin_mark_commission_paid(request, pk):
         
     if comm.status == 'paid':
         return Response({'error': 'Already paid'}, status=400)
-        
+    if comm.status == 'cancelled':
+        return Response({'error': 'Commission is cancelled'}, status=400)
+
+    txn_ref = (request.data.get('transaction_reference') or '').strip()
+    if not txn_ref:
+        return Response({'error': 'transaction_reference is required'}, status=400)
+
     comm.status = 'paid'
     comm.paid_at = timezone.now()
     comm.paid_by = request.user
-    comm.transaction_reference = request.data.get('transaction_reference', '')
-    comm.notes = request.data.get('notes', '')
+    comm.transaction_reference = txn_ref
+    comm.notes = (request.data.get('notes') or '').strip()
     comm.save()
     
     return Response({'success': True, 'status': comm.status, 'paid_at': comm.paid_at})

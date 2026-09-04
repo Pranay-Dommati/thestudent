@@ -4,6 +4,7 @@ import axiosInstance from '../utils/axios'
 import customToast from '../utils/customToast'
 import storage from '../utils/storage'
 import posthog from 'posthog-js'
+import { getReferralCode } from '../utils/referral'
 
 const AuthContext = createContext(null)
 const IS_DEV = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV
@@ -272,11 +273,13 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  const googleLogin = async (googleToken) => {
+  const googleLogin = async (googleToken, options = {}) => {
     try {
+      const influencerCode = options.influencerCode || getReferralCode()
       const response = await axiosInstance.post('/auth/google/token/', {
         id_token: googleToken,
-        signup_source: 'scrib'
+        signup_source: 'scrib',
+        ...(influencerCode ? { influencer_code: influencerCode } : {}),
       })
 
       const { user: loggedInUser, access, refresh } = response.data

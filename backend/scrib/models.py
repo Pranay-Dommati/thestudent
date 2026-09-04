@@ -615,6 +615,18 @@ class Influencer(models.Model):
     referral_code = models.CharField(max_length=50, unique=True, db_index=True)
     dashboard_token = models.CharField(max_length=64, unique=True, db_index=True)
 
+    commission_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=10.0,
+        help_text='Percent of each qualifying payment paid to this influencer'
+    )
+
+    commission_eligible_payments = models.PositiveSmallIntegerField(
+        default=2,
+        help_text="How many of a referred user's successful payments earn commission, "
+                  "counted from their first payment. e.g. 2 = only the user's 1st and 2nd "
+                  "payments. 0 disables commissions for this influencer."
+    )
+
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -644,7 +656,8 @@ class InfluencerClick(models.Model):
 
 class InfluencerReferral(models.Model):
     influencer = models.ForeignKey(Influencer, on_delete=models.CASCADE, related_name='referrals')
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='influencer_referral_record')
+    # A user can be referred by at most one influencer.
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='influencer_referral_record')
     registered_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -688,6 +701,39 @@ class InfluencerCommission(models.Model):
 
     def __str__(self):
         return f"Commission for {self.influencer.name} ({self.status})"
+
+
+def attach_influencer_referral(user, referral_code):
+    """
+    Idempotently link `user` to the influencer identified by `referral_code`.
+
+    Safe to call from any signup path. Does nothing if the code is empty/unknown,
+    the influencer isn't active, or the user is already attributed to someone.
+    Returns the Influencer on success, else None.
+    """
+    if not referral_code:
+        return None
+    code = str(referral_code).strip().lower()
+    if not code:
+        return None
+
+    influencer = Influencer.objects.filter(
+        referral_code=code, status=Influencer.STATUS_ACTIVE
+    ).first()
+    if not influencer:
+        return None
+
+    # Already attributed (to anyone)? Leave it — first touch wins.
+    if InfluencerReferral.objects.filter(user=user).exists():
+        return None
+
+    InfluencerReferral.objects.get_or_create(
+        user=user, defaults={'influencer': influencer}
+    )
+    if getattr(user, 'referred_by_influencer_id', None) != influencer.id:
+        user.referred_by_influencer = influencer
+        user.save(update_fields=['referred_by_influencer'])
+    return influencer
 
 
 # -----------------------------------------------------------------------------

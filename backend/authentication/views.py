@@ -343,17 +343,14 @@ def otp_signup(request):
         )
         if created:
             user.set_password(password)
-            
-            # Influencer Referral Tracking
-            influencer_code = request.data.get('influencer_code')
-            if influencer_code:
-                from scrib.models import Influencer, InfluencerReferral
-                influencer = Influencer.objects.filter(referral_code=influencer_code, status=Influencer.STATUS_ACTIVE).first()
-                if influencer:
-                    user.referred_by_influencer = influencer
-                    InfluencerReferral.objects.create(influencer=influencer, user=user)
-                    
             user.save()
+
+            # Influencer Referral Tracking (idempotent, safe on failure)
+            try:
+                from scrib.models import attach_influencer_referral
+                attach_influencer_referral(user, request.data.get('influencer_code'))
+            except Exception as e:
+                logger.error(f"[influencer] otp_signup referral attach failed: {e}")
         else:
             # Update name/password if still inactive
             if not user.is_active:
@@ -362,6 +359,11 @@ def otp_signup(request):
                 user.agreed_to_terms = serializer.validated_data.get('agreed_to_terms', False)
                 user.auth_method = 'email'
                 user.save()
+                try:
+                    from scrib.models import attach_influencer_referral
+                    attach_influencer_referral(user, request.data.get('influencer_code'))
+                except Exception as e:
+                    logger.error(f"[influencer] otp_signup(retry) referral attach failed: {e}")
             else:
                 # Defensive, though validate_email should have caught this
                 return Response({'error': 'User already exists.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1286,16 +1288,13 @@ def google_auth_callback(request):
                 )
                 created = True
                 logger.info(f"Google Auth Token: New user created - {email}")
-                
-                # Influencer Referral Tracking
-                influencer_code = request.data.get('influencer_code')
-                if influencer_code:
-                    from scrib.models import Influencer, InfluencerReferral
-                    influencer = Influencer.objects.filter(referral_code=influencer_code, status=Influencer.STATUS_ACTIVE).first()
-                    if influencer:
-                        user.referred_by_influencer = influencer
-                        user.save(update_fields=['referred_by_influencer'])
-                        InfluencerReferral.objects.create(influencer=influencer, user=user)
+
+                # Influencer Referral Tracking (idempotent, safe on failure)
+                try:
+                    from scrib.models import attach_influencer_referral
+                    attach_influencer_referral(user, request.data.get('influencer_code'))
+                except Exception as e:
+                    logger.error(f"[influencer] google_auth_callback referral attach failed: {e}")
 
                 tag_signup_cohort(user)
                 grant_signup_credits(user)
@@ -1453,16 +1452,13 @@ def google_auth_token(request):
                 )
                 created = True
                 logger.info(f"Google token auth: New user created - {email}")
-                
-                # Influencer Referral Tracking
-                influencer_code = request.data.get('influencer_code')
-                if influencer_code:
-                    from scrib.models import Influencer, InfluencerReferral
-                    influencer = Influencer.objects.filter(referral_code=influencer_code, status=Influencer.STATUS_ACTIVE).first()
-                    if influencer:
-                        user.referred_by_influencer = influencer
-                        user.save(update_fields=['referred_by_influencer'])
-                        InfluencerReferral.objects.create(influencer=influencer, user=user)
+
+                # Influencer Referral Tracking (idempotent, safe on failure)
+                try:
+                    from scrib.models import attach_influencer_referral
+                    attach_influencer_referral(user, request.data.get('influencer_code'))
+                except Exception as e:
+                    logger.error(f"[influencer] google_auth_token referral attach failed: {e}")
 
                 tag_signup_cohort(user)
                 grant_signup_credits(user)

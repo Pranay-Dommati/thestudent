@@ -6,6 +6,7 @@ import OtpModal from './components/Auth/OtpModal'
 import { otpSignup } from './services/otpAuth'
 import universalToast from './utils/universalToast'
 import GoogleButtonSkeleton from './components/GoogleButtonSkeleton'
+import { getReferralCode, clearReferralCode } from './utils/referral'
 
 const SignupPage = () => {
   const navigate = useNavigate()
@@ -82,7 +83,7 @@ const SignupPage = () => {
         password,
         agreed_to_terms: agreedToTerms,
       }
-      const refCode = localStorage.getItem('influencer_ref')
+      const refCode = getReferralCode()
       if (refCode) {
         payload.influencer_code = refCode
       }
@@ -109,8 +110,9 @@ const SignupPage = () => {
 
   const { renderGoogleButton, isReady } = useGoogleAuth(
     async (credential) => {
-      const success = await googleLogin(credential)
+      const success = await googleLogin(credential, { influencerCode: getReferralCode() })
       if (success) {
+        clearReferralCode()
         navigate(nextUrl)
       }
     },
@@ -233,6 +235,7 @@ const SignupPage = () => {
         onClose={() => setOtpOpen(false)}
         onVerified={(data) => {
           if (data?.access && data?.refresh) {
+            clearReferralCode()
             setAuthSession({
               user: data.user,
               access: data.access,
