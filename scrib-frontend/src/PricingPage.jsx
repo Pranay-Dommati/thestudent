@@ -16,7 +16,6 @@ const tiers = [
     price: '₹19',
     credits: '2 credits',
     helper: '2 PDF pages',
-    priceTag: 'Try now',
     highlight: false,
   },
   {
@@ -173,140 +172,94 @@ const PricingPage = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-12">
-        <div className="text-center px-4">
-          <h1 className="text-2xl font-semibold md:text-3xl lg:text-4xl">Simple, pay-as-you-go pricing</h1>
-
+      <main className="mx-auto max-w-5xl px-6 py-14">
+        <div className="text-center">
+          <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Simple, pay-as-you-go pricing</h1>
+          <p className="mx-auto mt-3 max-w-md text-sm text-[#7b756d]">
+            Buy credits when you need them. They never expire, and there's no subscription.
+          </p>
+          <p className="mt-4 text-sm text-[#7b756d]">
+            New here?{' '}
+            <Link to="/library" className="font-semibold text-[#1f1f1f] underline underline-offset-4 hover:text-[#4e8c3a] transition-colors">
+              Browse 50+ free note previews →
+            </Link>
+          </p>
         </div>
 
-        {/* Trust banner — see before you buy */}
-        {/* Mobile: compact single row */}
-        <div className="mt-6 flex items-center justify-between rounded-xl border border-[#e2dbd2] bg-white px-4 py-3 sm:hidden">
-          <p className="text-[13px] text-[#1f1f1f]">New here? See notes before buying</p>
-          <Link
-            to="/library"
-            className="flex-shrink-0 rounded-full border border-[#e2dbd2] bg-white px-3 py-1.5 text-[11px] font-medium text-[#1f1f1f] hover:bg-[#faf8f3] transition-colors"
-          >
-            Preview →
-          </Link>
-        </div>
-        {/* Desktop: full card */}
-        <div className="mt-6 hidden sm:flex flex-row items-center justify-between gap-3 rounded-2xl border border-[#e2dbd2] bg-[#fdfcf9] px-5 py-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#f0f9eb] border border-[#cce8ba]">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4e8c3a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[#1f1f1f]">New here? See exactly what you're paying for</p>
-              <p className="mt-0.5 text-xs text-[#7b756d]">Browse 50+ free handwritten note previews — no account needed. Verify the quality before spending a single rupee.</p>
-            </div>
-          </div>
-          <Link
-            to="/library"
-            className="flex-shrink-0 rounded-full border border-[#1f1f1f] bg-white px-4 py-2 text-xs font-semibold text-[#1f1f1f] hover:bg-[#1f1f1f] hover:text-white transition-colors whitespace-nowrap"
-          >
-            Browse free previews →
-          </Link>
-        </div>
-
-        <div className="mt-8 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-12 grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           {tiers.map((tier) => (
             <div
               key={tier.id}
-              className={`relative flex flex-row sm:flex-col items-center sm:items-stretch justify-between sm:justify-start rounded-2xl border bg-white p-5 sm:p-6 ${
-                tier.highlight ? 'border-[1.5px] border-black shadow-sm' : 'border-[#e2dbd2]'
+              className={`relative flex flex-col rounded-2xl border bg-white p-6 ${
+                tier.highlight ? 'border-black shadow-sm' : 'border-[#e2dbd2]'
               }`}
             >
-              {tier.highlight && tier.tag ? (
-                <span className="absolute -top-[10px] left-5 sm:left-1/2 sm:-translate-x-1/2 rounded-full bg-[#1a1a1a] ring-4 ring-white px-3 py-0.5 text-[11px] font-semibold text-[#f0c06a]">
+              {tier.tag ? (
+                <span className="absolute -top-2.5 left-6 rounded-full bg-[#1a1a1a] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#f0c06a] ring-4 ring-white">
                   {tier.tag}
                 </span>
               ) : null}
 
-              {/* Left Side (Mobile) / Top Side (Desktop) */}
-              <div className="flex flex-col flex-1 sm:w-auto">
-                {/* Price */}
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2">
-                    <span className="text-3xl sm:text-4xl font-medium tracking-tight text-[#1f1f1f]">
-                      {tier.price}
-                    </span>
-                    {tier.priceTag && (
-                      <span className="inline-flex rounded-md bg-[#eef7df] px-2 py-0.5 text-[11px] font-semibold text-[#557a3f]">
-                        {tier.priceTag}
-                      </span>
-                    )}
-                  </div>
-                  <span className="mt-1 hidden sm:block text-sm text-[#5f5a54]">/ pack</span>
-                </div>
-
-                {/* Credits */}
-                <div className="mt-1 sm:mt-6 flex flex-col">
-                  {/* Desktop version */}
-                  <div className="hidden sm:flex flex-col">
-                    <span className="text-lg font-semibold text-[#1f1f1f]">{tier.credits}</span>
-                    {tier.tag && !tier.highlight ? (
-                      <div className="mt-1">
-                        <span className="inline-flex rounded-md bg-[#eef7df] px-1.5 py-0.5 text-[10px] font-semibold text-[#557a3f]">
-                          {tier.tag}
-                        </span>
-                      </div>
-                    ) : null}
-                    <span className="mt-1 text-[13px] leading-snug text-[#5f5a54]">
-                      {tier.helper}
-                    </span>
-                  </div>
-                  
-                  {/* Mobile version */}
-                  <div className="flex sm:hidden flex-col">
-                    <span className="text-[13px] text-[#9a9289]">
-                      {tier.credits} · {tier.helper}
-                    </span>
-                  </div>
-                </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-3xl font-semibold tracking-tight text-[#1f1f1f]">{tier.price}</span>
+                <span className="text-sm text-[#9a9289]">/ pack</span>
               </div>
 
-              {/* Right Side (Mobile) / Bottom Side (Desktop) */}
-              <div className="sm:mt-auto sm:pt-8 flex-shrink-0 ml-4 sm:ml-0">
-                <button
-                  id={`pricing-buy-${tier.id}`}
-                  onClick={() => handleBuyClick(tier.id)}
-                  disabled={processingPack === tier.id}
-                  className={`w-full sm:w-full rounded-lg px-5 sm:px-4 py-2 sm:py-2 text-sm font-semibold transition-all ${
-                    tier.highlight
-                      ? 'bg-[#1a1a1a] text-white hover:bg-[#333333]'
-                      : 'border border-[#e2dbd2] bg-white text-[#1f1f1f] hover:bg-[#f7f4ee]'
-                  } disabled:opacity-50`}
-                >
-                  {processingPack === tier.id ? 'Processing...' : (
-                    <>
-                      <span className="sm:hidden">Buy</span>
-                      <span className="hidden sm:inline">{isLoggedIn ? 'Buy pack' : 'Sign in to buy'}</span>
-                    </>
-                  )}
-                </button>
+              <div className="mt-5">
+                <p className="text-base font-semibold text-[#1f1f1f]">{tier.credits}</p>
+                <p className="mt-0.5 text-[13px] text-[#8a847c]">{tier.helper}</p>
               </div>
+
+              <button
+                id={`pricing-buy-${tier.id}`}
+                onClick={() => handleBuyClick(tier.id)}
+                disabled={processingPack === tier.id}
+                className={`mt-6 w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 ${
+                  tier.highlight
+                    ? 'bg-[#1a1a1a] text-white hover:bg-[#333333]'
+                    : 'border border-[#e2dbd2] bg-white text-[#1f1f1f] hover:bg-[#f7f4ee]'
+                }`}
+              >
+                {processingPack === tier.id
+                  ? 'Processing…'
+                  : isLoggedIn
+                    ? 'Buy pack'
+                    : 'Sign in to buy'}
+              </button>
             </div>
           ))}
         </div>
 
-        <div className="mt-6 rounded-xl border border-[#e2dbd2] bg-[#faf8f3] px-4 py-4 text-center text-[12px] text-[#6f6a63]">
-          Payments via UPI / Razorpay · Secure · Credits added instantly · No auto-renewal, ever
+        <p className="mt-6 text-center text-xs text-[#9a9289]">
+          Secure UPI / Razorpay checkout · Credits added instantly · No auto-renewal
+        </p>
+
+        {/* Enterprise — bulk / whole-batch needs are handled over email, not checkout */}
+        <div className="mt-10 flex flex-col gap-3 rounded-2xl border border-[#1f1f1f] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[#1f1f1f]">Need notes at scale?</p>
+            <p className="mt-0.5 text-xs text-[#7b756d]">
+              Bulk credits, flexible invoicing, and dedicated support for your institution or organization.
+            </p>
+          </div>
+          <Link
+            to="/enterprise"
+            className="flex-shrink-0 rounded-full border border-[#1f1f1f] bg-white px-4 py-2 text-xs font-semibold text-[#1f1f1f] transition-colors hover:bg-[#1f1f1f] hover:text-white whitespace-nowrap"
+          >
+            Contact us →
+          </Link>
         </div>
 
-        <div className="mt-10">
-          <h2 className="text-sm font-semibold">Common questions</h2>
-          <div className="mt-4 space-y-4">
+        <div className="mt-14 mx-auto max-w-2xl">
+          <h2 className="text-center text-lg font-semibold text-[#1f1f1f]">Common questions</h2>
+          <dl className="mt-6 divide-y divide-[#eee7dd] border-y border-[#eee7dd]">
             {faqs.map((faq) => (
-              <div key={faq.id}>
-                <p className="text-sm font-semibold">{faq.question}</p>
-                <p className="mt-1 text-sm text-[#7b756d]">{faq.answer}</p>
+              <div key={faq.id} className="py-4">
+                <dt className="text-sm font-semibold text-[#1f1f1f]">{faq.question}</dt>
+                <dd className="mt-1 text-sm text-[#7b756d]">{faq.answer}</dd>
               </div>
             ))}
-          </div>
+          </dl>
         </div>
       </main>
 
@@ -315,6 +268,7 @@ const PricingPage = () => {
           <p>&copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <Link to="/support" className="hover:text-[#1f1f1f] transition-colors">Support</Link>
+            <Link to="/enterprise" className="hover:text-[#1f1f1f] transition-colors">Enterprise</Link>
             <Link to="/terms" className="hover:text-[#1f1f1f] transition-colors">Terms</Link>
             <Link to="/privacy" className="hover:text-[#1f1f1f] transition-colors">Privacy</Link>
           </div>

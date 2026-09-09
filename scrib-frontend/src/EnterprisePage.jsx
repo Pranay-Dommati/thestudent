@@ -8,45 +8,46 @@ import MobileMenu from './components/MobileMenu'
 import customToast from './utils/customToast'
 import axiosInstance from './utils/axios'
 
-const SupportPage = () => {
+const EnterprisePage = () => {
   const { user, isLoggedIn, logout } = useAuth()
-  
+
   const [formData, setFormData] = useState({
     name: user?.full_name || '',
     email: user?.email || '',
-    subject: '',
-    message: ''
+    phone: '',
+    message: '',
   })
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [sent, setSent] = useState(false)
 
   const handleChange = (e) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    if (!formData.subject.trim() || !formData.message.trim()) {
-      customToast.error('Please fill in all required fields.')
+
+    if (!formData.email.trim()) {
+      customToast.error('Please provide an email address so we can reply.')
       return
     }
-    
-    if (!isLoggedIn && !formData.email.trim()) {
-      customToast.error('Please provide an email address so we can reply.')
+    if (!formData.message.trim()) {
+      customToast.error('Please tell us a bit about what you need.')
       return
     }
 
     setIsSubmitting(true)
-    
+
     try {
-      const res = await axiosInstance.post('/scrib/support/', formData)
-      
+      const res = await axiosInstance.post('/scrib/enterprise/', formData)
+
       if (res.data?.success) {
-        customToast.success(res.data.message || 'Message sent successfully!')
-        setFormData(prev => ({ ...prev, subject: '', message: '' }))
+        customToast.success(res.data.message || 'Inquiry sent successfully!')
+        setSent(true)
+        setFormData((prev) => ({ ...prev, phone: '', message: '' }))
       } else {
-        customToast.error(res.data?.message || 'Failed to send message.')
+        customToast.error(res.data?.message || 'Failed to send inquiry.')
       }
     } catch (err) {
       customToast.error(err.response?.data?.message || 'Network error. Please try again later.')
@@ -58,9 +59,11 @@ const SupportPage = () => {
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-[#1f1f1f] flex flex-col">
       <Helmet>
-        <title>Help & Support - Scrib</title>
+        <title>Enterprise - Scrib by EasyLearnova</title>
+        <meta name="description" content="Bulk credits, custom note formats, and dedicated support for schools, coaching institutes and teams. Tell us what you need." />
+        <link rel="canonical" href="https://scrib.easylearnova.com/enterprise" />
       </Helmet>
-      
+
       {/* Header */}
       <header className="border-b border-[#e4ddd4] bg-white/90 sticky top-0 z-10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 md:px-6 md:py-4">
@@ -70,16 +73,16 @@ const SupportPage = () => {
             </Link>
             <Breadcrumb crumbs={[
               { label: 'Home', to: '/' },
-              { label: 'Support' },
+              { label: 'Enterprise' },
             ]} />
           </div>
-          
+
           <nav className="hidden items-center gap-6 text-sm text-[#7b756d] md:flex">
             <Link to="/library" className="hover:text-[#1f1f1f]">Library</Link>
             <Link to="/generate" className="hover:text-[#1f1f1f]">Generate</Link>
             <Link to="/pricing" className="hover:text-[#1f1f1f]">Pricing</Link>
           </nav>
-          
+
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
               <Link to="/dashboard" className="hidden rounded-full border border-[#d9d1c7] bg-white px-3 py-1 text-xs font-semibold hover:bg-[#faf8f3] sm:inline-flex">
@@ -115,14 +118,26 @@ const SupportPage = () => {
       <main className="flex-1 flex items-center justify-center py-12 px-4 md:px-6">
         <div className="w-full max-w-lg bg-white rounded-3xl border border-[#e2dbd2] shadow-sm p-6 md:p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold">How can we help?</h1>
+            <span className="inline-flex rounded-full bg-[#f2ede3] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#7b756d]">
+              Enterprise
+            </span>
+            <h1 className="mt-3 text-2xl font-bold">Talk to us about a bigger plan</h1>
             <p className="mt-2 text-sm text-[#7b756d]">
-              Have a question, feedback, or need help with a payment? Send us a message and we'll get back to you as soon as possible.
+              Bulk credits, custom note formats, invoicing, or a rollout for your school, coaching institute or team — tell us
+              what you need and we&apos;ll get back to you by email.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLoggedIn && (
+          {sent ? (
+            <div className="rounded-2xl border border-[#dbe8c3] bg-[#eef7df] p-5 text-center">
+              <p className="text-sm font-semibold text-[#4e7a37]">Thanks — your inquiry is on its way.</p>
+              <p className="mt-1 text-xs text-[#5f7a4c]">We&apos;ll reply to {formData.email} shortly.</p>
+              <Link to="/pricing" className="mt-4 inline-block text-xs font-semibold text-[#1f1f1f] underline">
+                Back to pricing
+              </Link>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="name" className="block text-xs font-semibold mb-1">Your Name</label>
@@ -137,7 +152,7 @@ const SupportPage = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="email" className="block text-xs font-semibold mb-1">Email Address <span className="text-red-500">*</span></label>
+                  <label htmlFor="email" className="block text-xs font-semibold mb-1">Email <span className="text-red-500">*</span></label>
                   <input
                     id="email"
                     name="email"
@@ -150,49 +165,49 @@ const SupportPage = () => {
                   />
                 </div>
               </div>
-            )}
 
-            <div>
-              <label htmlFor="subject" className="block text-xs font-semibold mb-1">Subject <span className="text-red-500">*</span></label>
-              <select
-                id="subject"
-                name="subject"
-                value={formData.subject}
-                onChange={handleChange}
-                required
-                className="w-full rounded-xl border border-[#e2dbd2] bg-[#faf8f3] px-3 py-2 text-sm focus:border-[#1f1f1f] focus:outline-none focus:ring-1 focus:ring-[#1f1f1f] transition-all"
+              <div>
+                <label htmlFor="phone" className="block text-xs font-semibold mb-1">
+                  Mobile number <span className="font-normal text-[#a39b92]">(optional)</span>
+                </label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-[#e2dbd2] bg-[#faf8f3] px-3 py-2 text-sm focus:border-[#1f1f1f] focus:outline-none focus:ring-1 focus:ring-[#1f1f1f] transition-all"
+                  placeholder="+91 98765 43210"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="message" className="block text-xs font-semibold mb-1">What do you need? <span className="text-red-500">*</span></label>
+                <textarea
+                  id="message"
+                  name="message"
+                  rows="5"
+                  value={formData.message}
+                  onChange={handleChange}
+                  required
+                  className="w-full rounded-xl border border-[#e2dbd2] bg-[#faf8f3] px-3 py-2 text-sm focus:border-[#1f1f1f] focus:outline-none focus:ring-1 focus:ring-[#1f1f1f] transition-all resize-y"
+                  placeholder="e.g. ~500 handwritten note pages per month for our JEE batch, with our institute's header on each page."
+                ></textarea>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full mt-2 rounded-xl bg-[#1f1f1f] py-3 text-sm font-semibold text-white transition-all hover:bg-[#333] hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="" disabled>Select a topic...</option>
-                <option value="General Question">General Question</option>
-                <option value="Payment / Credits Issue">Payment / Credits Issue</option>
-                <option value="Bug Report">Bug Report</option>
-                <option value="Feature Request">Feature Request</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
+                {isSubmitting ? 'Sending...' : 'Send inquiry'}
+              </button>
 
-            <div>
-              <label htmlFor="message" className="block text-xs font-semibold mb-1">Message <span className="text-red-500">*</span></label>
-              <textarea
-                id="message"
-                name="message"
-                rows="5"
-                value={formData.message}
-                onChange={handleChange}
-                required
-                className="w-full rounded-xl border border-[#e2dbd2] bg-[#faf8f3] px-3 py-2 text-sm focus:border-[#1f1f1f] focus:outline-none focus:ring-1 focus:ring-[#1f1f1f] transition-all resize-y"
-                placeholder="How can we help you today?"
-              ></textarea>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full mt-2 rounded-xl bg-[#1f1f1f] py-3 text-sm font-semibold text-white transition-all hover:bg-[#333] hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? 'Sending...' : 'Send Message'}
-            </button>
-          </form>
+              <p className="text-center text-[11px] text-[#a39b92]">
+                Just a regular question? <Link to="/support" className="underline hover:text-[#1f1f1f]">Contact support</Link> instead.
+              </p>
+            </form>
+          )}
         </div>
       </main>
 
@@ -214,4 +229,4 @@ const SupportPage = () => {
   )
 }
 
-export default SupportPage
+export default EnterprisePage

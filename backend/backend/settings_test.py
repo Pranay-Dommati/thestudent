@@ -37,3 +37,14 @@ MIGRATION_MODULES = _SkipMigrations()
 PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 CELERY_TASK_ALWAYS_EAGER = True
 EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+
+# Throttling and the in-flight lock both live in the cache and would make tests
+# order-dependent. Use a throwaway in-process cache and lift the rate ceilings;
+# the throttle/lock behaviour has its own dedicated tests that opt back in.
+CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
+REST_FRAMEWORK = {**REST_FRAMEWORK, 'DEFAULT_THROTTLE_RATES': {
+    **REST_FRAMEWORK.get('DEFAULT_THROTTLE_RATES', {}),
+    'yt_organize_anon': '10000/hour',
+    'yt_organize_anon_day': '10000/day',
+    'yt_organize_user': '10000/hour',
+}}

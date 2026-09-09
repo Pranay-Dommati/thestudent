@@ -11,6 +11,50 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+@shared_task(bind=True, max_retries=0)
+def organize_youtube_task(self, cache_key, url, meta_title, duration_seconds, lock_key=None):
+    """Run the YouTube outline+expand pipeline and publish the result to cache.
+
+    Lives on the Celery worker rather than a thread in the web service on
+    purpose: gunicorn there runs with ``--max-requests 500``, so a worker
+    process is recycled regularly and would kill an in-flight thread — and the
+    browser polling this job supplies ~60 of those requests itself. A recycled
+    worker meant the job silently stranded on "processing" forever.
+
+    Progress and results travel through the cache (Redis in production), so it
+    does not matter which process serves the polling requests. ``lock_key`` is
+    the per-caller "one job in flight" lock the view took — released here so the
+    caller can start another the moment this one settles.
+    """
+    # Imported here to keep task registration cheap at worker start-up.
+    from django.core.cache import cache
+    from scrib.services import youtube_notes
+    from scrib.views import _write_job_state, PRICE_PER_CREDIT_RUPEES
+
+    def _publish(stage, message):
+        _write_job_state(cache_key, {'status': 'processing', 'stage': stage, 'message': message})
+
+    try:
+        result = youtube_notes.organize(url, meta_title, duration_seconds, progress=_publish)
+        result['cost_rupees'] = result['total_pages'] * PRICE_PER_CREDIT_RUPEES
+        _write_job_state(cache_key, {'status': 'ready', 'result': result})
+        logger.info('[scrib-yt] job %s ready: %d pages', cache_key, result['total_pages'])
+    except youtube_notes.VideoUnreadable as exc:
+        _write_job_state(cache_key, {'status': 'failed', 'code': exc.code, 'message': exc.message})
+    except Exception as exc:
+        logger.exception('[scrib-yt] job %s crashed: %s', cache_key, exc)
+        _write_job_state(cache_key, {
+            'status': 'failed', 'code': 'video_unreadable',
+            'message': "Something went wrong processing this video. Please try again.",
+        })
+    finally:
+        if lock_key:
+            try:
+                cache.delete(lock_key)
+            except Exception:
+                pass  # 15-min TTL is the backstop
+
+
 def send_generation_failed_email(user, pack_title, credits_refunded):
     """Notify the user their study pack generation failed and credits were refunded.
 

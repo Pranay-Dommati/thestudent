@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "audit:viz": "node scripts/dsa-viz-audit.mjs"
   },
   "dependencies": {
     "@google/generative-ai": "^0.1.3",

@@ -10,13 +10,14 @@ import Breadcrumb from './components/Breadcrumb'
 import MobileMenu from './components/MobileMenu'
 import ShareAndEarnModal from './components/ShareAndEarnModal'
 import DownloadReminderModal from './components/DownloadReminderModal'
+import BuyCreditsModal from './components/BuyCreditsModal'
 import HeaderAuthSkeleton from './components/HeaderAuthSkeleton'
 import ShareStatsBanner from './components/ShareStatsBanner'
 import { usePostHog } from '@posthog/react'
 import { useGoogleAuth } from './hooks/useGoogleAuth'
 import GoogleButtonSkeleton from './components/GoogleButtonSkeleton'
-import { startPaymentFlow } from './services/paymentService'
-
+import { startPaymentFlow, startCreditRecharge } from './services/paymentService'
+import { ytJob } from './utils/youtubeJob'
 
 
 const GeneratePage = () => {
@@ -25,6 +26,7 @@ const GeneratePage = () => {
   const navigate = useNavigate()
 
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showBuyModal, setShowBuyModal] = useState(false)
   const { renderGoogleButton, isReady: googleReady } = useGoogleAuth(
     async (credential) => {
       const success = await googleLogin(credential)
@@ -210,13 +212,37 @@ const GeneratePage = () => {
     } catch { return [] }
   })
 
+  // "From YouTube" flow: URL input, and whether the current pages came from a
+  // video (gates the inline ₹8/credit recharge shown instead of the /pricing redirect).
+  const [youtubeUrl, setYoutubeUrl] = useState('')
+  const [cameFromYoutube, setCameFromYoutube] = useState(
+    () => sessionStorage.getItem('scrib_draft_from_youtube') === 'true'
+  )
+  const [isRecharging, setIsRecharging] = useState(false)
+  const [organizeStartedAt, setOrganizeStartedAt] = useState(null)
+  const [organizeElapsed, setOrganizeElapsed] = useState(0)
+  const [organizeStatus, setOrganizeStatus] = useState('')
+  const PRICE_PER_CREDIT = 9
+
+  // Live "…42s" counter while the YouTube job runs, so the long wait reads as
+  // progress rather than a hang.
+  useEffect(() => {
+    if (!organizeStartedAt) { setOrganizeElapsed(0); return }
+    const id = setInterval(
+      () => setOrganizeElapsed(Math.floor((Date.now() - organizeStartedAt) / 1000)),
+      1000,
+    )
+    return () => clearInterval(id)
+  }, [organizeStartedAt])
+
   // Sync draft state to sessionStorage
   useEffect(() => {
     sessionStorage.setItem('scrib_draft_mode', mode)
     sessionStorage.setItem('scrib_draft_pages_v2', JSON.stringify(pages))
     sessionStorage.setItem('scrib_draft_paste', pasteText)
     sessionStorage.setItem('scrib_draft_remaining', JSON.stringify(remainingTopics))
-  }, [mode, pages, pasteText, remainingTopics])
+    sessionStorage.setItem('scrib_draft_from_youtube', String(cameFromYoutube))
+  }, [mode, pages, pasteText, remainingTopics, cameFromYoutube])
   const [isOrganizing, setIsOrganizing] = useState(false)
   // null = Auto (AI decides page density from topic complexity); 1-4 = force exactly N topics/page
   const [forceTopicsPerPage, setForceTopicsPerPage] = useState(null)
@@ -632,12 +658,168 @@ const GeneratePage = () => {
       setPasteText('')
       setAiGeneratedWarning(true)
       customToast.success(`Organized into ${organized.length} page${organized.length !== 1 ? 's' : ''}!`)
+      scrollToGenerateAction()
     } catch (error) {
       console.error(error)
       customToast.error('Failed to organize topics. Please try again.')
     } finally {
       setIsOrganizing(false)
     }
+  }
+
+  // Switching input mode by hand clears the "came from a YouTube video" flag so
+  // the inline ₹8/credit recharge doesn't linger on an unrelated draft.
+  const switchMode = (next) => {
+    if (next !== 'youtube') setCameFromYoutube(false)
+    setMode(next)
+  }
+
+  const ytErrorMessage = (error) => {
+    const status = error?.response?.status
+    const body = error?.response?.data || {}
+    if (status === 429 && body.code === 'job_in_flight') {
+      return body.message || 'You already have a video being organised — give it a minute, or cancel it below.'
+    }
+    if (status === 429) {
+      return 'You\'ve organised a lot of videos recently. Try again later, or sign in for a higher limit.'
+    }
+    return body.message || body.detail || error?.message
+      || 'Failed to read this video. Make sure it\'s a public YouTube link and try again.'
+  }
+
+  // After topics land in the editor, bring the Generate action into view so the
+  // next step (generate / top up credits) is obvious — on mobile and desktop,
+  // and whether the result arrived on this page or via the indicator's CTA.
+  const scrollToGenerateAction = () => {
+    const run = () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
+    // Wait out ScrollToTop's on-navigation jump and let the new pages commit.
+    requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(run, 120)))
+  }
+
+  // Drop a finished organise's topics into the manual editor.
+  const loadYoutubeGroups = (groups, remainingTopics) => {
+    const organized = (groups || [])
+      .map(g => ({ ...g, topics: (g.topics || []).slice(0, MAX_TOPICS_PER_PAGE) }))
+      .slice(0, MAX_PAGES)
+    if (!organized.length) {
+      customToast.error('This video didn\'t produce any notes.')
+      return
+    }
+    setPages(organized)
+    setRemainingTopics(Array.isArray(remainingTopics) ? remainingTopics : [])
+    setCameFromYoutube(true)
+    setMode('manual')
+    setYoutubeUrl('')
+    setAiGeneratedWarning(true)
+    setInvalidTopics([])
+    setIsOrganizing(false)
+    setOrganizeStartedAt(null)
+    setOrganizeStatus('')
+    customToast.success(
+      `Organized into ${organized.length} page${organized.length !== 1 ? 's' : ''} from the video!`
+    )
+    scrollToGenerateAction()
+  }
+
+  // The organise job runs server-side and its polling lives in the global
+  // YoutubeOrganizeIndicator; this page just kicks it off and reacts to the
+  // shared store — so the topics land here whether the job finishes while we're
+  // on the page or after the user navigates back to it.
+  const consumedYtResultRef = useRef(null)
+  const shownYtErrorRef = useRef(0)
+  const appliedYtModeRef = useRef(null)
+  // True between clicking organise and the job being registered — so the sync
+  // below doesn't briefly flip the button back to idle during that ~1-2s POST.
+  const ytStartingRef = useRef(false)
+  useEffect(() => {
+    const sync = () => {
+      const result = ytJob.getResult()
+      if (result?.groups?.length && result.jobId !== consumedYtResultRef.current) {
+        consumedYtResultRef.current = result.jobId
+        loadYoutubeGroups(result.groups, result.remaining_topics)
+        ytJob.clearResult()
+        return
+      }
+      const err = ytJob.getError()
+      if (err?.message && err.savedAt !== shownYtErrorRef.current) {
+        shownYtErrorRef.current = err.savedAt
+        customToast.error(err.message)
+        ytJob.clearError()
+        setIsOrganizing(false)
+        setOrganizeStartedAt(null)
+        setOrganizeStatus('')
+        return
+      }
+      const active = ytJob.getActive()
+      if (active?.jobId) {
+        setIsOrganizing(true)
+        setOrganizeStartedAt(prev => prev || active.startedAt || Date.now())
+        if (active.message) setOrganizeStatus(active.message)
+        // Surface the YouTube tab once when a job first appears, but don't keep
+        // yanking the user back if they switch tabs while it runs.
+        if (appliedYtModeRef.current !== active.jobId) {
+          appliedYtModeRef.current = active.jobId
+          setMode('youtube')
+        }
+      } else if (!ytStartingRef.current) {
+        // No job pending (idle, or one expired server-side without settling).
+        // These are no-ops when already cleared, so React bails without a render.
+        setIsOrganizing(false)
+        setOrganizeStartedAt(null)
+        setOrganizeStatus('')
+      }
+    }
+    sync()
+    return ytJob.subscribe(sync)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleOrganizeFromYoutube = async (customUrl = null) => {
+    // Called both from the button (gets a click event) and from the homepage
+    // ?yt= handoff (gets the URL) - only a string counts as an override.
+    const url = (typeof customUrl === 'string' ? customUrl : youtubeUrl).trim()
+    if (!url) {
+      customToast.error('Paste a YouTube video link first.')
+      return
+    }
+    ytStartingRef.current = true
+    setIsOrganizing(true)
+    setOrganizeStartedAt(Date.now())
+    setOrganizeStatus('Watching the video…')
+    try {
+      const start = await axiosInstance.post('/scrib/youtube/organize/', { url })
+      // Fast pre-flight rejections (private / live / too long) come back here as a 4xx.
+      const jobId = start.data?.job_id
+      if (!jobId) throw new Error('Could not start processing this video.')
+      // Hand the job to the global indicator — it owns polling from here.
+      // setActive before clearError so a sync never sees "nothing pending".
+      ytJob.setActive({ jobId, url, startedAt: Date.now(), message: 'Watching the video…' })
+      ytJob.clearError()
+    } catch (error) {
+      console.error(error)
+      customToast.error(ytErrorMessage(error))
+      setIsOrganizing(false)
+      setOrganizeStartedAt(null)
+      setOrganizeStatus('')
+    } finally {
+      ytStartingRef.current = false
+    }
+  }
+
+  const handleCancelYoutube = async () => {
+    const active = ytJob.getActive()
+    ytJob.clearActive()
+    setIsOrganizing(false)
+    setOrganizeStartedAt(null)
+    setOrganizeStatus('')
+    if (active?.jobId) {
+      try {
+        await axiosInstance.post(`/scrib/youtube/organize/cancel/${active.jobId}/`)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    customToast.success('Cancelled. You can start another video now.')
   }
 
   useEffect(() => {
@@ -657,21 +839,27 @@ const GeneratePage = () => {
     handleOrganizeTopics(incoming)
   }, [location.search, navigate])
 
-  // Rendered once, placed twice (mobile/desktop) below — same handler either way.
-  const organizeAIButton = (
-    <button
-      onClick={handleOrganizeTopics}
-      disabled={isOrganizing}
-      className="flex w-full items-center justify-center gap-2 rounded-full bg-[#1f1f1f] px-4 py-2.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto sm:py-2"
-    >
-      {isOrganizing && (
-        <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-        </svg>
-      )}
-      {isOrganizing ? 'Organizing...' : '✦ Organize with AI'}
-    </button>
-  )
+  // Homepage "From YouTube" box hands the link over as ?yt= and we take it from
+  // here - same flow as if the user had pasted it into the YouTube tab.
+  // StrictMode remounts effects in dev, so without the ref the second run would
+  // start a duplicate job and the server's in-flight lock would 429 it.
+  const handedOverYoutubeUrl = useRef(null)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const incoming = params.get('yt')
+    if (!incoming || handedOverYoutubeUrl.current === incoming) return
+    handedOverYoutubeUrl.current = incoming
+
+    // Drop the parameter first so a refresh doesn't re-run a paid organise.
+    const newParams = new URLSearchParams(location.search)
+    newParams.delete('yt')
+    const searchString = newParams.toString()
+    navigate(`${location.pathname}${searchString ? `?${searchString}` : ''}`, { replace: true, state: location.state })
+
+    setMode('youtube')
+    setYoutubeUrl(incoming)
+    handleOrganizeFromYoutube(incoming)
+  }, [location.search, navigate])
 
   // ── Page builder helpers ────────────────────────────────────────────────
   const validPages = pages
@@ -752,7 +940,7 @@ const GeneratePage = () => {
     const currentCredits = latestCreditBalance ?? user?.credit_balance ?? 0
     if (currentCredits < creditsNeeded) {
       customToast.error('Please add credits first.', { id: 'gen-error' })
-      navigate('/pricing')
+      setShowBuyModal(true)
       return
     }
 
@@ -796,6 +984,7 @@ const GeneratePage = () => {
         setPages([{ topics: [{ name: '', instruction: '' }] }])
         setPasteText('')
         setMode('manual')
+        setCameFromYoutube(false)
       }, 800)
     } catch (error) {
       setHistoryItems(prev => prev.filter(item => item.id !== tempId))
@@ -805,7 +994,7 @@ const GeneratePage = () => {
       })
       if (error?.response?.status === 402) {
         customToast.error('Please add credits first.', { id: 'gen-error' })
-        navigate('/pricing')
+        setShowBuyModal(true)
       } else {
         customToast.error(error?.response?.data?.message || 'Generation failed. Please try again.', { id: 'gen-error' })
       }
@@ -815,6 +1004,33 @@ const GeneratePage = () => {
   }
 
   const creditBalance = latestCreditBalance ?? user?.credit_balance ?? 0
+  const creditShortfall = Math.max(validPages.length - creditBalance, 0)
+
+  // Inline exact-shortfall top-up, offered on any draft that is short on credits.
+  // 'or buy a pack' below it opens BuyCreditsModal for people who want to stock up.
+  const handleRechargeClick = async () => {
+    if (isRecharging || creditShortfall <= 0) return
+    if (!isLoggedIn) {
+      setShowAuthModal(true)
+      return
+    }
+    setIsRecharging(true)
+    await startCreditRecharge({
+      credits: creditShortfall,
+      user,
+      onSuccess: async ({ credit_balance, credits_added }) => {
+        setIsRecharging(false)
+        if (typeof credit_balance === 'number') setLatestCreditBalance(credit_balance)
+        await refreshUser?.()
+        customToast.success(`${credits_added} credits added — you're ready to generate!`, { duration: 4000 })
+      },
+      onFailure: (message) => {
+        setIsRecharging(false)
+        customToast.error(message || 'Payment failed. Please try again.')
+      },
+      onDismiss: () => setIsRecharging(false),
+    })
+  }
 
   return (
     <div className="min-h-screen bg-[#f7f4ee] text-[#1f1f1f]">
@@ -952,10 +1168,10 @@ const GeneratePage = () => {
               </div>
 
           <div className="px-1 py-4 md:px-6 md:py-5">
-            <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 mb-5">
+            <div className="flex flex-nowrap items-center gap-1.5 md:gap-3 mb-5">
               <button
-                onClick={() => setMode('manual')}
-                className={`rounded-xl md:rounded-full border px-4 py-3 md:py-2 text-sm md:text-xs font-medium md:font-semibold transition-colors ${
+                onClick={() => switchMode('manual')}
+                className={`flex-1 md:flex-none whitespace-nowrap rounded-full border px-2.5 py-2.5 md:px-4 md:py-2 text-[11px] md:text-xs font-medium md:font-semibold transition-colors ${
                   mode === 'manual'
                     ? 'border-[#1f1f1f] bg-[#1f1f1f] text-white'
                     : 'border-[#d9d1c7] bg-white text-[#5f5a54] hover:bg-[#f5f2ec]'
@@ -964,14 +1180,27 @@ const GeneratePage = () => {
                 Build manually
               </button>
               <button
-                onClick={() => setMode('paste')}
-                className={`rounded-xl md:rounded-full border px-4 py-3 md:py-2 text-sm md:text-xs font-medium md:font-semibold transition-colors ${
+                onClick={() => switchMode('paste')}
+                className={`flex-1 md:flex-none whitespace-nowrap rounded-full border px-2.5 py-2.5 md:px-4 md:py-2 text-[11px] md:text-xs font-medium md:font-semibold transition-colors ${
                   mode === 'paste'
                     ? 'border-[#1f1f1f] bg-[#1f1f1f] text-white'
                     : 'border-[#d9d1c7] bg-white text-[#5f5a54] hover:bg-[#f5f2ec]'
                 }`}
               >
                 Paste or Upload
+              </button>
+              <button
+                onClick={() => switchMode('youtube')}
+                className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-2.5 md:px-4 md:py-2 text-[11px] md:text-xs font-medium md:font-semibold transition-colors ${
+                  mode === 'youtube'
+                    ? 'border-[#1f1f1f] bg-[#1f1f1f] text-white'
+                    : 'border-[#d9d1c7] bg-white text-[#5f5a54] hover:bg-[#f5f2ec]'
+                }`}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M23 12s0-3.5-.5-5.2a3 3 0 0 0-2.1-2.1C18.7 4 12 4 12 4s-6.7 0-8.4.5a3 3 0 0 0-2.1 2.1C1 8.5 1 12 1 12s0 3.5.5 5.2a3 3 0 0 0 2.1 2.1C5.3 20 12 20 12 20s6.7 0 8.4-.5a3 3 0 0 0 2.1-2.1C23 15.5 23 12 23 12ZM10 15V9l5 3-5 3Z" />
+                </svg>
+                From YouTube
               </button>
             </div>
 
@@ -1119,6 +1348,44 @@ const GeneratePage = () => {
                   <p className="text-xs text-[#8a847c] text-center">AI organized these — review and edit before generating.</p>
                 )}
               </div>
+            ) : mode === 'youtube' ? (
+              <div className="rounded-xl border border-[#ded6cc] bg-white p-4 shadow-sm">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[#5f5a54] tracking-wide">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#c33" aria-hidden="true">
+                    <path d="M23 12s0-3.5-.5-5.2a3 3 0 0 0-2.1-2.1C18.7 4 12 4 12 4s-6.7 0-8.4.5a3 3 0 0 0-2.1 2.1C1 8.5 1 12 1 12s0 3.5.5 5.2a3 3 0 0 0 2.1 2.1C5.3 20 12 20 12 20s6.7 0 8.4-.5a3 3 0 0 0 2.1-2.1C23 15.5 23 12 23 12ZM10 15V9l5 3-5 3Z" />
+                  </svg>
+                  Turn a YouTube video into summary notes
+                </div>
+                <div className="mt-3">
+                  <input
+                    type="url"
+                    inputMode="url"
+                    className="w-full rounded-lg border border-[#e0d9ce] bg-white px-3 py-2 text-sm outline-none focus:border-[#9b93e7] focus:ring-1 focus:ring-[#9b93e7]/20"
+                    placeholder="https://www.youtube.com/watch?v=…"
+                    value={youtubeUrl}
+                    onChange={e => setYoutubeUrl(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !isOrganizing) handleOrganizeFromYoutube() }}
+                  />
+                </div>
+                {isOrganizing ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <p className="text-[11px] text-[#8a847c]">
+                      This can take a minute or two — it keeps running even if you leave.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCancelYoutube}
+                      className="text-[11px] font-semibold text-[#c0392b] underline underline-offset-2 hover:no-underline"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-[11px] text-[#8a847c]">
+                    Paste the link, then hit <span className="font-semibold">Organize from video</span> below.
+                  </p>
+                )}
+              </div>
             ) : (
               <div
                 className={`rounded-xl border p-4 shadow-sm transition-colors ${
@@ -1174,31 +1441,24 @@ const GeneratePage = () => {
                 )}
                 {pasteText && (
                   <div ref={topicsControlsRef} className="mt-3 flex flex-col gap-2.5">
-                    <div className="flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between md:gap-3">
-                      <div className="flex flex-wrap items-center gap-2.5">
-                        <span className="text-xs font-semibold text-[#5f5a54] whitespace-nowrap">Topics per page</span>
-                        <div className="inline-flex rounded-full border border-[#d9d1c7] bg-[#faf8f4] p-0.5">
-                          {TOPICS_PER_PAGE_OPTIONS.map(opt => (
-                            <button
-                              key={String(opt.value)}
-                              type="button"
-                              onClick={() => setForceTopicsPerPage(opt.value)}
-                              className={`min-w-[2rem] rounded-full px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-                                forceTopicsPerPage === opt.value
-                                  ? 'bg-[#1f1f1f] text-white'
-                                  : 'text-[#6f6a63] hover:text-[#1f1f1f] hover:bg-white'
-                              }`}
-                            >
-                              {opt.label}
-                            </button>
-                          ))}
-                        </div>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className="text-xs font-semibold text-[#5f5a54] whitespace-nowrap">Topics per page</span>
+                      <div className="inline-flex rounded-full border border-[#d9d1c7] bg-[#faf8f4] p-0.5">
+                        {TOPICS_PER_PAGE_OPTIONS.map(opt => (
+                          <button
+                            key={String(opt.value)}
+                            type="button"
+                            onClick={() => setForceTopicsPerPage(opt.value)}
+                            className={`min-w-[2rem] rounded-full px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                              forceTopicsPerPage === opt.value
+                                ? 'bg-[#1f1f1f] text-white'
+                                : 'text-[#6f6a63] hover:text-[#1f1f1f] hover:bg-white'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
                       </div>
-                      {/* Mobile's equivalent action lives in the sticky bottom
-                          bar instead of here — this box can run tall with pasted
-                          text, and a button living below it there means someone
-                          has to know to scroll down to find their next step. */}
-                      <div className="hidden md:block">{organizeAIButton}</div>
                     </div>
                     <p className="text-[11px] text-[#8a847c] leading-relaxed">
                       {TOPICS_PER_PAGE_OPTIONS.find(o => o.value === forceTopicsPerPage)?.hint}
@@ -1216,26 +1476,31 @@ const GeneratePage = () => {
               {validPages.length > 0 && (
                 <span className="text-[#a39b92]">·</span>
               )}
-              <span>{validPages.length} credit{validPages.length !== 1 ? 's' : ''} required</span>
+              <span>
+                {validPages.length} credit{validPages.length !== 1 ? 's' : ''} required
+                {validPages.length > 0 && (
+                  <span className="text-[#a39b92]"> (≈ ₹{validPages.length * PRICE_PER_CREDIT})</span>
+                )}
+              </span>
             </div>
 
           </div>
 
           <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col md:static md:flex-row md:flex-wrap md:items-center justify-between gap-2 md:gap-4 border-t border-[#e2dbd2] md:border-[#eee6dc] bg-white md:bg-[#f7f4ee] px-5 py-3 md:py-4 md:px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] md:shadow-none">
-              {mode !== 'paste' && (
+              {mode === 'manual' && (
                 <div className="flex items-center justify-between md:hidden w-full mb-1">
                   <div className="flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-[#059669]" />
                     <span className="text-sm font-medium text-[#5f5a54]">PDF · <span className="font-bold text-[#1f1f1f]">{validPages.length} pages</span></span>
                   </div>
                   <span className="rounded-full bg-[#fdf2df] border border-[#f3d9a9] px-3 py-1 text-[11px] font-semibold text-[#b47a26]">
-                    {validPages.length} credits
+                    {validPages.length} credits · ₹{validPages.length * PRICE_PER_CREDIT}
                   </span>
                 </div>
               )}
 
               <div className="hidden md:block">
-                {mode !== 'paste' ? (
+                {mode === 'manual' ? (
                   <>
                     <p className="text-sm font-semibold">
                       {validPages.length} credit{validPages.length !== 1 ? 's' : ''}
@@ -1261,37 +1526,68 @@ const GeneratePage = () => {
               </div>
 
               <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-                {mode === 'paste' ? (
-                  // The paste flow's real next step (organize) lives in this same
+                {mode === 'paste' || mode === 'youtube' ? (
+                  // The input flows' real next step (organize) lives in this same
                   // sticky slot instead of a disabled placeholder — on mobile the
                   // topics box can be tall enough that the inline button below it
                   // is off-screen, so this bar is the only next-step CTA guaranteed
                   // to be visible without scrolling.
-                  <button
-                    onClick={handleOrganizeTopics}
-                    disabled={isOrganizing || !pasteText.trim()}
-                    className={`flex w-full md:w-auto items-center justify-center gap-2 rounded-xl px-5 py-2.5 md:py-2 text-sm md:text-bold font-bold transition-all ${
-                      isOrganizing || !pasteText.trim()
-                        ? 'border border-[#f0ece5] bg-transparent text-[#e0d9ce] md:border-none md:bg-[#e7e2db] md:text-[#b1aaa0]'
-                        : 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black hover:-translate-y-0.5'
-                    }`}
-                  >
-                    {isOrganizing && (
-                      <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                      </svg>
-                    )}
-                    {isOrganizing ? 'Organizing...' : pasteText.trim() ? '✦ Organize with AI' : 'Add topics first'}
-                  </button>
+                  (() => {
+                    const isYt = mode === 'youtube'
+                    const inputReady = isYt ? youtubeUrl.trim() : pasteText.trim()
+                    return (
+                      <button
+                        onClick={isYt ? handleOrganizeFromYoutube : handleOrganizeTopics}
+                        disabled={isOrganizing || !inputReady}
+                        className={`flex w-full md:w-auto items-center justify-center gap-2 rounded-xl px-5 py-2.5 md:py-2 text-sm md:text-bold font-bold transition-all ${
+                          isOrganizing
+                            ? 'border border-[#1b1b1b]/25 bg-[#ebe4d8] text-[#1f1f1f] md:border-none md:bg-[#e7e2db] md:text-[#6f6a63]'
+                            : !inputReady
+                              ? 'border border-[#e3ddd3] bg-[#f4f1ec] text-[#a8a096] md:border-none md:bg-[#e7e2db] md:text-[#b1aaa0]'
+                              : 'border border-[#1b1b1b] bg-transparent text-[#1f1f1f] md:border-none md:bg-[#1b1b1b] md:text-white active:bg-[#1f1f1f] active:text-white md:hover:bg-black hover:-translate-y-0.5'
+                        }`}
+                      >
+                        {isOrganizing && (
+                          <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                          </svg>
+                        )}
+                        {isOrganizing
+                          ? (isYt
+                              ? `${organizeStatus || 'Watching the video…'}${organizeElapsed >= 3 ? ` ${organizeElapsed}s` : ''}`
+                              : 'Organizing...')
+                          : inputReady
+                            ? (isYt ? 'Organize from video' : '✦ Organize with AI')
+                            : (isYt ? 'Paste a link first' : 'Add topics first')}
+                      </button>
+                    )
+                  })()
+                ) : isLoggedIn && creditShortfall > 0 ? (
+                  <div className="flex w-full items-center gap-2 md:w-auto md:flex-row md:items-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowBuyModal(true)}
+                      className="shrink-0 rounded-xl border border-[#d9d1c7] bg-white px-3 py-2.5 md:px-4 md:py-2 text-xs md:text-sm font-semibold text-[#5f5a54] transition-colors hover:border-[#1b1b1b] hover:text-[#1f1f1f]"
+                    >
+                      Buy a pack
+                    </button>
+                    <button
+                      onClick={handleRechargeClick}
+                      disabled={isRecharging}
+                      className={`flex-1 md:flex-none rounded-xl px-4 py-2.5 md:px-5 md:py-2 text-sm font-bold transition-all ${
+                        isRecharging
+                          ? 'bg-[#e7e2db] text-[#b1aaa0]'
+                          : 'bg-[#1b1b1b] text-white active:bg-black md:hover:bg-black'
+                      }`}
+                    >
+                      {isRecharging
+                        ? 'Processing…'
+                        : `Recharge ${creditShortfall} · ₹${creditShortfall * PRICE_PER_CREDIT}`}
+                    </button>
+                  </div>
                 ) : (
                   <button
-                    onClick={
-                      !isLoggedIn
-                        ? handleAuthClick
-                        : (creditBalance < Math.max(1, validPages.length))
-                          ? () => navigate('/pricing?next=/generate')
-                          : handleGenerate
-                    }
+                    onClick={!isLoggedIn ? handleAuthClick : handleGenerate}
                     disabled={isGenerating}
                     className={`w-full md:w-auto rounded-xl px-5 py-2.5 md:py-2 text-sm md:text-bold font-bold transition-all ${
                       isGenerating
@@ -1305,15 +1601,17 @@ const GeneratePage = () => {
                       ? 'Generating...'
                       : !isLoggedIn
                         ? 'Sign up to Generate'
-                        : (creditBalance < Math.max(1, validPages.length))
-                          ? 'Add credits to generate'
-                          : 'Generate PDF'}
+                        : 'Generate PDF'}
                   </button>
                 )}
 
                 <p className="mt-0.5 text-center text-[11px] text-[#a39b92] md:hidden">
-                  {mode !== 'paste'
-                    ? (isLoggedIn ? `${Math.max(creditBalance - validPages.length, 0)} credits remaining after` : 'Sign up to generate notes')
+                  {mode === 'manual'
+                    ? (isLoggedIn
+                        ? (creditShortfall > 0
+                            ? `You have ${creditBalance} of ${validPages.length} credits needed`
+                            : `${Math.max(creditBalance - validPages.length, 0)} credits remaining after`)
+                        : 'Sign up to generate notes')
                     : (isLoggedIn ? `${creditBalance} credits available` : 'Sign up to generate notes')}
                 </p>
               </div>
@@ -1818,6 +2116,17 @@ const GeneratePage = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {showBuyModal && (
+        <BuyCreditsModal
+          onClose={() => setShowBuyModal(false)}
+          onSuccess={async ({ credit_balance }) => {
+            if (typeof credit_balance === 'number') setLatestCreditBalance(credit_balance)
+            await refreshUser?.()
+            setShowBuyModal(false)
+          }}
+        />
       )}
 
       {/* Share & Earn Modal */}

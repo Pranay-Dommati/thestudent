@@ -3,6 +3,8 @@ import datetime
 import json
 import logging
 import os
+import re
+import threading
 import uuid
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -15,6 +17,7 @@ from rest_framework.decorators import api_view, permission_classes, authenticati
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 # pyrefly: ignore [missing-import]
@@ -35,6 +38,8 @@ from .serializers import (
     PromoCodeRedemptionSerializer,
     ExternalClientPaymentSerializer,
 )
+# pyrefly: ignore [missing-import]
+from .services import youtube_notes
 # pyrefly: ignore [missing-import]
 from .services.cache import normalize_prompt, find_cached_note
 # pyrefly: ignore [missing-import]
@@ -66,6 +71,14 @@ CREDIT_PACKS = {
     'popular': {'credits': 20, 'amount_paise': 16900},  # ₹169
     'pro':     {'credits': 40, 'amount_paise': 31900},  # ₹319
 }
+
+# Exact-amount credit top-up: recharge precisely the shortfall for the pages
+# you have, rather than buying a fixed pack. 1 credit = 1 generated page.
+# Priced a little above the smallest pack (starter is 89/10 = 8.90) so an
+# a-la-carte top-up never undercuts a pack; bulk packs stay the better rate.
+PRICE_PER_CREDIT_PAISE = 900   # 9 rupees per credit
+PRICE_PER_CREDIT_RUPEES = PRICE_PER_CREDIT_PAISE // 100
+MAX_CUSTOM_CREDITS = 200
 
 
 def error_response(message, status_code=400, code='bad_request', details=None):
@@ -423,6 +436,252 @@ class OrganizeTopicsView(APIView):
             'credit_savings': credit_savings,
             'source': source,
         })
+
+
+# ── "From YouTube" flow ──────────────────────────────────────────────────────
+# The pipeline itself lives in services/youtube_notes.py — a two-pass
+# (outline-then-expand) design, because one generation asked to watch an hour of
+# video and write the whole topic list at once reliably drops the tail. These
+# views only do HTTP: fast pre-flight rejection, then a background job.
+
+_YT_JOB_TTL = 1800  # seconds a finished/failed job stays readable in cache
+
+
+def _write_job_state(cache_key, payload):
+    """Publish job state, surviving a database connection that went stale.
+
+    Without Redis the cache is DatabaseCache, so every write is a MySQL query.
+    A video call takes 60-180s, which is long enough for a remote MySQL server
+    to drop the idle connection — the next write then raises "Server has gone
+    away". That used to escape the worker thread *including from its own except
+    block*, so the job published no terminal state at all and the browser polled
+    a permanently "processing" entry until it timed out.
+
+    Recycling the connection and retrying fixes the common case; swallowing the
+    error means a failed status write can never mask the real error either.
+    """
+    from django.core.cache import cache
+    from django.db import close_old_connections
+
+    for attempt in (1, 2):
+        try:
+            cache.set(cache_key, payload, _YT_JOB_TTL)
+            return True
+        except Exception as exc:
+            logger.warning('[scrib] job-state write failed (attempt %d/2): %s', attempt, exc)
+            try:
+                close_old_connections()
+            except Exception:
+                pass
+    logger.error('[scrib] could not publish job state for %s — job will look stuck', cache_key)
+    return False
+
+
+_YT_INFLIGHT_TTL = 15 * 60   # safety net if a job never releases its lock
+
+
+def _client_ident(request):
+    """Best-effort caller identity for per-caller limits: user id, else client IP."""
+    if getattr(request, 'user', None) and request.user.is_authenticated:
+        return f'u{request.user.id}'
+    xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    ip = xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR', '') or 'unknown'
+    return f'ip{ip}'
+
+
+class _YTOrganizeAnonHourThrottle(AnonRateThrottle):
+    scope = 'yt_organize_anon'            # e.g. 5/hour — guests only (None for authed)
+
+
+class _YTOrganizeAnonDayThrottle(AnonRateThrottle):
+    scope = 'yt_organize_anon_day'        # e.g. 20/day — distinct scope => distinct bucket
+
+
+class _YTOrganizeUserThrottle(UserRateThrottle):
+    scope = 'yt_organize_user'            # e.g. 40/hour — authed callers only
+
+    def get_cache_key(self, request, view):
+        # UserRateThrottle would otherwise also cap anon callers by IP; the two
+        # anon throttles own that. Skip anon here so the limits don't interact.
+        if not (request.user and request.user.is_authenticated):
+            return None
+        return super().get_cache_key(request, view)
+
+
+class YouTubeOrganizeView(APIView):
+    """POST /api/scrib/youtube/organize/
+
+    Starts "turn this YouTube video into note pages". Pre-flight checks (missing
+    / private / live / over-length) run synchronously and fail in under a
+    second; the slow pipeline (transcript -> topics, or watch the video) runs on
+    the Celery worker. Returns ``202 {job_id}`` — poll ``…/status/<job_id>/``.
+
+    Open to guests, but rate-limited hard: each call is a paid, minutes-long
+    job. Anon callers get a tight hourly + daily cap and one job in flight at a
+    time; signed-in callers get a higher cap.
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]
+    throttle_classes = [_YTOrganizeAnonHourThrottle, _YTOrganizeAnonDayThrottle,
+                        _YTOrganizeUserThrottle]
+
+    def post(self, request):
+        url = youtube_notes.normalize_youtube_url(request.data.get('url'))
+        if not url:
+            return error_response('Enter a valid YouTube video link', code='invalid_url')
+
+        from django.core.cache import cache
+        ident = _client_ident(request)
+        lock_key = f'scrib_yt_inflight_{ident}'
+        # One organise job in flight per caller. Legit use is serial (you wait
+        # for the result before pasting the next link); a script firing many in
+        # parallel gets exactly one through.
+        if not cache.add(lock_key, '1', _YT_INFLIGHT_TTL):
+            return error_response(
+                "You already have a video being organised. Give it a minute to finish.",
+                status_code=429, code='job_in_flight',
+            )
+
+        try:
+            meta_title, duration_seconds = youtube_notes.preflight(url)
+        except youtube_notes.VideoUnreadable as exc:
+            cache.delete(lock_key)
+            return error_response(exc.message, status_code=exc.status_code, code=exc.code)
+
+        job_id = uuid.uuid4().hex
+        cache_key = f'scrib_yt_job_{job_id}'
+
+        def _publish(stage, message):
+            _write_job_state(
+                cache_key,
+                {'status': 'processing', 'stage': stage, 'message': message},
+            )
+
+        _publish('watching', 'Watching the video…')
+
+        # Prefer the Celery worker: this web service runs gunicorn with
+        # --max-requests 500, so its processes are recycled routinely and a
+        # thread living in one would be killed mid-job (the browser's own status
+        # polling supplies ~60 of those requests per job). Fall back to a daemon
+        # thread only when there is no broker — i.e. local dev — mirroring what
+        # GenerateStudyPackView already does.
+        from scrib.tasks import organize_youtube_task
+        args = (cache_key, url, meta_title, duration_seconds, lock_key)
+        task_id = None
+        if getattr(settings, 'CELERY_TASK_ALWAYS_EAGER', False):
+            def _run():
+                from django.db import close_old_connections, connection
+                close_old_connections()
+                try:
+                    organize_youtube_task(*args)
+                finally:
+                    try:
+                        connection.close()
+                    except Exception:
+                        pass
+
+            threading.Thread(target=_run, daemon=True).start()
+            logger.info('[scrib-yt] job %s dispatched to a background thread (no broker)', job_id)
+        else:
+            try:
+                _dispatched = organize_youtube_task.delay(*args)
+                task_id = getattr(_dispatched, 'id', None)
+                if not isinstance(task_id, str):
+                    task_id = None
+            except Exception as exc:
+                cache.delete(lock_key)
+                logger.error('[scrib-yt] could not enqueue job %s: %s', job_id, exc)
+                return error_response('Could not start processing right now. Please try again.',
+                                      status_code=503, code='enqueue_failed')
+            logger.info('[scrib-yt] job %s dispatched to Celery', job_id)
+
+        # Track who owns this job and how to stop it, so POST …/cancel/<job_id>/
+        # can free the in-flight lock (and revoke the worker task) instead of
+        # making the caller wait out the 15-minute safety TTL. Kept in its own
+        # key because progress writes replace the polled job-state wholesale.
+        cache.set(
+            f'scrib_yt_jobmeta_{job_id}',
+            {'owner': ident, 'lock_key': lock_key, 'task_id': task_id},
+            _YT_INFLIGHT_TTL,
+        )
+
+        return Response({'job_id': job_id, 'status': 'processing'}, status=202)
+
+
+
+class YouTubeOrganizeStatusView(APIView):
+    """GET /api/scrib/youtube/organize/status/<job_id>/ — poll a running job."""
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = []   # the frontend polls this every 3s — must never 429
+
+    def get(self, request, job_id):
+        from django.core.cache import cache
+        data = cache.get(f'scrib_yt_job_{job_id}')
+        if data is None:
+            return error_response(
+                'This request expired. Please paste the link again.',
+                status_code=404, code='job_not_found',
+            )
+        if data.get('status') == 'ready':
+            return Response({'status': 'ready', **data['result']})
+        if data.get('status') == 'failed':
+            return Response(
+                {'status': 'failed', 'message': data.get('message'), 'code': data.get('code')},
+                status=422,
+            )
+        return Response({
+            'status': 'processing',
+            'stage': data.get('stage', 'watching'),
+            'message': data.get('message', 'Watching the video…'),
+        })
+
+
+class YouTubeOrganizeCancelView(APIView):
+    """POST /api/scrib/youtube/organize/cancel/<job_id>/
+
+    Stops a running organise: frees the caller's one-job-in-flight lock so they
+    can start another immediately, and revokes the worker task. Safe to call on
+    a job that already finished or whose metadata expired — it still clears any
+    lock stranded under this caller's identity.
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [AllowAny]
+    throttle_classes = []
+
+    def post(self, request, job_id):
+        from django.core.cache import cache
+        ident = _client_ident(request)
+        meta = cache.get(f'scrib_yt_jobmeta_{job_id}')
+
+        if not meta:
+            # Job settled or its metadata expired; still clear this caller's lock
+            # in case it stranded, so a retry isn't blocked for no reason.
+            cache.delete(f'scrib_yt_inflight_{ident}')
+            return Response({'status': 'cancelled'})
+
+        if meta.get('owner') != ident:
+            return error_response('This job belongs to someone else.',
+                                  status_code=403, code='forbidden')
+
+        cache.delete(meta.get('lock_key') or f'scrib_yt_inflight_{ident}')
+
+        task_id = meta.get('task_id')
+        if task_id:
+            try:
+                from backend.celery import app as celery_app
+                celery_app.control.revoke(task_id, terminate=True)
+            except Exception as exc:
+                logger.warning('[scrib-yt] could not revoke task %s: %s', task_id, exc)
+
+        _write_job_state(f'scrib_yt_job_{job_id}', {
+            'status': 'failed', 'code': 'cancelled',
+            'message': 'You cancelled this video.',
+        })
+        cache.delete(f'scrib_yt_jobmeta_{job_id}')
+        logger.info('[scrib-yt] job %s cancelled by %s', job_id, ident)
+        return Response({'status': 'cancelled'})
+
 
 class ParseSyllabusView(APIView):
     permission_classes = [AllowAny]
@@ -1229,15 +1488,34 @@ class CreateOrderView(APIView):
         pack_id = (
             str(request.data.get('pack', '') or request.data.get('pack_id', '')).strip().lower()
         )
-        if pack_id not in CREDIT_PACKS:
+
+        # Exact-amount top-up: {"credits": N} with no valid pack. Priced at
+        # PRICE_PER_CREDIT_PAISE each. Used by the "From YouTube" flow to
+        # recharge precisely the shortfall for a given video.
+        raw_credits = request.data.get('credits')
+        if pack_id not in CREDIT_PACKS and raw_credits is not None:
+            try:
+                credits_n = int(raw_credits)
+            except (TypeError, ValueError):
+                credits_n = 0
+            if not (1 <= credits_n <= MAX_CUSTOM_CREDITS):
+                logger.warning('[payments] CreateOrder invalid credits=%r user=%s', raw_credits, request.user.id)
+                return error_response(
+                    f'Choose between 1 and {MAX_CUSTOM_CREDITS} credits',
+                    code='invalid_credits',
+                )
+            pack_id = 'custom'
+            pack = {'credits': credits_n, 'amount_paise': credits_n * PRICE_PER_CREDIT_PAISE}
+        elif pack_id not in CREDIT_PACKS:
             logger.warning('[payments] CreateOrder invalid pack=%r user=%s', pack_id, request.user.id)
             return error_response(
                 'Invalid credit pack',
                 code='invalid_pack',
                 details={'available_packs': list(CREDIT_PACKS.keys())},
             )
+        else:
+            pack = CREDIT_PACKS[pack_id]
 
-        pack = CREDIT_PACKS[pack_id]
         amount_paise = pack['amount_paise']
         receipt = f"scrib_{request.user.id}_{uuid.uuid4().hex[:10]}"
 
@@ -1992,6 +2270,61 @@ class ContactSupportView(APIView):
         except Exception as e:
             logger.error(f"Failed to send support email: {e}", exc_info=True)
             return error_response('Failed to send message. Please try again later.', status_code=500)
+
+
+class EnterpriseInquiryView(APIView):
+    authentication_classes = [JWTAuthentication]
+    # Allow any so both guests and logged-in users can reach out
+    permission_classes = [AllowAny]
+
+    # Enterprise leads go to the team inboxes, not the personal support inbox.
+    RECIPIENTS = ['easylearnova@gmail.com', 'bannydommati@gmail.com']
+
+    def post(self, request):
+        name = request.data.get('name', '').strip()
+        email = request.data.get('email', '').strip()
+        phone = request.data.get('phone', '').strip()
+        message = request.data.get('message', '').strip()
+
+        if request.user.is_authenticated:
+            if not name:
+                name = getattr(request.user, 'full_name', '') or request.user.email
+            if not email:
+                email = request.user.email
+
+        if not email:
+            return error_response('An email address is required so we can reply to you.')
+        if not message:
+            return error_response('Please tell us a bit about what you need.')
+
+        body = "New Enterprise Inquiry from Scrib\n\n"
+        body += f"Name: {name or 'Not provided'}\n"
+        body += f"Email: {email}\n"
+        body += f"Mobile: {phone or 'Not provided'}\n"
+        if request.user.is_authenticated:
+            body += f"User ID: {request.user.id}\n"
+        body += f"\nMessage:\n{message}\n"
+        html_body = body.replace("\n", "<br>")
+        subject = f"[Scrib Enterprise] {name or email}"
+
+        try:
+            from authentication.views import send_email_via_ses
+            sent_any = False
+            for recipient in self.RECIPIENTS:
+                if send_email_via_ses(
+                    to_email=recipient,
+                    subject=subject,
+                    html_content=html_body,
+                    reply_to=email or None,
+                ):
+                    sent_any = True
+
+            if sent_any:
+                return Response({'success': True, 'message': "Thanks — we've received your enterprise inquiry and will get back to you shortly."})
+            return error_response('Failed to send inquiry via SES. Please try again later.', status_code=500)
+        except Exception as e:
+            logger.error(f"Failed to send enterprise inquiry email: {e}", exc_info=True)
+            return error_response('Failed to send inquiry. Please try again later.', status_code=500)
 
 
 class MyStudyPacksView(APIView):

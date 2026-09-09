@@ -180,6 +180,26 @@ a {
   100% { left: 130%; }
 }
 
+/* Indeterminate progress bar for the "From YouTube" indicator card. */
+.yt-progress-track {
+  position: relative;
+  overflow: hidden;
+  background: #f0ece5;
+}
+.yt-progress-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, #e0342b, transparent);
+  animation: yt-progress-slide 1.4s ease-in-out infinite;
+}
+@keyframes yt-progress-slide {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
 .scrib-btn-secondary {
   background: #2f2f2f;
   color: var(--scrib-text);

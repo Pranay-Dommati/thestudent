@@ -18,6 +18,9 @@ urlpatterns = [
     path('generate-note/', views.GenerateNoteView.as_view(), name='generate-note'),
     path('generate-study-pack/', views.GenerateStudyPackView.as_view(), name='generate-study-pack'),
     path('organize-topics/', views.OrganizeTopicsView.as_view(), name='organize-topics'),
+    path('youtube/organize/', views.YouTubeOrganizeView.as_view(), name='youtube-organize'),
+    path('youtube/organize/status/<str:job_id>/', views.YouTubeOrganizeStatusView.as_view(), name='youtube-organize-status'),
+    path('youtube/organize/cancel/<str:job_id>/', views.YouTubeOrganizeCancelView.as_view(), name='youtube-organize-cancel'),
     path('parse-syllabus/', views.ParseSyllabusView.as_view(), name='parse-syllabus'),
     path('moderate-topics/', views.ModerateTopicsView.as_view(), name='moderate-topics'),
     # Payment endpoints
@@ -36,6 +39,7 @@ urlpatterns = [
     
     # Support
     path('support/', views.ContactSupportView.as_view(), name='support'),
+    path('enterprise/', views.EnterpriseInquiryView.as_view(), name='enterprise'),
 
     # Promo / Coupon codes
     path('redeem-coupon/', views.RedeemCouponView.as_view(), name='redeem-coupon'),

@@ -47,6 +47,18 @@ export async function createOrder(pack) {
 }
 
 /**
+ * Create an exact-amount credit top-up order (backend sets the amount).
+ * Used by the "From YouTube" flow to recharge precisely the shortfall.
+ *
+ * @param {number} credits - How many credits to buy (1–200)
+ * @returns {Promise<{key_id, order_id, amount, currency, credits, pack}>}
+ */
+export async function createCreditOrder(credits) {
+  const res = await axiosInstance.post('/scrib/payments/create-order/', { credits })
+  return res.data
+}
+
+/**
  * Step 2: Verify the Razorpay payment on the backend.
  * Backend performs HMAC signature verification before crediting.
  *
@@ -159,5 +171,88 @@ export async function startPaymentFlow({ pack, user, onSuccess, onFailure, onDis
     onFailure?.(msg)
   })
 
+  razorpay.open()
+}
+
+/**
+ * Exact-amount credit recharge flow (server-priced per credit):
+ *   load script → create custom order → open Razorpay → verify on success
+ *
+ * Verification reuses the standard /payments/verify/ endpoint — the backend
+ * credits exactly `credits` from the order it created.
+ *
+ * @param {object} options
+ * @param {number} options.credits - Credits to buy (the shortfall)
+ * @param {object} options.user
+ * @param {function} options.onSuccess - Called with {credit_balance, credits_added}
+ * @param {function} options.onFailure - Called with error message string
+ * @param {function} options.onDismiss - Called when the user closes the modal
+ */
+export async function startCreditRecharge({ credits, user, onSuccess, onFailure, onDismiss }) {
+  try {
+    await loadRazorpayScript()
+  } catch {
+    onFailure?.('Could not load payment gateway. Please check your internet connection.')
+    return
+  }
+
+  let orderData
+  try {
+    orderData = await createCreditOrder(credits)
+  } catch (err) {
+    const msg = err?.response?.data?.message || 'Failed to initiate payment. Please try again.'
+    onFailure?.(msg)
+    return
+  }
+
+  const options = {
+    key: orderData.key_id,
+    amount: orderData.amount,
+    currency: orderData.currency || 'INR',
+    name: 'Scrib by EasyLearnova',
+    description: `${orderData.credits} Credits (₹${orderData.amount / 100})`,
+    order_id: orderData.order_id,
+    prefill: {
+      name: user?.full_name || '',
+      email: user?.email || '',
+    },
+    notes: { pack: 'custom', credits: orderData.credits },
+    theme: { color: '#1f1f1f' },
+    handler: async function (response) {
+      try {
+        const result = await verifyPayment(response)
+        if (result.success) {
+          posthog.capture('payment_completed', {
+            pack: 'custom',
+            credits_added: result.credits_added,
+            credit_balance: result.credit_balance,
+          })
+          onSuccess?.({
+            credit_balance: result.credit_balance,
+            credits_added: result.credits_added,
+          })
+        } else {
+          onFailure?.('Payment verification failed. Please contact support.')
+        }
+      } catch (err) {
+        const msg = err?.response?.data?.message || 'Payment verification failed. Please contact support.'
+        onFailure?.(msg)
+      }
+    },
+    modal: {
+      ondismiss: function () {
+        onDismiss?.()
+      },
+    },
+  }
+
+  posthog.capture('payment_initiated', { pack: 'custom', credits: orderData.credits, amount: orderData.amount })
+
+  const razorpay = new window.Razorpay(options)
+  razorpay.on('payment.failed', function (response) {
+    const msg = response?.error?.description || 'Payment failed. Please try again.'
+    posthog.capture('payment_failed', { pack: 'custom', error: response?.error?.code })
+    onFailure?.(msg)
+  })
   razorpay.open()
 }

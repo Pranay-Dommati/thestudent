@@ -17,6 +17,7 @@ import ProfilePage from './ProfilePage.jsx'
 import TermsPage from './TermsPage.jsx'
 import PrivacyPage from './PrivacyPage.jsx'
 import SupportPage from './SupportPage.jsx'
+import EnterprisePage from './EnterprisePage.jsx'
 import TopicPage from './TopicPage.jsx'
 import NotFoundPage from './NotFoundPage.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
@@ -25,6 +26,7 @@ import PDFViewerPage from './PDFViewerPage.jsx'
 import ForgotPasswordPage from './ForgotPasswordPage.jsx'
 import ResetPasswordPage from './ResetPasswordPage.jsx'
 import GlobalGenerationIndicator from './components/GlobalGenerationIndicator.jsx'
+import YoutubeOrganizeIndicator from './components/YoutubeOrganizeIndicator.jsx'
 import ScrollToTop from './components/ScrollToTop.jsx'
 import ShareLandingPage from './ShareLandingPage.jsx'
 import InfluencerDashboardPage from './InfluencerDashboardPage.jsx'
@@ -61,6 +63,7 @@ const AppContent = (
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/support" element={<SupportPage />} />
+          <Route path="/enterprise" element={<EnterprisePage />} />
           <Route path="/view/share/:shareToken" element={<PDFViewerPage />} />
           <Route path="/view/:slug" element={<PDFViewerPage />} />
           <Route path="/view" element={<PDFViewerPage />} />
@@ -73,6 +76,7 @@ const AppContent = (
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
         <GlobalGenerationIndicator />
+        <YoutubeOrganizeIndicator />
       </BrowserRouter>
       <Toaster position="top-center">
         {(t) => (

@@ -490,6 +490,12 @@ if DEBUG:
         'DEFAULT_THROTTLE_RATES': {
             'anon': os.environ.get('DRF_THROTTLE_RATE_ANON', '120/min'),
             'user': os.environ.get('DRF_THROTTLE_RATE_USER', '240/min'),
+            # /youtube/organize/ - each call starts a paid, minutes-long job, so
+            # it is throttled far below the generic anon rate. Guests get a tight
+            # hourly + daily cap; signed-in users (identifiable, bannable) more.
+            'yt_organize_anon': os.environ.get('DRF_YT_ORGANIZE_ANON', '5/hour'),
+            'yt_organize_anon_day': os.environ.get('DRF_YT_ORGANIZE_ANON_DAY', '20/day'),
+            'yt_organize_user': os.environ.get('DRF_YT_ORGANIZE_USER', '40/hour'),
         },
     }
 else:
@@ -513,6 +519,12 @@ else:
         'DEFAULT_THROTTLE_RATES': {
             'anon': os.environ.get('DRF_THROTTLE_RATE_ANON', '60/min'),
             'user': os.environ.get('DRF_THROTTLE_RATE_USER', '120/min'),
+            # /youtube/organize/ - each call starts a paid, minutes-long job, so
+            # it is throttled far below the generic anon rate. Guests get a tight
+            # hourly + daily cap; signed-in users (identifiable, bannable) more.
+            'yt_organize_anon': os.environ.get('DRF_YT_ORGANIZE_ANON', '5/hour'),
+            'yt_organize_anon_day': os.environ.get('DRF_YT_ORGANIZE_ANON_DAY', '20/day'),
+            'yt_organize_user': os.environ.get('DRF_YT_ORGANIZE_USER', '40/hour'),
         },
     }
 
@@ -637,6 +649,25 @@ SIMPLE_JWT = {
 
 # API Keys for third-party services (MUST come from env; no hardcoded fallbacks)
 YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY', '')
+
+# ── Transcript source (scrib "From YouTube" flow) ────────────────────────────
+# YouTube hard rate-limits transcript scraping by IP: a home IP was blocked
+# after ~12 fetches, so a datacenter IP is blocked essentially at once. So the
+# primary source is Supadata, a managed transcript API (free tier: 100/month).
+# All of these are optional - with nothing set, transcript fetching is attempted
+# directly (fine for local dev) and any refusal just routes the job to the
+# first-party Gemini video path, which is never blocked.
+SUPADATA_API_KEY = os.environ.get('SUPADATA_API_KEY', '')
+SUPADATA_API_URL = os.environ.get('SUPADATA_API_URL', 'https://api.supadata.ai/v1')
+
+# Proxy fallback for the direct youtube-transcript-api path (only used when
+# SUPADATA_API_KEY is unset). WEBSHARE_* expects a *Rotating Residential* plan;
+# their "Proxy Server" / "Static Residential" products are datacenter-class and
+# get blocked the same way. TRANSCRIPT_PROXY_URL is a generic escape hatch,
+# e.g. http://user:pass@host:port
+WEBSHARE_PROXY_USERNAME = os.environ.get('WEBSHARE_PROXY_USERNAME', '')
+WEBSHARE_PROXY_PASSWORD = os.environ.get('WEBSHARE_PROXY_PASSWORD', '')
+TRANSCRIPT_PROXY_URL = os.environ.get('TRANSCRIPT_PROXY_URL', '')
 
 # Gemini API key for AI services (from env only)
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')

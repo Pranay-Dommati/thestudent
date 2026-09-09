@@ -29,6 +29,8 @@ import FibonacciVisualizer from './FibonacciVisualizer';
 import FactorialVisualizer from './FactorialVisualizer';
 import SubsetsVisualizer from './SubsetsVisualizer';
 import ValidParenthesesVisualizer from './ValidParenthesesVisualizer';
+import ProblemPlayer from '../../dsa-viz/ProblemPlayer';
+import { DSA_VIZ_SLUGS } from '../../dsa-viz/problems';
 
 // ============ MAIN DSA IMMERSIVE VISUALIZER ============
 const DSAImmersiveVisualizer = ({
@@ -444,7 +446,17 @@ const DSAImmersiveVisualizer = ({
             <div className="flex-1 flex overflow-hidden">
                 {/* Visualization Area */}
                 <div className="flex-1 min-w-0">
-                    {algorithmType === 'quick-sort' ? (
+                    {DSA_VIZ_SLUGS.has(algorithmType) ? (
+                        <ProblemPlayer
+                            slug={algorithmType}
+                            customArray={customArray}
+                            code={code}
+                            onProgress={setProgress}
+                            seekRef={synthSeekRef}
+                            drawerState={drawerState}
+                            setDrawerState={setDrawerState}
+                        />
+                    ) : algorithmType === 'quick-sort' ? (
                         activeTab === 'combined' ? (
                             <QuickSortSyncedVisualizer customArray={customArray} code={code} onProgress={setProgress} seekRef={synthSeekRef} drawerState={drawerState} setDrawerState={setDrawerState} />
                         ) : (

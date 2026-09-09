@@ -41,3 +41,8 @@ redis>=5.0.0
 
 # Memory monitoring (used in scrib pdf_generation to log RSS per batch)
 psutil>=5.9.0
+
+# YouTube transcript fetching for the "From YouTube" flow (transcript-first path).
+# Scrapes YouTube's timedtext endpoint - no API key, but datacenter IPs are
+# often blocked, which is why the video pipeline remains the fallback.
+youtube-transcript-api>=1.2.4

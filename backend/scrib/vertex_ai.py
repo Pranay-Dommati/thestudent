@@ -50,7 +50,11 @@ def _setup_credentials():
 
 
 def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=65535,
-                          file_bytes=None, file_mime_type=None):
+                          file_bytes=None, file_mime_type=None, youtube_url=None,
+                          youtube_fps=0.5, youtube_media_resolution='MEDIA_RESOLUTION_MEDIUM',
+                          youtube_start_offset_s=None, youtube_end_offset_s=None,
+                          model=None, temperature=None, response_schema=None,
+                          request_timeout_s=540):
     """Call Vertex AI Gemini and return the response text.
 
     Parameters
@@ -70,30 +74,88 @@ def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=6
         also be provided.
     file_mime_type : str | None
         MIME type of ``file_bytes`` (e.g. ``'application/pdf'``).
+    youtube_url : str | None
+        A canonical public YouTube URL. When set, Gemini watches the video
+        alongside the prompt. Media resolution is forced low so longer videos
+        stay within the token budget. Mutually exclusive with ``file_bytes``.
+    youtube_fps : float
+        Frames per second to sample from the video (default 0.5 = one frame
+        every two seconds). Lower = fewer tokens and a faster response.
+    youtube_media_resolution : str
+        ``MEDIA_RESOLUTION_LOW`` / ``_MEDIUM`` / ``_HIGH``. Medium keeps
+        on-screen code and diagrams readable; callers drop to low for long
+        videos to stay within the context window.
+    youtube_start_offset_s, youtube_end_offset_s : int | None
+        Clip the video to this window (seconds). Used to re-watch only the tail
+        of a video when a first pass stopped short, instead of paying for the
+        whole thing again.
+    model : str | None
+        Override the default model for this call (e.g. a stronger model for
+        video comprehension). Defaults to ``MODEL_NAME``.
+    temperature : float | None
+        Sampling temperature. The API default is tuned for creative writing; a
+        low value (0.1-0.3) is what you want for extraction/classification, both
+        for instruction-following and to stop the same input producing wildly
+        different output run to run.
+    response_schema : dict | None
+        A JSON schema the response must conform to. Uses constrained decoding,
+        so the reply is structurally valid JSON by construction — no missing
+        fields and no stray escape sequences to repair. Requires
+        ``response_mime_type='application/json'``.
+    request_timeout_s : int
+        Client-side timeout for the API call. Video understanding is slow, so
+        this defaults high (9 min); callers running synchronously should keep
+        it well under any upstream proxy/gunicorn timeout.
     """
     _setup_credentials()
 
+    model_name = model or MODEL_NAME
     logger.info("[SCRIB AI] *** USING GOOGLE VERTEX AI ***")
-    logger.info(f"[SCRIB AI] Model: {MODEL_NAME}")
+    logger.info(f"[SCRIB AI] Model: {model_name}")
     logger.info(f"[SCRIB AI] Project: easylearnova | Location: {LOCATION}")
 
+    from google.genai import types as genai_types
+
+    http_options = genai_types.HttpOptions(timeout=int(request_timeout_s * 1000))
     client = genai.Client(
         vertexai=True,
         project="easylearnova",
         location=LOCATION,
+        http_options=http_options,
     )
 
     # Build generation config — always include max_output_tokens to avoid
     # silent truncation at the default limit.
-    from google.genai import types as genai_types
-
     gen_config = genai_types.GenerateContentConfig(
         max_output_tokens=max_output_tokens,
     )
     if response_mime_type:
         gen_config.response_mime_type = response_mime_type
+    if temperature is not None:
+        gen_config.temperature = temperature
+    if response_schema is not None:
+        gen_config.response_schema = response_schema
 
-    if file_bytes:
+    if youtube_url:
+        # Resolution + sample rate are chosen by the caller from the video's
+        # length: medium resolution so on-screen code/diagrams stay legible,
+        # dropped to low only for long videos that would otherwise near the
+        # context limit.
+        # Pass the enum, not the bare string — pydantic warns on every call otherwise.
+        gen_config.media_resolution = genai_types.MediaResolution(youtube_media_resolution)
+        video_metadata = genai_types.VideoMetadata(fps=youtube_fps)
+        if youtube_start_offset_s is not None:
+            video_metadata.start_offset = f'{int(youtube_start_offset_s)}s'
+        if youtube_end_offset_s is not None:
+            video_metadata.end_offset = f'{int(youtube_end_offset_s)}s'
+        contents = [
+            genai_types.Part(
+                file_data=genai_types.FileData(file_uri=youtube_url, mime_type='video/*'),
+                video_metadata=video_metadata,
+            ),
+            prompt,
+        ]
+    elif file_bytes:
         contents = [
             genai_types.Part.from_bytes(data=file_bytes, mime_type=file_mime_type),
             prompt,
@@ -102,11 +164,11 @@ def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=6
         contents = prompt
 
     response = client.models.generate_content(
-        model=MODEL_NAME,
+        model=model_name,
         contents=contents,
         config=gen_config,
     )
 
-    logger.info(f"[SCRIB AI] SUCCESS - Response received from Vertex AI ({MODEL_NAME}). No fallback used.")
+    logger.info(f"[SCRIB AI] SUCCESS - Response received from Vertex AI ({model_name}). No fallback used.")
     return response.text
 

@@ -52,10 +52,16 @@ const pricingTiers = [
 
 const topicChips = ['Cloud Computing', 'Photosynthesis', "Ohm's Law", 'Recursion', 'French Revolution']
 
+// watch / youtu.be / shorts / live / embed, with or without scheme or www.
+const YOUTUBE_URL_PATTERN =
+  /^(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?[^\s]*v=|shorts\/|live\/|embed\/)|youtu\.be\/)[\w-]{11}/i
+
 
 const App = () => {
   const { user, refreshUser, logout, isLoggedIn, loading } = useAuth()
   const [topicInput, setTopicInput] = useState('')
+  const [youtubeInput, setYoutubeInput] = useState('')
+  const [youtubeError, setYoutubeError] = useState('')
   const [showBuyModal, setShowBuyModal] = useState(false)
   const [processingPack, setProcessingPack] = useState(null)
   const [packStrip, setPackStrip] = useState([])
@@ -145,6 +151,23 @@ const App = () => {
       isMounted = false
     }
   }, [])
+
+  // Checked here only so an obvious typo doesn't cost the user a page load -
+  // /generate and the backend both re-validate and own the real errors.
+  const submitYoutube = (event) => {
+    event.preventDefault()
+    const url = youtubeInput.trim()
+    if (!url) {
+      setYoutubeError('Paste a YouTube video link first.')
+      return
+    }
+    if (!YOUTUBE_URL_PATTERN.test(url)) {
+      setYoutubeError("That doesn't look like a YouTube link.")
+      return
+    }
+    setYoutubeError('')
+    navigate(`/generate?yt=${encodeURIComponent(url)}`)
+  }
 
   return (
     <div className="min-h-screen bg-[#fcf9f4] text-[#1f1f1f] font-sans overflow-x-hidden selection:bg-[#d9d1c7] selection:text-[#1f1f1f]">
@@ -257,7 +280,52 @@ const App = () => {
               Interview notes, free previews, or generate custom <br className="hidden sm:block" />
               handwritten notes for any topic
             </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-2">
+
+            {/* Paste a YouTube lecture -> hands the link to /generate's YouTube tab. */}
+            <form onSubmit={submitYoutube} className="relative mx-auto mt-7 max-w-lg">
+              <span className="pointer-events-none absolute -left-1.5 -top-3.5 z-10 -rotate-[9deg] select-none">
+                <span className="relative inline-block rounded-md bg-[#fde3e3] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#e0342b] shadow-sm ring-1 ring-[#f5c1c1]">
+                  New
+                  <svg className="absolute -right-2 -top-2 h-3.5 w-3.5 text-[#e0342b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                    <path d="M12 3v3M18.4 5.6l-2.1 2.1M21 12h-3" />
+                  </svg>
+                </span>
+              </span>
+              <div
+                className={`flex items-center rounded-full border bg-white py-1 pl-3.5 pr-1 shadow-sm transition-colors ${
+                  youtubeError ? 'border-[#e0a3a3]' : 'border-[#ded6cc] focus-within:border-[#1f1f1f]'
+                }`}
+              >
+                <svg className="shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="#e0342b" aria-hidden="true">
+                  <path d="M23 12s0-3.5-.5-5.2a3 3 0 0 0-2.1-2.1C18.7 4 12 4 12 4s-6.7 0-8.4.5a3 3 0 0 0-2.1 2.1C1 8.5 1 12 1 12s0 3.5.5 5.2a3 3 0 0 0 2.1 2.1C5.3 20 12 20 12 20s6.7 0 8.4-.5a3 3 0 0 0 2.1-2.1C23 15.5 23 12 23 12ZM10 15V9l5 3-5 3Z" />
+                </svg>
+                <input
+                  type="text"
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck="false"
+                  aria-label="YouTube video link"
+                  className="w-full min-w-0 bg-transparent px-2.5 py-1.5 text-sm outline-none placeholder:text-[#a8a29a]"
+                  placeholder="Paste a YouTube lecture link"
+                  value={youtubeInput}
+                  onChange={(event) => {
+                    setYoutubeInput(event.target.value)
+                    if (youtubeError) setYoutubeError('')
+                  }}
+                />
+                <button
+                  type="submit"
+                  className="shrink-0 rounded-full border border-[#1f1f1f] bg-transparent px-4 py-1.5 text-xs font-semibold text-[#1f1f1f] transition-colors hover:bg-[#1f1f1f] hover:text-white"
+                >
+                  Organise
+                </button>
+              </div>
+              {youtubeError ? (
+                <p className="mt-2 text-xs font-medium text-[#c0392b]">{youtubeError}</p>
+              ) : null}
+            </form>
+
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
               <Link
                 to="/library"
                 className="rounded-full border border-[#d9d1c7] bg-white px-4 py-2 text-xs font-semibold text-[#1f1f1f] hover:bg-[#faf8f3] transition-colors"
@@ -266,7 +334,7 @@ const App = () => {
               </Link>
               <button
                 onClick={() => navigate('/generate')}
-                className="rounded-full btn-shine-effect px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity"
+                className="btn-shine-effect rounded-full bg-[#1f1f1f] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition-opacity"
               >
                 Generate custom notes
               </button>
@@ -413,7 +481,7 @@ const App = () => {
             <div className="md:hidden rounded-[24px] border border-[#e2dbd2] bg-white p-5 shadow-sm">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a847c]">Pricing</p>
               <h2 className="mt-1 text-2xl font-semibold text-[#1f1f1f]">Credit packs</h2>
-              <p className="mt-1 text-sm text-[#5f5a54]">Pay only for what you generate. Credits never expire. Built to remain affordable while supporting AI generation and cloud processing.</p>
+              <p className="mt-1 text-sm text-[#5f5a54]">Pay only for what you generate. Credits never expire.</p>
               
               <div className="mt-8 flex flex-col gap-4">
                 {pricingTiers.map((tier) => (
@@ -481,7 +549,7 @@ const App = () => {
             {/* --- Desktop View (Original Grid Cards) --- */}
             <div className="hidden md:block">
               <p className="text-sm font-semibold">Credit packs</p>
-              <p className="text-sm text-[#7b756d]">Pay only for what you generate. Credits never expire. Built to remain affordable while supporting AI generation and cloud processing.</p>
+              <p className="text-sm text-[#7b756d]">Pay only for what you generate. Credits never expire.</p>
               <div className="mt-6 grid gap-4 md:grid-cols-4">
                 {pricingTiers.map((tier) => (
                   <div
@@ -543,6 +611,22 @@ const App = () => {
               </div>
             </div>
 
+            {/* Enterprise — bulk / whole-batch needs are handled over email, not checkout */}
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-[#1f1f1f] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[#1f1f1f]">Need notes at scale?</p>
+                <p className="mt-0.5 text-xs text-[#7b756d]">
+                  Bulk credits, flexible invoicing, and dedicated support for your institution or organization.
+                </p>
+              </div>
+              <Link
+                to="/enterprise"
+                className="flex-shrink-0 rounded-full border border-[#1f1f1f] bg-white px-4 py-2 text-xs font-semibold text-[#1f1f1f] transition-colors hover:bg-[#1f1f1f] hover:text-white whitespace-nowrap"
+              >
+                Contact us →
+              </Link>
+            </div>
+
           </div>
         </section>
       </main>
@@ -553,6 +637,7 @@ const App = () => {
           <p>&copy; {new Date().getFullYear()} EasyLearnova. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <Link to="/support" className="hover:text-[#1f1f1f] transition-colors">Support</Link>
+            <Link to="/enterprise" className="hover:text-[#1f1f1f] transition-colors">Enterprise</Link>
             <Link to="/terms" className="hover:text-[#1f1f1f] transition-colors">Terms</Link>
             <Link to="/privacy" className="hover:text-[#1f1f1f] transition-colors">Privacy</Link>
           </div>

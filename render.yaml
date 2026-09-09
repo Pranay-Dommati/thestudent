@@ -247,6 +247,19 @@ services:
         value: INFO
       - key: GOOGLE_SERVICE_ACCOUNT_JSON
         sync: false
+      # scrib "From YouTube" flow — fetch_transcript() runs on this worker.
+      # preflight() on the web service needs YOUTUBE_API_KEY too (already set there).
+      - key: YOUTUBE_API_KEY
+        sync: false
+      # Transcript source. Set SUPADATA_API_KEY (managed API) OR the WEBSHARE_*
+      # pair (youtube-transcript-api + rotating-residential proxy). Neither set =
+      # every video takes the first-party Gemini video path.
+      - key: SUPADATA_API_KEY
+        sync: false
+      - key: WEBSHARE_PROXY_USERNAME
+        sync: false
+      - key: WEBSHARE_PROXY_PASSWORD
+        sync: false
       - key: SCRIB_S3_ACCESS_KEY_ID
         sync: false
       - key: SCRIB_S3_SECRET_ACCESS_KEY
