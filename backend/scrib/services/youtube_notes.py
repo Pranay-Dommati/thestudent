@@ -978,6 +978,11 @@ def fetch_transcript(video_id):
     except Exception:
         cached = None
     if cached == _TRANSCRIPT_MISS:
+        # Silent otherwise - this looked exactly like "transcript step never ran" in
+        # production logs after a config fix, because nothing logged the skip.
+        logger.info('[scrib-yt] transcript cache: negative for %s (cached failure from '
+                    'the last %d min - skipping fetch, going straight to video path)',
+                    video_id, TRANSCRIPT_NEG_CACHE_TTL_S // 60)
         return None
     if cached:
         text, lang, gen = cached
