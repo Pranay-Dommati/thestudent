@@ -837,15 +837,18 @@ def _transcript_client():
     user = getattr(settings, 'WEBSHARE_PROXY_USERNAME', '')
     password = getattr(settings, 'WEBSHARE_PROXY_PASSWORD', '')
     if user and password:
+        logger.info('[scrib-yt] transcript client: Webshare proxy (user set, %d chars)', len(user))
         return YouTubeTranscriptApi(proxy_config=WebshareProxyConfig(
             proxy_username=user, proxy_password=password,
             retries_when_blocked=TRANSCRIPT_RETRIES_WHEN_BLOCKED))
 
     generic = getattr(settings, 'TRANSCRIPT_PROXY_URL', '')
     if generic:
+        logger.info('[scrib-yt] transcript client: generic proxy')
         return YouTubeTranscriptApi(proxy_config=GenericProxyConfig(
             http_url=generic, https_url=generic))
 
+    logger.info('[scrib-yt] transcript client: no proxy configured - direct IP, likely to be blocked')
     return YouTubeTranscriptApi()
 
 
@@ -935,8 +938,12 @@ def _fetch_transcript_direct(video_id):
             return None
         return text, track.language_code, track.is_generated
     except Exception as exc:
+        # 120 chars used to cut this off before the actual cause line (RequestBlocked's
+        # message is mostly boilerplate preamble) - 400 is enough to see whether it says
+        # "IP belonging to a cloud provider" (no proxy applied) vs "despite you using
+        # Webshare proxies" (proxy applied, still blocked - a different problem).
         logger.info('[scrib-yt] no transcript for %s (%s: %s)',
-                    video_id, type(exc).__name__, str(exc)[:120])
+                    video_id, type(exc).__name__, str(exc).replace('\n', ' ')[:400])
         return None
 
 
