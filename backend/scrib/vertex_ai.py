@@ -1,6 +1,8 @@
 import os
 import json
+import random
 import tempfile
+import time
 import logging
 from google import genai
 from django.conf import settings
@@ -10,6 +12,37 @@ MODEL_NAME = "gemini-3.1-flash-lite"
 # gemini-3.1-flash-lite (Preview) is only served from the "global" Vertex AI
 # endpoint, not regional ones like us-central1 — confirmed via direct test.
 LOCATION = "global"
+
+# Vertex failures that are worth retrying rather than surfacing. A 429 here is
+# almost never a hard quota wall — it is momentary capacity pressure that clears
+# within seconds, and a rejected request costs nothing, so retrying is free.
+RETRYABLE_STATUS = frozenset({429, 500, 503, 504})
+RETRY_BASE_DELAY_S = 2.0
+RETRY_MAX_DELAY_S = 20.0
+
+
+class VertexRateLimited(Exception):
+    """Vertex stayed busy across every retry.
+
+    Distinct from a generic failure because the right response is "ask the user
+    to try again in a moment", never "fall back to something more expensive" —
+    a heavier retry would be drawing on the very quota that just refused us.
+    """
+
+
+def _is_retryable(exc):
+    code = getattr(exc, 'code', None)
+    if code in RETRYABLE_STATUS:
+        return True
+    text = str(exc)
+    return any(marker in text for marker in
+               ('RESOURCE_EXHAUSTED', 'UNAVAILABLE', 'DEADLINE_EXCEEDED', 'INTERNAL'))
+
+
+def _retry_delay(attempt):
+    """Exponential backoff with jitter, so parallel workers don't resynchronise."""
+    delay = min(RETRY_BASE_DELAY_S * (2 ** attempt), RETRY_MAX_DELAY_S)
+    return delay + random.uniform(0, delay * 0.25)
 
 def _setup_credentials():
     """
@@ -54,7 +87,7 @@ def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=6
                           youtube_fps=0.5, youtube_media_resolution='MEDIA_RESOLUTION_MEDIUM',
                           youtube_start_offset_s=None, youtube_end_offset_s=None,
                           model=None, temperature=None, response_schema=None,
-                          request_timeout_s=540):
+                          request_timeout_s=540, max_attempts=3, on_retry=None):
     """Call Vertex AI Gemini and return the response text.
 
     Parameters
@@ -106,6 +139,14 @@ def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=6
         Client-side timeout for the API call. Video understanding is slow, so
         this defaults high (9 min); callers running synchronously should keep
         it well under any upstream proxy/gunicorn timeout.
+    max_attempts : int
+        Total tries for transient Vertex failures (429/5xx), with exponential
+        backoff between them. A rejected request is never billed, so retrying
+        costs only latency. Raises ``VertexRateLimited`` once they're used up.
+    on_retry : callable | None
+        ``on_retry(attempt, delay_seconds)``, called before each backoff so a
+        caller can tell the user it's waiting rather than appearing to hang.
+        Exceptions raised here are swallowed.
     """
     _setup_credentials()
 
@@ -163,12 +204,34 @@ def call_scrib_vertex_ai(prompt, *, response_mime_type=None, max_output_tokens=6
     else:
         contents = prompt
 
-    response = client.models.generate_content(
-        model=model_name,
-        contents=contents,
-        config=gen_config,
-    )
+    last_exc = None
+    for attempt in range(max_attempts):
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=gen_config,
+            )
+            logger.info(f"[SCRIB AI] SUCCESS - Response received from Vertex AI ({model_name}). No fallback used.")
+            return response.text
+        except Exception as exc:
+            last_exc = exc
+            if not _is_retryable(exc):
+                raise
+            if attempt == max_attempts - 1:
+                break
+            delay = _retry_delay(attempt)
+            logger.warning('[SCRIB AI] %s busy (%s) - retry %d/%d in %.1fs',
+                           model_name, getattr(exc, 'code', '?'),
+                           attempt + 1, max_attempts - 1, delay)
+            if on_retry:
+                try:
+                    on_retry(attempt + 1, delay)
+                except Exception:
+                    pass    # progress reporting must never break the call
+            time.sleep(delay)
 
-    logger.info(f"[SCRIB AI] SUCCESS - Response received from Vertex AI ({model_name}). No fallback used.")
-    return response.text
+    logger.error('[SCRIB AI] %s still busy after %d attempts: %s',
+                 model_name, max_attempts, last_exc)
+    raise VertexRateLimited(str(last_exc)) from last_exc
 

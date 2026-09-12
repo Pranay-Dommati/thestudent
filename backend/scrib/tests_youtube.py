@@ -21,6 +21,8 @@ from rest_framework.test import APIClient
 
 # pyrefly: ignore [missing-import]
 from .services import youtube_notes as yt
+# pyrefly: ignore [missing-import]
+from .vertex_ai import VertexRateLimited
 
 User = get_user_model()
 
@@ -619,6 +621,128 @@ class HybridRouterTests(CacheTestCase):
         mock_fetch.return_value = (_transcript(3000), 'en', True)
         mock_video.return_value = {'source': 'video', 'total_pages': 5}
         self.assertEqual(yt.organize(CANONICAL, 'T', 20 * 60)['source'], 'video')
+
+
+class RateLimitResilienceTests(CacheTestCase):
+    """A busy Vertex must never push a usable transcript onto the video path.
+
+    Regression: a single 429 on the transcript organise call sent the job to the
+    video path, which needs ~40x the tokens from the same exhausted per-minute
+    quota - so the fallback fed the very exhaustion that caused it, and the next
+    request was rate-limited too. Retry instead, and if capacity never comes
+    back, ask the user to retry rather than spending 500k tokens on a hiccup.
+    """
+
+    @patch('scrib.services.youtube_notes.organize_from_video')
+    @patch('scrib.services.youtube_notes.call_scrib_vertex_ai')
+    @patch('scrib.services.youtube_notes.fetch_transcript')
+    def test_persistent_rate_limit_does_not_touch_the_video_path(
+            self, mock_fetch, mock_ai, mock_video):
+        mock_fetch.return_value = (_transcript(3000), 'en', True)
+        mock_ai.side_effect = VertexRateLimited('429 RESOURCE_EXHAUSTED')
+
+        with self.assertRaises(yt.VideoUnreadable) as cm:
+            yt.organize(CANONICAL, 'T', 20 * 60)
+
+        self.assertEqual(cm.exception.code, 'ai_busy')
+        self.assertEqual(cm.exception.status_code, 503)
+        mock_video.assert_not_called()
+
+    @patch('scrib.services.youtube_notes.organize_from_video')
+    @patch('scrib.services.youtube_notes.call_scrib_vertex_ai')
+    @patch('scrib.services.youtube_notes.fetch_transcript')
+    def test_busy_message_tells_the_user_to_retry(self, mock_fetch, mock_ai, mock_video):
+        mock_fetch.return_value = (_transcript(3000), 'en', True)
+        mock_ai.side_effect = VertexRateLimited('429')
+        with self.assertRaises(yt.VideoUnreadable) as cm:
+            yt.organize(CANONICAL, 'T', 20 * 60)
+        self.assertIn('busy', cm.exception.message.lower())
+
+    @patch('scrib.services.youtube_notes.organize_from_video')
+    @patch('scrib.services.youtube_notes.call_scrib_vertex_ai')
+    @patch('scrib.services.youtube_notes.fetch_transcript')
+    def test_a_real_failure_still_falls_back_to_video(self, mock_fetch, mock_ai, mock_video):
+        """Only capacity is special-cased - genuine breakage keeps the safety net."""
+        mock_fetch.return_value = (_transcript(3000), 'en', True)
+        mock_ai.side_effect = RuntimeError('malformed everything')
+        mock_video.return_value = {'source': 'video', 'total_pages': 5}
+        self.assertEqual(yt.organize(CANONICAL, 'T', 20 * 60)['source'], 'video')
+        mock_video.assert_called_once()
+
+    def test_transcript_call_asks_for_a_deeper_retry_budget(self):
+        """The cheap path must retry harder than the Vertex default."""
+        import inspect
+        from scrib.vertex_ai import call_scrib_vertex_ai as real
+        default = inspect.signature(real).parameters['max_attempts'].default
+        self.assertGreater(yt.TRANSCRIPT_MAX_ATTEMPTS, default)
+
+
+class VertexRetryTests(TestCase):
+    """The retry layer itself: what counts as transient, and what it costs."""
+
+    def _api_error(self, code):
+        exc = Exception(str(code) + ' error')
+        exc.code = code
+        return exc
+
+    def test_rate_limits_and_server_blips_are_retryable(self):
+        from scrib.vertex_ai import _is_retryable
+        for code in (429, 500, 503, 504):
+            self.assertTrue(_is_retryable(self._api_error(code)), code)
+
+    def test_client_errors_are_not_retryable(self):
+        from scrib.vertex_ai import _is_retryable
+        for code in (400, 401, 403, 404):
+            self.assertFalse(_is_retryable(self._api_error(code)), code)
+
+    def test_status_strings_are_recognised_without_a_code(self):
+        from scrib.vertex_ai import _is_retryable
+        self.assertTrue(_is_retryable(Exception('RESOURCE_EXHAUSTED. quota')))
+        self.assertFalse(_is_retryable(Exception('INVALID_ARGUMENT')))
+
+    def test_backoff_grows_and_stays_bounded(self):
+        from scrib.vertex_ai import _retry_delay, RETRY_MAX_DELAY_S
+        delays = [_retry_delay(i) for i in range(6)]
+        self.assertLess(delays[0], delays[3])
+        for d in delays:
+            self.assertLessEqual(d, RETRY_MAX_DELAY_S * 1.25 + 0.01)
+
+    @patch('scrib.vertex_ai.time.sleep')          # no real waiting in tests
+    @patch('scrib.vertex_ai.genai.Client')
+    @patch('scrib.vertex_ai._setup_credentials')
+    def test_retries_then_succeeds(self, _creds, mock_client, mock_sleep):
+        from scrib.vertex_ai import call_scrib_vertex_ai
+        ok = type('R', (), {'text': '{"topics": []}'})()
+        busy = self._api_error(429)
+        mock_client.return_value.models.generate_content.side_effect = [busy, busy, ok]
+
+        seen = []
+        out = call_scrib_vertex_ai('p', max_attempts=3, on_retry=lambda a, d: seen.append(a))
+
+        self.assertEqual(out, '{"topics": []}')
+        self.assertEqual(len(seen), 2)            # reported both waits to the caller
+        self.assertEqual(mock_sleep.call_count, 2)
+
+    @patch('scrib.vertex_ai.time.sleep')
+    @patch('scrib.vertex_ai.genai.Client')
+    @patch('scrib.vertex_ai._setup_credentials')
+    def test_exhausted_retries_raise_rate_limited(self, _creds, mock_client, mock_sleep):
+        from scrib.vertex_ai import call_scrib_vertex_ai
+        mock_client.return_value.models.generate_content.side_effect = self._api_error(429)
+        with self.assertRaises(VertexRateLimited):
+            call_scrib_vertex_ai('p', max_attempts=3)
+        self.assertEqual(mock_client.return_value.models.generate_content.call_count, 3)
+
+    @patch('scrib.vertex_ai.time.sleep')
+    @patch('scrib.vertex_ai.genai.Client')
+    @patch('scrib.vertex_ai._setup_credentials')
+    def test_non_retryable_raises_immediately(self, _creds, mock_client, mock_sleep):
+        from scrib.vertex_ai import call_scrib_vertex_ai
+        mock_client.return_value.models.generate_content.side_effect = self._api_error(400)
+        with self.assertRaises(Exception):
+            call_scrib_vertex_ai('p', max_attempts=5)
+        self.assertEqual(mock_client.return_value.models.generate_content.call_count, 1)
+        mock_sleep.assert_not_called()
 
 
 class _NoTranscriptMixin:

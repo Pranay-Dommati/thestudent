@@ -33,7 +33,7 @@ from urllib.parse import urlparse, parse_qs
 from django.conf import settings
 
 # pyrefly: ignore [missing-import]
-from ..vertex_ai import call_scrib_vertex_ai
+from ..vertex_ai import call_scrib_vertex_ai, VertexRateLimited
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +85,10 @@ MIN_TRANSCRIPT_WPM = 60
 # video burn 5 minutes / ~30 MB grinding through the default 10 retries. Cap it
 # low: 3 blocked IPs in a row = give up to the (unblocked) video path.
 TRANSCRIPT_RETRIES_WHEN_BLOCKED = 3
+# The transcript organise call is one cheap request whose failure sends us to a
+# path costing ~40x the tokens, so it gets a deeper retry budget than the
+# Vertex default. ~2+4+8+16s of backoff, well inside the job's own budget.
+TRANSCRIPT_MAX_ATTEMPTS = 5
 # Hard wall-clock ceiling for a single fetch. Bounds worker-slot occupancy no
 # matter how the proxy / library misbehaves; on timeout we fall back to video.
 TRANSCRIPT_HARD_TIMEOUT_S = 90
@@ -1079,7 +1083,7 @@ def _build_transcript_prompt(text, target_topics, video_title, duration_seconds)
     )
 
 
-def organize_from_transcript(text, meta_title='', duration_seconds=0):
+def organize_from_transcript(text, meta_title='', duration_seconds=0, progress=None):
     """Turn a transcript into topics in a single text-only call. The cheap path.
 
     ~10k tokens for an hour of video against ~500k for the video itself, and the
@@ -1089,12 +1093,20 @@ def organize_from_transcript(text, meta_title='', duration_seconds=0):
     Raises ``VideoUnreadable`` when the transcript turns out to be unusable, so
     the caller can fall back to the video path.
     """
+    report = _safe_progress(progress)
     target = target_topic_count(duration_seconds or len(text.split()) / 2.5)
     prompt = _build_transcript_prompt(text, target, meta_title, duration_seconds)
+
+    def _busy(attempt, delay):
+        report('transcript', 'Our AI is busy - retrying in a moment…')
+
     raw = call_scrib_vertex_ai(
         prompt, response_mime_type='application/json',
         response_schema=TRANSCRIPT_SCHEMA, temperature=EXPAND_TEMPERATURE,
         model=EXPAND_MODEL, request_timeout_s=240,
+        # This is the path we want to win: it is one cheap call, and giving up
+        # sends us to a path costing ~40x the tokens. Retry harder than default.
+        max_attempts=TRANSCRIPT_MAX_ATTEMPTS, on_retry=_busy,
     )
     parsed = _loads_json(raw, 'transcript topics', salvage_key='topics')
 
@@ -1140,11 +1152,27 @@ def organize(url, meta_title='', duration_seconds=0, progress=None):
             logger.info('[scrib-yt] transcript path: %s, %d chars, lang=%s, auto=%s',
                         video_id, len(text), language, is_generated)
             try:
-                result = organize_from_transcript(text, meta_title, duration_seconds)
+                result = organize_from_transcript(
+                    text, meta_title, duration_seconds, progress=progress)
                 logger.info('[scrib-yt] transcript path produced %d pages', result['total_pages'])
                 return result
             except VideoUnreadable as exc:
                 logger.info('[scrib-yt] transcript unusable (%s) - falling back to video', exc.message)
+            except VertexRateLimited as exc:
+                # Deliberately NOT falling back to video. The video path needs
+                # ~40x the tokens of the call that was just refused, drawn from
+                # the same per-minute quota - it would deepen the exhaustion that
+                # caused this, and the next transcript request would 429 too.
+                # We have a usable transcript; the only missing piece is capacity.
+                logger.warning('[scrib-yt] vertex still busy after retries for %s - '
+                               'asking the user to retry rather than burning the video path (%s)',
+                               video_id, exc)
+                raise VideoUnreadable(
+                    "Our AI is busy right now. Give it a few seconds and hit "
+                    "Organize again - your transcript is already fetched, so the "
+                    "retry will be quick.",
+                    code='ai_busy', status_code=503,
+                )
             except Exception as exc:
                 logger.warning('[scrib-yt] transcript path failed (%s) - falling back to video', exc)
 
